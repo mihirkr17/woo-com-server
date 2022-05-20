@@ -39,6 +39,12 @@ async function run() {
       });
 
 
+      // inserting user
+      app.put('/user', async(req, res) => {
+         const uid = req.query.uid;
+      });
+
+
 
    } finally {
 
