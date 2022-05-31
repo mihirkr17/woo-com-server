@@ -172,9 +172,11 @@ async function run() {
         } else {
           newProduct = [body];
         }
+      } else {
+        newProduct = [body];
       }
-      
-      newProduct = [body];
+
+    
 
       const up = {
         $set: { product: newProduct },

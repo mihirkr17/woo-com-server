@@ -153,7 +153,9 @@ function run() {
                         newProduct = [body];
                     }
                 }
-                newProduct = [body];
+                else {
+                    newProduct = [body];
+                }
                 const up = {
                     $set: { product: newProduct },
                 };
