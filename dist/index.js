@@ -81,46 +81,36 @@ function run() {
                 const cartRes = yield cartCollection.findOne({ user_email: userEmail });
                 res.send(cartRes);
             }));
-            /* fetch one single product to purchase page when user click to buy now button and this product also add to my-cart page*/
+            /* fetch one single product to purchase page when user click to buy now button
+            and this product also add to my-cart page*/
             app.get("/my-cart-item/:pId/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const pId = req.params.pId;
-                const userEmail = req.params.userEmail;
-                const cartRes = yield cartCollection.findOne({
-                    product: { $elemMatch: { _id: pId } },
+                const email = req.params.userEmail;
+                const existsProduct = yield cartCollection.findOne({
+                    user_email: email,
                 });
-                if ((cartRes === null || cartRes === void 0 ? void 0 : cartRes._id) === pId) {
-                    res.send(cartRes);
+                if (existsProduct) {
+                    const product = existsProduct === null || existsProduct === void 0 ? void 0 : existsProduct.product;
+                    const findP = product.find((p) => p._id === pId);
+                    res.send(findP);
                 }
             }));
-            // update product quantity and total price in cart
-            // app.put(
-            //   "/up-cart-qty-ttl-price/:pId",
-            //   async (req: Request, res: Response) => {
-            //     const pId = req.params.pId;
-            //     const { quantity, total_price } = req.body;
-            //     const fill = { _id: ObjectId(pId) };
-            //     const result = await cartCollection.updateOne(
-            //       fill,
-            //       { $set: { quantity: quantity, total_price: total_price } },
-            //       { upsert: true }
-            //     );
-            //     res.send(result);
-            //   }
-            // );
+            // update quantity of product in my-cart
             app.put("/up-cart-qty-ttl-price/:pId/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const pId = req.params.pId;
                 const user_email = req.params.email;
-                const { quantity, total_price } = req.body;
+                const { quantity, total_price, total_discount } = req.body;
                 const fill = { user_email: user_email, "product._id": pId };
                 const result = yield cartCollection.updateOne(fill, {
                     $set: {
                         "product.$.quantity": quantity,
                         "product.$.total_price": total_price,
+                        "product.$.total_discount": total_discount,
                     },
                 }, { upsert: true });
                 res.send(result);
             }));
-            // remove item form cart with item cart id
+            // remove item form cart with item cart id and email
             app.delete("/delete-cart-item/:pcId/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const pcId = req.params.pcId;
                 const email = req.params.email;
@@ -135,82 +125,68 @@ function run() {
                 });
                 res.send(res2);
             }));
+            // inserting product into my cart api
             app.put("/my-cart/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                let newProduct;
                 const email = req.params.email;
                 const body = req.body;
                 const options = { upsert: true };
                 const query = { user_email: email };
                 const existsProduct = yield cartCollection.findOne({ user_email: email });
-                let newProduct;
                 if (existsProduct) {
-                    const productArr = existsProduct === null || existsProduct === void 0 ? void 0 : existsProduct.product;
-                    for (let i = 0; i < productArr.length; i++) {
-                        let elem = productArr[i]._id;
-                        if (elem === (body === null || body === void 0 ? void 0 : body._id)) {
-                            res.send({ message: "Already added" });
-                            return;
-                        }
-                        else {
-                            newProduct = [...productArr, body];
+                    const productArr = (existsProduct === null || existsProduct === void 0 ? void 0 : existsProduct.product)
+                        ? existsProduct === null || existsProduct === void 0 ? void 0 : existsProduct.product
+                        : [];
+                    if (productArr.length > 0) {
+                        for (let i = 0; i < productArr.length; i++) {
+                            let elem = productArr[i]._id;
+                            if (elem === (body === null || body === void 0 ? void 0 : body._id)) {
+                                res.send({ message: "Product Has Already In Your Cart" });
+                                return;
+                            }
+                            else {
+                                newProduct = [...productArr, body];
+                            }
                         }
                     }
+                    else {
+                        newProduct = [body];
+                    }
                 }
-                else {
-                    newProduct = [body];
-                }
+                newProduct = [body];
                 const up = {
                     $set: { product: newProduct },
                 };
                 const cartRes = yield cartCollection.updateOne(query, up, options);
-                res.send(cartRes);
+                res.send({
+                    data: cartRes,
+                    message: "Product Successfully Added To Your Cart",
+                });
             }));
-            // add product to the cart
-            // app.put("/my-cart/:pId", async (req: Request, res: Response) => {
-            //   const productId = req.params.pId;
-            //   const {
-            //     _id: product_id,
-            //     title,
-            //     price,
-            //     category,
-            //     image,
-            //     quantity,
-            //     total_price,
-            //     user_email,
-            //   } = req.body;
-            //   const newCart = {
-            //     product_id,
-            //     title,
-            //     price,
-            //     category,
-            //     image,
-            //     user_email,
-            //     quantity,
-            //     total_price,
-            //   };
-            //   const option = { upsert: true };
-            //   const query = { product_id: productId };
-            //   const upDoc = {
-            //     $set: newCart,
-            //   };
-            //   const cartRes = await cartCollection.updateOne(query, upDoc, option);
-            //   res.send(cartRes);
-            // });
             // order address add api
-            app.put("/order-address/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.put("/add-address/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const userEmail = req.params.userEmail;
                 const body = req.body;
-                const option = { upsert: true };
-                const query = { user_email: userEmail };
-                const updateDoc = {
-                    $set: body,
-                };
-                const result = yield addressCollection.updateOne(query, updateDoc, option);
+                const result = yield cartCollection.updateOne({ user_email: userEmail }, { $set: { address: body } }, { upsert: true });
+                res.send(result);
+            }));
+            // update select_address in address to confirm for order api
+            app.put("/select-address/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const userEmail = req.params.userEmail;
+                const body = req.body;
+                const result = yield cartCollection.updateOne({ user_email: userEmail }, { $set: { "address.select_address": body === null || body === void 0 ? void 0 : body.select_address } }, { upsert: true });
+                res.send(result);
+            }));
+            // delete or remove address from cart
+            app.delete("/delete-address/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const email = req.params.email;
+                const result = yield cartCollection.updateOne({ user_email: email }, { $set: { address: null } }, { upsert: true });
                 res.send(result);
             }));
             // get order address
             app.get("/cart-address/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const userEmail = req.params.userEmail;
-                const result = yield addressCollection.findOne({
+                const result = yield cartCollection.findOne({
                     user_email: userEmail,
                 });
                 res.send(result);
