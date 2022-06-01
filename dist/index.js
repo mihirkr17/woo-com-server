@@ -114,15 +114,7 @@ function run() {
             app.delete("/delete-cart-item/:pcId/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const pcId = req.params.pcId;
                 const email = req.params.email;
-                const res2 = yield cartCollection.updateOne({
-                    user_email: email,
-                }, {
-                    $pull: {
-                        product: {
-                            _id: pcId,
-                        },
-                    },
-                });
+                const res2 = yield cartCollection.updateOne({ user_email: email }, { $pull: { product: { _id: pcId } } });
                 res.send(res2);
             }));
             // inserting product into my cart api
@@ -193,18 +185,42 @@ function run() {
                 });
                 res.send(result);
             }));
-            /// jdfhdfjbjdfbj
+            // set order api call
             app.post("/set-order/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const userEmail = req.params.userEmail;
                 const body = req.body;
-                // const query = { user_email: userEmail };
-                body["user_email"] = userEmail;
-                const result = yield orderCollection.insertOne(body);
-                const order = yield orderCollection.findOne({
-                    user_email: userEmail,
-                    orderId: body === null || body === void 0 ? void 0 : body.orderId,
-                });
-                res.send({ result, orderId: order === null || order === void 0 ? void 0 : order.orderId });
+                const result = yield orderCollection.updateOne({ user_email: userEmail }, { $push: { orders: body } }, { upsert: true });
+                const order = yield orderCollection.findOne({ user_email: userEmail });
+                let orderId;
+                if (order) {
+                    let getOrder = order === null || order === void 0 ? void 0 : order.orders;
+                    orderId = getOrder.find((i) => i.orderId === (body === null || body === void 0 ? void 0 : body.orderId));
+                }
+                res.send({ result, orderId: orderId === null || orderId === void 0 ? void 0 : orderId.orderId });
+            }));
+            // get my order list in my-order page
+            app.get("/my-order/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const email = req.params.email;
+                res.send(yield orderCollection.findOne({ user_email: email }));
+            }));
+            // cancel orders
+            app.delete("/cancel-order/:email/:orderId", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const email = req.params.email;
+                const id = parseInt(req.params.orderId);
+                const result = yield orderCollection.updateOne({ user_email: email }, { $pull: { orders: { orderId: id } } });
+                res.send(result);
+            }));
+            // show all orders in admin manage orders
+            app.get("/all-orders", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                res.send(yield orderCollection.find().toArray());
+            }));
+            // update order status by admin
+            app.put("/update-order-status/:email/:id/:status", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const email = req.params.email;
+                const orderId = parseInt(req.params.id);
+                const status = req.params.status;
+                const rs = yield orderCollection.updateOne({ user_email: email, "orders.orderId": orderId }, { $set: { "orders.$.status": status } }, { upsert: true });
+                res.send(rs);
             }));
             // get order list
             app.get("/get-orderlist/:orderId", (req, res) => __awaiter(this, void 0, void 0, function* () {

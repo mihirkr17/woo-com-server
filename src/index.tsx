@@ -132,16 +132,8 @@ async function run() {
         const pcId = req.params.pcId;
         const email = req.params.email;
         const res2 = await cartCollection.updateOne(
-          {
-            user_email: email,
-          },
-          {
-            $pull: {
-              product: {
-                _id: pcId,
-              },
-            },
-          }
+          { user_email: email },
+          { $pull: { product: { _id: pcId } } }
         );
         res.send(res2);
       }
@@ -175,8 +167,6 @@ async function run() {
       } else {
         newProduct = [body];
       }
-
-    
 
       const up = {
         $set: { product: newProduct },
@@ -239,20 +229,68 @@ async function run() {
       res.send(result);
     });
 
-    /// jdfhdfjbjdfbj
+    // set order api call
     app.post("/set-order/:userEmail", async (req: Request, res: Response) => {
       const userEmail = req.params.userEmail;
       const body = req.body;
 
-      // const query = { user_email: userEmail };
-      body["user_email"] = userEmail;
-      const result = await orderCollection.insertOne(body);
-      const order = await orderCollection.findOne({
-        user_email: userEmail,
-        orderId: body?.orderId,
-      });
-      res.send({ result, orderId: order?.orderId });
+      const result = await orderCollection.updateOne(
+        { user_email: userEmail },
+        { $push: { orders: body } },
+        { upsert: true }
+      );
+      const order = await orderCollection.findOne({ user_email: userEmail });
+
+      let orderId;
+      if (order) {
+        let getOrder = order?.orders;
+        orderId = getOrder.find((i: any) => i.orderId === body?.orderId);
+      }
+      res.send({ result, orderId: orderId?.orderId });
     });
+
+    // get my order list in my-order page
+    app.get("/my-order/:email", async (req: Request, res: Response) => {
+      const email = req.params.email;
+      res.send(await orderCollection.findOne({ user_email: email }));
+    });
+
+    // cancel orders
+    app.delete(
+      "/cancel-order/:email/:orderId",
+      async (req: Request, res: Response) => {
+        const email = req.params.email;
+        const id = parseInt(req.params.orderId);
+
+        const result = await orderCollection.updateOne(
+          { user_email: email },
+          { $pull: { orders: { orderId: id } } }
+        );
+        res.send(result);
+      }
+    );
+
+    // show all orders in admin manage orders
+    app.get("/all-orders", async (req: Request, res: Response) => {
+      res.send(await orderCollection.find().toArray());
+    });
+
+    // update order status by admin
+    app.put(
+      "/update-order-status/:email/:id/:status",
+      async (req: Request, res: Response) => {
+        const email = req.params.email;
+        const orderId = parseInt(req.params.id);
+        const status = req.params.status;
+
+        const rs = await orderCollection.updateOne(
+          { user_email: email, "orders.orderId": orderId },
+          { $set: { "orders.$.status": status } },
+          { upsert: true }
+        );
+        res.send(rs);
+      }
+    );
 
     // get order list
     app.get("/get-orderlist/:orderId", async (req: Request, res: Response) => {
