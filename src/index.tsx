@@ -7,11 +7,11 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const cors = require("cors");
 require("dotenv").config();
 const app: Express = express();
+var jwt = require("jsonwebtoken");
 
 // middleware
 app.use(cors());
 app.use(express.json());
-
 // port and db connection
 const port = process.env.PORT || 5000;
 
@@ -23,6 +23,28 @@ const client = new MongoClient(uri, {
   serverApi: ServerApiVersion.v1,
 });
 
+const verifyJWT = async (req: Request, res: Response, next: any) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader)
+    return res.status(403).send({ message: "Unauthorized Access" });
+
+  const token = authHeader.split(" ")[1];
+
+  if (token) {
+    jwt.verify(
+      token,
+      process.env.ACCESS_TOKEN,
+      function (err: any, decoded: any) {
+        if (err) {
+          return res.status(401).send({ message: "Forbidden Access" });
+        }
+        req.decoded = decoded;
+        next();
+      }
+    );
+  }
+};
+
 async function run() {
   try {
     await client.connect();
@@ -30,9 +52,22 @@ async function run() {
     const productsCollection = client.db("Products").collection("product");
     const cartCollection = client.db("Products").collection("cart");
     const orderCollection = client.db("Products").collection("orders");
-    const addressCollection = client
-      .db("Products")
-      .collection("deliveryAddress");
+
+    const userCollection = client.db("Users").collection("user");
+
+    // add user to the database
+    app.put("/user/:email", async (req: Request, res: Response) => {
+      const email = req.params.email;
+      const result = await userCollection.updateOne(
+        { email: email },
+        { $set: { email } },
+        { upsert: true }
+      );
+      const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
+        expiresIn: "1h",
+      });
+      res.send({ result, token });
+    });
 
     // finding all Products
     app.get("/products", async (req: Request, res: Response) => {
@@ -51,27 +86,35 @@ async function run() {
     });
 
     // Fetch single product
-    app.get("/view-product/:productId", async (req: Request, res: Response) => {
-      const productId = req.params.productId;
-      let result = await productsCollection.findOne({
-        _id: ObjectId(productId),
-      });
-      const findCart = await cartCollection.findOne({
-        product: { $elemMatch: { _id: productId } },
-      });
+    // check in  cart and view product
+    app.get(
+      "/view-product/:productId/:email",
+      async (req: Request, res: Response) => {
+        const email = req.params.email;
+        const id = req.params.productId;
+        const filterP = await cartCollection
+          .aggregate([
+            { $unwind: "$product" },
+            { $match: { user_email: email, "product._id": id } },
+          ])
+          .toArray();
 
-      let cardHandler: boolean;
+        let result = await productsCollection.findOne({
+          _id: ObjectId(id),
+        });
 
-      if (findCart?._id === productId) {
-        cardHandler = true;
-      } else {
-        cardHandler = false;
+        const exist = filterP.some((f: any) => f?.product?._id == id);
+
+        let cardHandler: boolean;
+        if (exist) {
+          cardHandler = true;
+        } else {
+          cardHandler = false;
+        }
+        result["cardHandler"] = cardHandler;
+        res.send(result);
       }
-
-      result["cardHandler"] = cardHandler;
-
-      res.send(result);
-    });
+    );
 
     // fetch my added product in my cart page
     app.get(
@@ -90,15 +133,13 @@ async function run() {
       async (req: Request, res: Response) => {
         const pId = req.params.pId;
         const email = req.params.userEmail;
-        const existsProduct = await cartCollection.findOne({
-          user_email: email,
-        });
-
-        if (existsProduct) {
-          const product = existsProduct?.product;
-          const findP = product.find((p: any) => p._id === pId);
-          res.send(findP);
-        }
+        const findP = await cartCollection
+          .aggregate([
+            { $unwind: "$product" },
+            { $match: { "product._id": pId, user_email: email } },
+          ])
+          .toArray();
+        findP.map((p: any) => res.send(p));
       }
     );
 
@@ -270,11 +311,6 @@ async function run() {
       }
     );
 
-    // show all orders in admin manage orders
-    app.get("/all-orders", async (req: Request, res: Response) => {
-      res.send(await orderCollection.find().toArray());
-    });
-
     // update order status by admin
     app.put(
       "/update-order-status/:email/:id/:status",
@@ -296,6 +332,26 @@ async function run() {
     app.get("/get-orderlist/:orderId", async (req: Request, res: Response) => {
       const order_id = parseInt(req.params.orderId);
       const result = await orderCollection.findOne({ orderId: order_id });
+      res.send(result);
+    });
+
+    /// find orderId
+    app.get("/manage-orders/:filter", async (req: Request, res: Response) => {
+      const filter = req.params.filter;
+      let result: any;
+
+      if (filter === "all") {
+        result = await orderCollection
+          .aggregate([{ $unwind: "$orders" }])
+          .toArray();
+      } else {
+        result = await orderCollection
+          .aggregate([
+            { $unwind: "$orders" },
+            { $match: { "orders.status": filter } },
+          ])
+          .toArray();
+      }
       res.send(result);
     });
   } finally {

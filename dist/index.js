@@ -19,6 +19,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const cors = require("cors");
 require("dotenv").config();
 const app = (0, express_1.default)();
+var jwt = require("jsonwebtoken");
 // middleware
 app.use(cors());
 app.use(express_1.default.json());
@@ -31,6 +32,21 @@ const client = new MongoClient(uri, {
     useUnifiedTopology: true,
     serverApi: ServerApiVersion.v1,
 });
+const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    const authHeader = req.headers.authorization;
+    if (!authHeader)
+        return res.status(403).send({ message: "Unauthorized Access" });
+    const token = authHeader.split(" ")[1];
+    if (token) {
+        jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
+            if (err) {
+                return res.status(401).send({ message: "Forbidden Access" });
+            }
+            req.decoded = decoded;
+            next();
+        });
+    }
+});
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -39,9 +55,16 @@ function run() {
             const productsCollection = client.db("Products").collection("product");
             const cartCollection = client.db("Products").collection("cart");
             const orderCollection = client.db("Products").collection("orders");
-            const addressCollection = client
-                .db("Products")
-                .collection("deliveryAddress");
+            const userCollection = client.db("Users").collection("user");
+            // add user to the database
+            app.put("/user/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const email = req.params.email;
+                const result = yield userCollection.updateOne({ email: email }, { $set: { email } }, { upsert: true });
+                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
+                    expiresIn: "1h",
+                });
+                res.send({ result, token });
+            }));
             // finding all Products
             app.get("/products", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const results = yield productsCollection.find({}).toArray();
@@ -57,16 +80,22 @@ function run() {
                 res.send(results);
             }));
             // Fetch single product
-            app.get("/view-product/:productId", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const productId = req.params.productId;
+            // check in  cart and view product
+            app.get("/view-product/:productId/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const email = req.params.email;
+                const id = req.params.productId;
+                const filterP = yield cartCollection
+                    .aggregate([
+                    { $unwind: "$product" },
+                    { $match: { user_email: email, "product._id": id } },
+                ])
+                    .toArray();
                 let result = yield productsCollection.findOne({
-                    _id: ObjectId(productId),
+                    _id: ObjectId(id),
                 });
-                const findCart = yield cartCollection.findOne({
-                    product: { $elemMatch: { _id: productId } },
-                });
+                const exist = filterP.some((f) => { var _a; return ((_a = f === null || f === void 0 ? void 0 : f.product) === null || _a === void 0 ? void 0 : _a._id) == id; });
                 let cardHandler;
-                if ((findCart === null || findCart === void 0 ? void 0 : findCart._id) === productId) {
+                if (exist) {
                     cardHandler = true;
                 }
                 else {
@@ -86,14 +115,13 @@ function run() {
             app.get("/my-cart-item/:pId/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const pId = req.params.pId;
                 const email = req.params.userEmail;
-                const existsProduct = yield cartCollection.findOne({
-                    user_email: email,
-                });
-                if (existsProduct) {
-                    const product = existsProduct === null || existsProduct === void 0 ? void 0 : existsProduct.product;
-                    const findP = product.find((p) => p._id === pId);
-                    res.send(findP);
-                }
+                const findP = yield cartCollection
+                    .aggregate([
+                    { $unwind: "$product" },
+                    { $match: { "product._id": pId, user_email: email } },
+                ])
+                    .toArray();
+                findP.map((p) => res.send(p));
             }));
             // update quantity of product in my-cart
             app.put("/up-cart-qty-ttl-price/:pId/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -210,10 +238,6 @@ function run() {
                 const result = yield orderCollection.updateOne({ user_email: email }, { $pull: { orders: { orderId: id } } });
                 res.send(result);
             }));
-            // show all orders in admin manage orders
-            app.get("/all-orders", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                res.send(yield orderCollection.find().toArray());
-            }));
             // update order status by admin
             app.put("/update-order-status/:email/:id/:status", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
@@ -226,6 +250,25 @@ function run() {
             app.get("/get-orderlist/:orderId", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const order_id = parseInt(req.params.orderId);
                 const result = yield orderCollection.findOne({ orderId: order_id });
+                res.send(result);
+            }));
+            /// find orderId
+            app.get("/manage-orders/:filter", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const filter = req.params.filter;
+                let result;
+                if (filter === "all") {
+                    result = yield orderCollection
+                        .aggregate([{ $unwind: "$orders" }])
+                        .toArray();
+                }
+                else {
+                    result = yield orderCollection
+                        .aggregate([
+                        { $unwind: "$orders" },
+                        { $match: { "orders.status": filter } },
+                    ])
+                        .toArray();
+                }
                 res.send(result);
             }));
         }
