@@ -1,5 +1,6 @@
 import express, { Express, Request, Response } from "express";
 import { resolve } from "path/win32";
+import { pid } from "process";
 
 // Server setup
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
@@ -52,8 +53,8 @@ async function run() {
     const productsCollection = client.db("Products").collection("product");
     const cartCollection = client.db("Products").collection("cart");
     const orderCollection = client.db("Products").collection("orders");
-
     const userCollection = client.db("Users").collection("user");
+    const reviewCollection = client.db("Products").collection("review");
 
     // add user to the database
     app.put("/user/:email", async (req: Request, res: Response) => {
@@ -112,6 +113,106 @@ async function run() {
           cardHandler = false;
         }
         result["cardHandler"] = cardHandler;
+        res.send(result);
+      }
+    );
+
+    // upsert review in product
+    app.put("/add-rating/:email", async (req: Request, res: Response) => {
+      const email = req.params.email;
+      const body = req.body;
+      let newRating;
+
+      const findRating = await reviewCollection.findOne({
+        user_email: email,
+      });
+      if (findRating) {
+        const productArr: any[] = findRating?.rating ? findRating?.rating : [];
+        if (productArr.length > 0) {
+          for (let i = 0; i < productArr.length; i++) {
+            let elem = productArr[i].rating_id;
+            if (elem === body?.rating_id) {
+              res.send({ message: "Product Has Already In Your Cart" });
+              return;
+            } else {
+              newRating = [...productArr, body];
+            }
+          }
+        } else {
+          newRating = [body];
+        }
+      } else {
+        newRating = [body];
+      }
+
+      const products = await productsCollection.findOne({
+        _id: ObjectId(body?.product_id),
+      });
+
+      const point = parseInt(body?.rating_point);
+
+      let newRatingPoint = products?.rating;
+
+      let rat1: any = parseInt(newRatingPoint[4]?.count) || 0;
+      let rat2: any = parseInt(newRatingPoint[3]?.count) || 0;
+      let rat3: any = parseInt(newRatingPoint[2]?.count) || 0;
+      let rat4: any = parseInt(newRatingPoint[1]?.count) || 0;
+      let rat5: any = parseInt(newRatingPoint[0]?.count) || 0;
+
+      if (point === 5) {
+        rat5 += 1;
+      } else if (point === 4) {
+        rat4 += 1;
+      } else if (point === 3) {
+        rat3 += 1;
+      } else if (point === 2) {
+        rat2 += 1;
+      } else {
+        rat1 += 1;
+      }
+
+      let ratingArr: any[] = [
+        { weight: 5, count: rat5 },
+        { weight: 4, count: rat4 },
+        { weight: 3, count: rat3 },
+        { weight: 2, count: rat2 },
+        { weight: 1, count: rat1 },
+      ];
+
+      await productsCollection.updateOne(
+        { _id: ObjectId(body?.product_id) },
+        { $set: { rating: ratingArr } },
+        { upsert: true }
+      );
+
+      const result = await reviewCollection.updateOne(
+        { user_email: email },
+        { $set: { rating: newRating } },
+        { upsert: true }
+      );
+      res.send(result);
+    });
+
+    // my review
+    app.get("/my-review/:email", async (req: Request, res: Response) => {
+      const email = req.params.email;
+      const result = await reviewCollection
+        .aggregate([{ $unwind: "$rating" }, { $match: { user_email: email } }])
+        .toArray();
+      res.send(result);
+    });
+
+    // product review fetch
+    app.get(
+      "/product-review/:productId",
+      async (req: Request, res: Response) => {
+        const pId = req.params.productId;
+        const result = await reviewCollection
+          .aggregate([
+            { $unwind: "$rating" },
+            { $match: { "rating.product_id": pId } },
+          ])
+          .toArray();
         res.send(result);
       }
     );
@@ -275,19 +376,29 @@ async function run() {
       const userEmail = req.params.userEmail;
       const body = req.body;
 
-      const result = await orderCollection.updateOne(
-        { user_email: userEmail },
-        { $push: { orders: body } },
-        { upsert: true }
-      );
-      const order = await orderCollection.findOne({ user_email: userEmail });
+      if (body?.product.length <= 0) {
+        res.send({
+          message: "Order Cancelled. You Have To Select Atleast One Product",
+        });
+      } else if (body?.address === null) {
+        res.send({ message: "We Can Not Find Any Address In Your Order List" });
+      } else if (body?.address?.select_address === false) {
+        res.send({ message: "Address Not Selected" });
+      } else {
+        const result = await orderCollection.updateOne(
+          { user_email: userEmail },
+          { $push: { orders: body } },
+          { upsert: true }
+        );
+        const order = await orderCollection.findOne({ user_email: userEmail });
 
-      let orderId;
-      if (order) {
-        let getOrder = order?.orders;
-        orderId = getOrder.find((i: any) => i.orderId === body?.orderId);
+        let orderId;
+        if (order) {
+          let getOrder = order?.orders;
+          orderId = getOrder.find((i: any) => i.orderId === body?.orderId);
+        }
+        res.send({ result, orderId: orderId?.orderId });
       }
-      res.send({ result, orderId: orderId?.orderId });
     });
 
     // get my order list in my-order page
@@ -319,9 +430,28 @@ async function run() {
         const orderId = parseInt(req.params.id);
         const status = req.params.status;
 
+        let time: string = new Date().toLocaleString();
+        let upDoc: any;
+
+        if (status === "placed") {
+          upDoc = {
+            $set: {
+              "orders.$.status": status,
+              "orders.$.time_placed": time,
+            },
+          };
+        } else if (status === "shipped") {
+          upDoc = {
+            $set: {
+              "orders.$.status": status,
+              "orders.$.time_shipped": time,
+            },
+          };
+        }
+
         const rs = await orderCollection.updateOne(
           { user_email: email, "orders.orderId": orderId },
-          { $set: { "orders.$.status": status } },
+          upDoc,
           { upsert: true }
         );
         res.send(rs);
@@ -336,22 +466,11 @@ async function run() {
     });
 
     /// find orderId
-    app.get("/manage-orders/:filter", async (req: Request, res: Response) => {
-      const filter = req.params.filter;
-      let result: any;
+    app.get("/manage-orders/", async (req: Request, res: Response) => {
+      const result = await orderCollection
+        .aggregate([{ $unwind: "$orders" }])
+        .toArray();
 
-      if (filter === "all") {
-        result = await orderCollection
-          .aggregate([{ $unwind: "$orders" }])
-          .toArray();
-      } else {
-        result = await orderCollection
-          .aggregate([
-            { $unwind: "$orders" },
-            { $match: { "orders.status": filter } },
-          ])
-          .toArray();
-      }
       res.send(result);
     });
   } finally {
