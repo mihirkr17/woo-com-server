@@ -105,6 +105,16 @@ function run() {
                 result["cardHandler"] = cardHandler;
                 res.send(result);
             }));
+            // fetch product by category
+            app.get("/product-category/:category", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const productCategory = req.params.category;
+                const findP = yield productsCollection
+                    .find({
+                    category: productCategory,
+                })
+                    .toArray();
+                res.send(findP);
+            }));
             // upsert review in product
             app.put("/add-rating/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 var _a, _b, _c, _d, _e;

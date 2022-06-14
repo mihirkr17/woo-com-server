@@ -117,6 +117,20 @@ async function run() {
       }
     );
 
+    // fetch product by category
+    app.get(
+      "/product-category/:category",
+      async (req: Request, res: Response) => {
+        const productCategory = req.params.category;
+        const findP = await productsCollection
+          .find({
+            category: productCategory,
+          })
+          .toArray();
+        res.send(findP);
+      }
+    );
+
     // upsert review in product
     app.put("/add-rating/:email", async (req: Request, res: Response) => {
       const email = req.params.email;
