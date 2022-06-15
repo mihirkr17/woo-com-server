@@ -57,6 +57,13 @@ function run() {
             const orderCollection = client.db("Products").collection("orders");
             const userCollection = client.db("Users").collection("user");
             const reviewCollection = client.db("Products").collection("review");
+            // get owner
+            app.get("/fetch-owner/:email", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const email = req.params.email;
+                const result = yield userCollection.findOne({ email: email });
+                const isOwner = result.role === "owner";
+                res.send({ owner: isOwner });
+            }));
             // add user to the database
             app.put("/user/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;

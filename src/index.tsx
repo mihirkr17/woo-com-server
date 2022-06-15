@@ -56,6 +56,18 @@ async function run() {
     const userCollection = client.db("Users").collection("user");
     const reviewCollection = client.db("Products").collection("review");
 
+    // get owner
+    app.get(
+      "/fetch-owner/:email",
+      verifyJWT,
+      async (req: Request, res: Response) => {
+        const email = req.params.email;
+        const result = await userCollection.findOne({ email: email });
+        const isOwner = result.role === "owner";
+        res.send({ owner: isOwner });
+      }
+    );
+
     // add user to the database
     app.put("/user/:email", async (req: Request, res: Response) => {
       const email = req.params.email;
