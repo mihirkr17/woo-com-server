@@ -64,6 +64,13 @@ function run() {
                 const isOwner = result.role === "owner";
                 res.send({ owner: isOwner });
             }));
+            // get admin
+            app.get("/fetch-admin/:email", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const email = req.params.email;
+                const result = yield userCollection.findOne({ email: email });
+                const isAdmin = result.role === "admin";
+                res.send({ admin: isAdmin });
+            }));
             // add user to the database
             app.put("/user/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;

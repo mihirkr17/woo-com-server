@@ -68,6 +68,18 @@ async function run() {
       }
     );
 
+    // get admin
+    app.get(
+      "/fetch-admin/:email",
+      verifyJWT,
+      async (req: Request, res: Response) => {
+        const email = req.params.email;
+        const result = await userCollection.findOne({ email: email });
+        const isAdmin = result.role === "admin";
+        res.send({ admin: isAdmin });
+      }
+    );
+
     // add user to the database
     app.put("/user/:email", async (req: Request, res: Response) => {
       const email = req.params.email;
