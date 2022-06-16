@@ -62,6 +62,8 @@ async function run() {
       const findOwnerInDB = await userCollection.findOne({ email: authEmail });
       if (findOwnerInDB.role === "owner") {
         next();
+      } else if (findOwnerInDB.role === "admin") {
+        next();
       } else {
         res.status(403).send({ message: "Forbidden access" });
       }
@@ -86,7 +88,7 @@ async function run() {
 
     // get owner
     app.get(
-      "/fetch-owner/:email",
+      "/fetch-owner/owner/:email",
       verifyJWT,
       verifyAuth,
       async (req: Request, res: Response) => {
