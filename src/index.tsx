@@ -57,10 +57,10 @@ async function run() {
     const reviewCollection = client.db("Products").collection("review");
 
     // verify owner
-    const verifyOwner = async (req: Request, res: Response, next: any) => {
+    const verifyAuth = async (req: Request, res: Response, next: any) => {
       const authEmail = req.decoded.email;
       const findOwnerInDB = await userCollection.findOne({ email: authEmail });
-      if (findOwnerInDB && findOwnerInDB.role === "owner") {
+      if (findOwnerInDB && (findOwnerInDB.role === "owner" || findOwnerInDB.role === "admin")) {
         next();
       } else {
         res.status(403).send({ message: "Forbidden access" });
@@ -68,15 +68,15 @@ async function run() {
     };
 
     // verify admin
-    const verifyAdmin = async (req: Request, res: Response, next: any) => {
-      const authEmail = req.decoded.email;
-      const findAdminInDB = await userCollection.findOne({ email: authEmail });
-      if (findAdminInDB && findAdminInDB.role === "admin") {
-        next();
-      } else {
-        res.status(403).send({ message: "Forbidden access" });
-      }
-    };
+    // const verifyAdmin = async (req: Request, res: Response, next: any) => {
+    //   const authEmail = req.decoded.email;
+    //   const findAdminInDB = await userCollection.findOne({ email: authEmail });
+    //   if (findAdminInDB && findAdminInDB.role === "admin") {
+    //     next();
+    //   } else {
+    //     res.status(403).send({ message: "Forbidden access" });
+    //   }
+    // };
 
     // make admin request
     app.put("/make-admin/:userId", async (req: Request, res: Response) => {
@@ -99,7 +99,7 @@ async function run() {
     app.get(
       "/fetch-owner/:email",
       verifyJWT,
-      verifyOwner,
+      verifyAuth,
       async (req: Request, res: Response) => {
         const email = req.params.email;
         const result = await userCollection.findOne({ email: email });
@@ -112,7 +112,7 @@ async function run() {
     app.get(
       "/fetch-admin/:email",
       verifyJWT,
-      verifyAdmin,
+      verifyAuth,
       async (req: Request, res: Response) => {
         const email = req.params.email;
         const result = await userCollection.findOne({ email: email });
