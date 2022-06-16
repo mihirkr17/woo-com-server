@@ -86,7 +86,6 @@ async function run() {
     });
 
     // get owner and admin
-
     app.get(
       "/fetch-auth/:email",
       async (req: Request, res: Response) => {
