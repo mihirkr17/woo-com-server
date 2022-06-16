@@ -60,18 +60,22 @@ async function run() {
     const verifyOwner = async (req: Request, res: Response, next: any) => {
       const authEmail = req.decoded.email;
       const findOwnerInDB = await userCollection.findOne({ email: authEmail });
-      findOwnerInDB.role === "owner"
-        ? next()
-        : res.status(403).send({ message: "Forbidden access" });
+      if (findOwnerInDB && findOwnerInDB.role === "owner") {
+        next();
+      } else {
+        res.status(403).send({ message: "Forbidden access" });
+      }
     };
 
     // verify admin
     const verifyAdmin = async (req: Request, res: Response, next: any) => {
       const authEmail = req.decoded.email;
       const findAdminInDB = await userCollection.findOne({ email: authEmail });
-      findAdminInDB.role === "admin"
-        ? next()
-        : res.status(403).send({ message: "Forbidden access" });
+      if (findAdminInDB && findAdminInDB.role === "admin") {
+        next();
+      } else {
+        res.status(403).send({ message: "Forbidden access" });
+      }
     };
 
     // make admin request
