@@ -94,8 +94,8 @@ async function run() {
     // get owner
     app.get(
       "/fetch-owner/:email",
-      verifyOwner,
       verifyJWT,
+      verifyOwner,
       async (req: Request, res: Response) => {
         const email = req.params.email;
         const result = await userCollection.findOne({ email: email });
@@ -107,8 +107,8 @@ async function run() {
     // get admin
     app.get(
       "/fetch-admin/:email",
-      verifyAdmin,
       verifyJWT,
+      verifyAdmin,
       async (req: Request, res: Response) => {
         const email = req.params.email;
         const result = await userCollection.findOne({ email: email });
