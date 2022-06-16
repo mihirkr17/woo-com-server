@@ -64,7 +64,7 @@ function run() {
             }));
             // get all user in allUser Page
             app.get("/all-users", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                res.send(yield userCollection.find({}).toArray());
+                res.send(yield userCollection.find({ role: { $ne: "owner" } }).toArray());
             }));
             // get owner
             app.get("/fetch-owner/:email", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {

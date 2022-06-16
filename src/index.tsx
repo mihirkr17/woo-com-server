@@ -70,7 +70,7 @@ async function run() {
 
     // get all user in allUser Page
     app.get("/all-users", async (req: Request, res: Response) => {
-      res.send(await userCollection.find({}).toArray());
+      res.send(await userCollection.find({ role: { $ne: "owner" } }).toArray());
     });
 
     // get owner
