@@ -39,6 +39,7 @@ const verifyJWT = async (req: Request, res: Response, next: any) => {
         if (err) {
           return res.status(401).send({ message: "Forbidden Access" });
         }
+        console.log(decoded);
         req.decoded = decoded;
         next();
       }
