@@ -32,21 +32,25 @@ const client = new MongoClient(uri, {
     useUnifiedTopology: true,
     serverApi: ServerApiVersion.v1,
 });
-const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    const authHeader = req.headers.authorization;
-    if (!authHeader)
-        return res.status(403).send({ message: "Unauthorized Access" });
-    const token = authHeader.split(" ")[1];
-    if (token) {
-        jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
-            if (err) {
-                return res.status(401).send({ message: "Forbidden Access" });
-            }
-            req.decoded = decoded;
-            next();
-        });
-    }
-});
+// const verifyJWT = async (req: Request, res: Response, next: any) => {
+//   const authHeader = req.headers.authorization;
+//   if (!authHeader)
+//     return res.status(403).send({ message: "Unauthorized Access" });
+//   const token = authHeader.split(" ")[1];
+//   if (token) {
+//     jwt.verify(
+//       token,
+//       process.env.ACCESS_TOKEN,
+//       function (err: any, decoded: any) {
+//         if (err) {
+//           return res.status(401).send({ message: "Forbidden Access" });
+//         }
+//         req.decoded = decoded;
+//         next();
+//       }
+//     );
+//   }
+// };
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -57,6 +61,16 @@ function run() {
             const orderCollection = client.db("Products").collection("orders");
             const userCollection = client.db("Users").collection("user");
             const reviewCollection = client.db("Products").collection("review");
+            // // verify owner
+            // const verifyAuth = async (req: Request, res: Response, next: any) => {
+            //   const authEmail = req.decoded.email;
+            //   const findOwnerInDB = await userCollection.findOne({ email: authEmail });
+            //   if (findOwnerInDB.role === "owner" || findOwnerInDB.role === "admin") {
+            //     next();
+            //   } else {
+            //     res.status(403).send({ message: "Forbidden access" });
+            //   }
+            // };
             // make admin request
             app.put("/make-admin/:userId", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const userId = req.params.userId;
@@ -66,19 +80,18 @@ function run() {
             app.get("/all-users", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 res.send(yield userCollection.find({ role: { $ne: "owner" } }).toArray());
             }));
-            // get owner
-            app.get("/fetch-owner/:email", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+            // get owner and admin
+            app.get("/fetch-auth/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
                 const result = yield userCollection.findOne({ email: email });
-                const isOwner = result.role === "owner";
-                res.send({ owner: isOwner });
-            }));
-            // get admin
-            app.get("/fetch-admin/:email", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const email = req.params.email;
-                const result = yield userCollection.findOne({ email: email });
-                const isAdmin = result.role === "admin";
-                res.send({ admin: isAdmin });
+                if (result) {
+                    if (result.role === "owner") {
+                        res.send({ role: "owner" });
+                    }
+                    else if (result.role === "admin") {
+                        res.send({ role: "admin" });
+                    }
+                }
             }));
             // add user to the database
             app.put("/user/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
