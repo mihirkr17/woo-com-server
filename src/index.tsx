@@ -56,10 +56,22 @@ async function run() {
     const userCollection = client.db("Users").collection("user");
     const reviewCollection = client.db("Products").collection("review");
 
+    // make admin request
+    app.put("/make-admin/:userId", async (req: Request, res: Response) => {
+      const userId: string = req.params.userId;
+      res.send(
+        await userCollection.updateOne(
+          { _id: ObjectId(userId) },
+          { $set: { role: "admin" } },
+          { upsert: true }
+        )
+      );
+    });
+
     // get all user in allUser Page
-    app.get('/all-users', async(req:Request, res:Response) => {
+    app.get("/all-users", async (req: Request, res: Response) => {
       res.send(await userCollection.find({}).toArray());
-    })
+    });
 
     // get owner
     app.get(

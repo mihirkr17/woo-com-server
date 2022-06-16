@@ -57,8 +57,13 @@ function run() {
             const orderCollection = client.db("Products").collection("orders");
             const userCollection = client.db("Users").collection("user");
             const reviewCollection = client.db("Products").collection("review");
+            // make admin request
+            app.put("/make-admin/:userId", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const userId = req.params.userId;
+                res.send(yield userCollection.updateOne({ _id: ObjectId(userId) }, { $set: { role: "admin" } }, { upsert: true }));
+            }));
             // get all user in allUser Page
-            app.get('/all-users', (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.get("/all-users", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 res.send(yield userCollection.find({}).toArray());
             }));
             // get owner
