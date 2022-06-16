@@ -56,6 +56,11 @@ async function run() {
     const userCollection = client.db("Users").collection("user");
     const reviewCollection = client.db("Products").collection("review");
 
+    // get all user in allUser Page
+    app.get('/all-users', async(req:Request, res:Response) => {
+      res.send(await userCollection.find({}).toArray());
+    })
+
     // get owner
     app.get(
       "/fetch-owner/:email",

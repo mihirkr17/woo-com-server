@@ -57,6 +57,10 @@ function run() {
             const orderCollection = client.db("Products").collection("orders");
             const userCollection = client.db("Users").collection("user");
             const reviewCollection = client.db("Products").collection("review");
+            // get all user in allUser Page
+            app.get('/all-users', (req, res) => __awaiter(this, void 0, void 0, function* () {
+                res.send(yield userCollection.find({}).toArray());
+            }));
             // get owner
             app.get("/fetch-owner/:email", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
