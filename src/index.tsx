@@ -39,7 +39,6 @@ const verifyJWT = async (req: Request, res: Response, next: any) => {
         if (err) {
           return res.status(401).send({ message: "Forbidden Access" });
         }
-        console.log(decoded);
         req.decoded = decoded;
         next();
       }
@@ -61,18 +60,18 @@ async function run() {
     const verifyOwner = async (req: Request, res: Response, next: any) => {
       const authEmail = req.decoded.email;
       const findOwnerInDB = await userCollection.findOne({ email: authEmail });
-      findOwnerInDB?.role === "owner"
+      findOwnerInDB.role === "owner"
         ? next()
-        : res.status(401).send({ message: "Forbidden access" });
+        : res.status(403).send({ message: "Forbidden access" });
     };
 
     // verify admin
     const verifyAdmin = async (req: Request, res: Response, next: any) => {
       const authEmail = req.decoded.email;
-      const findOwnerInDB = await userCollection.findOne({ email: authEmail });
-      findOwnerInDB?.role === "admin"
+      const findAdminInDB = await userCollection.findOne({ email: authEmail });
+      findAdminInDB.role === "admin"
         ? next()
-        : res.status(401).send({ message: "Forbidden access" });
+        : res.status(403).send({ message: "Forbidden access" });
     };
 
     // make admin request
