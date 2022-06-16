@@ -56,6 +56,24 @@ async function run() {
     const userCollection = client.db("Users").collection("user");
     const reviewCollection = client.db("Products").collection("review");
 
+    // verify owner
+    const verifyOwner = async (req: Request, res: Response, next: any) => {
+      const authEmail = req.decoded.email;
+      const findOwnerInDB = await userCollection.findOne({ email: authEmail });
+      findOwnerInDB?.role === "owner"
+        ? next()
+        : res.status(401).send({ message: "Forbidden access" });
+    };
+
+    // verify admin
+    const verifyAdmin = async (req: Request, res: Response, next: any) => {
+      const authEmail = req.decoded.email;
+      const findOwnerInDB = await userCollection.findOne({ email: authEmail });
+      findOwnerInDB?.role === "admin"
+        ? next()
+        : res.status(401).send({ message: "Forbidden access" });
+    };
+
     // make admin request
     app.put("/make-admin/:userId", async (req: Request, res: Response) => {
       const userId: string = req.params.userId;
@@ -76,6 +94,7 @@ async function run() {
     // get owner
     app.get(
       "/fetch-owner/:email",
+      verifyOwner,
       verifyJWT,
       async (req: Request, res: Response) => {
         const email = req.params.email;
@@ -88,6 +107,7 @@ async function run() {
     // get admin
     app.get(
       "/fetch-admin/:email",
+      verifyAdmin,
       verifyJWT,
       async (req: Request, res: Response) => {
         const email = req.params.email;
