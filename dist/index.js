@@ -61,7 +61,9 @@ function run() {
             // // verify owner
             const verifyOwner = (req, res, next) => __awaiter(this, void 0, void 0, function* () {
                 const authEmail = req.decoded.email;
-                const findOwnerInDB = yield userCollection.findOne({ email: authEmail && authEmail });
+                const findOwnerInDB = yield userCollection.findOne({
+                    email: authEmail && authEmail,
+                });
                 if (findOwnerInDB.role === "owner") {
                     next();
                 }
@@ -99,7 +101,13 @@ function run() {
             // add user to the database
             app.put("/user/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
-                const result = yield userCollection.updateOne({ email: email }, { $set: { email, role: "user" } }, { upsert: true });
+                const findUser = yield userCollection.findOne({ email: email });
+                let updateDocuments;
+                updateDocuments =
+                    findUser && (findUser === null || findUser === void 0 ? void 0 : findUser.role) !== ""
+                        ? { $set: { email } }
+                        : { $set: { email, role: "user" } };
+                const result = yield userCollection.updateOne({ email: email }, updateDocuments, { upsert: true });
                 const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
                     algorithm: "HS256",
                     expiresIn: "2h",

@@ -58,7 +58,9 @@ async function run() {
     // // verify owner
     const verifyOwner = async (req: Request, res: Response, next: any) => {
       const authEmail = req.decoded.email;
-      const findOwnerInDB = await userCollection.findOne({ email: authEmail && authEmail });
+      const findOwnerInDB = await userCollection.findOne({
+        email: authEmail && authEmail,
+      });
 
       if (findOwnerInDB.role === "owner") {
         next();
@@ -68,16 +70,21 @@ async function run() {
     };
 
     // make admin request
-    app.put("/make-admin/:userId", verifyJWT, verifyOwner, async (req: Request, res: Response) => {
-      const userId: string = req.params.userId;
-      res.send(
-        await userCollection.updateOne(
-          { _id: ObjectId(userId) },
-          { $set: { role: "admin" } },
-          { upsert: true }
-        )
-      );
-    });
+    app.put(
+      "/make-admin/:userId",
+      verifyJWT,
+      verifyOwner,
+      async (req: Request, res: Response) => {
+        const userId: string = req.params.userId;
+        res.send(
+          await userCollection.updateOne(
+            { _id: ObjectId(userId) },
+            { $set: { role: "admin" } },
+            { upsert: true }
+          )
+        );
+      }
+    );
 
     // get all user in allUser Page
     app.get("/all-users", async (req: Request, res: Response) => {
@@ -85,34 +92,40 @@ async function run() {
     });
 
     // get owner, admin and user from database
-    app.get(
-      "/fetch-auth/:email",
-      async (req: Request, res: Response) => {
-        const email = req.params.email;
-        const token = req.headers.authorization?.split(" ")[1];
+    app.get("/fetch-auth/:email", async (req: Request, res: Response) => {
+      const email = req.params.email;
+      const token = req.headers.authorization?.split(" ")[1];
 
-        if (token) {
-          const result = await userCollection.findOne({ email: email });
+      if (token) {
+        const result = await userCollection.findOne({ email: email });
 
-          if (result && result.role === "owner") {
-            res.status(200).send({ role: "owner" });
-          }
-
-          if (result && result.role === "admin") {
-            res.status(200).send({ role: "admin" });
-          }
-        } else {
-          return res.status(403).send({ message: "Header Missing" });
+        if (result && result.role === "owner") {
+          res.status(200).send({ role: "owner" });
         }
+
+        if (result && result.role === "admin") {
+          res.status(200).send({ role: "admin" });
+        }
+      } else {
+        return res.status(403).send({ message: "Header Missing" });
       }
-    );
+    });
 
     // add user to the database
     app.put("/user/:email", async (req: Request, res: Response) => {
       const email = req.params.email;
+      const findUser = await userCollection.findOne({ email: email });
+
+      let updateDocuments: any;
+
+      updateDocuments =
+        findUser && findUser?.role !== ""
+          ? { $set: { email } }
+          : { $set: { email, role: "user" } };
+
       const result = await userCollection.updateOne(
         { email: email },
-        { $set: { email, role : "user" } },
+        updateDocuments,
         { upsert: true }
       );
       const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
