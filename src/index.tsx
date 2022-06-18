@@ -1,6 +1,4 @@
 import express, { Express, Request, Response } from "express";
-import { resolve } from "path/win32";
-import { pid } from "process";
 
 // Server setup
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
@@ -24,27 +22,28 @@ const client = new MongoClient(uri, {
   serverApi: ServerApiVersion.v1,
 });
 
-// const verifyJWT = async (req: Request, res: Response, next: any) => {
-//   const authHeader = req.headers.authorization;
-//   if (!authHeader)
-//     return res.status(403).send({ message: "Unauthorized Access" });
+// verifying jwt token
+const verifyJWT = async (req: Request, res: Response, next: any) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader)
+    return res.status(403).send({ message: "Unauthorized Access" });
 
-//   const token = authHeader.split(" ")[1];
+  const token = authHeader.split(" ")[1];
 
-//   if (token) {
-//     jwt.verify(
-//       token,
-//       process.env.ACCESS_TOKEN,
-//       function (err: any, decoded: any) {
-//         if (err) {
-//           return res.status(401).send({ message: "Forbidden Access" });
-//         }
-//         req.decoded = decoded;
-//         next();
-//       }
-//     );
-//   }
-// };
+  if (token) {
+    jwt.verify(
+      token,
+      process.env.ACCESS_TOKEN,
+      function (err: any, decoded: any) {
+        if (err) {
+          return res.status(401).send({ message: err.message });
+        }
+        req.decoded = decoded;
+        next();
+      }
+    );
+  }
+};
 
 async function run() {
   try {
@@ -57,19 +56,19 @@ async function run() {
     const reviewCollection = client.db("Products").collection("review");
 
     // // verify owner
-    // const verifyAuth = async (req: Request, res: Response, next: any) => {
-    //   const authEmail = req.decoded.email;
-    //   const findOwnerInDB = await userCollection.findOne({ email: authEmail });
+    const verifyOwner = async (req: Request, res: Response, next: any) => {
+      const authEmail = req.decoded.email;
+      const findOwnerInDB = await userCollection.findOne({ email: authEmail && authEmail });
 
-    //   if (findOwnerInDB.role === "owner" || findOwnerInDB.role === "admin") {
-    //     next();
-    //   } else {
-    //     res.status(403).send({ message: "Forbidden access" });
-    //   }
-    // };
+      if (findOwnerInDB.role === "owner") {
+        next();
+      } else {
+        res.status(403).send({ message: "Unauthorized" });
+      }
+    };
 
     // make admin request
-    app.put("/make-admin/:userId", async (req: Request, res: Response) => {
+    app.put("/make-admin/:userId", verifyJWT, verifyOwner, async (req: Request, res: Response) => {
       const userId: string = req.params.userId;
       res.send(
         await userCollection.updateOne(
@@ -86,40 +85,27 @@ async function run() {
     });
 
     // get owner, admin and user from database
-    app.get("/fetch-auth/:email", async (req: Request, res: Response) => {
-      const email = req.params.email;
-      const token = req.headers.authorization?.split(" ")[1];
+    app.get(
+      "/fetch-auth/:email",
+      async (req: Request, res: Response) => {
+        const email = req.params.email;
+        const token = req.headers.authorization?.split(" ")[1];
 
-      if (token) {
-        const result = await userCollection.findOne({ email: email });
+        if (token) {
+          const result = await userCollection.findOne({ email: email });
 
-        if (result && result.role === "owner") {
-          res.status(200).send({ role: "owner" });
+          if (result && result.role === "owner") {
+            res.status(200).send({ role: "owner" });
+          }
+
+          if (result && result.role === "admin") {
+            res.status(200).send({ role: "admin" });
+          }
+        } else {
+          return res.status(403).send({ message: "Header Missing" });
         }
-
-        if (result && result.role === "admin") {
-          res.status(200).send({ role: "admin" });
-        }
-
-        // jwt.verify(token, process.env.ACCESS_TOKEN, async (err : any, decoded:any) => {
-        //   if (err) {
-        //     return res.status(403).send({message : err?.message})
-        //   } else {
-        //     const result = await userCollection.findOne({ email: decoded?.email });
-
-        //     if (result && result.role === "owner") {
-        //       res.status(200).send({ role: "owner" });
-        //     }
-
-        //     if (result && result.role === "admin") {
-        //       res.status(200).send({ role: "admin" });
-        //     }
-        //   }
-        // })
-      } else {
-        return res.status(403).send({ message: "Unauthorized" });
       }
-    });
+    );
 
     // add user to the database
     app.put("/user/:email", async (req: Request, res: Response) => {
@@ -131,7 +117,7 @@ async function run() {
       );
       const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
         algorithm: "HS256",
-        expiresIn: "1hr",
+        expiresIn: "2h",
       });
       res.send({ result, token });
     });
