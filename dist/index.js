@@ -80,17 +80,35 @@ function run() {
             app.get("/all-users", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 res.send(yield userCollection.find({ role: { $ne: "owner" } }).toArray());
             }));
-            // get owner and admin
+            // get owner, admin and user from database
             app.get("/fetch-auth/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                var _a;
                 const email = req.params.email;
-                const result = yield userCollection.findOne({ email: email });
-                if (result) {
-                    if (result.role === "owner") {
-                        res.send({ role: "owner" });
+                const token = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1];
+                if (token) {
+                    const result = yield userCollection.findOne({ email: email });
+                    if (result && result.role === "owner") {
+                        res.status(200).send({ role: "owner" });
                     }
-                    else if (result.role === "admin") {
-                        res.send({ role: "admin" });
+                    if (result && result.role === "admin") {
+                        res.status(200).send({ role: "admin" });
                     }
+                    // jwt.verify(token, process.env.ACCESS_TOKEN, async (err : any, decoded:any) => {
+                    //   if (err) {
+                    //     return res.status(403).send({message : err?.message})
+                    //   } else {
+                    //     const result = await userCollection.findOne({ email: decoded?.email });
+                    //     if (result && result.role === "owner") {
+                    //       res.status(200).send({ role: "owner" });
+                    //     }
+                    //     if (result && result.role === "admin") {
+                    //       res.status(200).send({ role: "admin" });
+                    //     }
+                    //   }
+                    // })
+                }
+                else {
+                    return res.status(403).send({ message: "Unauthorized" });
                 }
             }));
             // add user to the database
@@ -98,7 +116,8 @@ function run() {
                 const email = req.params.email;
                 const result = yield userCollection.updateOne({ email: email }, { $set: { email } }, { upsert: true });
                 const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
-                    expiresIn: "1h",
+                    algorithm: "HS256",
+                    expiresIn: "1hr",
                 });
                 res.send({ result, token });
             }));
@@ -153,7 +172,7 @@ function run() {
             }));
             // upsert review in product
             app.put("/add-rating/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                var _a, _b, _c, _d, _e;
+                var _b, _c, _d, _e, _f;
                 const email = req.params.email;
                 const body = req.body;
                 let newRating;
@@ -186,11 +205,11 @@ function run() {
                 });
                 const point = parseInt(body === null || body === void 0 ? void 0 : body.rating_point);
                 let newRatingPoint = products === null || products === void 0 ? void 0 : products.rating;
-                let rat1 = parseInt((_a = newRatingPoint[4]) === null || _a === void 0 ? void 0 : _a.count) || 0;
-                let rat2 = parseInt((_b = newRatingPoint[3]) === null || _b === void 0 ? void 0 : _b.count) || 0;
-                let rat3 = parseInt((_c = newRatingPoint[2]) === null || _c === void 0 ? void 0 : _c.count) || 0;
-                let rat4 = parseInt((_d = newRatingPoint[1]) === null || _d === void 0 ? void 0 : _d.count) || 0;
-                let rat5 = parseInt((_e = newRatingPoint[0]) === null || _e === void 0 ? void 0 : _e.count) || 0;
+                let rat1 = parseInt((_b = newRatingPoint[4]) === null || _b === void 0 ? void 0 : _b.count) || 0;
+                let rat2 = parseInt((_c = newRatingPoint[3]) === null || _c === void 0 ? void 0 : _c.count) || 0;
+                let rat3 = parseInt((_d = newRatingPoint[2]) === null || _d === void 0 ? void 0 : _d.count) || 0;
+                let rat4 = parseInt((_e = newRatingPoint[1]) === null || _e === void 0 ? void 0 : _e.count) || 0;
+                let rat5 = parseInt((_f = newRatingPoint[0]) === null || _f === void 0 ? void 0 : _f.count) || 0;
                 if (point === 5) {
                     rat5 += 1;
                 }
@@ -347,7 +366,7 @@ function run() {
             }));
             // set order api call
             app.post("/set-order/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                var _f;
+                var _g;
                 const userEmail = req.params.userEmail;
                 const body = req.body;
                 if ((body === null || body === void 0 ? void 0 : body.product.length) <= 0) {
@@ -358,7 +377,7 @@ function run() {
                 else if ((body === null || body === void 0 ? void 0 : body.address) === null) {
                     res.send({ message: "We Can Not Find Any Address In Your Order List" });
                 }
-                else if (((_f = body === null || body === void 0 ? void 0 : body.address) === null || _f === void 0 ? void 0 : _f.select_address) === false) {
+                else if (((_g = body === null || body === void 0 ? void 0 : body.address) === null || _g === void 0 ? void 0 : _g.select_address) === false) {
                     res.send({ message: "Address Not Selected" });
                 }
                 else {

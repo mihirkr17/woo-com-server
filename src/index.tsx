@@ -85,21 +85,41 @@ async function run() {
       res.send(await userCollection.find({ role: { $ne: "owner" } }).toArray());
     });
 
-    // get owner and admin
-    app.get(
-      "/fetch-auth/:email",
-      async (req: Request, res: Response) => {
-        const email = req.params.email;
+    // get owner, admin and user from database
+    app.get("/fetch-auth/:email", async (req: Request, res: Response) => {
+      const email = req.params.email;
+      const token = req.headers.authorization?.split(" ")[1];
+
+      if (token) {
         const result = await userCollection.findOne({ email: email });
-        if (result) {
-          if (result.role === "owner") {
-            res.send({ role: "owner" });
-          } else if (result.role === "admin") {
-            res.send({ role: "admin" });
-          }
+
+        if (result && result.role === "owner") {
+          res.status(200).send({ role: "owner" });
         }
+
+        if (result && result.role === "admin") {
+          res.status(200).send({ role: "admin" });
+        }
+
+        // jwt.verify(token, process.env.ACCESS_TOKEN, async (err : any, decoded:any) => {
+        //   if (err) {
+        //     return res.status(403).send({message : err?.message})
+        //   } else {
+        //     const result = await userCollection.findOne({ email: decoded?.email });
+
+        //     if (result && result.role === "owner") {
+        //       res.status(200).send({ role: "owner" });
+        //     }
+
+        //     if (result && result.role === "admin") {
+        //       res.status(200).send({ role: "admin" });
+        //     }
+        //   }
+        // })
+      } else {
+        return res.status(403).send({ message: "Unauthorized" });
       }
-    );
+    });
 
     // add user to the database
     app.put("/user/:email", async (req: Request, res: Response) => {
@@ -110,7 +130,8 @@ async function run() {
         { upsert: true }
       );
       const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
-        expiresIn: "1h",
+        algorithm: "HS256",
+        expiresIn: "1hr",
       });
       res.send({ result, token });
     });
