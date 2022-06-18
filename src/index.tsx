@@ -116,14 +116,18 @@ async function run() {
       const email = req.params.email;
       const existUser = await userCollection.findOne({ email: email });
       if (existUser) {
-        return res.status(400).send({ message: "User Already Exists!" });
+        const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
+          algorithm: "HS256",
+          expiresIn: "2h",
+        });
+        res.status(200).send({ token });
       } else {
         const result = await userCollection.insertOne({ email, role: "user" });
         const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
           algorithm: "HS256",
           expiresIn: "2h",
         });
-        res.send({ result, token });
+        res.status(200).send({ result, token });
       }
     });
 

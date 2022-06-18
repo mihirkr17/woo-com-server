@@ -103,7 +103,11 @@ function run() {
                 const email = req.params.email;
                 const existUser = yield userCollection.findOne({ email: email });
                 if (existUser) {
-                    return res.status(400).send({ message: "User Already Exists!" });
+                    const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
+                        algorithm: "HS256",
+                        expiresIn: "2h",
+                    });
+                    res.status(200).send({ token });
                 }
                 else {
                     const result = yield userCollection.insertOne({ email, role: "user" });
@@ -111,7 +115,7 @@ function run() {
                         algorithm: "HS256",
                         expiresIn: "2h",
                     });
-                    res.send({ result, token });
+                    res.status(200).send({ result, token });
                 }
             }));
             // finding all Products
