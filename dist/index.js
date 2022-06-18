@@ -99,7 +99,7 @@ function run() {
             // add user to the database
             app.put("/user/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
-                const result = yield userCollection.updateOne({ email: email }, { $set: { email } }, { upsert: true });
+                const result = yield userCollection.updateOne({ email: email }, { $set: { email, role: "user" } }, { upsert: true });
                 const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
                     algorithm: "HS256",
                     expiresIn: "2h",

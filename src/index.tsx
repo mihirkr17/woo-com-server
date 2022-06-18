@@ -112,7 +112,7 @@ async function run() {
       const email = req.params.email;
       const result = await userCollection.updateOne(
         { email: email },
-        { $set: { email } },
+        { $set: { email, role : "user" } },
         { upsert: true }
       );
       const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
