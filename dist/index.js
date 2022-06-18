@@ -61,7 +61,9 @@ function run() {
             // // verify owner
             const verifyOwner = (req, res, next) => __awaiter(this, void 0, void 0, function* () {
                 const authEmail = req.decoded.email;
-                const findOwnerInDB = yield userCollection.findOne({ email: authEmail && authEmail });
+                const findOwnerInDB = yield userCollection.findOne({
+                    email: authEmail && authEmail,
+                });
                 if (findOwnerInDB.role === "owner") {
                     next();
                 }
@@ -97,14 +99,20 @@ function run() {
                 }
             }));
             // add user to the database
-            app.put("/user/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.post("/user/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
-                const result = yield userCollection.updateOne({ email: email }, { $set: { email, role: "user" } }, { upsert: true });
-                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
-                    algorithm: "HS256",
-                    expiresIn: "2h",
-                });
-                res.send({ result, token });
+                const existUser = yield userCollection.findOne({ email: email });
+                if (existUser) {
+                    return res.status(400).send({ message: "User Already Exists!" });
+                }
+                else {
+                    const result = yield userCollection.insertOne({ email, role: "user" });
+                    const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
+                        algorithm: "HS256",
+                        expiresIn: "2h",
+                    });
+                    res.send({ result, token });
+                }
             }));
             // finding all Products
             app.get("/products", (req, res) => __awaiter(this, void 0, void 0, function* () {
