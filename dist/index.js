@@ -71,6 +71,18 @@ function run() {
                     res.status(403).send({ message: "Unauthorized" });
                 }
             });
+            // update data 
+            app.put('/update-profile-data/:email', (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const email = req.params.email;
+                const data = req.body;
+                const result = yield userCollection.updateOne({ email: email }, { $set: req.body }, { upsert: true });
+                res.status(200).send(result);
+            }));
+            // fetch myProfile data in my profile page
+            app.get("/my-profile/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const email = req.params.email;
+                res.status(200).send(yield userCollection.findOne({ email: email }));
+            }));
             // make admin request
             app.put("/make-admin/:userId", verifyJWT, verifyOwner, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const userId = req.params.userId;
