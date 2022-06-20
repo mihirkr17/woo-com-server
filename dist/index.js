@@ -72,13 +72,23 @@ function run() {
                 }
             });
             // get product by some condition in manage product page api
-            app.get('/api/products', (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.get("/api/products", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const email = req.query.email;
                 const item = req.query.items;
                 const page = req.query.page;
-                const cursor = productsCollection.find({});
+                let cursor;
+                if (email) {
+                    cursor = productsCollection.find({ seller: email });
+                }
+                else {
+                    cursor = productsCollection.find({});
+                }
                 let result;
                 if (item || page) {
-                    result = yield cursor.skip(parseInt(item) * parseInt(page)).limit(5).toArray();
+                    result = yield cursor
+                        .skip(parseInt(item) * parseInt(page))
+                        .limit(5)
+                        .toArray();
                 }
                 else {
                     result = yield cursor.toArray();
@@ -86,7 +96,7 @@ function run() {
                 res.send(result);
             }));
             // product count
-            app.get('/api/product-count', (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.get("/api/product-count", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const count = yield productsCollection.estimatedDocumentCount();
                 res.send({ count });
             }));

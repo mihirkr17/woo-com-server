@@ -70,28 +70,36 @@ async function run() {
     };
 
     // get product by some condition in manage product page api
-    app.get('/api/products', async(req:Request, res:Response) => {
-      const item : any = req.query.items;
-      const page : any = req.query.page;
-      const cursor = productsCollection.find({});
+    app.get("/api/products", async (req: Request, res: Response) => {
+      const email: any = req.query.email;
+      const item: any = req.query.items;
+      const page: any = req.query.page;
+      let cursor: any;
+      if (email) {
+        cursor = productsCollection.find({ seller: email });
+      } else {
+        cursor = productsCollection.find({});
+      }
 
       let result;
 
       if (item || page) {
-        result = await cursor.skip(parseInt(item) * parseInt(page)).limit(5).toArray();
+        result = await cursor
+          .skip(parseInt(item) * parseInt(page))
+          .limit(5)
+          .toArray();
       } else {
         result = await cursor.toArray();
       }
 
       res.send(result);
-    })
-
+    });
 
     // product count
-    app.get('/api/product-count', async(req:Request, res:Response) => {
+    app.get("/api/product-count", async (req: Request, res: Response) => {
       const count = await productsCollection.estimatedDocumentCount();
-      res.send({count});
-    })
+      res.send({ count });
+    });
 
     // update data
     app.put(
