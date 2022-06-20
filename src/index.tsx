@@ -85,7 +85,7 @@ async function run() {
 
       if (item || page) {
         result = await cursor
-          .skip(5 * parseInt(page))
+          .skip(parseInt(item) * parseInt(page))
           .limit(5)
           .toArray();
       } else {
