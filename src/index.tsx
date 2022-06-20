@@ -69,13 +69,44 @@ async function run() {
       }
     };
 
-    // update data 
-    app.put('/update-profile-data/:email', async (req: Request, res: Response)=> {
-      const email = req.params.email;
-      const data = req.body;
-      const result = await userCollection.updateOne({email : email}, {$set : req.body}, {upsert : true});
-      res.status(200).send(result);
+    // get product by some condition in manage product page api
+    app.get('/api/products', async(req:Request, res:Response) => {
+      const item : any = req.query.items;
+      const page : any = req.query.page;
+      const cursor = productsCollection.find({});
+
+      let result;
+
+      if (item || page) {
+        result = await cursor.skip(parseInt(item) * parseInt(page)).limit(5).toArray();
+      } else {
+        result = await cursor.toArray();
+      }
+
+      res.send(result);
     })
+
+
+    // product count
+    app.get('/api/product-count', async(req:Request, res:Response) => {
+      const count = await productsCollection.estimatedDocumentCount();
+      res.send({count});
+    })
+
+    // update data
+    app.put(
+      "/update-profile-data/:email",
+      async (req: Request, res: Response) => {
+        const email = req.params.email;
+        const data = req.body;
+        const result = await userCollection.updateOne(
+          { email: email },
+          { $set: req.body },
+          { upsert: true }
+        );
+        res.status(200).send(result);
+      }
+    );
 
     // fetch myProfile data in my profile page
     app.get("/my-profile/:email", async (req: Request, res: Response) => {

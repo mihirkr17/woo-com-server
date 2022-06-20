@@ -71,8 +71,27 @@ function run() {
                     res.status(403).send({ message: "Unauthorized" });
                 }
             });
-            // update data 
-            app.put('/update-profile-data/:email', (req, res) => __awaiter(this, void 0, void 0, function* () {
+            // get product by some condition in manage product page api
+            app.get('/api/products', (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const item = req.query.items;
+                const page = req.query.page;
+                const cursor = productsCollection.find({});
+                let result;
+                if (item || page) {
+                    result = yield cursor.skip(parseInt(item) * parseInt(page)).limit(5).toArray();
+                }
+                else {
+                    result = yield cursor.toArray();
+                }
+                res.send(result);
+            }));
+            // product count
+            app.get('/api/product-count', (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const count = yield productsCollection.estimatedDocumentCount();
+                res.send({ count });
+            }));
+            // update data
+            app.put("/update-profile-data/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
                 const data = req.body;
                 const result = yield userCollection.updateOne({ email: email }, { $set: req.body }, { upsert: true });
