@@ -86,7 +86,7 @@ function run() {
                 let result;
                 if (item || page) {
                     result = yield cursor
-                        .skip(parseInt(item) * parseInt(page))
+                        .skip(parseInt(page) * 5)
                         .limit(5)
                         .toArray();
                 }
