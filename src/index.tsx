@@ -85,8 +85,8 @@ async function run() {
 
       if (item || page) {
         result = await cursor
-          .skip(parseInt(page) * 5)
-          .limit(5)
+          .skip(parseInt(page) * parseInt(item))
+          .limit(parseInt(item))
           .toArray();
       } else {
         result = await cursor.toArray();
@@ -97,8 +97,15 @@ async function run() {
 
     // product count
     app.get("/api/product-count", async (req: Request, res: Response) => {
-      const count = await productsCollection.estimatedDocumentCount();
-      res.send({ count });
+      const email = req.query.email;
+      let result: any;
+      if (email) {
+        result = await productsCollection.find({ seller: email }).toArray();
+        result = result.length;
+      } else {
+        result = await productsCollection.estimatedDocumentCount();
+      }
+      res.send({ count: result });
     });
 
     // update data

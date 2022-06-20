@@ -86,8 +86,8 @@ function run() {
                 let result;
                 if (item || page) {
                     result = yield cursor
-                        .skip(parseInt(page) * 5)
-                        .limit(5)
+                        .skip(parseInt(page) * parseInt(item))
+                        .limit(parseInt(item))
                         .toArray();
                 }
                 else {
@@ -97,8 +97,16 @@ function run() {
             }));
             // product count
             app.get("/api/product-count", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const count = yield productsCollection.estimatedDocumentCount();
-                res.send({ count });
+                const email = req.query.email;
+                let result;
+                if (email) {
+                    result = yield productsCollection.find({ seller: email }).toArray();
+                    result = result.length;
+                }
+                else {
+                    result = yield productsCollection.estimatedDocumentCount();
+                }
+                res.send({ count: result });
             }));
             // update data
             app.put("/update-profile-data/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
