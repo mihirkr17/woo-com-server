@@ -190,7 +190,7 @@ async function run() {
       );
       const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
         algorithm: "HS256",
-        expiresIn: "2h",
+        expiresIn: "6h",
       });
       res.send({ result, token });
     });
