@@ -159,7 +159,7 @@ function run() {
                 const result = yield userCollection.updateOne({ email: email }, updateDocuments, { upsert: true });
                 const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
                     algorithm: "HS256",
-                    expiresIn: "2h",
+                    expiresIn: "6h",
                 });
                 res.send({ result, token });
             }));
@@ -320,13 +320,13 @@ function run() {
             app.put("/up-cart-qty-ttl-price/:pId/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const pId = req.params.pId;
                 const user_email = req.params.email;
-                const { quantity, total_price, total_discount } = req.body;
+                const { quantity, price_total, discount_amount_total } = req.body;
                 const fill = { user_email: user_email, "product._id": pId };
                 const result = yield cartCollection.updateOne(fill, {
                     $set: {
                         "product.$.quantity": quantity,
-                        "product.$.total_price": total_price,
-                        "product.$.total_discount": total_discount,
+                        "product.$.price_total": price_total,
+                        "product.$.discount_amount_total": discount_amount_total,
                     },
                 }, { upsert: true });
                 res.send(result);
@@ -408,7 +408,6 @@ function run() {
             }));
             // set order api call
             app.post("/set-order/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                var _g;
                 const userEmail = req.params.userEmail;
                 const body = req.body;
                 if ((body === null || body === void 0 ? void 0 : body.product.length) <= 0) {
@@ -416,59 +415,55 @@ function run() {
                         message: "Order Cancelled. You Have To Select Atleast One Product",
                     });
                 }
-                else if ((body === null || body === void 0 ? void 0 : body.address) === null) {
-                    res.send({ message: "We Can Not Find Any Address In Your Order List" });
-                }
-                else if (((_g = body === null || body === void 0 ? void 0 : body.address) === null || _g === void 0 ? void 0 : _g.select_address) === false) {
-                    res.send({ message: "Address Not Selected" });
-                }
                 else {
                     const result = yield orderCollection.updateOne({ user_email: userEmail }, { $push: { orders: body } }, { upsert: true });
-                    const order = yield orderCollection.findOne({ user_email: userEmail });
-                    let orderId;
-                    if (order) {
-                        let getOrder = order === null || order === void 0 ? void 0 : order.orders;
-                        orderId = getOrder.find((i) => i.orderId === (body === null || body === void 0 ? void 0 : body.orderId));
-                    }
-                    res.send({ result, orderId: orderId === null || orderId === void 0 ? void 0 : orderId.orderId });
+                    res.send(result);
                 }
             }));
             // get my order list in my-order page
             app.get("/my-order/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
-                res.send(yield orderCollection.findOne({ user_email: email }));
+                const result = yield orderCollection
+                    .aggregate([
+                    { $unwind: "$orders" },
+                    { $unwind: "$orders.product" },
+                    { $match: { user_email: email } },
+                ])
+                    .toArray();
+                // res.send(await orderCollection.findOne({ user_email: email }));
+                res.send(result);
             }));
             // cancel orders
             app.delete("/cancel-order/:email/:orderId", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
                 const id = parseInt(req.params.orderId);
-                const result = yield orderCollection.updateOne({ user_email: email }, { $pull: { orders: { orderId: id } } });
+                const result = yield orderCollection.updateOne({ user_email: email }, { $pull: { "orders.$[].product": { orderId: id } } });
                 res.send(result);
             }));
-            // update order status by admin
-            app.put("/update-order-status/:email/:id/:status", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const email = req.params.email;
+            // update order status by admin or product owner
+            app.put("/update-order-status/:status/:user_email/:id", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const orderId = parseInt(req.params.id);
                 const status = req.params.status;
+                const userEmail = req.params.user_email;
                 let time = new Date().toLocaleString();
                 let upDoc;
                 if (status === "placed") {
                     upDoc = {
                         $set: {
-                            "orders.$.status": status,
-                            "orders.$.time_placed": time,
+                            "orders.$[].product.$[i].status": status,
+                            "orders.$[].product.$[i].time_placed": time,
                         },
                     };
                 }
                 else if (status === "shipped") {
                     upDoc = {
                         $set: {
-                            "orders.$.status": status,
-                            "orders.$.time_shipped": time,
+                            "orders.$[].product.$[i].status": status,
+                            "orders.$[].product.$[i].time_placed": time,
                         },
                     };
                 }
-                const rs = yield orderCollection.updateOne({ user_email: email, "orders.orderId": orderId }, upDoc, { upsert: true });
+                const rs = yield orderCollection.updateOne({ user_email: userEmail }, upDoc, { arrayFilters: [{ "i.orderId": orderId }] });
                 res.send(rs);
             }));
             // get order list
@@ -478,10 +473,27 @@ function run() {
                 res.send(result);
             }));
             /// find orderId
-            app.get("/manage-orders/", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const result = yield orderCollection
-                    .aggregate([{ $unwind: "$orders" }])
-                    .toArray();
+            app.get("/manage-orders", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const email = req.query.email;
+                let result;
+                if (email) {
+                    result = yield orderCollection
+                        .aggregate([
+                        { $unwind: "$orders" },
+                        { $unwind: "$orders.product" },
+                        {
+                            $match: {
+                                "orders.product.seller": email,
+                            },
+                        },
+                    ])
+                        .toArray();
+                }
+                else {
+                    result = yield orderCollection
+                        .aggregate([{ $unwind: "$orders" }])
+                        .toArray();
+                }
                 res.send(result);
             }));
         }

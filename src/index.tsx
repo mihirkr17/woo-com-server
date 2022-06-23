@@ -389,15 +389,15 @@ async function run() {
       async (req: Request, res: Response) => {
         const pId = req.params.pId;
         const user_email = req.params.email;
-        const { quantity, total_price, total_discount } = req.body;
+        const { quantity, price_total, discount_amount_total } = req.body;
         const fill = { user_email: user_email, "product._id": pId };
         const result = await cartCollection.updateOne(
           fill,
           {
             $set: {
               "product.$.quantity": quantity,
-              "product.$.total_price": total_price,
-              "product.$.total_discount": total_discount,
+              "product.$.price_total": price_total,
+              "product.$.discount_amount_total": discount_amount_total,
             },
           },
           { upsert: true }
@@ -519,31 +519,28 @@ async function run() {
         res.send({
           message: "Order Cancelled. You Have To Select Atleast One Product",
         });
-      } else if (body?.address === null) {
-        res.send({ message: "We Can Not Find Any Address In Your Order List" });
-      } else if (body?.address?.select_address === false) {
-        res.send({ message: "Address Not Selected" });
       } else {
         const result = await orderCollection.updateOne(
           { user_email: userEmail },
           { $push: { orders: body } },
           { upsert: true }
         );
-        const order = await orderCollection.findOne({ user_email: userEmail });
-
-        let orderId;
-        if (order) {
-          let getOrder = order?.orders;
-          orderId = getOrder.find((i: any) => i.orderId === body?.orderId);
-        }
-        res.send({ result, orderId: orderId?.orderId });
+        res.send(result);
       }
     });
 
     // get my order list in my-order page
     app.get("/my-order/:email", async (req: Request, res: Response) => {
       const email = req.params.email;
-      res.send(await orderCollection.findOne({ user_email: email }));
+      const result = await orderCollection
+        .aggregate([
+          { $unwind: "$orders" },
+          { $unwind: "$orders.product" },
+          { $match: { user_email: email } },
+        ])
+        .toArray();
+      // res.send(await orderCollection.findOne({ user_email: email }));
+      res.send(result);
     });
 
     // cancel orders
@@ -555,19 +552,20 @@ async function run() {
 
         const result = await orderCollection.updateOne(
           { user_email: email },
-          { $pull: { orders: { orderId: id } } }
+          { $pull: { "orders.$[].product": { orderId: id } } }
         );
+
         res.send(result);
       }
     );
 
-    // update order status by admin
+    // update order status by admin or product owner
     app.put(
-      "/update-order-status/:email/:id/:status",
+      "/update-order-status/:status/:user_email/:id",
       async (req: Request, res: Response) => {
-        const email = req.params.email;
         const orderId = parseInt(req.params.id);
         const status = req.params.status;
+        const userEmail = req.params.user_email;
 
         let time: string = new Date().toLocaleString();
         let upDoc: any;
@@ -575,23 +573,23 @@ async function run() {
         if (status === "placed") {
           upDoc = {
             $set: {
-              "orders.$.status": status,
-              "orders.$.time_placed": time,
+              "orders.$[].product.$[i].status": status,
+              "orders.$[].product.$[i].time_placed": time,
             },
           };
         } else if (status === "shipped") {
           upDoc = {
             $set: {
-              "orders.$.status": status,
-              "orders.$.time_shipped": time,
+              "orders.$[].product.$[i].status": status,
+              "orders.$[].product.$[i].time_placed": time,
             },
           };
         }
 
         const rs = await orderCollection.updateOne(
-          { user_email: email, "orders.orderId": orderId },
+          { user_email: userEmail },
           upDoc,
-          { upsert: true }
+          { arrayFilters: [{ "i.orderId": orderId }] }
         );
         res.send(rs);
       }
@@ -605,10 +603,27 @@ async function run() {
     });
 
     /// find orderId
-    app.get("/manage-orders/", async (req: Request, res: Response) => {
-      const result = await orderCollection
-        .aggregate([{ $unwind: "$orders" }])
-        .toArray();
+    app.get("/manage-orders", async (req: Request, res: Response) => {
+      const email = req.query.email;
+      let result: any;
+
+      if (email) {
+        result = await orderCollection
+          .aggregate([
+            { $unwind: "$orders" },
+            { $unwind: "$orders.product" },
+            {
+              $match: {
+                "orders.product.seller": email,
+              },
+            },
+          ])
+          .toArray();
+      } else {
+        result = await orderCollection
+          .aggregate([{ $unwind: "$orders" }])
+          .toArray();
+      }
 
       res.send(result);
     });
