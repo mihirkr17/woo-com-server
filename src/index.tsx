@@ -515,32 +515,24 @@ async function run() {
       const userEmail = req.params.userEmail;
       const body = req.body;
 
-      if (body?.product.length <= 0) {
-        res.send({
-          message: "Order Cancelled. You Have To Select Atleast One Product",
-        });
-      } else {
-        const result = await orderCollection.updateOne(
-          { user_email: userEmail },
-          { $push: { orders: body } },
-          { upsert: true }
-        );
-        res.send(result);
-      }
+      // if (body?.product.length <= 0) {
+      //   res.send({
+      //     message: "Order Cancelled. You Have To Select Atleast One Product",
+      //   });
+      // } else {
+      const result = await orderCollection.updateOne(
+        { user_email: userEmail },
+        { $push: { orders: body } },
+        { upsert: true }
+      );
+      res.send(result);
+      // }
     });
 
     // get my order list in my-order page
     app.get("/my-order/:email", async (req: Request, res: Response) => {
       const email = req.params.email;
-      const result = await orderCollection
-        .aggregate([
-          { $unwind: "$orders" },
-          { $unwind: "$orders.product" },
-          { $match: { user_email: email } },
-        ])
-        .toArray();
-      // res.send(await orderCollection.findOne({ user_email: email }));
-      res.send(result);
+      res.send(await orderCollection.findOne({ user_email: email }));
     });
 
     // cancel orders
@@ -552,10 +544,10 @@ async function run() {
 
         const result = await orderCollection.updateOne(
           { user_email: email },
-          { $pull: { "orders.$[].product": { orderId: id } } }
+          { $pull: { orders: { orderId: id } } }
         );
 
-        res.send(result);
+        res.send({ result, message: "Order Cancelled successfully" });
       }
     );
 
@@ -573,15 +565,15 @@ async function run() {
         if (status === "placed") {
           upDoc = {
             $set: {
-              "orders.$[].product.$[i].status": status,
-              "orders.$[].product.$[i].time_placed": time,
+              "orders.$[i].status": status,
+              "orders.$[i].time_placed": time,
             },
           };
         } else if (status === "shipped") {
           upDoc = {
             $set: {
-              "orders.$[].product.$[i].status": status,
-              "orders.$[].product.$[i].time_placed": time,
+              "orders.$[i].status": status,
+              "orders.$[i].time_placed": time,
             },
           };
         }
@@ -611,10 +603,9 @@ async function run() {
         result = await orderCollection
           .aggregate([
             { $unwind: "$orders" },
-            { $unwind: "$orders.product" },
             {
               $match: {
-                "orders.product.seller": email,
+                "orders.seller": email,
               },
             },
           ])

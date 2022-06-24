@@ -410,35 +410,26 @@ function run() {
             app.post("/set-order/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const userEmail = req.params.userEmail;
                 const body = req.body;
-                if ((body === null || body === void 0 ? void 0 : body.product.length) <= 0) {
-                    res.send({
-                        message: "Order Cancelled. You Have To Select Atleast One Product",
-                    });
-                }
-                else {
-                    const result = yield orderCollection.updateOne({ user_email: userEmail }, { $push: { orders: body } }, { upsert: true });
-                    res.send(result);
-                }
+                // if (body?.product.length <= 0) {
+                //   res.send({
+                //     message: "Order Cancelled. You Have To Select Atleast One Product",
+                //   });
+                // } else {
+                const result = yield orderCollection.updateOne({ user_email: userEmail }, { $push: { orders: body } }, { upsert: true });
+                res.send(result);
+                // }
             }));
             // get my order list in my-order page
             app.get("/my-order/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
-                const result = yield orderCollection
-                    .aggregate([
-                    { $unwind: "$orders" },
-                    { $unwind: "$orders.product" },
-                    { $match: { user_email: email } },
-                ])
-                    .toArray();
-                // res.send(await orderCollection.findOne({ user_email: email }));
-                res.send(result);
+                res.send(yield orderCollection.findOne({ user_email: email }));
             }));
             // cancel orders
             app.delete("/cancel-order/:email/:orderId", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
                 const id = parseInt(req.params.orderId);
-                const result = yield orderCollection.updateOne({ user_email: email }, { $pull: { "orders.$[].product": { orderId: id } } });
-                res.send(result);
+                const result = yield orderCollection.updateOne({ user_email: email }, { $pull: { orders: { orderId: id } } });
+                res.send({ result, message: "Order Cancelled successfully" });
             }));
             // update order status by admin or product owner
             app.put("/update-order-status/:status/:user_email/:id", (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -450,16 +441,16 @@ function run() {
                 if (status === "placed") {
                     upDoc = {
                         $set: {
-                            "orders.$[].product.$[i].status": status,
-                            "orders.$[].product.$[i].time_placed": time,
+                            "orders.$[i].status": status,
+                            "orders.$[i].time_placed": time,
                         },
                     };
                 }
                 else if (status === "shipped") {
                     upDoc = {
                         $set: {
-                            "orders.$[].product.$[i].status": status,
-                            "orders.$[].product.$[i].time_placed": time,
+                            "orders.$[i].status": status,
+                            "orders.$[i].time_placed": time,
                         },
                     };
                 }
@@ -480,10 +471,9 @@ function run() {
                     result = yield orderCollection
                         .aggregate([
                         { $unwind: "$orders" },
-                        { $unwind: "$orders.product" },
                         {
                             $match: {
-                                "orders.product.seller": email,
+                                "orders.seller": email,
                             },
                         },
                     ])
