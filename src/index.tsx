@@ -623,6 +623,18 @@ async function run() {
 
       res.send(result);
     });
+
+    // set total earning to user db
+    app.put("/add-earning/:email", async (req: Request, res: Response) => {
+      const email = req.params.email;
+      const { total_earn } = req.body;
+      const result = await userCollection.updateOne(
+        { email: email },
+        { $set: {total_earn} },
+        { upsert: true }
+      );
+      res.status(200).send(result);
+    });
   } finally {
   }
 }

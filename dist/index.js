@@ -406,25 +406,31 @@ function run() {
                 });
                 res.send(result);
             }));
+            /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+            +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+              This is order section api operation
+            +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+            +++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
             // set order api call
             app.post("/set-order/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const userEmail = req.params.userEmail;
                 const body = req.body;
-                // if (body?.product.length <= 0) {
-                //   res.send({
-                //     message: "Order Cancelled. You Have To Select Atleast One Product",
-                //   });
-                // } else {
-                const result = yield orderCollection.updateOne({ user_email: userEmail }, { $push: { orders: body } }, { upsert: true });
-                res.send(result);
-                // }
+                if (!body) {
+                    res.send({
+                        message: "Order Cancelled. You Have To Select At least One Product",
+                    });
+                }
+                else {
+                    const result = yield orderCollection.updateOne({ user_email: userEmail }, { $push: { orders: body } }, { upsert: true });
+                    res.send(result);
+                }
             }));
             // get my order list in my-order page
             app.get("/my-order/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
                 res.send(yield orderCollection.findOne({ user_email: email }));
             }));
-            // cancel orders
+            // cancel orders from admin
             app.delete("/cancel-order/:email/:orderId", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
                 const id = parseInt(req.params.orderId);
@@ -485,6 +491,13 @@ function run() {
                         .toArray();
                 }
                 res.send(result);
+            }));
+            // set total earning to user db
+            app.put("/add-earning/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const email = req.params.email;
+                const { total_earn } = req.body;
+                const result = yield userCollection.updateOne({ email: email }, { $set: { total_earn } }, { upsert: true });
+                res.status(200).send(result);
             }));
         }
         finally {
