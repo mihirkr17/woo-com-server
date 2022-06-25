@@ -510,23 +510,28 @@ async function run() {
       res.send(result);
     });
 
+    /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+      This is order section api operation
+    +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    +++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
     // set order api call
     app.post("/set-order/:userEmail", async (req: Request, res: Response) => {
-      const userEmail = req.params.userEmail;
-      const body = req.body;
+      const userEmail: string = req.params.userEmail;
+      const body: string = req.body;
 
-      // if (body?.product.length <= 0) {
-      //   res.send({
-      //     message: "Order Cancelled. You Have To Select Atleast One Product",
-      //   });
-      // } else {
-      const result = await orderCollection.updateOne(
-        { user_email: userEmail },
-        { $push: { orders: body } },
-        { upsert: true }
-      );
-      res.send(result);
-      // }
+      if (!body) {
+        res.send({
+          message: "Order Cancelled. You Have To Select At least One Product",
+        });
+      } else {
+        const result = await orderCollection.updateOne(
+          { user_email: userEmail },
+          { $push: { orders: body } },
+          { upsert: true }
+        );
+        res.send(result);
+      }
     });
 
     // get my order list in my-order page
@@ -535,7 +540,7 @@ async function run() {
       res.send(await orderCollection.findOne({ user_email: email }));
     });
 
-    // cancel orders
+    // cancel orders from admin
     app.delete(
       "/cancel-order/:email/:orderId",
       async (req: Request, res: Response) => {
