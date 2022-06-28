@@ -564,16 +564,16 @@ async function run() {
 
     // update order status by admin or product owner
     app.put(
-      "/update-order-status/:status/:user_email/:id/:commission/:totalEarn",
+      "/update-order-status/:status/:user_email/:id",
       async (req: Request, res: Response) => {
         const orderId = parseInt(req.params.id);
         const status = req.params.status;
         const userEmail = req.params.user_email;
-        const commission = req.params.commission;
-        const total_earn = parseFloat(req.params.totalEarn);
-        const { ownerCommission, totalEarn } = req.body;
+        const { ownerCommission, totalEarn, seller_email } = req.body;
         let time: string = new Date().toLocaleString();
         let upDoc: any;
+
+        console.log(ownerCommission);
 
         if (status === "placed") {
           upDoc = {
@@ -590,18 +590,18 @@ async function run() {
             },
           };
 
-          if (ownerCommission || totalEarn) {
+          if (ownerCommission && totalEarn) {
             const ownerCol = await userCollection.findOne({ role: "owner" });
             let adminCol = await userCollection.findOne({
-              user_email: userEmail,
+              email: seller_email,
             });
             if (ownerCol) {
-              let ownerTotalEarn = ownerCol?.owner_total_earn;
+              let ownerTotalEarn = ownerCol?.total_earn;
               let ownerComm = parseFloat(ownerCommission);
               let earn = parseFloat(ownerTotalEarn) + ownerComm;
               await userCollection.updateOne(
                 { role: "owner" },
-                { $set: { owner_total_earn: earn } },
+                { $set: { total_earn: earn } },
                 { upsert: true }
               );
             }
@@ -611,8 +611,8 @@ async function run() {
               let totalEr = parseFloat(totalEarn);
               totalEarned = parseFloat(totalEarned) + totalEr;
               await userCollection.updateOne(
-                { user_email: userEmail },
-                { $set: { total_earn: totalEarn } },
+                { email: seller_email },
+                { $set: { total_earn: totalEarned } },
                 { upsert: true }
               );
             }
@@ -658,30 +658,6 @@ async function run() {
       }
 
       res.send(result);
-    });
-
-    // set total earning to user db
-    app.put("/add-earning/:param", async (req: Request, res: Response) => {
-      const param = req.params.param;
-      const { total_earn, owner_total_earn } = req.body;
-
-      if (param === "owner") {
-        const result = await userCollection.updateOne(
-          { role: param },
-          { $set: { owner_total_earn } },
-          { upsert: true }
-        );
-        res.status(200).send(result);
-      }
-
-      if (param !== "owner") {
-        const result = await userCollection.updateOne(
-          { email: param },
-          { $set: { total_earn } },
-          { upsert: true }
-        );
-        res.status(200).send(result);
-      }
     });
   } finally {
   }

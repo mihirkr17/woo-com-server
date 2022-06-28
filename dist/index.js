@@ -443,15 +443,14 @@ function run() {
                 res.send({ result, message: "Order Cancelled successfully" });
             }));
             // update order status by admin or product owner
-            app.put("/update-order-status/:status/:user_email/:id/:commission/:totalEarn", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.put("/update-order-status/:status/:user_email/:id", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const orderId = parseInt(req.params.id);
                 const status = req.params.status;
                 const userEmail = req.params.user_email;
-                const commission = req.params.commission;
-                const total_earn = parseFloat(req.params.totalEarn);
-                const { ownerCommission, totalEarn } = req.body;
+                const { ownerCommission, totalEarn, seller_email } = req.body;
                 let time = new Date().toLocaleString();
                 let upDoc;
+                console.log(ownerCommission);
                 if (status === "placed") {
                     upDoc = {
                         $set: {
@@ -467,22 +466,22 @@ function run() {
                             "orders.$[i].time_placed": time,
                         },
                     };
-                    if (ownerCommission || totalEarn) {
+                    if (ownerCommission && totalEarn) {
                         const ownerCol = yield userCollection.findOne({ role: "owner" });
                         let adminCol = yield userCollection.findOne({
-                            user_email: userEmail,
+                            email: seller_email,
                         });
                         if (ownerCol) {
-                            let ownerTotalEarn = ownerCol === null || ownerCol === void 0 ? void 0 : ownerCol.owner_total_earn;
+                            let ownerTotalEarn = ownerCol === null || ownerCol === void 0 ? void 0 : ownerCol.total_earn;
                             let ownerComm = parseFloat(ownerCommission);
                             let earn = parseFloat(ownerTotalEarn) + ownerComm;
-                            yield userCollection.updateOne({ role: "owner" }, { $set: { owner_total_earn: earn } }, { upsert: true });
+                            yield userCollection.updateOne({ role: "owner" }, { $set: { total_earn: earn } }, { upsert: true });
                         }
                         if (adminCol) {
                             let totalEarned = adminCol === null || adminCol === void 0 ? void 0 : adminCol.total_earn;
                             let totalEr = parseFloat(totalEarn);
                             totalEarned = parseFloat(totalEarned) + totalEr;
-                            yield userCollection.updateOne({ user_email: userEmail }, { $set: { total_earn: totalEarn } }, { upsert: true });
+                            yield userCollection.updateOne({ email: seller_email }, { $set: { total_earn: totalEarned } }, { upsert: true });
                         }
                     }
                 }
@@ -517,19 +516,6 @@ function run() {
                         .toArray();
                 }
                 res.send(result);
-            }));
-            // set total earning to user db
-            app.put("/add-earning/:param", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const param = req.params.param;
-                const { total_earn, owner_total_earn } = req.body;
-                if (param === "owner") {
-                    const result = yield userCollection.updateOne({ role: param }, { $set: { owner_total_earn } }, { upsert: true });
-                    res.status(200).send(result);
-                }
-                if (param !== "owner") {
-                    const result = yield userCollection.updateOne({ email: param }, { $set: { total_earn } }, { upsert: true });
-                    res.status(200).send(result);
-                }
             }));
         }
         finally {
