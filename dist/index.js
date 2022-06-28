@@ -163,6 +163,11 @@ function run() {
                 });
                 res.send({ result, token });
             }));
+            // inserting product into database
+            app.post("/add-product", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const body = req.body;
+                res.status(200).send(yield productsCollection.insertOne(body));
+            }));
             // finding all Products
             app.get("/products", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const results = yield productsCollection.find({}).toArray();
@@ -493,11 +498,17 @@ function run() {
                 res.send(result);
             }));
             // set total earning to user db
-            app.put("/add-earning/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const email = req.params.email;
-                const { total_earn } = req.body;
-                const result = yield userCollection.updateOne({ email: email }, { $set: { total_earn } }, { upsert: true });
-                res.status(200).send(result);
+            app.put("/add-earning/:param", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const param = req.params.param;
+                const { total_earn, owner_total_earn } = req.body;
+                if (param === "owner") {
+                    const result = yield userCollection.updateOne({ role: param }, { $set: { owner_total_earn } }, { upsert: true });
+                    res.status(200).send(result);
+                }
+                if (param !== "owner") {
+                    const result = yield userCollection.updateOne({ email: param }, { $set: { total_earn } }, { upsert: true });
+                    res.status(200).send(result);
+                }
             }));
         }
         finally {

@@ -195,6 +195,12 @@ async function run() {
       res.send({ result, token });
     });
 
+    // inserting product into database
+    app.post("/add-product", async(req:Request, res:Response) => {
+      const body = req.body;
+      res.status(200).send(await productsCollection.insertOne(body));
+    });
+
     // finding all Products
     app.get("/products", async (req: Request, res: Response) => {
       const results = await productsCollection.find({}).toArray();
@@ -625,15 +631,27 @@ async function run() {
     });
 
     // set total earning to user db
-    app.put("/add-earning/:email", async (req: Request, res: Response) => {
-      const email = req.params.email;
-      const { total_earn } = req.body;
-      const result = await userCollection.updateOne(
-        { email: email },
-        { $set: {total_earn} },
-        { upsert: true }
-      );
-      res.status(200).send(result);
+    app.put("/add-earning/:param", async (req: Request, res: Response) => {
+      const param = req.params.param;
+      const { total_earn, owner_total_earn } = req.body;
+
+      if (param === "owner") {
+        const result = await userCollection.updateOne(
+          { role: param },
+          { $set: { owner_total_earn } },
+          { upsert: true }
+        );
+        res.status(200).send(result);
+      }
+
+      if (param !== "owner") {
+        const result = await userCollection.updateOne(
+          { email: param },
+          { $set: { total_earn } },
+          { upsert: true }
+        );
+        res.status(200).send(result);
+      }
     });
   } finally {
   }
