@@ -571,6 +571,7 @@ async function run() {
         const userEmail = req.params.user_email;
         const commission = req.params.commission;
         const total_earn = parseFloat(req.params.totalEarn);
+        const { ownerCommission, totalEarn } = req.body;
         let time: string = new Date().toLocaleString();
         let upDoc: any;
 
@@ -589,16 +590,16 @@ async function run() {
             },
           };
 
-          if (commission && total_earn) {
+          if (ownerCommission || totalEarn) {
             const ownerCol = await userCollection.findOne({ role: "owner" });
             let adminCol = await userCollection.findOne({
               user_email: userEmail,
             });
             if (ownerCol) {
-              let owner_total_earn = ownerCol?.owner_total_earn;
-              let ownerCommission = parseFloat(commission);
-              let earn = parseFloat(owner_total_earn) + ownerCommission;
-              const updateOwnerEarn = await userCollection.updateOne(
+              let ownerTotalEarn = ownerCol?.owner_total_earn;
+              let ownerComm = parseFloat(ownerCommission);
+              let earn = parseFloat(ownerTotalEarn) + ownerComm;
+              await userCollection.updateOne(
                 { role: "owner" },
                 { $set: { owner_total_earn: earn } },
                 { upsert: true }
@@ -606,9 +607,10 @@ async function run() {
             }
 
             if (adminCol) {
-              let totalEarn = adminCol?.total_earn;
-              totalEarn = totalEarn + total_earn;
-              const updateOwnerEarn = await userCollection.updateOne(
+              let totalEarned = adminCol?.total_earn;
+              let totalEr = parseFloat(totalEarn);
+              totalEarned = parseFloat(totalEarned) + totalEr;
+              await userCollection.updateOne(
                 { user_email: userEmail },
                 { $set: { total_earn: totalEarn } },
                 { upsert: true }

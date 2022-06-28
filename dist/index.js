@@ -449,6 +449,7 @@ function run() {
                 const userEmail = req.params.user_email;
                 const commission = req.params.commission;
                 const total_earn = parseFloat(req.params.totalEarn);
+                const { ownerCommission, totalEarn } = req.body;
                 let time = new Date().toLocaleString();
                 let upDoc;
                 if (status === "placed") {
@@ -466,21 +467,22 @@ function run() {
                             "orders.$[i].time_placed": time,
                         },
                     };
-                    if (commission && total_earn) {
+                    if (ownerCommission || totalEarn) {
                         const ownerCol = yield userCollection.findOne({ role: "owner" });
                         let adminCol = yield userCollection.findOne({
                             user_email: userEmail,
                         });
                         if (ownerCol) {
-                            let owner_total_earn = ownerCol === null || ownerCol === void 0 ? void 0 : ownerCol.owner_total_earn;
-                            let ownerCommission = parseFloat(commission);
-                            let earn = parseFloat(owner_total_earn) + ownerCommission;
-                            const updateOwnerEarn = yield userCollection.updateOne({ role: "owner" }, { $set: { owner_total_earn: earn } }, { upsert: true });
+                            let ownerTotalEarn = ownerCol === null || ownerCol === void 0 ? void 0 : ownerCol.owner_total_earn;
+                            let ownerComm = parseFloat(ownerCommission);
+                            let earn = parseFloat(ownerTotalEarn) + ownerComm;
+                            yield userCollection.updateOne({ role: "owner" }, { $set: { owner_total_earn: earn } }, { upsert: true });
                         }
                         if (adminCol) {
-                            let totalEarn = adminCol === null || adminCol === void 0 ? void 0 : adminCol.total_earn;
-                            totalEarn = totalEarn + total_earn;
-                            const updateOwnerEarn = yield userCollection.updateOne({ user_email: userEmail }, { $set: { total_earn: totalEarn } }, { upsert: true });
+                            let totalEarned = adminCol === null || adminCol === void 0 ? void 0 : adminCol.total_earn;
+                            let totalEr = parseFloat(totalEarn);
+                            totalEarned = parseFloat(totalEarned) + totalEr;
+                            yield userCollection.updateOne({ user_email: userEmail }, { $set: { total_earn: totalEarn } }, { upsert: true });
                         }
                     }
                 }
