@@ -443,10 +443,12 @@ function run() {
                 res.send({ result, message: "Order Cancelled successfully" });
             }));
             // update order status by admin or product owner
-            app.put("/update-order-status/:status/:user_email/:id", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.put("/update-order-status/:status/:user_email/:id/:commission/:totalEarn", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const orderId = parseInt(req.params.id);
                 const status = req.params.status;
                 const userEmail = req.params.user_email;
+                const commission = req.params.commission;
+                const total_earn = parseFloat(req.params.totalEarn);
                 let time = new Date().toLocaleString();
                 let upDoc;
                 if (status === "placed") {
@@ -464,6 +466,23 @@ function run() {
                             "orders.$[i].time_placed": time,
                         },
                     };
+                    if (commission && total_earn) {
+                        const ownerCol = yield userCollection.findOne({ role: "owner" });
+                        let adminCol = yield userCollection.findOne({
+                            user_email: userEmail,
+                        });
+                        if (ownerCol) {
+                            let owner_total_earn = ownerCol === null || ownerCol === void 0 ? void 0 : ownerCol.owner_total_earn;
+                            let ownerCommission = parseFloat(commission);
+                            let earn = parseFloat(owner_total_earn) + ownerCommission;
+                            const updateOwnerEarn = yield userCollection.updateOne({ role: "owner" }, { $set: { owner_total_earn: earn } }, { upsert: true });
+                        }
+                        if (adminCol) {
+                            let totalEarn = adminCol === null || adminCol === void 0 ? void 0 : adminCol.total_earn;
+                            totalEarn = totalEarn + total_earn;
+                            const updateOwnerEarn = yield userCollection.updateOne({ user_email: userEmail }, { $set: { total_earn: totalEarn } }, { upsert: true });
+                        }
+                    }
                 }
                 const rs = yield orderCollection.updateOne({ user_email: userEmail }, upDoc, { arrayFilters: [{ "i.orderId": orderId }] });
                 res.send(rs);
