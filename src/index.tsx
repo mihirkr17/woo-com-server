@@ -573,8 +573,6 @@ async function run() {
         let time: string = new Date().toLocaleString();
         let upDoc: any;
 
-        console.log(ownerCommission);
-
         if (status === "placed") {
           upDoc = {
             $set: {

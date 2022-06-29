@@ -450,7 +450,6 @@ function run() {
                 const { ownerCommission, totalEarn, seller_email } = req.body;
                 let time = new Date().toLocaleString();
                 let upDoc;
-                console.log(ownerCommission);
                 if (status === "placed") {
                     upDoc = {
                         $set: {
