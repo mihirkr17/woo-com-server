@@ -78,24 +78,25 @@ function run() {
                 const page = req.query.page;
                 let searchText = req.query.s;
                 let cursor;
+                let result;
                 if (email) {
-                    cursor = productsCollection.find({ seller: email });
-                    if (searchText) {
-                        cursor = productsCollection.find({ title: { $regex: searchText } });
-                    }
+                    cursor = searchText
+                        ? productsCollection.find({
+                            seller: email,
+                            title: { $regex: searchText },
+                        })
+                        : productsCollection.find({ seller: email });
                 }
                 else {
-                    cursor = productsCollection.find({});
+                    cursor = searchText
+                        ? productsCollection.find({ title: { $regex: searchText } })
+                        : productsCollection.find({});
                 }
-                let result;
                 if (item || page) {
                     result = yield cursor
                         .skip(parseInt(page) * parseInt(item))
                         .limit(parseInt(item))
                         .toArray();
-                }
-                else if (searchText) {
-                    result = yield cursor.toArray();
                 }
                 else {
                     result = yield cursor.toArray();
