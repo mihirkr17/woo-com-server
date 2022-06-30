@@ -76,9 +76,13 @@ function run() {
                 const email = req.query.email;
                 const item = req.query.items;
                 const page = req.query.page;
+                let searchText = req.query.s;
                 let cursor;
                 if (email) {
                     cursor = productsCollection.find({ seller: email });
+                    if (searchText) {
+                        cursor = productsCollection.find({ title: { $regex: searchText } });
+                    }
                 }
                 else {
                     cursor = productsCollection.find({});
@@ -89,6 +93,9 @@ function run() {
                         .skip(parseInt(page) * parseInt(item))
                         .limit(parseInt(item))
                         .toArray();
+                }
+                else if (searchText) {
+                    result = yield cursor.toArray();
                 }
                 else {
                     result = yield cursor.toArray();

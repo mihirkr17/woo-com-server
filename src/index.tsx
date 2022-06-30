@@ -74,9 +74,14 @@ async function run() {
       const email: any = req.query.email;
       const item: any = req.query.items;
       const page: any = req.query.page;
+      let searchText: any = req.query.s;
       let cursor: any;
+
       if (email) {
         cursor = productsCollection.find({ seller: email });
+        if (searchText) {
+          cursor = productsCollection.find({ title: { $regex: searchText } });
+        }
       } else {
         cursor = productsCollection.find({});
       }
@@ -88,6 +93,8 @@ async function run() {
           .skip(parseInt(page) * parseInt(item))
           .limit(parseInt(item))
           .toArray();
+      } else if (searchText) {
+        result = await cursor.toArray();
       } else {
         result = await cursor.toArray();
       }
