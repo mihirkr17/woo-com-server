@@ -149,6 +149,29 @@ async function run() {
       }
     );
 
+    // update product information
+    app.put(
+      "/api/update-product/:productId",
+      async (req: Request, res: Response) => {
+        const productId = req.params.productId;
+        const body = req.body;
+        let available = body?.available;
+
+        if (available && available >= 1) {
+          body["stock"] = "in";
+        } else {
+          body["stock"] = "out";
+        }
+        const result = await productsCollection.updateOne(
+          { _id: ObjectId(productId) },
+          {
+            $set: body,
+          },
+          { upsert: true }
+        );
+      }
+    );
+
     // update data
     app.put(
       "/update-profile-data/:email",
@@ -239,6 +262,13 @@ async function run() {
     // inserting product into database
     app.post("/add-product", async (req: Request, res: Response) => {
       const body = req.body;
+      let available = body?.available;
+
+      if (available && available >= 1) {
+        body["stock"] = "in";
+      } else {
+        body["stock"] = "out";
+      }
       res.status(200).send(await productsCollection.insertOne(body));
     });
 

@@ -140,6 +140,21 @@ function run() {
                     ? res.status(200).send({ message: "Product deleted successfully." })
                     : res.status(503).send({ message: "Service unavailable" });
             }));
+            // update product information
+            app.put("/api/update-product/:productId", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const productId = req.params.productId;
+                const body = req.body;
+                let available = body === null || body === void 0 ? void 0 : body.available;
+                if (available && available >= 1) {
+                    body["stock"] = "in";
+                }
+                else {
+                    body["stock"] = "out";
+                }
+                const result = yield productsCollection.updateOne({ _id: ObjectId(productId) }, {
+                    $set: body,
+                }, { upsert: true });
+            }));
             // update data
             app.put("/update-profile-data/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
@@ -198,6 +213,13 @@ function run() {
             // inserting product into database
             app.post("/add-product", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const body = req.body;
+                let available = body === null || body === void 0 ? void 0 : body.available;
+                if (available && available >= 1) {
+                    body["stock"] = "in";
+                }
+                else {
+                    body["stock"] = "out";
+                }
                 res.status(200).send(yield productsCollection.insertOne(body));
             }));
             // finding all Products
