@@ -71,37 +71,48 @@ function run() {
                     res.status(403).send({ message: "Unauthorized" });
                 }
             });
-            // get product by some condition in manage product page api
-            app.get("/api/products", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const email = req.query.email;
-                const item = req.query.items;
-                const page = req.query.page;
-                let searchText = req.query.s;
-                let filters = req.query.filters;
+            // get products by some condition in manage product page api
+            app.get("/api/manage-product", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                let item;
+                let page;
+                let email = req.query.email;
+                item = req.query.items;
+                page = req.query.page;
+                let searchText = req.query.search;
+                let filters = req.query.category;
                 let cursor;
                 let result;
-                if (email) {
-                    cursor = searchText
-                        ? productsCollection.find({
-                            seller: email,
-                            title: { $regex: searchText },
-                        })
-                        : productsCollection.find({ seller: email });
-                    cursor = filters
-                        ? productsCollection.find({
-                            seller: email,
-                            category: filters,
-                        })
-                        : productsCollection.find({ seller: email });
-                }
-                else {
-                    cursor = searchText
-                        ? productsCollection.find({ title: { $regex: searchText } })
-                        : productsCollection.find({});
-                    cursor = filters
-                        ? productsCollection.find({ category: filters })
-                        : productsCollection.find({});
-                }
+                const searchQuery = (sTxt, email = "") => {
+                    item = "";
+                    page = "";
+                    let findProduct = {
+                        $or: [
+                            { title: { $regex: sTxt, $options: "i" } },
+                            { seller: { $regex: sTxt, $options: "i" } },
+                        ],
+                    };
+                    if (email) {
+                        findProduct["seller"] = email;
+                    }
+                    return findProduct;
+                };
+                const filterQuery = (category, email = "") => {
+                    item = "";
+                    page = "";
+                    let findProduct = {
+                        category: category,
+                    };
+                    if (email) {
+                        findProduct["seller"] = email;
+                    }
+                    return findProduct;
+                };
+                cursor =
+                    searchText && searchText.length > 0
+                        ? productsCollection.find(searchQuery(searchText, email || ""))
+                        : filters && filters !== "all"
+                            ? productsCollection.find(filterQuery(filters, email || ""))
+                            : productsCollection.find({ seller: email } || {});
                 if (item || page) {
                     result = yield cursor
                         .skip(parseInt(page) * parseInt(item))

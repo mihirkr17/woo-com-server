@@ -69,39 +69,51 @@ async function run() {
       }
     };
 
-    // get product by some condition in manage product page api
-    app.get("/api/products", async (req: Request, res: Response) => {
-      const email: any = req.query.email;
-      const item: any = req.query.items;
-      const page: any = req.query.page;
-      let searchText: any = req.query.s;
-      let filters: any = req.query.filters;
+    // get products by some condition in manage product page api
+    app.get("/api/manage-product", async (req: Request, res: Response) => {
+      let item: any;
+      let page: any;
+      let email: any = req.query.email;
+      item = req.query.items;
+      page = req.query.page;
+      let searchText: any = req.query.search;
+      let filters: any = req.query.category;
       let cursor: any;
       let result: any;
 
-      if (email) {
-        cursor = searchText
-          ? productsCollection.find({
-              seller: email,
-              title: { $regex: searchText },
-            })
-          : productsCollection.find({ seller: email });
+      const searchQuery = (sTxt: string, email: string = "") => {
+        item = "";
+        page = "";
+        let findProduct: any = {
+          $or: [
+            { title: { $regex: sTxt, $options: "i" } },
+            { seller: { $regex: sTxt, $options: "i" } },
+          ],
+        };
+        if (email) {
+          findProduct["seller"] = email;
+        }
+        return findProduct;
+      };
 
-        cursor = filters
-          ? productsCollection.find({
-              seller: email,
-              category: filters,
-            })
-          : productsCollection.find({ seller: email });
-      } else {
-        cursor = searchText
-          ? productsCollection.find({ title: { $regex: searchText } })
-          : productsCollection.find({});
+      const filterQuery = (category: string, email: string = "") => {
+        item = "";
+        page = "";
+        let findProduct: any = {
+          category: category,
+        };
+        if (email) {
+          findProduct["seller"] = email;
+        }
+        return findProduct;
+      };
 
-        cursor = filters
-          ? productsCollection.find({ category: filters })
-          : productsCollection.find({});
-      }
+      cursor =
+        searchText && searchText.length > 0
+          ? productsCollection.find(searchQuery(searchText, email || ""))
+          : filters && filters !== "all"
+          ? productsCollection.find(filterQuery(filters, email || ""))
+          : productsCollection.find({ seller: email } || {});
 
       if (item || page) {
         result = await cursor
