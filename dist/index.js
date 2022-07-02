@@ -112,7 +112,7 @@ function run() {
                         ? productsCollection.find(searchQuery(searchText, email || ""))
                         : filters && filters !== "all"
                             ? productsCollection.find(filterQuery(filters, email || ""))
-                            : productsCollection.find({ seller: email } || {});
+                            : productsCollection.find((email && { seller: email }) || {});
                 if (item || page) {
                     result = yield cursor
                         .skip(parseInt(page) * parseInt(item))
@@ -127,15 +127,18 @@ function run() {
             // product count
             app.get("/api/product-count", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.query.email;
-                let result;
-                if (email) {
-                    result = yield productsCollection.find({ seller: email }).toArray();
-                    result = result.length;
-                }
-                else {
-                    result = yield productsCollection.estimatedDocumentCount();
-                }
+                let result = yield productsCollection.countDocuments(email && { seller: email });
                 res.send({ count: result });
+            }));
+            // Delete product from manage product page
+            app.delete("/api/delete-product/:productId", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const productId = req.params.productId;
+                const result = yield productsCollection.deleteOne({
+                    _id: ObjectId(productId),
+                });
+                result
+                    ? res.status(200).send({ message: "Product deleted successfully." })
+                    : res.status(503).send({ message: "Service unavailable" });
             }));
             // update data
             app.put("/update-profile-data/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {

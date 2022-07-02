@@ -113,7 +113,7 @@ async function run() {
           ? productsCollection.find(searchQuery(searchText, email || ""))
           : filters && filters !== "all"
           ? productsCollection.find(filterQuery(filters, email || ""))
-          : productsCollection.find({ seller: email } || {});
+          : productsCollection.find((email && { seller: email }) || {});
 
       if (item || page) {
         result = await cursor
@@ -129,15 +129,25 @@ async function run() {
     // product count
     app.get("/api/product-count", async (req: Request, res: Response) => {
       const email = req.query.email;
-      let result: any;
-      if (email) {
-        result = await productsCollection.find({ seller: email }).toArray();
-        result = result.length;
-      } else {
-        result = await productsCollection.estimatedDocumentCount();
-      }
+      let result = await productsCollection.countDocuments(
+        email && { seller: email }
+      );
       res.send({ count: result });
     });
+
+    // Delete product from manage product page
+    app.delete(
+      "/api/delete-product/:productId",
+      async (req: Request, res: Response) => {
+        const productId: string = req.params.productId;
+        const result = await productsCollection.deleteOne({
+          _id: ObjectId(productId),
+        });
+        result
+          ? res.status(200).send({ message: "Product deleted successfully." })
+          : res.status(503).send({ message: "Service unavailable" });
+      }
+    );
 
     // update data
     app.put(
