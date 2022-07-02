@@ -75,6 +75,7 @@ async function run() {
       const item: any = req.query.items;
       const page: any = req.query.page;
       let searchText: any = req.query.s;
+      let filters: any = req.query.filters;
       let cursor: any;
       let result: any;
 
@@ -85,9 +86,20 @@ async function run() {
               title: { $regex: searchText },
             })
           : productsCollection.find({ seller: email });
+
+        cursor = filters
+          ? productsCollection.find({
+              seller: email,
+              category: filters,
+            })
+          : productsCollection.find({ seller: email });
       } else {
         cursor = searchText
           ? productsCollection.find({ title: { $regex: searchText } })
+          : productsCollection.find({});
+
+        cursor = filters
+          ? productsCollection.find({ category: filters })
           : productsCollection.find({});
       }
 

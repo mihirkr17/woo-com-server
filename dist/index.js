@@ -77,6 +77,7 @@ function run() {
                 const item = req.query.items;
                 const page = req.query.page;
                 let searchText = req.query.s;
+                let filters = req.query.filters;
                 let cursor;
                 let result;
                 if (email) {
@@ -86,10 +87,19 @@ function run() {
                             title: { $regex: searchText },
                         })
                         : productsCollection.find({ seller: email });
+                    cursor = filters
+                        ? productsCollection.find({
+                            seller: email,
+                            category: filters,
+                        })
+                        : productsCollection.find({ seller: email });
                 }
                 else {
                     cursor = searchText
                         ? productsCollection.find({ title: { $regex: searchText } })
+                        : productsCollection.find({});
+                    cursor = filters
+                        ? productsCollection.find({ category: filters })
                         : productsCollection.find({});
                 }
                 if (item || page) {
