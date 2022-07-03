@@ -154,6 +154,9 @@ function run() {
                 const result = yield productsCollection.updateOne({ _id: ObjectId(productId) }, {
                     $set: body,
                 }, { upsert: true });
+                res
+                    .status(200)
+                    .send(result && { message: "Product updated successfully" });
             }));
             // update data
             app.put("/update-profile-data/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -173,8 +176,11 @@ function run() {
                 res.send(yield userCollection.updateOne({ _id: ObjectId(userId) }, { $set: { role: "admin" } }, { upsert: true }));
             }));
             // get all user in allUser Page
-            app.get("/all-users", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                res.send(yield userCollection.find({ role: { $ne: "owner" } }).toArray());
+            app.get("/api/manage-user", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const uType = req.query.uTyp;
+                res.send(yield userCollection
+                    .find({ role: uType })
+                    .toArray());
             }));
             // get owner, admin and user from database
             app.get("/fetch-auth/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {

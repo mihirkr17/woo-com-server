@@ -169,6 +169,10 @@ async function run() {
           },
           { upsert: true }
         );
+
+        res
+          .status(200)
+          .send(result && { message: "Product updated successfully" });
       }
     );
 
@@ -211,8 +215,13 @@ async function run() {
     );
 
     // get all user in allUser Page
-    app.get("/all-users", async (req: Request, res: Response) => {
-      res.send(await userCollection.find({ role: { $ne: "owner" } }).toArray());
+    app.get("/api/manage-user", async (req: Request, res: Response) => {
+      const uType = req.query.uTyp;
+      res.send(
+        await userCollection
+          .find({ role: uType })
+          .toArray()
+      );
     });
 
     // get owner, admin and user from database
