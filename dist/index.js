@@ -178,9 +178,7 @@ function run() {
             // get all user in allUser Page
             app.get("/api/manage-user", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const uType = req.query.uTyp;
-                res.send(yield userCollection
-                    .find({ role: uType })
-                    .toArray());
+                res.send(yield userCollection.find({ role: uType }).toArray());
             }));
             // get owner, admin and user from database
             app.get("/fetch-auth/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -380,6 +378,14 @@ function run() {
                 ])
                     .toArray();
                 findP.map((p) => res.send(p));
+                // let findP = await cartCollection.findOne({ user_email: email });
+                // let filterProduct;
+                // if (findP) {
+                //   let cartObj = findP?.product;
+                //   filterProduct = cartObj.filter((p: any) => p?._id === pId);
+                // }
+                // findP["product"] = filterProduct;
+                // res.send(findP);
             }));
             // update quantity of product in my-cart
             app.put("/up-cart-qty-ttl-price/:pId/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -443,24 +449,54 @@ function run() {
                     message: "Product Successfully Added To Your Cart",
                 });
             }));
-            // order address add api
-            app.put("/add-address/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            // inserting address in cart
+            app.post("/api/add-cart-address/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const userEmail = req.params.userEmail;
                 const body = req.body;
-                const result = yield cartCollection.updateOne({ user_email: userEmail }, { $set: { address: body } }, { upsert: true });
+                const result = yield cartCollection.updateOne({ user_email: userEmail }, { $push: { address: body } }, { upsert: true });
+                res.send(result);
+            }));
+            // order address add api
+            app.put("/api/update-cart-address/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const userEmail = req.params.userEmail;
+                const body = req.body;
+                const result = yield cartCollection.updateOne({ user_email: userEmail }, {
+                    $set: {
+                        "address.$[i]": body,
+                    },
+                }, { arrayFilters: [{ "i.addressId": body === null || body === void 0 ? void 0 : body.addressId }] });
                 res.send(result);
             }));
             // update select_address in address to confirm for order api
-            app.put("/select-address/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.put("/api/select-address/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const userEmail = req.params.userEmail;
-                const body = req.body;
-                const result = yield cartCollection.updateOne({ user_email: userEmail }, { $set: { "address.select_address": body === null || body === void 0 ? void 0 : body.select_address } }, { upsert: true });
-                res.send(result);
+                const { addressId, select_address } = req.body;
+                const addr = yield cartCollection.findOne({ user_email: userEmail });
+                if (addr) {
+                    const addressArr = addr === null || addr === void 0 ? void 0 : addr.address;
+                    if (addressArr && addressArr.length > 0) {
+                        yield cartCollection.updateOne({ user_email: userEmail }, {
+                            $set: {
+                                "address.$[j].select_address": false,
+                            },
+                        }, {
+                            arrayFilters: [{ "j.addressId": { $ne: addressId } }],
+                            multi: true,
+                        });
+                    }
+                }
+                let result = yield cartCollection.updateOne({ user_email: userEmail }, {
+                    $set: {
+                        "address.$[i].select_address": select_address,
+                    },
+                }, { arrayFilters: [{ "i.addressId": addressId }] });
+                res.status(200).send(result);
             }));
             // delete or remove address from cart
-            app.delete("/delete-address/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.delete("/api/delete-cart-address/:email/:addressId", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
-                const result = yield cartCollection.updateOne({ user_email: email }, { $set: { address: null } }, { upsert: true });
+                const addressId = parseInt(req.params.addressId);
+                const result = yield cartCollection.updateOne({ user_email: email }, { $pull: { address: { addressId } } });
                 res.send(result);
             }));
             // get order address
@@ -548,9 +584,9 @@ function run() {
                 res.send(rs);
             }));
             // get order list
-            app.get("/get-orderlist/:orderId", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const order_id = parseInt(req.params.orderId);
-                const result = yield orderCollection.findOne({ orderId: order_id });
+            app.get("/api/checkout/:cartId", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const cartId = req.params.cartId;
+                const result = yield cartCollection.findOne({ _id: ObjectId(cartId) });
                 res.send(result);
             }));
             /// find orderId

@@ -217,11 +217,7 @@ async function run() {
     // get all user in allUser Page
     app.get("/api/manage-user", async (req: Request, res: Response) => {
       const uType = req.query.uTyp;
-      res.send(
-        await userCollection
-          .find({ role: uType })
-          .toArray()
-      );
+      res.send(await userCollection.find({ role: uType }).toArray());
     });
 
     // get owner, admin and user from database
@@ -466,6 +462,14 @@ async function run() {
           ])
           .toArray();
         findP.map((p: any) => res.send(p));
+        // let findP = await cartCollection.findOne({ user_email: email });
+        // let filterProduct;
+        // if (findP) {
+        //   let cartObj = findP?.product;
+        //   filterProduct = cartObj.filter((p: any) => p?._id === pId);
+        // }
+        // findP["product"] = filterProduct;
+        // res.send(findP);
       }
     );
 
@@ -546,42 +550,91 @@ async function run() {
       });
     });
 
-    // order address add api
-    app.put("/add-address/:userEmail", async (req: Request, res: Response) => {
-      const userEmail = req.params.userEmail;
-      const body = req.body;
-      const result = await cartCollection.updateOne(
-        { user_email: userEmail },
-        { $set: { address: body } },
-        { upsert: true }
-      );
-      res.send(result);
-    });
-
-    // update select_address in address to confirm for order api
-    app.put(
-      "/select-address/:userEmail",
+    // inserting address in cart
+    app.post(
+      "/api/add-cart-address/:userEmail",
       async (req: Request, res: Response) => {
         const userEmail = req.params.userEmail;
         const body = req.body;
         const result = await cartCollection.updateOne(
           { user_email: userEmail },
-          { $set: { "address.select_address": body?.select_address } },
+          { $push: { address: body } },
           { upsert: true }
         );
         res.send(result);
       }
     );
 
+    // order address add api
+    app.put(
+      "/api/update-cart-address/:userEmail",
+      async (req: Request, res: Response) => {
+        const userEmail = req.params.userEmail;
+        const body = req.body;
+
+        const result = await cartCollection.updateOne(
+          { user_email: userEmail },
+          {
+            $set: {
+              "address.$[i]": body,
+            },
+          },
+          { arrayFilters: [{ "i.addressId": body?.addressId }] }
+        );
+        res.send(result);
+      }
+    );
+
+    // update select_address in address to confirm for order api
+    app.put(
+      "/api/select-address/:userEmail",
+      async (req: Request, res: Response) => {
+        const userEmail = req.params.userEmail;
+        const { addressId, select_address } = req.body;
+
+        const addr = await cartCollection.findOne({ user_email: userEmail });
+        if (addr) {
+          const addressArr = addr?.address;
+
+          if (addressArr && addressArr.length > 0) {
+            await cartCollection.updateOne(
+              { user_email: userEmail },
+              {
+                $set: {
+                  "address.$[j].select_address": false,
+                },
+              },
+              {
+                arrayFilters: [{ "j.addressId": { $ne: addressId } }],
+                multi: true,
+              }
+            );
+          }
+        }
+
+        let result = await cartCollection.updateOne(
+          { user_email: userEmail },
+          {
+            $set: {
+              "address.$[i].select_address": select_address,
+            },
+          },
+          { arrayFilters: [{ "i.addressId": addressId }] }
+        );
+
+        res.status(200).send(result);
+      }
+    );
+
     // delete or remove address from cart
     app.delete(
-      "/delete-address/:email",
+      "/api/delete-cart-address/:email/:addressId",
       async (req: Request, res: Response) => {
         const email = req.params.email;
+        const addressId = parseInt(req.params.addressId);
         const result = await cartCollection.updateOne(
           { user_email: email },
-          { $set: { address: null } },
-          { upsert: true }
+          { $pull: { address: { addressId } } }
         );
         res.send(result);
       }
@@ -707,9 +760,9 @@ async function run() {
     );
 
     // get order list
-    app.get("/get-orderlist/:orderId", async (req: Request, res: Response) => {
-      const order_id = parseInt(req.params.orderId);
-      const result = await orderCollection.findOne({ orderId: order_id });
+    app.get("/api/checkout/:cartId", async (req: Request, res: Response) => {
+      const cartId = req.params.cartId;
+      const result = await cartCollection.findOne({ _id: ObjectId(cartId) });
       res.send(result);
     });
 
