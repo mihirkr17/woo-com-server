@@ -9,7 +9,12 @@ const app: Express = express();
 var jwt = require("jsonwebtoken");
 
 // middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
+  })
+);
 app.use(express.json());
 // port and db connection
 const port = process.env.PORT || 5000;
