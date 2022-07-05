@@ -21,7 +21,10 @@ require("dotenv").config();
 const app = (0, express_1.default)();
 var jwt = require("jsonwebtoken");
 // middleware
-app.use(cors());
+app.use(cors({
+    origin: "*",
+    methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
+}));
 app.use(express_1.default.json());
 // port and db connection
 const port = process.env.PORT || 5000;
