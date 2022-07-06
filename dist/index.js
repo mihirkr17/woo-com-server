@@ -369,27 +369,6 @@ function run() {
                 const cartRes = yield cartCollection.findOne({ user_email: userEmail });
                 res.send(cartRes);
             }));
-            /* fetch one single product to purchase page when user click to buy now button
-            and this product also add to my-cart page*/
-            app.get("/my-cart-item/:pId/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const pId = req.params.pId;
-                const email = req.params.userEmail;
-                const findP = yield cartCollection
-                    .aggregate([
-                    { $unwind: "$product" },
-                    { $match: { "product._id": pId, user_email: email } },
-                ])
-                    .toArray();
-                findP.map((p) => res.send(p));
-                // let findP = await cartCollection.findOne({ user_email: email });
-                // let filterProduct;
-                // if (findP) {
-                //   let cartObj = findP?.product;
-                //   filterProduct = cartObj.filter((p: any) => p?._id === pId);
-                // }
-                // findP["product"] = filterProduct;
-                // res.send(findP);
-            }));
             // update quantity of product in my-cart
             app.put("/up-cart-qty-ttl-price/:pId/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const pId = req.params.pId;
@@ -535,11 +514,23 @@ function run() {
                 res.send(yield orderCollection.findOne({ user_email: email }));
             }));
             // cancel orders from admin
-            app.delete("/cancel-order/:email/:orderId", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.delete("/api/remove-order/:email/:orderId", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
                 const id = parseInt(req.params.orderId);
                 const result = yield orderCollection.updateOne({ user_email: email }, { $pull: { orders: { orderId: id } } });
-                res.send({ result, message: "Order Cancelled successfully" });
+                res.send({ result, message: "Order Removed successfully" });
+            }));
+            // cancel my orders
+            app.put("/api/cancel-my-order/:userEmail/:orderId", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const userEmail = req.params.userEmail;
+                const orderId = parseInt(req.params.orderId);
+                const { status, cancel_reason, time_canceled } = req.body;
+                const result = yield orderCollection.updateOne({ user_email: userEmail }, { $set: {
+                        "orders.$[i].status": status,
+                        "orders.$[i].cancel_reason": cancel_reason,
+                        "orders.$[i].time_canceled": time_canceled,
+                    } }, { arrayFilters: [{ "i.orderId": orderId }] });
+                res.send({ result, message: "Order canceled successfully" });
             }));
             // update order status by admin or product owner
             app.put("/update-order-status/:status/:user_email/:id", (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -561,7 +552,7 @@ function run() {
                     upDoc = {
                         $set: {
                             "orders.$[i].status": status,
-                            "orders.$[i].time_placed": time,
+                            "orders.$[i].time_shipped": time,
                         },
                     };
                     if (ownerCommission && totalEarn) {
