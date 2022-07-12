@@ -431,6 +431,27 @@ function run() {
                     message: "Product Successfully Added To Your Cart",
                 });
             }));
+            // update cart items
+            app.put("/api/update-cart-items/:email/:pId", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const pId = req.params.pId;
+                const email = req.params.email;
+                const { quantity, price, discount_amount_fixed, discount_amount_total, discount, price_total, price_fixed, stock, available, modifiedAt, } = req.body;
+                const result = yield cartCollection.updateOne({ user_email: email, "product._id": pId }, {
+                    $set: {
+                        "product.$.quantity": quantity,
+                        "product.$.price": price,
+                        "product.$.discount": discount,
+                        "product.$.price_total": price_total,
+                        "product.$.price_fixed": price_fixed,
+                        "product.$.discount_amount_fixed": discount_amount_fixed,
+                        "product.$.discount_amount_total": discount_amount_total,
+                        "product.$.stock": stock,
+                        "product.$.available": available,
+                        "product.$.modifiedAt": modifiedAt,
+                    },
+                }, { upsert: true });
+                res.status(200).send(result);
+            }));
             // inserting address in cart
             app.post("/api/add-cart-address/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const userEmail = req.params.userEmail;
@@ -525,11 +546,13 @@ function run() {
                 const userEmail = req.params.userEmail;
                 const orderId = parseInt(req.params.orderId);
                 const { status, cancel_reason, time_canceled } = req.body;
-                const result = yield orderCollection.updateOne({ user_email: userEmail }, { $set: {
+                const result = yield orderCollection.updateOne({ user_email: userEmail }, {
+                    $set: {
                         "orders.$[i].status": status,
                         "orders.$[i].cancel_reason": cancel_reason,
                         "orders.$[i].time_canceled": time_canceled,
-                    } }, { arrayFilters: [{ "i.orderId": orderId }] });
+                    },
+                }, { arrayFilters: [{ "i.orderId": orderId }] });
                 res.send({ result, message: "Order canceled successfully" });
             }));
             // update order status by admin or product owner
