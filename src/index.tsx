@@ -301,22 +301,22 @@ async function run() {
     // Fetch single product
     // check in  cart and view product
     app.get(
-      "/view-product/:productId/:email",
+      "/api/fetch-single-product/:productId/:email",
       async (req: Request, res: Response) => {
         const email = req.params.email;
-        const id = req.params.productId;
+        const productId = req.params.productId;
         const filterP = await cartCollection
           .aggregate([
             { $unwind: "$product" },
-            { $match: { user_email: email, "product._id": id } },
+            { $match: { user_email: email, "product._id": productId } },
           ])
           .toArray();
 
         let result = await productsCollection.findOne({
-          _id: ObjectId(id),
+          _id: ObjectId(productId),
         });
 
-        const exist = filterP.some((f: any) => f?.product?._id == id);
+        const exist = filterP.some((f: any) => f?.product?._id === productId);
 
         let cardHandler: boolean;
         if (exist) {
@@ -432,11 +432,11 @@ async function run() {
     app.get(
       "/product-review/:productId",
       async (req: Request, res: Response) => {
-        const pId = req.params.productId;
+        const productId = req.params.productId;
         const result = await reviewCollection
           .aggregate([
             { $unwind: "$rating" },
-            { $match: { "rating.product_id": pId } },
+            { $match: { "rating.product_id": productId } },
           ])
           .toArray();
         res.send(result);
@@ -448,21 +448,27 @@ async function run() {
       "/my-cart-items/:userEmail",
       async (req: Request, res: Response) => {
         const userEmail = req.params.userEmail;
-        const cartRes = await cartCollection.findOne({ user_email: userEmail });
-        res.send(cartRes);
+        const result = await cartCollection.findOne({ user_email: userEmail });
+
+        if (result) {
+          await cartCollection.updateOne(
+            { user_email: userEmail },
+            { $pull: { product: { stock: "out" } } }
+          );
+        }
+        res.status(200).send(result);
       }
     );
 
     // update quantity of product in my-cart
     app.put(
-      "/up-cart-qty-ttl-price/:pId/:email",
+      "/api/update-product-quantity/:productId/:email",
       async (req: Request, res: Response) => {
-        const pId = req.params.pId;
-        const user_email = req.params.email;
+        const productId = req.params.productId;
+        const userEmail = req.params.email;
         const { quantity, price_total, discount_amount_total } = req.body;
-        const fill = { user_email: user_email, "product._id": pId };
         const result = await cartCollection.updateOne(
-          fill,
+          { user_email: userEmail, "product._id": productId },
           {
             $set: {
               "product.$.quantity": quantity,
@@ -472,69 +478,76 @@ async function run() {
           },
           { upsert: true }
         );
-        res.send(result);
+        res.status(200).send(result);
       }
     );
 
     // remove item form cart with item cart id and email
     app.delete(
-      "/delete-cart-item/:pcId/:email",
+      "/delete-cart-item/:productId/:email",
       async (req: Request, res: Response) => {
-        const pcId = req.params.pcId;
-        const email = req.params.email;
-        const res2 = await cartCollection.updateOne(
-          { user_email: email },
-          { $pull: { product: { _id: pcId } } }
+        const productId = req.params.productId;
+        const userEmail = req.params.email;
+        const result = await cartCollection.updateOne(
+          { user_email: userEmail },
+          { $pull: { product: { _id: productId } } }
         );
-        res.send(res2);
+        res
+          .status(200)
+          .send({ result, message: `removed successfully from cart` });
       }
     );
 
     // inserting product into my cart api
-    app.put("/my-cart/:email", async (req: Request, res: Response) => {
-      let newProduct;
-      const email = req.params.email;
+    app.put("/api/add-to-cart/:email", async (req: Request, res: Response) => {
+      let newProduct: any;
+      const email: string = req.params.email;
       const body = req.body;
       const options = { upsert: true };
       const query = { user_email: email };
-      const existsProduct = await cartCollection.findOne({ user_email: email });
-      if (existsProduct) {
-        const productArr: any[] = existsProduct?.product
-          ? existsProduct?.product
-          : [];
-        if (productArr.length > 0) {
-          for (let i = 0; i < productArr.length; i++) {
-            let elem = productArr[i]._id;
-            if (elem === body?._id) {
-              res.send({ message: "Product Has Already In Your Cart" });
-              return;
-            } else {
-              newProduct = [...productArr, body];
+
+      if (body?.stock === "in" && body?.available > 0) {
+        const existsProduct = await cartCollection.findOne({
+          user_email: email,
+        });
+        if (existsProduct) {
+          const productArr: any[] = existsProduct?.product
+            ? existsProduct?.product
+            : [];
+          if (productArr.length > 0) {
+            for (let i = 0; i < productArr.length; i++) {
+              let elem = productArr[i]._id;
+              if (elem === body?._id) {
+                res.send({ message: "Product Has Already In Your Cart" });
+                return;
+              } else {
+                newProduct = [...productArr, body];
+              }
             }
+          } else {
+            newProduct = [body];
           }
         } else {
           newProduct = [body];
         }
-      } else {
-        newProduct = [body];
+
+        const up = {
+          $set: { product: newProduct },
+        };
+
+        const cartRes = await cartCollection.updateOne(query, up, options);
+        res.send({
+          data: cartRes,
+          message: "Product Successfully Added To Your Cart",
+        });
       }
-
-      const up = {
-        $set: { product: newProduct },
-      };
-
-      const cartRes = await cartCollection.updateOne(query, up, options);
-      res.send({
-        data: cartRes,
-        message: "Product Successfully Added To Your Cart",
-      });
     });
 
     // update cart items
     app.put(
-      "/api/update-cart-items/:email/:pId",
+      "/api/update-cart-items/:email/:productId",
       async (req: Request, res: Response) => {
-        const pId: string = req.params.pId;
+        const productId = req.params.productId;
         const email: string = req.params.email;
         const {
           quantity,
@@ -548,8 +561,9 @@ async function run() {
           available,
           modifiedAt,
         } = req.body;
+
         const result = await cartCollection.updateOne(
-          { user_email: email, "product._id": pId },
+          { user_email: email, "product._id": productId },
           {
             $set: {
               "product.$.quantity": quantity,
@@ -744,7 +758,13 @@ async function run() {
         const orderId = parseInt(req.params.id);
         const status = req.params.status;
         const userEmail = req.params.user_email;
-        const { ownerCommission, totalEarn, seller_email } = req.body;
+        const {
+          ownerCommission,
+          totalEarn,
+          seller_email,
+          productId,
+          quantity,
+        } = req.body;
         let time: string = new Date().toLocaleString();
         let upDoc: any;
 
@@ -790,14 +810,36 @@ async function run() {
               );
             }
           }
+
+          if (productId) {
+            let product = await productsCollection.findOne({
+              _id: ObjectId(productId),
+            });
+            let available = parseInt(product?.available) - parseInt(quantity);
+            let top_sell =
+              (parseInt(product?.top_sell) || 0) + parseInt(quantity);
+
+            let stock: string;
+            if (available >= 1) {
+              stock = "in";
+            } else {
+              stock = "out";
+            }
+
+            await productsCollection.updateOne(
+              { _id: ObjectId(productId) },
+              { $set: { available, stock, top_sell } },
+              { upsert: true }
+            );
+          }
         }
 
-        const rs = await orderCollection.updateOne(
+        const result = await orderCollection.updateOne(
           { user_email: userEmail },
           upDoc,
           { arrayFilters: [{ "i.orderId": orderId }] }
         );
-        res.send(rs);
+        res.send(result);
       }
     );
 
