@@ -247,10 +247,10 @@ async function run() {
 
     // add user to the database
     app.put("/user/:email", async (req: Request, res: Response) => {
-      const email = req.params.email;
+      const email: string = req.params.email;
       const findUser = await userCollection.findOne({ email: email });
 
-      let updateDocuments: any;
+      let updateDocuments;
 
       updateDocuments =
         findUser && findUser?.role !== ""
