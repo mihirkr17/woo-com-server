@@ -2,7 +2,6 @@ import express, { Express, Request, Response } from "express";
 
 // Server setup
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-// const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 const app: Express = express();
@@ -128,7 +127,7 @@ async function run() {
       } else {
         result = await cursor.toArray();
       }
-      res.send(result);
+      res.status(200).send(result);
     });
 
     // product count
@@ -137,7 +136,7 @@ async function run() {
       let result = await productsCollection.countDocuments(
         email && { seller: email }
       );
-      res.send({ count: result });
+      res.status(200).send({ count: result });
     });
 
     // Delete product from manage product page
@@ -185,8 +184,7 @@ async function run() {
     app.put(
       "/update-profile-data/:email",
       async (req: Request, res: Response) => {
-        const email = req.params.email;
-        const data = req.body;
+        const email: string = req.params.email;
         const result = await userCollection.updateOne(
           { email: email },
           { $set: req.body },
@@ -209,7 +207,7 @@ async function run() {
       verifyOwner,
       async (req: Request, res: Response) => {
         const userId: string = req.params.userId;
-        res.send(
+        res.status(200).send(
           await userCollection.updateOne(
             { _id: ObjectId(userId) },
             { $set: { role: "admin" } },
@@ -222,7 +220,7 @@ async function run() {
     // get all user in allUser Page
     app.get("/api/manage-user", async (req: Request, res: Response) => {
       const uType = req.query.uTyp;
-      res.send(await userCollection.find({ role: uType }).toArray());
+      res.status(200).send(await userCollection.find({ role: uType }).toArray());
     });
 
     // get owner, admin and user from database
@@ -266,7 +264,7 @@ async function run() {
         algorithm: "HS256",
         expiresIn: "6h",
       });
-      res.send({ result, token });
+      res.status(200).send({ result, token });
     });
 
     // inserting product into database
@@ -872,7 +870,7 @@ async function run() {
           .toArray();
       }
 
-      res.send(result);
+      res.status(200).send(result);
     });
   } finally {
   }
@@ -880,7 +878,7 @@ async function run() {
 run();
 
 app.get("/", (req: Request, res: Response) => {
-  res.send("Server running");
+  res.status(200).send("Woo-Com Server is running");
 });
 
 app.listen(port, () => {
