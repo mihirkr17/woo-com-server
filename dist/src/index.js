@@ -13,9 +13,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
-const { dbh } = require("./database/db");
+const ad = require("../components/seller");
+console.log(ad.add);
 // Server setup
-const { ObjectId } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const cors = require("cors");
 require("dotenv").config();
 const app = (0, express_1.default)();
@@ -26,7 +27,15 @@ app.use(cors({
     methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
 }));
 app.use(express_1.default.json());
+// port and db connection
 const port = process.env.PORT || 5000;
+// database information
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PWD}@cluster0.8bccj.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`;
+const client = new MongoClient(uri, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverApi: ServerApiVersion.v1,
+});
 // verifying jwt token
 const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     const authHeader = req.headers.authorization;
@@ -46,38 +55,38 @@ const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
+            yield client.connect();
             // product collection
-            yield dbh.connect();
-            const productsCollection = dbh.db("Products").collection("product");
-            const cartCollection = dbh.db("Products").collection("cart");
-            const orderCollection = dbh.db("Products").collection("orders");
-            const userCollection = dbh.db("Users").collection("user");
-            const reviewCollection = dbh.db("Products").collection("review");
+            const productsCollection = client.db("Products").collection("product");
+            const cartCollection = client.db("Products").collection("cart");
+            const orderCollection = client.db("Products").collection("orders");
+            const userCollection = client.db("Users").collection("user");
+            const reviewCollection = client.db("Products").collection("review");
             // // verify owner
-            const verifyAuth = (req, res, next) => __awaiter(this, void 0, void 0, function* () {
+            const verifyOwner = (req, res, next) => __awaiter(this, void 0, void 0, function* () {
                 const authEmail = req.decoded.email;
-                const findAuthInDB = yield userCollection.findOne({
+                const findOwnerInDB = yield userCollection.findOne({
                     email: authEmail && authEmail,
                 });
-                if (findAuthInDB.role === "owner" || findAuthInDB.role === "admin") {
+                if (findOwnerInDB.role === "owner") {
                     next();
                 }
                 else {
-                    res.status(403).send({ message: "Forbidden" });
+                    res.status(403).send({ message: "Unauthorized" });
                 }
             });
             // get products by some condition in manage product page api
             app.get("/api/manage-product", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 let item;
                 let page;
-                let seller_name = req.query.seller;
+                let email = req.query.email;
                 item = req.query.items;
                 page = req.query.page;
                 let searchText = req.query.search;
                 let filters = req.query.category;
                 let cursor;
                 let result;
-                const searchQuery = (sTxt, seller_name = "") => {
+                const searchQuery = (sTxt, email = "") => {
                     item = "";
                     page = "";
                     let findProduct = {
@@ -86,28 +95,28 @@ function run() {
                             { seller: { $regex: sTxt, $options: "i" } },
                         ],
                     };
-                    if (seller_name) {
-                        findProduct["seller"] = seller_name;
+                    if (email) {
+                        findProduct["seller"] = email;
                     }
                     return findProduct;
                 };
-                const filterQuery = (category, seller_name = "") => {
+                const filterQuery = (category, email = "") => {
                     item = "";
                     page = "";
                     let findProduct = {
                         category: category,
                     };
-                    if (seller_name) {
-                        findProduct["seller"] = seller_name;
+                    if (email) {
+                        findProduct["seller"] = email;
                     }
                     return findProduct;
                 };
                 cursor =
                     searchText && searchText.length > 0
-                        ? productsCollection.find(searchQuery(searchText, seller_name || ""))
+                        ? productsCollection.find(searchQuery(searchText, email || ""))
                         : filters && filters !== "all"
-                            ? productsCollection.find(filterQuery(filters, seller_name || ""))
-                            : productsCollection.find((seller_name && { seller: seller_name }) || {});
+                            ? productsCollection.find(filterQuery(filters, email || ""))
+                            : productsCollection.find((email && { seller: email }) || {});
                 if (item || page) {
                     result = yield cursor
                         .skip(parseInt(page) * parseInt(item))
@@ -121,8 +130,8 @@ function run() {
             }));
             // product count
             app.get("/api/product-count", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const seller = req.query.seller;
-                let result = yield productsCollection.countDocuments(seller && { seller: seller });
+                const email = req.query.email;
+                let result = yield productsCollection.countDocuments(email && { seller: email });
                 res.status(200).send({ count: result });
             }));
             // Delete product from manage product page
@@ -165,25 +174,14 @@ function run() {
                 res.status(200).send(yield userCollection.findOne({ email: email }));
             }));
             // make admin request
-            app.put("/make-admin/:userId", verifyJWT, verifyAuth, (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.put("/make-admin/:userId", verifyJWT, verifyOwner, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const userId = req.params.userId;
-                res
-                    .status(200)
-                    .send(yield userCollection.updateOne({ _id: ObjectId(userId) }, { $set: { role: "admin" } }, { upsert: true }));
-            }));
-            // demote to user request
-            app.put("/api/demote-to-user/:userId", verifyJWT, verifyAuth, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const userId = req.params.userId;
-                res
-                    .status(200)
-                    .send(yield userCollection.updateOne({ _id: ObjectId(userId) }, { $set: { role: "user" } }, { upsert: true }));
+                res.status(200).send(yield userCollection.updateOne({ _id: ObjectId(userId) }, { $set: { role: "admin" } }, { upsert: true }));
             }));
             // get all user in allUser Page
             app.get("/api/manage-user", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const uType = req.query.uTyp;
-                res
-                    .status(200)
-                    .send(yield userCollection.find({ role: uType }).toArray());
+                res.status(200).send(yield userCollection.find({ role: uType }).toArray());
             }));
             // get owner, admin and user from database
             app.get("/fetch-auth/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -192,50 +190,16 @@ function run() {
                 const token = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1];
                 if (token) {
                     const result = yield userCollection.findOne({ email: email });
-                    res.status(200).send({ role: result && result.role, result });
+                    if (result && result.role === "owner") {
+                        res.status(200).send({ role: "owner" });
+                    }
+                    if (result && result.role === "admin") {
+                        res.status(200).send({ role: "admin" });
+                    }
                 }
                 else {
                     return res.status(403).send({ message: "Header Missing" });
                 }
-            }));
-            // make seller request
-            app.put("/api/make-seller-request/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const userEmail = req.params.userEmail;
-                let body = req.body;
-                let existSellerName;
-                if (body === null || body === void 0 ? void 0 : body.seller) {
-                    existSellerName = yield userCollection.findOne({
-                        seller: body === null || body === void 0 ? void 0 : body.seller,
-                    });
-                }
-                if (existSellerName) {
-                    return res
-                        .status(200)
-                        .send({ message: "Seller name exists ! try to another" });
-                }
-                else {
-                    const result = yield userCollection.updateOne({ email: userEmail }, {
-                        $set: body,
-                    }, { upsert: true });
-                    res.status(200).send({ result, message: "success" });
-                }
-            }));
-            //    api/check-seller-request
-            app.get("/api/check-seller-request", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                res
-                    .status(200)
-                    .send(yield userCollection.find({ seller_request: "pending" }).toArray());
-            }));
-            // api/make-seller-request
-            app.put("/api/permit-seller-request/:userId", verifyJWT, verifyAuth, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const userId = req.params.userId;
-                console.log(userId);
-                const result = yield userCollection.updateOne({ _id: ObjectId(userId) }, {
-                    $set: { role: "seller", seller_request: "ok", isSeller: true },
-                }, { upsert: true });
-                (result === null || result === void 0 ? void 0 : result.acknowledged)
-                    ? res.status(200).send({ message: "Request Success" })
-                    : res.status(400).send({ message: "Bad Request" });
             }));
             // add user to the database
             app.put("/user/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -667,15 +631,15 @@ function run() {
             }));
             /// find orderId
             app.get("/manage-orders", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const seller = req.query.seller;
+                const email = req.query.email;
                 let result;
-                if (seller) {
+                if (email) {
                     result = yield orderCollection
                         .aggregate([
                         { $unwind: "$orders" },
                         {
                             $match: {
-                                "orders.seller": seller,
+                                "orders.seller": email,
                             },
                         },
                     ])

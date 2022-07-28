@@ -1,7 +1,8 @@
 import express, { Express, Request, Response } from "express";
+const { dbh } = require("./database/db");
 
 // Server setup
-const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const { ObjectId } = require("mongodb");
 const cors = require("cors");
 require("dotenv").config();
 const app: Express = express();
@@ -15,16 +16,7 @@ app.use(
   })
 );
 app.use(express.json());
-// port and db connection
 const port = process.env.PORT || 5000;
-
-// database information
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PWD}@cluster0.8bccj.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`;
-const client = new MongoClient(uri, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  serverApi: ServerApiVersion.v1,
-});
 
 // verifying jwt token
 const verifyJWT = async (req: Request, res: Response, next: any) => {
@@ -51,25 +43,25 @@ const verifyJWT = async (req: Request, res: Response, next: any) => {
 
 async function run() {
   try {
-    await client.connect();
     // product collection
-    const productsCollection = client.db("Products").collection("product");
-    const cartCollection = client.db("Products").collection("cart");
-    const orderCollection = client.db("Products").collection("orders");
-    const userCollection = client.db("Users").collection("user");
-    const reviewCollection = client.db("Products").collection("review");
+    await dbh.connect();
+    const productsCollection = dbh.db("Products").collection("product");
+    const cartCollection = dbh.db("Products").collection("cart");
+    const orderCollection = dbh.db("Products").collection("orders");
+    const userCollection = dbh.db("Users").collection("user");
+    const reviewCollection = dbh.db("Products").collection("review");
 
     // // verify owner
-    const verifyOwner = async (req: Request, res: Response, next: any) => {
+    const verifyAuth = async (req: Request, res: Response, next: any) => {
       const authEmail = req.decoded.email;
-      const findOwnerInDB = await userCollection.findOne({
+      const findAuthInDB = await userCollection.findOne({
         email: authEmail && authEmail,
       });
 
-      if (findOwnerInDB.role === "owner") {
+      if (findAuthInDB.role === "owner" || findAuthInDB.role === "admin") {
         next();
       } else {
-        res.status(403).send({ message: "Unauthorized" });
+        res.status(403).send({ message: "Forbidden" });
       }
     };
 
@@ -77,7 +69,7 @@ async function run() {
     app.get("/api/manage-product", async (req: Request, res: Response) => {
       let item: any;
       let page: any;
-      let email: any = req.query.email;
+      let seller_name: any = req.query.seller;
       item = req.query.items;
       page = req.query.page;
       let searchText: any = req.query.search;
@@ -85,7 +77,7 @@ async function run() {
       let cursor: any;
       let result: any;
 
-      const searchQuery = (sTxt: string, email: string = "") => {
+      const searchQuery = (sTxt: string, seller_name: string = "") => {
         item = "";
         page = "";
         let findProduct: any = {
@@ -94,30 +86,32 @@ async function run() {
             { seller: { $regex: sTxt, $options: "i" } },
           ],
         };
-        if (email) {
-          findProduct["seller"] = email;
+        if (seller_name) {
+          findProduct["seller"] = seller_name;
         }
         return findProduct;
       };
 
-      const filterQuery = (category: string, email: string = "") => {
+      const filterQuery = (category: string, seller_name: string = "") => {
         item = "";
         page = "";
         let findProduct: any = {
           category: category,
         };
-        if (email) {
-          findProduct["seller"] = email;
+        if (seller_name) {
+          findProduct["seller"] = seller_name;
         }
         return findProduct;
       };
 
       cursor =
         searchText && searchText.length > 0
-          ? productsCollection.find(searchQuery(searchText, email || ""))
+          ? productsCollection.find(searchQuery(searchText, seller_name || ""))
           : filters && filters !== "all"
-          ? productsCollection.find(filterQuery(filters, email || ""))
-          : productsCollection.find((email && { seller: email }) || {});
+          ? productsCollection.find(filterQuery(filters, seller_name || ""))
+          : productsCollection.find(
+              (seller_name && { seller: seller_name }) || {}
+            );
 
       if (item || page) {
         result = await cursor
@@ -132,9 +126,9 @@ async function run() {
 
     // product count
     app.get("/api/product-count", async (req: Request, res: Response) => {
-      const email = req.query.email;
+      const seller = req.query.seller;
       let result = await productsCollection.countDocuments(
-        email && { seller: email }
+        seller && { seller: seller }
       );
       res.status(200).send({ count: result });
     });
@@ -204,23 +198,46 @@ async function run() {
     app.put(
       "/make-admin/:userId",
       verifyJWT,
-      verifyOwner,
+      verifyAuth,
       async (req: Request, res: Response) => {
         const userId: string = req.params.userId;
-        res.status(200).send(
-          await userCollection.updateOne(
-            { _id: ObjectId(userId) },
-            { $set: { role: "admin" } },
-            { upsert: true }
-          )
-        );
+        res
+          .status(200)
+          .send(
+            await userCollection.updateOne(
+              { _id: ObjectId(userId) },
+              { $set: { role: "admin" } },
+              { upsert: true }
+            )
+          );
+      }
+    );
+
+    // demote to user request
+    app.put(
+      "/api/demote-to-user/:userId",
+      verifyJWT,
+      verifyAuth,
+      async (req: Request, res: Response) => {
+        const userId: string = req.params.userId;
+        res
+          .status(200)
+          .send(
+            await userCollection.updateOne(
+              { _id: ObjectId(userId) },
+              { $set: { role: "user" } },
+              { upsert: true }
+            )
+          );
       }
     );
 
     // get all user in allUser Page
     app.get("/api/manage-user", async (req: Request, res: Response) => {
       const uType = req.query.uTyp;
-      res.status(200).send(await userCollection.find({ role: uType }).toArray());
+      res
+        .status(200)
+        .send(await userCollection.find({ role: uType }).toArray());
     });
 
     // get owner, admin and user from database
@@ -231,17 +248,75 @@ async function run() {
       if (token) {
         const result = await userCollection.findOne({ email: email });
 
-        if (result && result.role === "owner") {
-          res.status(200).send({ role: "owner" });
-        }
-
-        if (result && result.role === "admin") {
-          res.status(200).send({ role: "admin" });
-        }
+        res.status(200).send({ role: result && result.role, result });
       } else {
         return res.status(403).send({ message: "Header Missing" });
       }
     });
+
+    // make seller request
+    app.put(
+      "/api/make-seller-request/:userEmail",
+      async (req: Request, res: Response) => {
+        const userEmail = req.params.userEmail;
+        let body = req.body;
+        let existSellerName;
+
+        if (body?.seller) {
+          existSellerName = await userCollection.findOne({
+            seller: body?.seller,
+          });
+        }
+
+        if (existSellerName) {
+          return res
+            .status(200)
+            .send({ message: "Seller name exists ! try to another" });
+        } else {
+          const result = await userCollection.updateOne(
+            { email: userEmail },
+            {
+              $set: body,
+            },
+            { upsert: true }
+          );
+          res.status(200).send({ result, message: "success" });
+        }
+      }
+    );
+
+    //    api/check-seller-request
+    app.get(
+      "/api/check-seller-request",
+      async (req: Request, res: Response) => {
+        res
+          .status(200)
+          .send(
+            await userCollection.find({ seller_request: "pending" }).toArray()
+          );
+      }
+    );
+
+    // api/make-seller-request
+    app.put(
+      "/api/permit-seller-request/:userId",
+      verifyJWT,
+      verifyAuth,
+      async (req: Request, res: Response) => {
+        const userId: string = req.params.userId;
+        console.log(userId);
+        const result = await userCollection.updateOne(
+          { _id: ObjectId(userId) },
+          {
+            $set: { role: "seller", seller_request: "ok", isSeller: true },
+          },
+          { upsert: true }
+        );
+        result?.acknowledged
+          ? res.status(200).send({ message: "Request Success" })
+          : res.status(400).send({ message: "Bad Request" });
+      }
+    );
 
     // add user to the database
     app.put("/user/:email", async (req: Request, res: Response) => {
@@ -850,16 +925,16 @@ async function run() {
 
     /// find orderId
     app.get("/manage-orders", async (req: Request, res: Response) => {
-      const email = req.query.email;
+      const seller = req.query.seller;
       let result: any;
 
-      if (email) {
+      if (seller) {
         result = await orderCollection
           .aggregate([
             { $unwind: "$orders" },
             {
               $match: {
-                "orders.seller": email,
+                "orders.seller": seller,
               },
             },
           ])
