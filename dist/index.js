@@ -409,27 +409,48 @@ function run() {
                 res.status(200).send(result);
             }));
             // update quantity of product in my-cart
-            app.put("/api/update-product-quantity/:productId/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.put("/api/update-product-quantity/:productId/:email/:cartTypes", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const productId = req.params.productId;
                 const userEmail = req.params.email;
+                const cart_types = req.params.cartTypes;
                 const { quantity, price_total, discount_amount_total } = req.body;
-                const result = yield cartCollection.updateOne({ user_email: userEmail, "product._id": productId }, {
-                    $set: {
-                        "product.$.quantity": quantity,
-                        "product.$.price_total": price_total,
-                        "product.$.discount_amount_total": discount_amount_total,
-                    },
-                }, { upsert: true });
+                let updateDocuments;
+                if (cart_types === "buy") {
+                    updateDocuments = {
+                        $set: {
+                            "buy_product.quantity": quantity,
+                            "buy_product.price_total": price_total,
+                            "buy_product.discount_amount_total": discount_amount_total,
+                        },
+                    };
+                }
+                else {
+                    updateDocuments = {
+                        $set: {
+                            "product.$.quantity": quantity,
+                            "product.$.price_total": price_total,
+                            "product.$.discount_amount_total": discount_amount_total,
+                        },
+                    };
+                }
+                const result = yield cartCollection.updateOne({ user_email: userEmail, "product._id": productId }, updateDocuments, { upsert: true });
                 res.status(200).send(result);
             }));
             // remove item form cart with item cart id and email
-            app.delete("/delete-cart-item/:productId/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.delete("/delete-cart-item/:productId/:email/:cartTypes", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const productId = req.params.productId;
                 const userEmail = req.params.email;
-                const result = yield cartCollection.updateOne({ user_email: userEmail }, { $pull: { product: { _id: productId } } });
+                const cart_types = req.params.cartTypes;
+                let updateDocuments;
+                if (cart_types === "buy") {
+                    updateDocuments = yield cartCollection.updateOne({ user_email: userEmail }, { $set: { buy_product: {} } });
+                }
+                else {
+                    updateDocuments = yield cartCollection.updateOne({ user_email: userEmail }, { $pull: { product: { _id: productId } } });
+                }
                 res
                     .status(200)
-                    .send({ result, message: `removed successfully from cart` });
+                    .send({ updateDocuments, message: `removed successfully from cart` });
             }));
             // inserting product into my cart api
             app.put("/api/add-to-cart/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -474,6 +495,13 @@ function run() {
                         message: "Product Successfully Added To Your Cart",
                     });
                 }
+            }));
+            // buy single product
+            app.put("/api/add-buy-product/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const userEmail = req.params.email;
+                const body = req.body;
+                const cartRes = yield cartCollection.updateOne({ user_email: userEmail }, { $set: { buy_product: body } }, { upsert: true });
+                res.status(200).send(cartRes);
             }));
             // update cart items
             app.put("/api/update-cart-items/:email/:productId", (req, res) => __awaiter(this, void 0, void 0, function* () {

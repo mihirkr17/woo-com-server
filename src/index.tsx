@@ -535,20 +535,35 @@ async function run() {
 
     // update quantity of product in my-cart
     app.put(
-      "/api/update-product-quantity/:productId/:email",
+      "/api/update-product-quantity/:productId/:email/:cartTypes",
       async (req: Request, res: Response) => {
         const productId = req.params.productId;
         const userEmail = req.params.email;
+        const cart_types = req.params.cartTypes;
         const { quantity, price_total, discount_amount_total } = req.body;
-        const result = await cartCollection.updateOne(
-          { user_email: userEmail, "product._id": productId },
-          {
+        let updateDocuments;
+
+        if (cart_types === "buy") {
+          updateDocuments = {
+            $set: {
+              "buy_product.quantity": quantity,
+              "buy_product.price_total": price_total,
+              "buy_product.discount_amount_total": discount_amount_total,
+            },
+          };
+        } else {
+          updateDocuments = {
             $set: {
               "product.$.quantity": quantity,
               "product.$.price_total": price_total,
               "product.$.discount_amount_total": discount_amount_total,
             },
-          },
+          };
+        }
+
+        const result = await cartCollection.updateOne(
+          { user_email: userEmail, "product._id": productId },
+          updateDocuments,
           { upsert: true }
         );
         res.status(200).send(result);
@@ -557,17 +572,28 @@ async function run() {
 
     // remove item form cart with item cart id and email
     app.delete(
-      "/delete-cart-item/:productId/:email",
+      "/delete-cart-item/:productId/:email/:cartTypes",
       async (req: Request, res: Response) => {
         const productId = req.params.productId;
         const userEmail = req.params.email;
-        const result = await cartCollection.updateOne(
-          { user_email: userEmail },
-          { $pull: { product: { _id: productId } } }
-        );
+        const cart_types = req.params.cartTypes;
+        let updateDocuments;
+
+        if (cart_types === "buy") {
+          updateDocuments = await cartCollection.updateOne(
+            { user_email: userEmail },
+            { $set: { buy_product: {} } }
+          );
+        } else {
+          updateDocuments = await cartCollection.updateOne(
+            { user_email: userEmail },
+            { $pull: { product: { _id: productId } } }
+          );
+        }
+
         res
           .status(200)
-          .send({ result, message: `removed successfully from cart` });
+          .send({ updateDocuments, message: `removed successfully from cart` });
       }
     );
 
@@ -615,6 +641,21 @@ async function run() {
         });
       }
     });
+
+    // buy single product
+    app.put(
+      "/api/add-buy-product/:email",
+      async (req: Request, res: Response) => {
+        const userEmail = req.params.email;
+        const body = req.body;
+        const cartRes = await cartCollection.updateOne(
+          { user_email: userEmail },
+          { $set: { buy_product: body } },
+          { upsert: true }
+        );
+        res.status(200).send(cartRes);
+      }
+    );
 
     // update cart items
     app.put(
