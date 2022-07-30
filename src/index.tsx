@@ -552,9 +552,11 @@ async function run() {
               "buy_product.discount_amount_total": discount_amount_total,
             },
           };
+
           filters = {
             user_email: userEmail,
           };
+
         } else {
           updateDocuments = {
             $set: {
@@ -563,6 +565,7 @@ async function run() {
               "product.$.discount_amount_total": discount_amount_total,
             },
           };
+          
           filters = {
             user_email: userEmail,
             "product._id": productId,

@@ -415,6 +415,7 @@ function run() {
                 const cart_types = req.params.cartTypes;
                 const { quantity, price_total, discount_amount_total } = req.body;
                 let updateDocuments;
+                let filters;
                 if (cart_types === "buy") {
                     updateDocuments = {
                         $set: {
@@ -422,6 +423,9 @@ function run() {
                             "buy_product.price_total": price_total,
                             "buy_product.discount_amount_total": discount_amount_total,
                         },
+                    };
+                    filters = {
+                        user_email: userEmail,
                     };
                 }
                 else {
@@ -432,8 +436,12 @@ function run() {
                             "product.$.discount_amount_total": discount_amount_total,
                         },
                     };
+                    filters = {
+                        user_email: userEmail,
+                        "product._id": productId,
+                    };
                 }
-                const result = yield cartCollection.updateOne({ user_email: userEmail, "product._id": productId }, updateDocuments, { upsert: true });
+                const result = yield cartCollection.updateOne(filters, updateDocuments, { upsert: true });
                 res.status(200).send(result);
             }));
             // remove item form cart with item cart id and email
