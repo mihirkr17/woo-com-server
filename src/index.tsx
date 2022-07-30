@@ -591,8 +591,7 @@ async function run() {
           );
         }
 
-        res
-          .status(200)
+        res.status(200)
           .send({ updateDocuments, message: `removed successfully from cart` });
       }
     );
