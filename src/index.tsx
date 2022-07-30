@@ -537,12 +537,12 @@ async function run() {
     app.put(
       "/api/update-product-quantity/:productId/:email/:cartTypes",
       async (req: Request, res: Response) => {
-        const productId = req.params.productId;
-        const userEmail = req.params.email;
-        const cart_types = req.params.cartTypes;
+        const productId: string = req.params.productId;
+        const userEmail: string = req.params.email;
+        const cart_types: string = req.params.cartTypes;
         const { quantity, price_total, discount_amount_total } = req.body;
-        let updateDocuments;
-        let filters;
+        let updateDocuments: any;
+        let filters: any;
 
         if (cart_types === "buy") {
           updateDocuments = {
