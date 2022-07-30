@@ -542,6 +542,7 @@ async function run() {
         const cart_types = req.params.cartTypes;
         const { quantity, price_total, discount_amount_total } = req.body;
         let updateDocuments;
+        let filters;
 
         if (cart_types === "buy") {
           updateDocuments = {
@@ -551,6 +552,9 @@ async function run() {
               "buy_product.discount_amount_total": discount_amount_total,
             },
           };
+          filters = {
+            user_email: userEmail,
+          };
         } else {
           updateDocuments = {
             $set: {
@@ -559,10 +563,14 @@ async function run() {
               "product.$.discount_amount_total": discount_amount_total,
             },
           };
+          filters = {
+            user_email: userEmail,
+            "product._id": productId,
+          };
         }
 
         const result = await cartCollection.updateOne(
-          { user_email: userEmail, "product._id": productId },
+          filters,
           updateDocuments,
           { upsert: true }
         );
@@ -591,7 +599,8 @@ async function run() {
           );
         }
 
-        res.status(200)
+        res
+          .status(200)
           .send({ updateDocuments, message: `removed successfully from cart` });
       }
     );
