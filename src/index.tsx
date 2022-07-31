@@ -79,6 +79,13 @@ async function run() {
       }
     };
 
+    // fetch products by recommended
+    app.get("/api/products/recommended", async (req: Request, res: Response) => {
+      res.status(200).send(
+        await productsCollection.find({top_sell : {$gte : 5}}).toArray()
+      );
+    });
+
     // get products by some condition in manage product page api
     app.get("/api/manage-product", async (req: Request, res: Response) => {
       let item: any;
@@ -423,7 +430,7 @@ async function run() {
         const productCategory = req.params.category;
         const findP = await productsCollection
           .find({
-            category: productCategory,
+            sub_category: productCategory,
           })
           .toArray();
         res.send(findP);
@@ -939,7 +946,7 @@ async function run() {
               total_earn = parseFloat(total_earn) + totalEr;
               let success_sell = sellerColumn?.success_sell || 0;
               success_sell = success_sell + parseInt(quantity);
-              
+
               await userCollection.updateOne(
                 { seller },
                 { $set: { total_earn, success_sell } },

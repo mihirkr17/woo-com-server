@@ -79,6 +79,10 @@ function run() {
                     res.status(403).send({ message: "Forbidden" });
                 }
             });
+            // fetch products by recommended
+            app.get("/api/products/recommended", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                res.status(200).send(yield productsCollection.find({ top_sell: { $gte: 5 } }).toArray());
+            }));
             // get products by some condition in manage product page api
             app.get("/api/manage-product", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 let item;
@@ -322,7 +326,7 @@ function run() {
                 const productCategory = req.params.category;
                 const findP = yield productsCollection
                     .find({
-                    category: productCategory,
+                    sub_category: productCategory,
                 })
                     .toArray();
                 res.send(findP);
