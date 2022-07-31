@@ -66,6 +66,19 @@ function run() {
                     res.status(403).send({ message: "Forbidden" });
                 }
             });
+            // verify seller
+            const verifySeller = (req, res, next) => __awaiter(this, void 0, void 0, function* () {
+                const authEmail = req.decoded.email;
+                const findAuthInDB = yield userCollection.findOne({
+                    email: authEmail && authEmail,
+                });
+                if (findAuthInDB.role === "seller") {
+                    next();
+                }
+                else {
+                    res.status(403).send({ message: "Forbidden" });
+                }
+            });
             // get products by some condition in manage product page api
             app.get("/api/manage-product", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 let item;
@@ -640,7 +653,7 @@ function run() {
                 const orderId = parseInt(req.params.id);
                 const status = req.params.status;
                 const userEmail = req.params.user_email;
-                const { ownerCommission, totalEarn, seller_email, productId, quantity, } = req.body;
+                const { ownerCommission, totalEarn, productId, quantity, seller } = req.body;
                 let time = new Date().toLocaleString();
                 let upDoc;
                 if (status === "placed") {
@@ -660,20 +673,22 @@ function run() {
                     };
                     if (ownerCommission && totalEarn) {
                         const ownerCol = yield userCollection.findOne({ role: "owner" });
-                        let adminCol = yield userCollection.findOne({
-                            email: seller_email,
+                        const sellerColumn = yield userCollection.findOne({
+                            seller: seller,
                         });
                         if (ownerCol) {
-                            let ownerTotalEarn = ownerCol === null || ownerCol === void 0 ? void 0 : ownerCol.total_earn;
-                            let ownerComm = parseFloat(ownerCommission);
-                            let earn = parseFloat(ownerTotalEarn) + ownerComm;
-                            yield userCollection.updateOne({ role: "owner" }, { $set: { total_earn: earn } }, { upsert: true });
+                            let total_earn = (ownerCol === null || ownerCol === void 0 ? void 0 : ownerCol.total_earn) || 0;
+                            let totalEr = parseFloat(ownerCommission);
+                            total_earn = parseFloat(total_earn) + totalEr;
+                            yield userCollection.updateOne({ role: "owner" }, { $set: { total_earn } }, { upsert: true });
                         }
-                        if (adminCol) {
-                            let totalEarned = adminCol === null || adminCol === void 0 ? void 0 : adminCol.total_earn;
+                        if (sellerColumn) {
+                            let total_earn = (sellerColumn === null || sellerColumn === void 0 ? void 0 : sellerColumn.total_earn) || 0;
                             let totalEr = parseFloat(totalEarn);
-                            totalEarned = parseFloat(totalEarned) + totalEr;
-                            yield userCollection.updateOne({ email: seller_email }, { $set: { total_earn: totalEarned } }, { upsert: true });
+                            total_earn = parseFloat(total_earn) + totalEr;
+                            let success_sell = (sellerColumn === null || sellerColumn === void 0 ? void 0 : sellerColumn.success_sell) || 0;
+                            success_sell = success_sell + parseInt(quantity);
+                            yield userCollection.updateOne({ seller }, { $set: { total_earn, success_sell } }, { upsert: true });
                         }
                     }
                     if (productId) {
@@ -695,6 +710,16 @@ function run() {
                 const result = yield orderCollection.updateOne({ user_email: userEmail }, upDoc, { arrayFilters: [{ "i.orderId": orderId }] });
                 res.send(result);
             }));
+            // dispatch order from seller
+            app.put("/api/dispatch-order-request/:orderId/:userEmail", verifyJWT, verifySeller, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const orderId = parseInt(req.params.orderId);
+                const userEmail = req.params.userEmail;
+                res.status(200).send(yield orderCollection.updateOne({ user_email: userEmail }, {
+                    $set: {
+                        "orders.$[i].dispatch": true,
+                    },
+                }, { arrayFilters: [{ "i.orderId": orderId }] }));
+            }));
             // get order list
             app.get("/api/checkout/:cartId", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const cartId = req.params.cartId;
@@ -711,7 +736,13 @@ function run() {
                         { $unwind: "$orders" },
                         {
                             $match: {
-                                "orders.seller": seller,
+                                $and: [
+                                    {
+                                        $or: [{ "orders.status": "pending" }],
+                                    },
+                                    { "orders.dispatch": { $ne: true } },
+                                    { "orders.seller": seller },
+                                ],
                             },
                         },
                     ])
@@ -719,7 +750,12 @@ function run() {
                 }
                 else {
                     result = yield orderCollection
-                        .aggregate([{ $unwind: "$orders" }])
+                        .aggregate([
+                        { $unwind: "$orders" },
+                        {
+                            $match: { "orders.dispatch": true },
+                        },
+                    ])
                         .toArray();
                 }
                 res.status(200).send(result);

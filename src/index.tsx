@@ -65,6 +65,20 @@ async function run() {
       }
     };
 
+    // verify seller
+    const verifySeller = async (req: Request, res: Response, next: any) => {
+      const authEmail = req.decoded.email;
+      const findAuthInDB = await userCollection.findOne({
+        email: authEmail && authEmail,
+      });
+
+      if (findAuthInDB.role === "seller") {
+        next();
+      } else {
+        res.status(403).send({ message: "Forbidden" });
+      }
+    };
+
     // get products by some condition in manage product page api
     app.get("/api/manage-product", async (req: Request, res: Response) => {
       let item: any;
@@ -556,7 +570,6 @@ async function run() {
           filters = {
             user_email: userEmail,
           };
-
         } else {
           updateDocuments = {
             $set: {
@@ -565,7 +578,7 @@ async function run() {
               "product.$.discount_amount_total": discount_amount_total,
             },
           };
-          
+
           filters = {
             user_email: userEmail,
             "product._id": productId,
@@ -883,13 +896,8 @@ async function run() {
         const orderId = parseInt(req.params.id);
         const status = req.params.status;
         const userEmail = req.params.user_email;
-        const {
-          ownerCommission,
-          totalEarn,
-          seller_email,
-          productId,
-          quantity,
-        } = req.body;
+        const { ownerCommission, totalEarn, productId, quantity, seller } =
+          req.body;
         let time: string = new Date().toLocaleString();
         let upDoc: any;
 
@@ -910,27 +918,31 @@ async function run() {
 
           if (ownerCommission && totalEarn) {
             const ownerCol = await userCollection.findOne({ role: "owner" });
-            let adminCol = await userCollection.findOne({
-              email: seller_email,
+            const sellerColumn = await userCollection.findOne({
+              seller: seller,
             });
+
             if (ownerCol) {
-              let ownerTotalEarn = ownerCol?.total_earn;
-              let ownerComm = parseFloat(ownerCommission);
-              let earn = parseFloat(ownerTotalEarn) + ownerComm;
+              let total_earn = ownerCol?.total_earn || 0;
+              let totalEr = parseFloat(ownerCommission);
+              total_earn = parseFloat(total_earn) + totalEr;
               await userCollection.updateOne(
                 { role: "owner" },
-                { $set: { total_earn: earn } },
+                { $set: { total_earn } },
                 { upsert: true }
               );
             }
 
-            if (adminCol) {
-              let totalEarned = adminCol?.total_earn;
+            if (sellerColumn) {
+              let total_earn = sellerColumn?.total_earn || 0;
               let totalEr = parseFloat(totalEarn);
-              totalEarned = parseFloat(totalEarned) + totalEr;
+              total_earn = parseFloat(total_earn) + totalEr;
+              let success_sell = sellerColumn?.success_sell || 0;
+              success_sell = success_sell + parseInt(quantity);
+              
               await userCollection.updateOne(
-                { email: seller_email },
-                { $set: { total_earn: totalEarned } },
+                { seller },
+                { $set: { total_earn, success_sell } },
                 { upsert: true }
               );
             }
@@ -968,6 +980,28 @@ async function run() {
       }
     );
 
+    // dispatch order from seller
+    app.put(
+      "/api/dispatch-order-request/:orderId/:userEmail",
+      verifyJWT,
+      verifySeller,
+      async (req: Request, res: Response) => {
+        const orderId: number = parseInt(req.params.orderId);
+        const userEmail: string = req.params.userEmail;
+        res.status(200).send(
+          await orderCollection.updateOne(
+            { user_email: userEmail },
+            {
+              $set: {
+                "orders.$[i].dispatch": true,
+              },
+            },
+            { arrayFilters: [{ "i.orderId": orderId }] }
+          )
+        );
+      }
+    );
+
     // get order list
     app.get("/api/checkout/:cartId", async (req: Request, res: Response) => {
       const cartId = req.params.cartId;
@@ -986,14 +1020,25 @@ async function run() {
             { $unwind: "$orders" },
             {
               $match: {
-                "orders.seller": seller,
+                $and: [
+                  {
+                    $or: [{ "orders.status": "pending" }],
+                  },
+                  { "orders.dispatch": { $ne: true } },
+                  { "orders.seller": seller },
+                ],
               },
             },
           ])
           .toArray();
       } else {
         result = await orderCollection
-          .aggregate([{ $unwind: "$orders" }])
+          .aggregate([
+            { $unwind: "$orders" },
+            {
+              $match: { "orders.dispatch": true },
+            },
+          ])
           .toArray();
       }
 
