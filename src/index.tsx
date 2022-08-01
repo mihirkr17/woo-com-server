@@ -21,8 +21,7 @@ const port = process.env.PORT || 5000;
 // verifying jwt token
 const verifyJWT = async (req: Request, res: Response, next: any) => {
   const authHeader = req.headers.authorization;
-  if (!authHeader)
-    return res.status(403).send({ message: "Unauthorized Access" });
+  if (!authHeader) return res.status(403).send({ message: "Forbidden" });
 
   const token = authHeader.split(" ")[1];
 
@@ -32,7 +31,8 @@ const verifyJWT = async (req: Request, res: Response, next: any) => {
       process.env.ACCESS_TOKEN,
       function (err: any, decoded: any) {
         if (err) {
-          return res.status(401).send({ message: err.message });
+          return res.status(401).send({
+            message: err.message});
         }
         req.decoded = decoded;
         next();
@@ -79,12 +79,66 @@ async function run() {
       }
     };
 
-    // fetch products by recommended
-    app.get("/api/products/recommended", async (req: Request, res: Response) => {
-      res.status(200).send(
-        await productsCollection.find({top_sell : {$gte : 5}}).toArray()
-      );
+    /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    ++++++++++ Authorization api request endpoints Start ++++++++++++
+    +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+    // add user to the database
+    app.put("/api/sign-user/:email", async (req: Request, res: Response) => {
+      const email: string = req.params.email;
+
+      const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
+        algorithm: "HS256",
+        expiresIn: "1h",
+      });
+
+      res.cookie('token', token, { httpOnly: true });
+
+      const existsUser = await userCollection.findOne({ email: email });
+
+      if (existsUser) {
+        return res.status(200).send({ token });
+      } else {
+        const result = await userCollection.updateOne(
+          { email: email },
+          { $set: { email, role: "user" } },
+          { upsert: true }
+        );
+        return res.status(200).send({ result, token });
+      }
     });
+
+    // fetch user information from database and send to client
+    app.get(
+      "/api/fetch-auth-user",
+      verifyJWT,
+      async (req: Request, res: Response) => {
+        const email: string = req.decoded.email;
+
+        if (email) {
+          const result = await userCollection.findOne({ email: email });
+          res.status(200).send({ result });
+        } else {
+          return res
+            .status(403)
+            .send({ message: "Forbidden. Header Is Missing" });
+        }
+      }
+    );
+    /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    ++++++++++ Authorization api request endpoints End ++++++++++++
+    +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+    // fetch products by recommended
+    app.get(
+      "/api/products/recommended",
+      async (req: Request, res: Response) => {
+        res
+          .status(200)
+          .send(
+            await productsCollection.find({ top_sell: { $gte: 5 } }).toArray()
+          );
+      }
+    );
 
     // get products by some condition in manage product page api
     app.get("/api/manage-product", async (req: Request, res: Response) => {
@@ -261,20 +315,6 @@ async function run() {
         .send(await userCollection.find({ role: uType }).toArray());
     });
 
-    // get owner, admin and user from database
-    app.get("/fetch-auth/:email", async (req: Request, res: Response) => {
-      const email = req.params.email;
-      const token = req.headers.authorization?.split(" ")[1];
-
-      if (token) {
-        const result = await userCollection.findOne({ email: email });
-
-        res.status(200).send({ role: result && result.role, result });
-      } else {
-        return res.status(403).send({ message: "Header Missing" });
-      }
-    });
-
     // make seller request
     app.put(
       "/api/make-seller-request/:userEmail",
@@ -338,30 +378,6 @@ async function run() {
           : res.status(400).send({ message: "Bad Request" });
       }
     );
-
-    // add user to the database
-    app.put("/user/:email", async (req: Request, res: Response) => {
-      const email: string = req.params.email;
-      const findUser = await userCollection.findOne({ email: email });
-
-      let updateDocuments;
-
-      updateDocuments =
-        findUser && findUser?.role !== ""
-          ? { $set: { email } }
-          : { $set: { email, role: "user" } };
-
-      const result = await userCollection.updateOne(
-        { email: email },
-        updateDocuments,
-        { upsert: true }
-      );
-      const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
-        algorithm: "HS256",
-        expiresIn: "6h",
-      });
-      res.status(200).send({ result, token });
-    });
 
     // inserting product into database
     app.post("/add-product", async (req: Request, res: Response) => {

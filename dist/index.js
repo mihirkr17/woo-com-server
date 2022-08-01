@@ -31,12 +31,14 @@ const port = process.env.PORT || 5000;
 const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     const authHeader = req.headers.authorization;
     if (!authHeader)
-        return res.status(403).send({ message: "Unauthorized Access" });
+        return res.status(403).send({ message: "Forbidden" });
     const token = authHeader.split(" ")[1];
     if (token) {
         jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
             if (err) {
-                return res.status(401).send({ message: err.message });
+                return res.status(401).send({
+                    message: err.message
+                });
             }
             req.decoded = decoded;
             next();
@@ -79,9 +81,49 @@ function run() {
                     res.status(403).send({ message: "Forbidden" });
                 }
             });
+            /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+            ++++++++++ Authorization api request endpoints Start ++++++++++++
+            +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+            // add user to the database
+            app.put("/api/sign-user/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const email = req.params.email;
+                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
+                    algorithm: "HS256",
+                    expiresIn: "5m",
+                });
+                res.cookie('token', token, { httpOnly: true });
+                const existsUser = yield userCollection.findOne({ email: email });
+                if (existsUser) {
+                    return res.status(200).send({ token });
+                }
+                else {
+                    const result = yield userCollection.updateOne({ email: email }, { $set: { email, role: "user" } }, { upsert: true });
+                    return res.status(200).send({ result, token });
+                }
+            }));
+            // fetch user information from database and send to client
+            app.get("/api/fetch-auth-user", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                var _a;
+                const email = req.decoded.email;
+                const token = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1];
+                if (token && email) {
+                    const result = yield userCollection.findOne({ email: email });
+                    res.status(200).send({ result });
+                }
+                else {
+                    return res
+                        .status(403)
+                        .send({ message: "Forbidden. Header Is Missing" });
+                }
+            }));
+            /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+            ++++++++++ Authorization api request endpoints End ++++++++++++
+            +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
             // fetch products by recommended
             app.get("/api/products/recommended", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                res.status(200).send(yield productsCollection.find({ top_sell: { $gte: 5 } }).toArray());
+                res
+                    .status(200)
+                    .send(yield productsCollection.find({ top_sell: { $gte: 5 } }).toArray());
             }));
             // get products by some condition in manage product page api
             app.get("/api/manage-product", (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -202,19 +244,6 @@ function run() {
                     .status(200)
                     .send(yield userCollection.find({ role: uType }).toArray());
             }));
-            // get owner, admin and user from database
-            app.get("/fetch-auth/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                var _a;
-                const email = req.params.email;
-                const token = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1];
-                if (token) {
-                    const result = yield userCollection.findOne({ email: email });
-                    res.status(200).send({ role: result && result.role, result });
-                }
-                else {
-                    return res.status(403).send({ message: "Header Missing" });
-                }
-            }));
             // make seller request
             app.put("/api/make-seller-request/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const userEmail = req.params.userEmail;
@@ -253,22 +282,6 @@ function run() {
                 (result === null || result === void 0 ? void 0 : result.acknowledged)
                     ? res.status(200).send({ message: "Request Success" })
                     : res.status(400).send({ message: "Bad Request" });
-            }));
-            // add user to the database
-            app.put("/user/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const email = req.params.email;
-                const findUser = yield userCollection.findOne({ email: email });
-                let updateDocuments;
-                updateDocuments =
-                    findUser && (findUser === null || findUser === void 0 ? void 0 : findUser.role) !== ""
-                        ? { $set: { email } }
-                        : { $set: { email, role: "user" } };
-                const result = yield userCollection.updateOne({ email: email }, updateDocuments, { upsert: true });
-                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
-                    algorithm: "HS256",
-                    expiresIn: "6h",
-                });
-                res.status(200).send({ result, token });
             }));
             // inserting product into database
             app.post("/add-product", (req, res) => __awaiter(this, void 0, void 0, function* () {
