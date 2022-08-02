@@ -32,7 +32,8 @@ const verifyJWT = async (req: Request, res: Response, next: any) => {
       function (err: any, decoded: any) {
         if (err) {
           return res.status(401).send({
-            message: err.message});
+            message: err.message,
+          });
         }
         req.decoded = decoded;
         next();
@@ -86,24 +87,25 @@ async function run() {
     app.put("/api/sign-user/:email", async (req: Request, res: Response) => {
       const email: string = req.params.email;
 
-      const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
+      let token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
         algorithm: "HS256",
         expiresIn: "1h",
       });
 
-      res.cookie('token', token, { httpOnly: true });
+      if (email) {
+        // res.cookie("token", token, { httpOnly: true });
+        const existsUser = await userCollection.findOne({ email: email });
 
-      const existsUser = await userCollection.findOne({ email: email });
-
-      if (existsUser) {
-        return res.status(200).send({ token });
-      } else {
-        const result = await userCollection.updateOne(
-          { email: email },
-          { $set: { email, role: "user" } },
-          { upsert: true }
-        );
-        return res.status(200).send({ result, token });
+        if (existsUser) {
+          return res.status(200).send({ token });
+        } else {
+          const result = await userCollection.updateOne(
+            { email: email },
+            { $set: { email, role: "user" } },
+            { upsert: true }
+          );
+          return res.status(200).send({ result, token });
+        }
       }
     });
 
@@ -411,22 +413,22 @@ async function run() {
     // Fetch single product
     // check in  cart and view product
     app.get(
-      "/api/fetch-single-product/:productId/:email",
+      "/api/fetch-single-product/:product_slug/:email",
       async (req: Request, res: Response) => {
         const email = req.params.email;
-        const productId = req.params.productId;
+        const product_slug = req.params.product_slug;
         const filterP = await cartCollection
           .aggregate([
             { $unwind: "$product" },
-            { $match: { user_email: email, "product._id": productId } },
+            { $match: { user_email: email, "product.slug": product_slug } },
           ])
           .toArray();
 
         let result = await productsCollection.findOne({
-          _id: ObjectId(productId),
+          slug: product_slug,
         });
 
-        const exist = filterP.some((f: any) => f?.product?._id === productId);
+        const exist = filterP.some((f: any) => f?.product?.slug === product_slug);
 
         let cardHandler: boolean;
         if (exist) {
@@ -439,19 +441,34 @@ async function run() {
       }
     );
 
+  
     // fetch product by category
-    app.get(
-      "/product-category/:category",
-      async (req: Request, res: Response) => {
-        const productCategory = req.params.category;
-        const findP = await productsCollection
-          .find({
-            sub_category: productCategory,
-          })
-          .toArray();
-        res.send(findP);
+    app.get("/api/product-by-category", async (req: Request, res: Response) => {
+      let findQuery;
+      const productCategory = req.query.category;
+      const productSubCategory = req.query.sub_category;
+      const filters = req.query.filters;
+      let sorting;
+
+      if (filters) {
+        if (filters === "lowest") {
+          sorting = { price: 1}
+        }
+
+        else if (filters === "highest") {
+          sorting = { price: -1}
+        } else {
+          sorting = {};
+        }  
       }
-    );
+
+      findQuery = productCategory
+        ? { category: productCategory }
+        : { sub_category: productSubCategory };
+
+      const tt = await productsCollection.find( findQuery, { price: {$exists: 1,}}).sort(sorting).toArray();
+      res.send(tt);
+    });
 
     // upsert review in product
     app.put("/add-rating/:email", async (req: Request, res: Response) => {

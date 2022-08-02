@@ -37,7 +37,7 @@ const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function
         jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
             if (err) {
                 return res.status(401).send({
-                    message: err.message
+                    message: err.message,
                 });
             }
             req.decoded = decoded;
@@ -87,26 +87,26 @@ function run() {
             // add user to the database
             app.put("/api/sign-user/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
-                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
+                let token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
                     algorithm: "HS256",
-                    expiresIn: "5m",
+                    expiresIn: "1h",
                 });
-                res.cookie('token', token, { httpOnly: true });
-                const existsUser = yield userCollection.findOne({ email: email });
-                if (existsUser) {
-                    return res.status(200).send({ token });
-                }
-                else {
-                    const result = yield userCollection.updateOne({ email: email }, { $set: { email, role: "user" } }, { upsert: true });
-                    return res.status(200).send({ result, token });
+                if (email) {
+                    // res.cookie("token", token, { httpOnly: true });
+                    const existsUser = yield userCollection.findOne({ email: email });
+                    if (existsUser) {
+                        return res.status(200).send({ token });
+                    }
+                    else {
+                        const result = yield userCollection.updateOne({ email: email }, { $set: { email, role: "user" } }, { upsert: true });
+                        return res.status(200).send({ result, token });
+                    }
                 }
             }));
             // fetch user information from database and send to client
             app.get("/api/fetch-auth-user", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                var _a;
                 const email = req.decoded.email;
-                const token = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1];
-                if (token && email) {
+                if (email) {
                     const result = yield userCollection.findOne({ email: email });
                     res.status(200).send({ result });
                 }
@@ -311,19 +311,19 @@ function run() {
             }));
             // Fetch single product
             // check in  cart and view product
-            app.get("/api/fetch-single-product/:productId/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.get("/api/fetch-single-product/:product_slug/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
-                const productId = req.params.productId;
+                const product_slug = req.params.product_slug;
                 const filterP = yield cartCollection
                     .aggregate([
                     { $unwind: "$product" },
-                    { $match: { user_email: email, "product._id": productId } },
+                    { $match: { user_email: email, "product.slug": product_slug } },
                 ])
                     .toArray();
                 let result = yield productsCollection.findOne({
-                    _id: ObjectId(productId),
+                    slug: product_slug,
                 });
-                const exist = filterP.some((f) => { var _a; return ((_a = f === null || f === void 0 ? void 0 : f.product) === null || _a === void 0 ? void 0 : _a._id) === productId; });
+                const exist = filterP.some((f) => { var _a; return ((_a = f === null || f === void 0 ? void 0 : f.product) === null || _a === void 0 ? void 0 : _a.slug) === product_slug; });
                 let cardHandler;
                 if (exist) {
                     cardHandler = true;
@@ -335,18 +335,32 @@ function run() {
                 res.send(result);
             }));
             // fetch product by category
-            app.get("/product-category/:category", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const productCategory = req.params.category;
-                const findP = yield productsCollection
-                    .find({
-                    sub_category: productCategory,
-                })
-                    .toArray();
-                res.send(findP);
+            app.get("/api/product-by-category", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                let findQuery;
+                const productCategory = req.query.category;
+                const productSubCategory = req.query.sub_category;
+                const filters = req.query.filters;
+                let sorting;
+                if (filters) {
+                    if (filters === "lowest") {
+                        sorting = { price: 1 };
+                    }
+                    else if (filters === "highest") {
+                        sorting = { price: -1 };
+                    }
+                    else {
+                        sorting = {};
+                    }
+                }
+                findQuery = productCategory
+                    ? { category: productCategory }
+                    : { sub_category: productSubCategory };
+                const tt = yield productsCollection.find(findQuery, { price: { $exists: 1, } }).sort(sorting).toArray();
+                res.send(tt);
             }));
             // upsert review in product
             app.put("/add-rating/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                var _b, _c, _d, _e, _f;
+                var _a, _b, _c, _d, _e;
                 const email = req.params.email;
                 const body = req.body;
                 let newRating;
@@ -379,11 +393,11 @@ function run() {
                 });
                 const point = parseInt(body === null || body === void 0 ? void 0 : body.rating_point);
                 let newRatingPoint = products === null || products === void 0 ? void 0 : products.rating;
-                let rat1 = parseInt((_b = newRatingPoint[4]) === null || _b === void 0 ? void 0 : _b.count) || 0;
-                let rat2 = parseInt((_c = newRatingPoint[3]) === null || _c === void 0 ? void 0 : _c.count) || 0;
-                let rat3 = parseInt((_d = newRatingPoint[2]) === null || _d === void 0 ? void 0 : _d.count) || 0;
-                let rat4 = parseInt((_e = newRatingPoint[1]) === null || _e === void 0 ? void 0 : _e.count) || 0;
-                let rat5 = parseInt((_f = newRatingPoint[0]) === null || _f === void 0 ? void 0 : _f.count) || 0;
+                let rat1 = parseInt((_a = newRatingPoint[4]) === null || _a === void 0 ? void 0 : _a.count) || 0;
+                let rat2 = parseInt((_b = newRatingPoint[3]) === null || _b === void 0 ? void 0 : _b.count) || 0;
+                let rat3 = parseInt((_c = newRatingPoint[2]) === null || _c === void 0 ? void 0 : _c.count) || 0;
+                let rat4 = parseInt((_d = newRatingPoint[1]) === null || _d === void 0 ? void 0 : _d.count) || 0;
+                let rat5 = parseInt((_e = newRatingPoint[0]) === null || _e === void 0 ? void 0 : _e.count) || 0;
                 if (point === 5) {
                     rat5 += 1;
                 }
