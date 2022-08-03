@@ -50,7 +50,6 @@ async function run() {
     const cartCollection = dbh.db("Products").collection("cart");
     const orderCollection = dbh.db("Products").collection("orders");
     const userCollection = dbh.db("Users").collection("user");
-    const reviewCollection = dbh.db("Products").collection("review");
 
     // // verify owner
     const verifyAuth = async (req: Request, res: Response, next: any) => {
@@ -382,7 +381,7 @@ async function run() {
     );
 
     // inserting product into database
-    app.post("/add-product", async (req: Request, res: Response) => {
+    app.post("/api/add-product", async (req: Request, res: Response) => {
       const body = req.body;
       let available = body?.available;
 
@@ -428,7 +427,9 @@ async function run() {
           slug: product_slug,
         });
 
-        const exist = filterP.some((f: any) => f?.product?.slug === product_slug);
+        const exist = filterP.some(
+          (f: any) => f?.product?.slug === product_slug
+        );
 
         let cardHandler: boolean;
         if (exist) {
@@ -441,7 +442,6 @@ async function run() {
       }
     );
 
-  
     // fetch product by category
     app.get("/api/product-by-category", async (req: Request, res: Response) => {
       let findQuery;
@@ -452,121 +452,89 @@ async function run() {
 
       if (filters) {
         if (filters === "lowest") {
-          sorting = { price: 1}
-        }
-
-        else if (filters === "highest") {
-          sorting = { price: -1}
+          sorting = { price: 1 };
+        } else if (filters === "highest") {
+          sorting = { price: -1 };
         } else {
           sorting = {};
-        }  
+        }
       }
 
       findQuery = productCategory
         ? { category: productCategory }
         : { sub_category: productSubCategory };
 
-      const tt = await productsCollection.find( findQuery, { price: {$exists: 1,}}).sort(sorting).toArray();
+      const tt = await productsCollection
+        .find(findQuery, { price: { $exists: 1 } })
+        .sort(sorting)
+        .toArray();
       res.send(tt);
     });
 
     // upsert review in product
-    app.put("/add-rating/:email", async (req: Request, res: Response) => {
-      const email = req.params.email;
-      const body = req.body;
-      let newRating;
-
-      const findRating = await reviewCollection.findOne({
-        user_email: email,
-      });
-      if (findRating) {
-        const productArr: any[] = findRating?.rating ? findRating?.rating : [];
-        if (productArr.length > 0) {
-          for (let i = 0; i < productArr.length; i++) {
-            let elem = productArr[i].rating_id;
-            if (elem === body?.rating_id) {
-              res.send({ message: "Product Has Already In Your Cart" });
-              return;
-            } else {
-              newRating = [...productArr, body];
-            }
-          }
-        } else {
-          newRating = [body];
-        }
-      } else {
-        newRating = [body];
-      }
-
-      const products = await productsCollection.findOne({
-        _id: ObjectId(body?.product_id),
-      });
-
-      const point = parseInt(body?.rating_point);
-
-      let newRatingPoint = products?.rating;
-
-      let rat1: any = parseInt(newRatingPoint[4]?.count) || 0;
-      let rat2: any = parseInt(newRatingPoint[3]?.count) || 0;
-      let rat3: any = parseInt(newRatingPoint[2]?.count) || 0;
-      let rat4: any = parseInt(newRatingPoint[1]?.count) || 0;
-      let rat5: any = parseInt(newRatingPoint[0]?.count) || 0;
-
-      if (point === 5) {
-        rat5 += 1;
-      } else if (point === 4) {
-        rat4 += 1;
-      } else if (point === 3) {
-        rat3 += 1;
-      } else if (point === 2) {
-        rat2 += 1;
-      } else {
-        rat1 += 1;
-      }
-
-      let ratingArr: any[] = [
-        { weight: 5, count: rat5 },
-        { weight: 4, count: rat4 },
-        { weight: 3, count: rat3 },
-        { weight: 2, count: rat2 },
-        { weight: 1, count: rat1 },
-      ];
-
-      await productsCollection.updateOne(
-        { _id: ObjectId(body?.product_id) },
-        { $set: { rating: ratingArr } },
-        { upsert: true }
-      );
-
-      const result = await reviewCollection.updateOne(
-        { user_email: email },
-        { $set: { rating: newRating } },
-        { upsert: true }
-      );
-      res.send(result);
-    });
-
-    // my review
-    app.get("/my-review/:email", async (req: Request, res: Response) => {
-      const email = req.params.email;
-      const result = await reviewCollection
-        .aggregate([{ $unwind: "$rating" }, { $match: { user_email: email } }])
-        .toArray();
-      res.send(result);
-    });
-
-    // product review fetch
-    app.get(
-      "/product-review/:productId",
+    app.put(
+      "/api/add-product-rating/:productId/:email",
       async (req: Request, res: Response) => {
         const productId = req.params.productId;
-        const result = await reviewCollection
-          .aggregate([
-            { $unwind: "$rating" },
-            { $match: { "rating.product_id": productId } },
-          ])
-          .toArray();
-        res.send(result);
+        const email = req.params.email;
+        const body = req.body;
+        const orderId = parseInt(body?.orderId);
+
+        const orderUpdate = await orderCollection.updateOne(
+          { user_email: email },
+          {
+            $set: {
+              "orders.$[i].isRating": true,
+            },
+          },
+          { upsert: true, arrayFilters: [{ "i.orderId": orderId }] }
+        );
+
+        const products = await productsCollection.findOne({
+          _id: ObjectId(productId),
+        });
+
+        const point = parseInt(body?.rating_point);
+        let newRatingPoint = products?.rating || [];
+
+        let rat1: any = parseInt(newRatingPoint[4]?.count) || 0;
+        let rat2: any = parseInt(newRatingPoint[3]?.count) || 0;
+        let rat3: any = parseInt(newRatingPoint[2]?.count) || 0;
+        let rat4: any = parseInt(newRatingPoint[1]?.count) || 0;
+        let rat5: any = parseInt(newRatingPoint[0]?.count) || 0;
+
+        if (point === 5) {
+          rat5 += 1;
+        } else if (point === 4) {
+          rat4 += 1;
+        } else if (point === 3) {
+          rat3 += 1;
+        } else if (point === 2) {
+          rat2 += 1;
+        } else {
+          rat1 += 1;
+        }
+
+        let ratingArr: any[] = [
+          { weight: 5, count: rat5 },
+          { weight: 4, count: rat4 },
+          { weight: 3, count: rat3 },
+          { weight: 2, count: rat2 },
+          { weight: 1, count: rat1 },
+        ];
+
+        const result = await productsCollection.updateOne(
+          { _id: ObjectId(productId) },
+          {
+            $set: { rating: ratingArr },
+            $push: { reviews: body },
+          },
+          { upsert: true }
+        );
+
+        if (result) {
+          return res.status(200).send({ message : "Thanks for your review !" });
+        }
       }
     );
 

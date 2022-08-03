@@ -54,7 +54,6 @@ function run() {
             const cartCollection = dbh.db("Products").collection("cart");
             const orderCollection = dbh.db("Products").collection("orders");
             const userCollection = dbh.db("Users").collection("user");
-            const reviewCollection = dbh.db("Products").collection("review");
             // // verify owner
             const verifyAuth = (req, res, next) => __awaiter(this, void 0, void 0, function* () {
                 const authEmail = req.decoded.email;
@@ -284,7 +283,7 @@ function run() {
                     : res.status(400).send({ message: "Bad Request" });
             }));
             // inserting product into database
-            app.post("/add-product", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.post("/api/add-product", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const body = req.body;
                 let available = body === null || body === void 0 ? void 0 : body.available;
                 if (available && available >= 1) {
@@ -355,44 +354,29 @@ function run() {
                 findQuery = productCategory
                     ? { category: productCategory }
                     : { sub_category: productSubCategory };
-                const tt = yield productsCollection.find(findQuery, { price: { $exists: 1, } }).sort(sorting).toArray();
+                const tt = yield productsCollection
+                    .find(findQuery, { price: { $exists: 1 } })
+                    .sort(sorting)
+                    .toArray();
                 res.send(tt);
             }));
             // upsert review in product
-            app.put("/add-rating/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.put("/api/add-product-rating/:productId/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 var _a, _b, _c, _d, _e;
+                const productId = req.params.productId;
                 const email = req.params.email;
                 const body = req.body;
-                let newRating;
-                const findRating = yield reviewCollection.findOne({
-                    user_email: email,
-                });
-                if (findRating) {
-                    const productArr = (findRating === null || findRating === void 0 ? void 0 : findRating.rating) ? findRating === null || findRating === void 0 ? void 0 : findRating.rating : [];
-                    if (productArr.length > 0) {
-                        for (let i = 0; i < productArr.length; i++) {
-                            let elem = productArr[i].rating_id;
-                            if (elem === (body === null || body === void 0 ? void 0 : body.rating_id)) {
-                                res.send({ message: "Product Has Already In Your Cart" });
-                                return;
-                            }
-                            else {
-                                newRating = [...productArr, body];
-                            }
-                        }
-                    }
-                    else {
-                        newRating = [body];
-                    }
-                }
-                else {
-                    newRating = [body];
-                }
+                const orderId = parseInt(body === null || body === void 0 ? void 0 : body.orderId);
+                const orderUpdate = yield orderCollection.updateOne({ user_email: email }, {
+                    $set: {
+                        "orders.$[i].isRating": true,
+                    },
+                }, { upsert: true, arrayFilters: [{ "i.orderId": orderId }] });
                 const products = yield productsCollection.findOne({
-                    _id: ObjectId(body === null || body === void 0 ? void 0 : body.product_id),
+                    _id: ObjectId(productId),
                 });
                 const point = parseInt(body === null || body === void 0 ? void 0 : body.rating_point);
-                let newRatingPoint = products === null || products === void 0 ? void 0 : products.rating;
+                let newRatingPoint = (products === null || products === void 0 ? void 0 : products.rating) || [];
                 let rat1 = parseInt((_a = newRatingPoint[4]) === null || _a === void 0 ? void 0 : _a.count) || 0;
                 let rat2 = parseInt((_b = newRatingPoint[3]) === null || _b === void 0 ? void 0 : _b.count) || 0;
                 let rat3 = parseInt((_c = newRatingPoint[2]) === null || _c === void 0 ? void 0 : _c.count) || 0;
@@ -420,28 +404,13 @@ function run() {
                     { weight: 2, count: rat2 },
                     { weight: 1, count: rat1 },
                 ];
-                yield productsCollection.updateOne({ _id: ObjectId(body === null || body === void 0 ? void 0 : body.product_id) }, { $set: { rating: ratingArr } }, { upsert: true });
-                const result = yield reviewCollection.updateOne({ user_email: email }, { $set: { rating: newRating } }, { upsert: true });
-                res.send(result);
-            }));
-            // my review
-            app.get("/my-review/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const email = req.params.email;
-                const result = yield reviewCollection
-                    .aggregate([{ $unwind: "$rating" }, { $match: { user_email: email } }])
-                    .toArray();
-                res.send(result);
-            }));
-            // product review fetch
-            app.get("/product-review/:productId", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const productId = req.params.productId;
-                const result = yield reviewCollection
-                    .aggregate([
-                    { $unwind: "$rating" },
-                    { $match: { "rating.product_id": productId } },
-                ])
-                    .toArray();
-                res.send(result);
+                const result = yield productsCollection.updateOne({ _id: ObjectId(productId) }, {
+                    $set: { rating: ratingArr },
+                    $push: { reviews: body },
+                }, { upsert: true });
+                if (result) {
+                    return res.status(200).send({ message: "Thanks for your review !" });
+                }
             }));
             // fetch my added product in my cart page
             app.get("/my-cart-items/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
