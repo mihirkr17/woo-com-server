@@ -14,25 +14,32 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const { dbh } = require("./database/db");
+const cookieParser = require('cookie-parser');
 // Server setup
 const { ObjectId } = require("mongodb");
 const cors = require("cors");
 require("dotenv").config();
 const app = (0, express_1.default)();
 var jwt = require("jsonwebtoken");
+// const corsOptions = {
+//   origin: "http:localhost:3000/"
+//   credentials: true,
+// };
 // middleware
 app.use(cors({
-    origin: "*",
+    origin: true,
     methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
+    credentials: true,
 }));
+app.use(cookieParser());
 app.use(express_1.default.json());
 const port = process.env.PORT || 5000;
 // verifying jwt token
 const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    const authHeader = req.headers.authorization;
-    if (!authHeader)
-        return res.status(403).send({ message: "Forbidden" });
-    const token = authHeader.split(" ")[1];
+    // const authHeader = req.headers.authorization;
+    // if (!authHeader) return res.status(403).send({ message: "Forbidden" });
+    const token = req.cookies.token;
+    // const token = authHeader.split(" ")[1];
     if (token) {
         jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
             if (err) {
@@ -43,6 +50,9 @@ const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function
             req.decoded = decoded;
             next();
         });
+    }
+    else {
+        return res.status(403).send({ message: "Forbidden" });
     }
 });
 function run() {
@@ -91,9 +101,9 @@ function run() {
                     expiresIn: "1h",
                 });
                 if (email) {
-                    // res.cookie("token", token, { httpOnly: true });
                     const existsUser = yield userCollection.findOne({ email: email });
                     if (existsUser) {
+                        res.cookie('token', token, { maxAge: 900000, httpOnly: true, secure: false });
                         return res.status(200).send({ token });
                     }
                     else {
@@ -114,6 +124,10 @@ function run() {
                         .status(403)
                         .send({ message: "Forbidden. Header Is Missing" });
                 }
+            }));
+            app.get("/api/sign-out", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                res.clearCookie("token");
+                res.status(200).send({ message: "Successfully sign out the user" });
             }));
             /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
             ++++++++++ Authorization api request endpoints End ++++++++++++
@@ -197,12 +211,42 @@ function run() {
             app.put("/api/update-product/:productId", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const productId = req.params.productId;
                 const body = req.body;
+                let quantity = 1;
+                let productPrice = parseInt(body === null || body === void 0 ? void 0 : body.price);
+                let discount_amount_fixed = parseFloat(body === null || body === void 0 ? void 0 : body.discount_amount_fixed);
+                let discount_amount_total = discount_amount_fixed * quantity;
+                let discount = parseInt(body === null || body === void 0 ? void 0 : body.discount);
+                let price_total = (productPrice * quantity) - discount_amount_total;
+                let price_fixed = body === null || body === void 0 ? void 0 : body.price_fixed;
                 let available = body === null || body === void 0 ? void 0 : body.available;
                 if (available && available >= 1) {
                     body["stock"] = "in";
                 }
                 else {
                     body["stock"] = "out";
+                }
+                const exists = yield cartCollection.find({ "product._id": productId }).toArray();
+                if (exists && exists.length > 0) {
+                    yield cartCollection.updateMany({ "product._id": productId }, {
+                        $set: {
+                            "product.$.title": body.title,
+                            "product.$.slug": body.slug,
+                            "product.$.brand": body.brand,
+                            "product.$.image": body.image,
+                            "product.$.category": body.category,
+                            "product.$.sub_category": body.sub_category,
+                            "product.$.quantity": quantity,
+                            "product.$.price": productPrice,
+                            "product.$.price_total": price_total,
+                            "product.$.price_fixed": price_fixed,
+                            "product.$.discount": discount,
+                            "product.$.discount_amount_fixed": discount_amount_fixed,
+                            "product.$.discount_amount_total": discount_amount_total,
+                            "product.$.stock": body === null || body === void 0 ? void 0 : body.stock,
+                            "product.$.available": available,
+                            "product.$.modifiedAt": body === null || body === void 0 ? void 0 : body.modifiedAt,
+                        }
+                    }, { upsert: true });
                 }
                 const result = yield productsCollection.updateOne({ _id: ObjectId(productId) }, {
                     $set: body,

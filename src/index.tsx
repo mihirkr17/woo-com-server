@@ -1,5 +1,6 @@
 import express, { Express, Request, Response } from "express";
 const { dbh } = require("./database/db");
+const cookieParser = require('cookie-parser');
 
 // Server setup
 const { ObjectId } = require("mongodb");
@@ -8,22 +9,28 @@ require("dotenv").config();
 const app: Express = express();
 var jwt = require("jsonwebtoken");
 
+// const corsOptions = {
+//   origin: "http:localhost:3000/"
+//   credentials: true,
+// };
 // middleware
 app.use(
   cors({
-    origin: "*",
+    origin: true,
     methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
+    credentials: true,
   })
 );
+app.use(cookieParser());
 app.use(express.json());
 const port = process.env.PORT || 5000;
 
 // verifying jwt token
 const verifyJWT = async (req: Request, res: Response, next: any) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(403).send({ message: "Forbidden" });
-
-  const token = authHeader.split(" ")[1];
+  // const authHeader = req.headers.authorization;
+  // if (!authHeader) return res.status(403).send({ message: "Forbidden" });
+  const token = req.cookies.token;
+  // const token = authHeader.split(" ")[1];
 
   if (token) {
     jwt.verify(
@@ -39,6 +46,8 @@ const verifyJWT = async (req: Request, res: Response, next: any) => {
         next();
       }
     );
+  } else {
+    return res.status(403).send({ message: "Forbidden" })
   }
 };
 
@@ -92,10 +101,11 @@ async function run() {
       });
 
       if (email) {
-        // res.cookie("token", token, { httpOnly: true });
+
         const existsUser = await userCollection.findOne({ email: email });
 
         if (existsUser) {
+          res.cookie('token', token, { maxAge: 900000, httpOnly: true, secure: false });
           return res.status(200).send({ token });
         } else {
           const result = await userCollection.updateOne(
@@ -118,6 +128,7 @@ async function run() {
         if (email) {
           const result = await userCollection.findOne({ email: email });
           res.status(200).send({ result });
+        
         } else {
           return res
             .status(403)
@@ -125,6 +136,11 @@ async function run() {
         }
       }
     );
+
+    app.get("/api/sign-out", async (req:Request, res:Response) => {
+      res.clearCookie("token");
+      res.status(200).send({message : "Successfully sign out the user"});
+    })
     /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     ++++++++++ Authorization api request endpoints End ++++++++++++
     +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
@@ -229,6 +245,14 @@ async function run() {
       async (req: Request, res: Response) => {
         const productId = req.params.productId;
         const body = req.body;
+
+        let quantity = 1;
+        let productPrice = parseInt(body?.price);
+        let discount_amount_fixed = parseFloat(body?.discount_amount_fixed)
+        let discount_amount_total = discount_amount_fixed * quantity;
+        let discount = parseInt(body?.discount);
+        let price_total = (productPrice * quantity) - discount_amount_total;
+        let price_fixed = body?.price_fixed;
         let available = body?.available;
 
         if (available && available >= 1) {
@@ -236,6 +260,32 @@ async function run() {
         } else {
           body["stock"] = "out";
         }
+
+        const exists = await cartCollection.find({"product._id": productId}).toArray();
+
+        if (exists && exists.length > 0) {
+          await cartCollection.updateMany({"product._id": productId}, {
+            $set: {
+              "product.$.title": body.title,
+              "product.$.slug": body.slug,
+              "product.$.brand": body.brand,
+              "product.$.image": body.image,
+              "product.$.category": body.category,
+              "product.$.sub_category": body.sub_category,
+              "product.$.quantity": quantity,
+              "product.$.price": productPrice,
+              "product.$.price_total": price_total,
+              "product.$.price_fixed": price_fixed,
+              "product.$.discount": discount,
+              "product.$.discount_amount_fixed": discount_amount_fixed,
+              "product.$.discount_amount_total": discount_amount_total,
+              "product.$.stock": body?.stock,
+              "product.$.available": available,
+              "product.$.modifiedAt": body?.modifiedAt,
+            }
+          }, {upsert : true});
+        }
+
         const result = await productsCollection.updateOne(
           { _id: ObjectId(productId) },
           {
