@@ -101,11 +101,12 @@ async function run() {
 
         if (existsUser) {
           res.cookie("token", token, {
+            sameSite: "none",
+            secure: true,
             maxAge: 3600000,
             httpOnly: true,
-            secure: false,
           });
-          res.status(200).send({message : "Login success"});
+          res.status(200).send({ message: "Login success" });
         } else {
           await userCollection.updateOne(
             { email: email },
@@ -116,9 +117,10 @@ async function run() {
           res.cookie("token", token, {
             maxAge: 3600000,
             httpOnly: true,
-            secure: false,
+            sameSite: "none",
+            secure: true,
           });
-          res.status(200).send({message : "Login success"});
+          res.status(200).send({ message: "Login success" });
         }
       }
     });
