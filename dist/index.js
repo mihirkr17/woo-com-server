@@ -14,18 +14,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const { dbh } = require("./database/db");
-const cookieParser = require('cookie-parser');
+const cookieParser = require("cookie-parser");
 // Server setup
 const { ObjectId } = require("mongodb");
 const cors = require("cors");
 require("dotenv").config();
 const app = (0, express_1.default)();
 var jwt = require("jsonwebtoken");
-// const corsOptions = {
-//   origin: "http:localhost:3000/"
-//   credentials: true,
-// };
-// middleware
 app.use(cors({
     origin: true,
     methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
@@ -43,6 +38,7 @@ const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function
     if (token) {
         jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
             if (err) {
+                res.clearCookie("token");
                 return res.status(401).send({
                     message: err.message,
                 });
@@ -96,25 +92,32 @@ function run() {
             // add user to the database
             app.put("/api/sign-user/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
-                let token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
+                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
                     algorithm: "HS256",
                     expiresIn: "1h",
                 });
                 if (email) {
                     const existsUser = yield userCollection.findOne({ email: email });
                     if (existsUser) {
-                        res.cookie('token', token, { maxAge: 900000, httpOnly: true, secure: false });
-                        return res.status(200).send({ token });
+                        return res.cookie("token", token, {
+                            maxAge: 3600000,
+                            httpOnly: true,
+                            secure: false,
+                        });
                     }
                     else {
-                        const result = yield userCollection.updateOne({ email: email }, { $set: { email, role: "user" } }, { upsert: true });
-                        return res.status(200).send({ result, token });
+                        yield userCollection.updateOne({ email: email }, { $set: { email, role: "user" } }, { upsert: true });
+                        return res.cookie("token", token, {
+                            maxAge: 3600000,
+                            httpOnly: true,
+                            secure: false,
+                        });
                     }
                 }
             }));
             // fetch user information from database and send to client
-            app.get("/api/fetch-auth-user", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const email = req.decoded.email;
+            app.get("/api/fetch-auth-user/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const email = req.params.email;
                 if (email) {
                     const result = yield userCollection.findOne({ email: email });
                     res.status(200).send({ result });
@@ -122,7 +125,7 @@ function run() {
                 else {
                     return res
                         .status(403)
-                        .send({ message: "Forbidden. Header Is Missing" });
+                        .send({ message: "Forbidden. Email not found" });
                 }
             }));
             app.get("/api/sign-out", (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -208,7 +211,7 @@ function run() {
                     : res.status(503).send({ message: "Service unavailable" });
             }));
             // update product information
-            app.put("/api/update-product/:productId", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.put("/api/update-product/:productId", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const productId = req.params.productId;
                 const body = req.body;
                 let quantity = 1;
@@ -216,7 +219,7 @@ function run() {
                 let discount_amount_fixed = parseFloat(body === null || body === void 0 ? void 0 : body.discount_amount_fixed);
                 let discount_amount_total = discount_amount_fixed * quantity;
                 let discount = parseInt(body === null || body === void 0 ? void 0 : body.discount);
-                let price_total = (productPrice * quantity) - discount_amount_total;
+                let price_total = productPrice * quantity - discount_amount_total;
                 let price_fixed = body === null || body === void 0 ? void 0 : body.price_fixed;
                 let available = body === null || body === void 0 ? void 0 : body.available;
                 if (available && available >= 1) {
@@ -225,7 +228,9 @@ function run() {
                 else {
                     body["stock"] = "out";
                 }
-                const exists = yield cartCollection.find({ "product._id": productId }).toArray();
+                const exists = yield cartCollection
+                    .find({ "product._id": productId })
+                    .toArray();
                 if (exists && exists.length > 0) {
                     yield cartCollection.updateMany({ "product._id": productId }, {
                         $set: {
@@ -245,7 +250,7 @@ function run() {
                             "product.$.stock": body === null || body === void 0 ? void 0 : body.stock,
                             "product.$.available": available,
                             "product.$.modifiedAt": body === null || body === void 0 ? void 0 : body.modifiedAt,
-                        }
+                        },
                     }, { upsert: true });
                 }
                 const result = yield productsCollection.updateOne({ _id: ObjectId(productId) }, {
@@ -327,7 +332,7 @@ function run() {
                     : res.status(400).send({ message: "Bad Request" });
             }));
             // inserting product into database
-            app.post("/api/add-product", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.post("/api/add-product", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const body = req.body;
                 let available = body === null || body === void 0 ? void 0 : body.available;
                 if (available && available >= 1) {
@@ -405,13 +410,13 @@ function run() {
                 res.send(tt);
             }));
             // upsert review in product
-            app.put("/api/add-product-rating/:productId/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.put("/api/add-product-rating/:productId", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 var _a, _b, _c, _d, _e;
                 const productId = req.params.productId;
-                const email = req.params.email;
+                const email = req.decoded.email;
                 const body = req.body;
                 const orderId = parseInt(body === null || body === void 0 ? void 0 : body.orderId);
-                const orderUpdate = yield orderCollection.updateOne({ user_email: email }, {
+                yield orderCollection.updateOne({ user_email: email }, {
                     $set: {
                         "orders.$[i].isRating": true,
                     },
@@ -466,9 +471,9 @@ function run() {
                 res.status(200).send(result);
             }));
             // update quantity of product in my-cart
-            app.put("/api/update-product-quantity/:productId/:email/:cartTypes", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.put("/api/update-product-quantity/:productId/:cartTypes", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const productId = req.params.productId;
-                const userEmail = req.params.email;
+                const userEmail = req.decoded.email;
                 const cart_types = req.params.cartTypes;
                 const { quantity, price_total, discount_amount_total } = req.body;
                 let updateDocuments;
@@ -502,9 +507,9 @@ function run() {
                 res.status(200).send(result);
             }));
             // remove item form cart with item cart id and email
-            app.delete("/delete-cart-item/:productId/:email/:cartTypes", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.delete("/delete-cart-item/:productId/:cartTypes", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const productId = req.params.productId;
-                const userEmail = req.params.email;
+                const userEmail = req.decoded.email;
                 const cart_types = req.params.cartTypes;
                 let updateDocuments;
                 if (cart_types === "buy") {
@@ -518,9 +523,9 @@ function run() {
                     .send({ updateDocuments, message: `removed successfully from cart` });
             }));
             // inserting product into my cart api
-            app.put("/api/add-to-cart/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.put("/api/add-to-cart", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 let newProduct;
-                const email = req.params.email;
+                const email = req.decoded.email;
                 const body = req.body;
                 const options = { upsert: true };
                 const query = { user_email: email };
@@ -562,43 +567,22 @@ function run() {
                 }
             }));
             // buy single product
-            app.put("/api/add-buy-product/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const userEmail = req.params.email;
+            app.put("/api/add-buy-product", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const userEmail = req.decoded.email;
                 const body = req.body;
                 const cartRes = yield cartCollection.updateOne({ user_email: userEmail }, { $set: { buy_product: body } }, { upsert: true });
                 res.status(200).send(cartRes);
             }));
-            // update cart items
-            app.put("/api/update-cart-items/:email/:productId", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const productId = req.params.productId;
-                const email = req.params.email;
-                const { quantity, price, discount_amount_fixed, discount_amount_total, discount, price_total, price_fixed, stock, available, modifiedAt, } = req.body;
-                const result = yield cartCollection.updateOne({ user_email: email, "product._id": productId }, {
-                    $set: {
-                        "product.$.quantity": quantity,
-                        "product.$.price": price,
-                        "product.$.discount": discount,
-                        "product.$.price_total": price_total,
-                        "product.$.price_fixed": price_fixed,
-                        "product.$.discount_amount_fixed": discount_amount_fixed,
-                        "product.$.discount_amount_total": discount_amount_total,
-                        "product.$.stock": stock,
-                        "product.$.available": available,
-                        "product.$.modifiedAt": modifiedAt,
-                    },
-                }, { upsert: true });
-                res.status(200).send(result);
-            }));
             // inserting address in cart
-            app.post("/api/add-cart-address/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const userEmail = req.params.userEmail;
+            app.post("/api/add-cart-address", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const userEmail = req.decoded.email;
                 const body = req.body;
                 const result = yield cartCollection.updateOne({ user_email: userEmail }, { $push: { address: body } }, { upsert: true });
                 res.send(result);
             }));
             // order address add api
-            app.put("/api/update-cart-address/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const userEmail = req.params.userEmail;
+            app.put("/api/update-cart-address", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const userEmail = req.decoded.email;
                 const body = req.body;
                 const result = yield cartCollection.updateOne({ user_email: userEmail }, {
                     $set: {
@@ -608,8 +592,8 @@ function run() {
                 res.send(result);
             }));
             // update select_address in address to confirm for order api
-            app.put("/api/select-address/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const userEmail = req.params.userEmail;
+            app.put("/api/select-address", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const userEmail = req.decoded.email;
                 const { addressId, select_address } = req.body;
                 const addr = yield cartCollection.findOne({ user_email: userEmail });
                 if (addr) {
@@ -633,18 +617,10 @@ function run() {
                 res.status(200).send(result);
             }));
             // delete or remove address from cart
-            app.delete("/api/delete-cart-address/:email/:addressId", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const email = req.params.email;
+            app.delete("/api/delete-cart-address/:addressId", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const email = req.decoded.email;
                 const addressId = parseInt(req.params.addressId);
                 const result = yield cartCollection.updateOne({ user_email: email }, { $pull: { address: { addressId } } });
-                res.send(result);
-            }));
-            // get order address
-            app.get("/cart-address/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const userEmail = req.params.userEmail;
-                const result = yield cartCollection.findOne({
-                    user_email: userEmail,
-                });
                 res.send(result);
             }));
             /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -653,9 +629,12 @@ function run() {
             +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
             +++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
             // set order api call
-            app.post("/set-order/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.post("/set-order/:userEmail", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const userEmail = req.params.userEmail;
+                const verifiedEmail = req.decoded.email;
                 const body = req.body;
+                if (userEmail !== verifiedEmail)
+                    return res.status(401).send({ message: "Unauthorized access" });
                 if (!body) {
                     res.send({
                         message: "Order Cancelled. You Have To Select At least One Product",
@@ -663,7 +642,7 @@ function run() {
                 }
                 else {
                     const result = yield orderCollection.updateOne({ user_email: userEmail }, { $push: { orders: body } }, { upsert: true });
-                    res.send(result);
+                    res.status(200).send(result && { message: "Order success" });
                 }
             }));
             // get my order list in my-order page
@@ -758,11 +737,11 @@ function run() {
             app.put("/api/dispatch-order-request/:orderId/:userEmail", verifyJWT, verifySeller, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const orderId = parseInt(req.params.orderId);
                 const userEmail = req.params.userEmail;
-                res.status(200).send(yield orderCollection.updateOne({ user_email: userEmail }, {
+                res.status(200).send((yield orderCollection.updateOne({ user_email: userEmail }, {
                     $set: {
                         "orders.$[i].dispatch": true,
                     },
-                }, { arrayFilters: [{ "i.orderId": orderId }] }));
+                }, { arrayFilters: [{ "i.orderId": orderId }] })) && { message: "Successfully order dispatched" });
             }));
             // get order list
             app.get("/api/checkout/:cartId", (req, res) => __awaiter(this, void 0, void 0, function* () {

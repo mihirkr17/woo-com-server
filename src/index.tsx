@@ -1,6 +1,6 @@
 import express, { Express, Request, Response } from "express";
 const { dbh } = require("./database/db");
-const cookieParser = require('cookie-parser');
+const cookieParser = require("cookie-parser");
 
 // Server setup
 const { ObjectId } = require("mongodb");
@@ -9,11 +9,6 @@ require("dotenv").config();
 const app: Express = express();
 var jwt = require("jsonwebtoken");
 
-// const corsOptions = {
-//   origin: "http:localhost:3000/"
-//   credentials: true,
-// };
-// middleware
 app.use(
   cors({
     origin: true,
@@ -38,6 +33,7 @@ const verifyJWT = async (req: Request, res: Response, next: any) => {
       process.env.ACCESS_TOKEN,
       function (err: any, decoded: any) {
         if (err) {
+          res.clearCookie("token");
           return res.status(401).send({
             message: err.message,
           });
@@ -47,7 +43,7 @@ const verifyJWT = async (req: Request, res: Response, next: any) => {
       }
     );
   } else {
-    return res.status(403).send({ message: "Forbidden" })
+    return res.status(403).send({ message: "Forbidden" });
   }
 };
 
@@ -95,52 +91,57 @@ async function run() {
     app.put("/api/sign-user/:email", async (req: Request, res: Response) => {
       const email: string = req.params.email;
 
-      let token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
+      const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
         algorithm: "HS256",
         expiresIn: "1h",
       });
 
       if (email) {
-
         const existsUser = await userCollection.findOne({ email: email });
 
         if (existsUser) {
-          res.cookie('token', token, { maxAge: 900000, httpOnly: true, secure: false });
-          return res.status(200).send({ token });
+          return res.cookie("token", token, {
+            maxAge: 3600000,
+            httpOnly: true,
+            secure: false,
+          });
         } else {
-          const result = await userCollection.updateOne(
+          await userCollection.updateOne(
             { email: email },
             { $set: { email, role: "user" } },
             { upsert: true }
           );
-          return res.status(200).send({ result, token });
+
+          return res.cookie("token", token, {
+            maxAge: 3600000,
+            httpOnly: true,
+            secure: false,
+          });
         }
       }
     });
 
     // fetch user information from database and send to client
     app.get(
-      "/api/fetch-auth-user",
-      verifyJWT,
+      "/api/fetch-auth-user/:email",
       async (req: Request, res: Response) => {
-        const email: string = req.decoded.email;
+        const email: string = req.params.email;
 
         if (email) {
           const result = await userCollection.findOne({ email: email });
           res.status(200).send({ result });
-        
         } else {
           return res
             .status(403)
-            .send({ message: "Forbidden. Header Is Missing" });
+            .send({ message: "Forbidden. Email not found" });
         }
       }
     );
 
-    app.get("/api/sign-out", async (req:Request, res:Response) => {
+    app.get("/api/sign-out", async (req: Request, res: Response) => {
       res.clearCookie("token");
-      res.status(200).send({message : "Successfully sign out the user"});
-    })
+      res.status(200).send({ message: "Successfully sign out the user" });
+    });
     /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     ++++++++++ Authorization api request endpoints End ++++++++++++
     +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
@@ -242,16 +243,17 @@ async function run() {
     // update product information
     app.put(
       "/api/update-product/:productId",
+      verifyJWT,
       async (req: Request, res: Response) => {
         const productId = req.params.productId;
         const body = req.body;
 
         let quantity = 1;
         let productPrice = parseInt(body?.price);
-        let discount_amount_fixed = parseFloat(body?.discount_amount_fixed)
+        let discount_amount_fixed = parseFloat(body?.discount_amount_fixed);
         let discount_amount_total = discount_amount_fixed * quantity;
         let discount = parseInt(body?.discount);
-        let price_total = (productPrice * quantity) - discount_amount_total;
+        let price_total = productPrice * quantity - discount_amount_total;
         let price_fixed = body?.price_fixed;
         let available = body?.available;
 
@@ -261,29 +263,35 @@ async function run() {
           body["stock"] = "out";
         }
 
-        const exists = await cartCollection.find({"product._id": productId}).toArray();
+        const exists = await cartCollection
+          .find({ "product._id": productId })
+          .toArray();
 
         if (exists && exists.length > 0) {
-          await cartCollection.updateMany({"product._id": productId}, {
-            $set: {
-              "product.$.title": body.title,
-              "product.$.slug": body.slug,
-              "product.$.brand": body.brand,
-              "product.$.image": body.image,
-              "product.$.category": body.category,
-              "product.$.sub_category": body.sub_category,
-              "product.$.quantity": quantity,
-              "product.$.price": productPrice,
-              "product.$.price_total": price_total,
-              "product.$.price_fixed": price_fixed,
-              "product.$.discount": discount,
-              "product.$.discount_amount_fixed": discount_amount_fixed,
-              "product.$.discount_amount_total": discount_amount_total,
-              "product.$.stock": body?.stock,
-              "product.$.available": available,
-              "product.$.modifiedAt": body?.modifiedAt,
-            }
-          }, {upsert : true});
+          await cartCollection.updateMany(
+            { "product._id": productId },
+            {
+              $set: {
+                "product.$.title": body.title,
+                "product.$.slug": body.slug,
+                "product.$.brand": body.brand,
+                "product.$.image": body.image,
+                "product.$.category": body.category,
+                "product.$.sub_category": body.sub_category,
+                "product.$.quantity": quantity,
+                "product.$.price": productPrice,
+                "product.$.price_total": price_total,
+                "product.$.price_fixed": price_fixed,
+                "product.$.discount": discount,
+                "product.$.discount_amount_fixed": discount_amount_fixed,
+                "product.$.discount_amount_total": discount_amount_total,
+                "product.$.stock": body?.stock,
+                "product.$.available": available,
+                "product.$.modifiedAt": body?.modifiedAt,
+              },
+            },
+            { upsert: true }
+          );
         }
 
         const result = await productsCollection.updateOne(
@@ -431,17 +439,21 @@ async function run() {
     );
 
     // inserting product into database
-    app.post("/api/add-product", async (req: Request, res: Response) => {
-      const body = req.body;
-      let available = body?.available;
+    app.post(
+      "/api/add-product",
+      verifyJWT,
+      async (req: Request, res: Response) => {
+        const body = req.body;
+        let available = body?.available;
 
-      if (available && available >= 1) {
-        body["stock"] = "in";
-      } else {
-        body["stock"] = "out";
+        if (available && available >= 1) {
+          body["stock"] = "in";
+        } else {
+          body["stock"] = "out";
+        }
+        res.status(200).send(await productsCollection.insertOne(body));
       }
-      res.status(200).send(await productsCollection.insertOne(body));
-    });
+    );
 
     // finding all Products
     app.get("/products", async (req: Request, res: Response) => {
@@ -523,14 +535,15 @@ async function run() {
 
     // upsert review in product
     app.put(
-      "/api/add-product-rating/:productId/:email",
+      "/api/add-product-rating/:productId",
+      verifyJWT,
       async (req: Request, res: Response) => {
         const productId = req.params.productId;
-        const email = req.params.email;
+        const email = req.decoded.email;
         const body = req.body;
         const orderId = parseInt(body?.orderId);
 
-        const orderUpdate = await orderCollection.updateOne(
+        await orderCollection.updateOne(
           { user_email: email },
           {
             $set: {
@@ -583,7 +596,7 @@ async function run() {
         );
 
         if (result) {
-          return res.status(200).send({ message : "Thanks for your review !" });
+          return res.status(200).send({ message: "Thanks for your review !" });
         }
       }
     );
@@ -607,10 +620,11 @@ async function run() {
 
     // update quantity of product in my-cart
     app.put(
-      "/api/update-product-quantity/:productId/:email/:cartTypes",
+      "/api/update-product-quantity/:productId/:cartTypes",
+      verifyJWT,
       async (req: Request, res: Response) => {
         const productId: string = req.params.productId;
-        const userEmail: string = req.params.email;
+        const userEmail: string = req.decoded.email;
         const cart_types: string = req.params.cartTypes;
         const { quantity, price_total, discount_amount_total } = req.body;
         let updateDocuments: any;
@@ -654,10 +668,11 @@ async function run() {
 
     // remove item form cart with item cart id and email
     app.delete(
-      "/delete-cart-item/:productId/:email/:cartTypes",
+      "/delete-cart-item/:productId/:cartTypes",
+      verifyJWT,
       async (req: Request, res: Response) => {
         const productId = req.params.productId;
-        const userEmail = req.params.email;
+        const userEmail = req.decoded.email;
         const cart_types = req.params.cartTypes;
         let updateDocuments;
 
@@ -680,55 +695,60 @@ async function run() {
     );
 
     // inserting product into my cart api
-    app.put("/api/add-to-cart/:email", async (req: Request, res: Response) => {
-      let newProduct: any;
-      const email: string = req.params.email;
-      const body = req.body;
-      const options = { upsert: true };
-      const query = { user_email: email };
+    app.put(
+      "/api/add-to-cart",
+      verifyJWT,
+      async (req: Request, res: Response) => {
+        let newProduct: any;
+        const email: string = req.decoded.email;
+        const body = req.body;
+        const options = { upsert: true };
+        const query = { user_email: email };
 
-      if (body?.stock === "in" && body?.available > 0) {
-        const existsProduct = await cartCollection.findOne({
-          user_email: email,
-        });
-        if (existsProduct) {
-          const productArr: any[] = existsProduct?.product
-            ? existsProduct?.product
-            : [];
-          if (productArr.length > 0) {
-            for (let i = 0; i < productArr.length; i++) {
-              let elem = productArr[i]._id;
-              if (elem === body?._id) {
-                res.send({ message: "Product Has Already In Your Cart" });
-                return;
-              } else {
-                newProduct = [...productArr, body];
+        if (body?.stock === "in" && body?.available > 0) {
+          const existsProduct = await cartCollection.findOne({
+            user_email: email,
+          });
+          if (existsProduct) {
+            const productArr: any[] = existsProduct?.product
+              ? existsProduct?.product
+              : [];
+            if (productArr.length > 0) {
+              for (let i = 0; i < productArr.length; i++) {
+                let elem = productArr[i]._id;
+                if (elem === body?._id) {
+                  res.send({ message: "Product Has Already In Your Cart" });
+                  return;
+                } else {
+                  newProduct = [...productArr, body];
+                }
               }
+            } else {
+              newProduct = [body];
             }
           } else {
             newProduct = [body];
           }
-        } else {
-          newProduct = [body];
+
+          const up = {
+            $set: { product: newProduct },
+          };
+
+          const cartRes = await cartCollection.updateOne(query, up, options);
+          res.send({
+            data: cartRes,
+            message: "Product Successfully Added To Your Cart",
+          });
         }
-
-        const up = {
-          $set: { product: newProduct },
-        };
-
-        const cartRes = await cartCollection.updateOne(query, up, options);
-        res.send({
-          data: cartRes,
-          message: "Product Successfully Added To Your Cart",
-        });
       }
-    });
+    );
 
     // buy single product
     app.put(
-      "/api/add-buy-product/:email",
+      "/api/add-buy-product",
+      verifyJWT,
       async (req: Request, res: Response) => {
-        const userEmail = req.params.email;
+        const userEmail = req.decoded.email;
         const body = req.body;
         const cartRes = await cartCollection.updateOne(
           { user_email: userEmail },
@@ -739,52 +759,12 @@ async function run() {
       }
     );
 
-    // update cart items
-    app.put(
-      "/api/update-cart-items/:email/:productId",
-      async (req: Request, res: Response) => {
-        const productId = req.params.productId;
-        const email: string = req.params.email;
-        const {
-          quantity,
-          price,
-          discount_amount_fixed,
-          discount_amount_total,
-          discount,
-          price_total,
-          price_fixed,
-          stock,
-          available,
-          modifiedAt,
-        } = req.body;
-
-        const result = await cartCollection.updateOne(
-          { user_email: email, "product._id": productId },
-          {
-            $set: {
-              "product.$.quantity": quantity,
-              "product.$.price": price,
-              "product.$.discount": discount,
-              "product.$.price_total": price_total,
-              "product.$.price_fixed": price_fixed,
-              "product.$.discount_amount_fixed": discount_amount_fixed,
-              "product.$.discount_amount_total": discount_amount_total,
-              "product.$.stock": stock,
-              "product.$.available": available,
-              "product.$.modifiedAt": modifiedAt,
-            },
-          },
-          { upsert: true }
-        );
-        res.status(200).send(result);
-      }
-    );
-
     // inserting address in cart
     app.post(
-      "/api/add-cart-address/:userEmail",
+      "/api/add-cart-address",
+      verifyJWT,
       async (req: Request, res: Response) => {
-        const userEmail = req.params.userEmail;
+        const userEmail = req.decoded.email;
         const body = req.body;
         const result = await cartCollection.updateOne(
           { user_email: userEmail },
@@ -797,9 +777,10 @@ async function run() {
 
     // order address add api
     app.put(
-      "/api/update-cart-address/:userEmail",
+      "/api/update-cart-address",
+      verifyJWT,
       async (req: Request, res: Response) => {
-        const userEmail = req.params.userEmail;
+        const userEmail = req.decoded.email;
         const body = req.body;
 
         const result = await cartCollection.updateOne(
@@ -817,9 +798,10 @@ async function run() {
 
     // update select_address in address to confirm for order api
     app.put(
-      "/api/select-address/:userEmail",
+      "/api/select-address",
+      verifyJWT,
       async (req: Request, res: Response) => {
-        const userEmail = req.params.userEmail;
+        const userEmail = req.decoded.email;
         const { addressId, select_address } = req.body;
 
         const addr = await cartCollection.findOne({ user_email: userEmail });
@@ -858,9 +840,9 @@ async function run() {
 
     // delete or remove address from cart
     app.delete(
-      "/api/delete-cart-address/:email/:addressId",
+      "/api/delete-cart-address/:addressId",
       async (req: Request, res: Response) => {
-        const email = req.params.email;
+        const email = req.decoded.email;
         const addressId = parseInt(req.params.addressId);
         const result = await cartCollection.updateOne(
           { user_email: email },
@@ -870,38 +852,37 @@ async function run() {
       }
     );
 
-    // get order address
-    app.get("/cart-address/:userEmail", async (req: Request, res: Response) => {
-      const userEmail = req.params.userEmail;
-      const result = await cartCollection.findOne({
-        user_email: userEmail,
-      });
-      res.send(result);
-    });
-
     /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
       This is order section api operation
     +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     +++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
     // set order api call
-    app.post("/set-order/:userEmail", async (req: Request, res: Response) => {
-      const userEmail: string = req.params.userEmail;
-      const body: string = req.body;
+    app.post(
+      "/set-order/:userEmail",
+      verifyJWT,
+      async (req: Request, res: Response) => {
+        const userEmail: string = req.params.userEmail;
+        const verifiedEmail: string = req.decoded.email;
+        const body: string = req.body;
 
-      if (!body) {
-        res.send({
-          message: "Order Cancelled. You Have To Select At least One Product",
-        });
-      } else {
-        const result = await orderCollection.updateOne(
-          { user_email: userEmail },
-          { $push: { orders: body } },
-          { upsert: true }
-        );
-        res.send(result);
+        if (userEmail !== verifiedEmail)
+          return res.status(401).send({ message: "Unauthorized access" });
+
+        if (!body) {
+          res.send({
+            message: "Order Cancelled. You Have To Select At least One Product",
+          });
+        } else {
+          const result = await orderCollection.updateOne(
+            { user_email: userEmail },
+            { $push: { orders: body } },
+            { upsert: true }
+          );
+          res.status(200).send(result && { message: "Order success" });
+        }
       }
-    });
+    );
 
     // get my order list in my-order page
     app.get("/my-order/:email", async (req: Request, res: Response) => {
@@ -1047,7 +1028,7 @@ async function run() {
         const orderId: number = parseInt(req.params.orderId);
         const userEmail: string = req.params.userEmail;
         res.status(200).send(
-          await orderCollection.updateOne(
+          (await orderCollection.updateOne(
             { user_email: userEmail },
             {
               $set: {
@@ -1055,7 +1036,7 @@ async function run() {
               },
             },
             { arrayFilters: [{ "i.orderId": orderId }] }
-          )
+          )) && { message: "Successfully order dispatched" }
         );
       }
     );
