@@ -100,8 +100,8 @@ async function run() {
 
         if (existsUser) {
           res.cookie("token", token, {
-            // sameSite: "none",
-            // secure: true,
+            sameSite: "none",
+            secure: true,
             maxAge: 3600000,
             httpOnly: true,
           });
@@ -116,8 +116,8 @@ async function run() {
           res.cookie("token", token, {
             maxAge: 3600000,
             httpOnly: true,
-            // sameSite: "none",
-            // secure: true,
+            sameSite: "none",
+            secure: true,
           });
           res.status(200).send({ message: "Login success" });
         }
