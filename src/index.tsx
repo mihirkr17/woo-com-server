@@ -90,7 +90,7 @@ async function run() {
     // add user to the database
     app.put("/api/sign-user/:email", async (req: Request, res: Response) => {
       const email: string = req.params.email;
-
+      console.log(email);
       const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
         algorithm: "HS256",
         expiresIn: "1h",
@@ -100,11 +100,12 @@ async function run() {
         const existsUser = await userCollection.findOne({ email: email });
 
         if (existsUser) {
-          return res.cookie("token", token, {
+          res.cookie("token", token, {
             maxAge: 3600000,
             httpOnly: true,
             secure: false,
           });
+          res.status(200).send({message : "Login success"});
         } else {
           await userCollection.updateOne(
             { email: email },
@@ -112,11 +113,12 @@ async function run() {
             { upsert: true }
           );
 
-          return res.cookie("token", token, {
+          res.cookie("token", token, {
             maxAge: 3600000,
             httpOnly: true,
             secure: false,
           });
+          res.status(200).send({message : "Login success"});
         }
       }
     });
@@ -140,7 +142,7 @@ async function run() {
 
     app.get("/api/sign-out", async (req: Request, res: Response) => {
       res.clearCookie("token");
-      res.status(200).send({ message: "Successfully sign out the user" });
+      res.status(200).send({ message: "Sign out successfully" });
     });
     /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     ++++++++++ Authorization api request endpoints End ++++++++++++
