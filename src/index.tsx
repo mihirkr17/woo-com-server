@@ -90,7 +90,6 @@ async function run() {
     // add user to the database
     app.put("/api/sign-user/:email", async (req: Request, res: Response) => {
       const email: string = req.params.email;
-      console.log(email);
       const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
         algorithm: "HS256",
         expiresIn: "1h",
@@ -101,8 +100,8 @@ async function run() {
 
         if (existsUser) {
           res.cookie("token", token, {
-            sameSite: "none",
-            secure: true,
+            // sameSite: "none",
+            // secure: true,
             maxAge: 3600000,
             httpOnly: true,
           });
@@ -117,8 +116,8 @@ async function run() {
           res.cookie("token", token, {
             maxAge: 3600000,
             httpOnly: true,
-            sameSite: "none",
-            secure: true,
+            // sameSite: "none",
+            // secure: true,
           });
           res.status(200).send({ message: "Login success" });
         }
@@ -518,20 +517,31 @@ async function run() {
 
       if (filters) {
         if (filters === "lowest") {
-          sorting = { price: 1 };
+          sorting = { price_fixed: 1 };
         } else if (filters === "highest") {
-          sorting = { price: -1 };
+          sorting = { price_fixed: -1 };
         } else {
           sorting = {};
         }
       }
 
-      findQuery = productCategory
-        ? { category: productCategory }
-        : { sub_category: productSubCategory };
+      // findQuery = productCategory
+      //   ? { category: productCategory }
+      //   : { sub_category: productSubCategory };
+
+      if (productCategory) {
+        findQuery = { category: productCategory };
+      }
+
+      if (productCategory && productSubCategory) {
+        findQuery = {
+          category: productCategory,
+          sub_category: productSubCategory,
+        };
+      }
 
       const tt = await productsCollection
-        .find(findQuery, { price: { $exists: 1 } })
+        .find(findQuery, { price_fixed: { $exists: 1 } })
         .sort(sorting)
         .toArray();
       res.send(tt);

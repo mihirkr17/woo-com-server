@@ -92,7 +92,6 @@ function run() {
             // add user to the database
             app.put("/api/sign-user/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
-                console.log(email);
                 const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
                     algorithm: "HS256",
                     expiresIn: "1h",
@@ -101,9 +100,10 @@ function run() {
                     const existsUser = yield userCollection.findOne({ email: email });
                     if (existsUser) {
                         res.cookie("token", token, {
+                            // sameSite: "none",
+                            // secure: true,
                             maxAge: 3600000,
                             httpOnly: true,
-                            secure: false,
                         });
                         res.status(200).send({ message: "Login success" });
                     }
@@ -112,7 +112,8 @@ function run() {
                         res.cookie("token", token, {
                             maxAge: 3600000,
                             httpOnly: true,
-                            secure: false,
+                            // sameSite: "none",
+                            // secure: true,
                         });
                         res.status(200).send({ message: "Login success" });
                     }
@@ -394,20 +395,29 @@ function run() {
                 let sorting;
                 if (filters) {
                     if (filters === "lowest") {
-                        sorting = { price: 1 };
+                        sorting = { price_fixed: 1 };
                     }
                     else if (filters === "highest") {
-                        sorting = { price: -1 };
+                        sorting = { price_fixed: -1 };
                     }
                     else {
                         sorting = {};
                     }
                 }
-                findQuery = productCategory
-                    ? { category: productCategory }
-                    : { sub_category: productSubCategory };
+                // findQuery = productCategory
+                //   ? { category: productCategory }
+                //   : { sub_category: productSubCategory };
+                if (productCategory) {
+                    findQuery = { category: productCategory };
+                }
+                if (productCategory && productSubCategory) {
+                    findQuery = {
+                        category: productCategory,
+                        sub_category: productSubCategory,
+                    };
+                }
                 const tt = yield productsCollection
-                    .find(findQuery, { price: { $exists: 1 } })
+                    .find(findQuery, { price_fixed: { $exists: 1 } })
                     .sort(sorting)
                     .toArray();
                 res.send(tt);
