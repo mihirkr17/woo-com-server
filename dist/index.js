@@ -100,8 +100,8 @@ function run() {
                     const existsUser = yield userCollection.findOne({ email: email });
                     if (existsUser) {
                         res.cookie("token", token, {
-                            // sameSite: "none",
-                            // secure: true,
+                            sameSite: "none",
+                            secure: true,
                             maxAge: 3600000,
                             httpOnly: true,
                         });
@@ -112,8 +112,8 @@ function run() {
                         res.cookie("token", token, {
                             maxAge: 3600000,
                             httpOnly: true,
-                            // sameSite: "none",
-                            // secure: true,
+                            sameSite: "none",
+                            secure: true,
                         });
                         res.status(200).send({ message: "Login success" });
                     }
@@ -139,11 +139,34 @@ function run() {
             /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
             ++++++++++ Authorization api request endpoints End ++++++++++++
             +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+            // search product api
+            app.get("/api/search-products/:q", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const q = req.params.q;
+                const searchQuery = (sTxt, seller_name = "") => {
+                    let findProduct = {
+                        $or: [
+                            { title: { $regex: sTxt, $options: "i" } },
+                            { seller: { $regex: sTxt, $options: "i" } },
+                            { brand: { $regex: sTxt, $options: "i" } },
+                        ],
+                    };
+                    if (seller_name) {
+                        findProduct["seller"] = seller_name;
+                    }
+                    return findProduct;
+                };
+                const result = yield productsCollection.find(searchQuery(q)).toArray();
+                res.status(200).send(result);
+            }));
             // fetch products by recommended
             app.get("/api/products/recommended", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 res
                     .status(200)
-                    .send(yield productsCollection.find({ top_sell: { $gte: 5 } }).toArray());
+                    .send(yield productsCollection
+                    .find({})
+                    .sort({ rating_average: -1, top_sell: -1 })
+                    .limit(6)
+                    .toArray());
             }));
             // get products by some condition in manage product page api
             app.get("/api/manage-product", (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -348,18 +371,14 @@ function run() {
                 res.status(200).send(yield productsCollection.insertOne(body));
             }));
             // finding all Products
-            app.get("/products", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const results = yield productsCollection.find({}).toArray();
-                res.send(results);
-            }));
-            // Finding one specific particular product
-            app.get("/products/:productId", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const productId = req.params.productId;
-                const q = {
-                    _id: ObjectId(productId),
-                };
-                const results = yield productsCollection.findOne(q);
-                res.send(results);
+            app.get("/all-products/:limits", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const totalLimits = parseInt(req.params.limits);
+                const results = yield productsCollection
+                    .find({})
+                    .skip(0)
+                    .limit(totalLimits)
+                    .toArray();
+                res.status(200).send(results);
             }));
             // Fetch single product
             // check in  cart and view product
@@ -466,8 +485,19 @@ function run() {
                     { weight: 2, count: rat2 },
                     { weight: 1, count: rat1 },
                 ];
+                let weightVal = 0;
+                let countValue = 0;
+                ratingArr &&
+                    ratingArr.length > 0 &&
+                    ratingArr.forEach((rat) => {
+                        const multiWeight = parseInt(rat === null || rat === void 0 ? void 0 : rat.weight) * parseInt(rat === null || rat === void 0 ? void 0 : rat.count);
+                        weightVal += multiWeight;
+                        countValue += rat === null || rat === void 0 ? void 0 : rat.count;
+                    });
+                const ava = weightVal / countValue;
+                const average = parseFloat(ava.toFixed(2));
                 const result = yield productsCollection.updateOne({ _id: ObjectId(productId) }, {
-                    $set: { rating: ratingArr },
+                    $set: { rating: ratingArr, rating_average: average },
                     $push: { reviews: body },
                 }, { upsert: true });
                 if (result) {

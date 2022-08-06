@@ -149,6 +149,27 @@ async function run() {
     ++++++++++ Authorization api request endpoints End ++++++++++++
     +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
+    // search product api
+    app.get("/api/search-products/:q", async (req: Request, res: Response) => {
+      const q = req.params.q;
+      const searchQuery = (sTxt: string, seller_name: string = "") => {
+        let findProduct: any = {
+          $or: [
+            { title: { $regex: sTxt, $options: "i" } },
+            { seller: { $regex: sTxt, $options: "i" } },
+            { brand: { $regex: sTxt, $options: "i" } },
+          ],
+        };
+        if (seller_name) {
+          findProduct["seller"] = seller_name;
+        }
+        return findProduct;
+      };
+
+      const result = await productsCollection.find(searchQuery(q)).toArray();
+      res.status(200).send(result);
+    });
+
     // fetch products by recommended
     app.get(
       "/api/products/recommended",
@@ -156,7 +177,11 @@ async function run() {
         res
           .status(200)
           .send(
-            await productsCollection.find({ top_sell: { $gte: 5 } }).toArray()
+            await productsCollection
+              .find({})
+              .sort({ rating_average: -1, top_sell: -1 })
+              .limit(6)
+              .toArray()
           );
       }
     );
@@ -459,19 +484,14 @@ async function run() {
     );
 
     // finding all Products
-    app.get("/products", async (req: Request, res: Response) => {
-      const results = await productsCollection.find({}).toArray();
-      res.send(results);
-    });
-
-    // Finding one specific particular product
-    app.get("/products/:productId", async (req: Request, res: Response) => {
-      const productId: string = req.params.productId;
-      const q = {
-        _id: ObjectId(productId),
-      };
-      const results = await productsCollection.findOne(q);
-      res.send(results);
+    app.get("/all-products/:limits", async (req: Request, res: Response) => {
+      const totalLimits = parseInt(req.params.limits);
+      const results = await productsCollection
+        .find({})
+        .skip(0)
+        .limit(totalLimits)
+        .toArray();
+      res.status(200).send(results);
     });
 
     // Fetch single product
@@ -600,10 +620,22 @@ async function run() {
           { weight: 1, count: rat1 },
         ];
 
+        let weightVal: number = 0;
+        let countValue: number = 0;
+        ratingArr &&
+          ratingArr.length > 0 &&
+          ratingArr.forEach((rat) => {
+            const multiWeight = parseInt(rat?.weight) * parseInt(rat?.count);
+            weightVal += multiWeight;
+            countValue += rat?.count;
+          });
+        const ava = weightVal / countValue;
+        const average = parseFloat(ava.toFixed(2));
+
         const result = await productsCollection.updateOne(
           { _id: ObjectId(productId) },
           {
-            $set: { rating: ratingArr },
+            $set: { rating: ratingArr, rating_average: average },
             $push: { reviews: body },
           },
           { upsert: true }
