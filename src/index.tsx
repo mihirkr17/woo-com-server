@@ -132,7 +132,7 @@ async function run() {
 
         if (email) {
           const result = await userCollection.findOne({ email: email });
-          res.status(200).send({ result });
+          return res.status(200).send({ result });
         } else {
           return res
             .status(403)
@@ -217,7 +217,7 @@ async function run() {
         item = "";
         page = "";
         let findProduct: any = {
-          category: category,
+          "genre.category": category,
         };
         if (seller_name) {
           findProduct["seller"] = seller_name;
@@ -339,8 +339,9 @@ async function run() {
     // update data
     app.put(
       "/update-profile-data/:email",
+      verifyJWT,
       async (req: Request, res: Response) => {
-        const email: string = req.params.email;
+        const email: string = req.decoded.email;
         const result = await userCollection.updateOne(
           { email: email },
           { $set: req.body },
@@ -501,13 +502,14 @@ async function run() {
       async (req: Request, res: Response) => {
         const email = req.params.email;
         const product_slug = req.params.product_slug;
+
         const filterP = await cartCollection
           .aggregate([
             { $unwind: "$product" },
             { $match: { user_email: email, "product.slug": product_slug } },
           ])
           .toArray();
-
+        await productsCollection.createIndex({ slug: 1 });
         let result = await productsCollection.findOne({
           slug: product_slug,
         });
@@ -531,7 +533,8 @@ async function run() {
     app.get("/api/product-by-category", async (req: Request, res: Response) => {
       let findQuery;
       const productCategory = req.query.category;
-      const productSubCategory = req.query.sub_category;
+      const productSubCategory = req.query.sb_category;
+      const productSecondCategory = req.query.sc_category;
       const filters = req.query.filters;
       let sorting;
 
@@ -550,13 +553,21 @@ async function run() {
       //   : { sub_category: productSubCategory };
 
       if (productCategory) {
-        findQuery = { category: productCategory };
+        findQuery = { "genre.category": productCategory };
       }
 
       if (productCategory && productSubCategory) {
         findQuery = {
-          category: productCategory,
-          sub_category: productSubCategory,
+          "genre.category": productCategory,
+          "genre.sub_category": productSubCategory,
+        };
+      }
+
+      if (productCategory && productSubCategory && productSecondCategory) {
+        findQuery = {
+          "genre.category": productCategory,
+          "genre.sub_category": productSubCategory,
+          "genre.second_category" : productSecondCategory
         };
       }
 
@@ -567,7 +578,7 @@ async function run() {
       res.send(tt);
     });
 
-    // upsert review in product
+    // Add rating and review in products
     app.put(
       "/api/add-product-rating/:productId",
       verifyJWT,
@@ -592,53 +603,71 @@ async function run() {
         });
 
         const point = parseInt(body?.rating_point);
-        let newRatingPoint = products?.rating || [];
 
-        let rat1: any = parseInt(newRatingPoint[4]?.count) || 0;
-        let rat2: any = parseInt(newRatingPoint[3]?.count) || 0;
-        let rat3: any = parseInt(newRatingPoint[2]?.count) || 0;
-        let rat4: any = parseInt(newRatingPoint[1]?.count) || 0;
-        let rat5: any = parseInt(newRatingPoint[0]?.count) || 0;
+        let ratingPoints =
+          products?.rating && products?.rating.length > 0
+            ? products?.rating
+            : [
+                { weight: 5, count: 0 },
+                { weight: 4, count: 0 },
+                { weight: 3, count: 0 },
+                { weight: 2, count: 0 },
+                { weight: 1, count: 0 },
+              ];
 
-        if (point === 5) {
-          rat5 += 1;
-        } else if (point === 4) {
-          rat4 += 1;
-        } else if (point === 3) {
-          rat3 += 1;
-        } else if (point === 2) {
-          rat2 += 1;
-        } else {
-          rat1 += 1;
+        let counter: number = 0;
+        let newRatingArray: any[] = [];
+
+        for (let i = 0; i < ratingPoints.length; i++) {
+          let count = ratingPoints[i].count;
+          let weight = ratingPoints[i].weight;
+          if (point === weight) {
+            counter = count;
+            count += 1;
+          }
+          newRatingArray.push({ weight, count: count });
         }
-
-        let ratingArr: any[] = [
-          { weight: 5, count: rat5 },
-          { weight: 4, count: rat4 },
-          { weight: 3, count: rat3 },
-          { weight: 2, count: rat2 },
-          { weight: 1, count: rat1 },
-        ];
 
         let weightVal: number = 0;
         let countValue: number = 0;
-        ratingArr &&
-          ratingArr.length > 0 &&
-          ratingArr.forEach((rat) => {
+
+        newRatingArray &&
+          newRatingArray.length > 0 &&
+          newRatingArray.forEach((rat: any) => {
             const multiWeight = parseInt(rat?.weight) * parseInt(rat?.count);
             weightVal += multiWeight;
             countValue += rat?.count;
           });
         const ava = weightVal / countValue;
-        const average = parseFloat(ava.toFixed(2));
+        const average = parseFloat(ava.toFixed(1));
+
+        let filters: any;
+        let options: any;
+
+        if (products?.rating && products?.rating.length > 0) {
+          filters = {
+            $set: {
+              "rating.$[i].count": counter + 1,
+              rating_average: average,
+            },
+            $push: { reviews: body },
+          };
+          options = { upsert: true, arrayFilters: [{ "i.weight": point }] };
+        } else {
+          filters = {
+            $set: {
+              rating: newRatingArray,
+              rating_average: average,
+            },
+            $push: { reviews: body },
+          };
+          options = { upsert: true };
+        }
 
         const result = await productsCollection.updateOne(
           { _id: ObjectId(productId) },
-          {
-            $set: { rating: ratingArr, rating_average: average },
-            $push: { reviews: body },
-          },
-          { upsert: true }
+          filters,
+          options
         );
 
         if (result) {
@@ -938,9 +967,10 @@ async function run() {
 
     // cancel orders from admin
     app.delete(
-      "/api/remove-order/:email/:orderId",
+      "/api/remove-order/:orderId",
+      verifyJWT,
       async (req: Request, res: Response) => {
-        const email = req.params.email;
+        const email = req.decoded.email;
         const id = parseInt(req.params.orderId);
 
         const result = await orderCollection.updateOne(
@@ -948,13 +978,14 @@ async function run() {
           { $pull: { orders: { orderId: id } } }
         );
 
-        res.send({ result, message: "Order Removed successfully" });
+        res.status(200).send({ result, message: "Order Removed successfully" });
       }
     );
 
     // cancel my orders
     app.put(
       "/api/cancel-my-order/:userEmail/:orderId",
+      verifyJWT,
       async (req: Request, res: Response) => {
         const userEmail = req.params.userEmail;
         const orderId = parseInt(req.params.orderId);

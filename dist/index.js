@@ -100,8 +100,8 @@ function run() {
                     const existsUser = yield userCollection.findOne({ email: email });
                     if (existsUser) {
                         res.cookie("token", token, {
-                            sameSite: "none",
-                            secure: true,
+                            // sameSite: "none",
+                            // secure: true,
                             maxAge: 3600000,
                             httpOnly: true,
                         });
@@ -112,8 +112,8 @@ function run() {
                         res.cookie("token", token, {
                             maxAge: 3600000,
                             httpOnly: true,
-                            sameSite: "none",
-                            secure: true,
+                            // sameSite: "none",
+                            // secure: true,
                         });
                         res.status(200).send({ message: "Login success" });
                     }
@@ -124,7 +124,7 @@ function run() {
                 const email = req.params.email;
                 if (email) {
                     const result = yield userCollection.findOne({ email: email });
-                    res.status(200).send({ result });
+                    return res.status(200).send({ result });
                 }
                 else {
                     return res
@@ -197,7 +197,7 @@ function run() {
                     item = "";
                     page = "";
                     let findProduct = {
-                        category: category,
+                        "genre.category": category,
                     };
                     if (seller_name) {
                         findProduct["seller"] = seller_name;
@@ -288,8 +288,8 @@ function run() {
                     .send(result && { message: "Product updated successfully" });
             }));
             // update data
-            app.put("/update-profile-data/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const email = req.params.email;
+            app.put("/update-profile-data/:email", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const email = req.decoded.email;
                 const result = yield userCollection.updateOne({ email: email }, { $set: req.body }, { upsert: true });
                 res.status(200).send(result);
             }));
@@ -391,6 +391,7 @@ function run() {
                     { $match: { user_email: email, "product.slug": product_slug } },
                 ])
                     .toArray();
+                yield productsCollection.createIndex({ slug: 1 });
                 let result = yield productsCollection.findOne({
                     slug: product_slug,
                 });
@@ -409,7 +410,8 @@ function run() {
             app.get("/api/product-by-category", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 let findQuery;
                 const productCategory = req.query.category;
-                const productSubCategory = req.query.sub_category;
+                const productSubCategory = req.query.sb_category;
+                const productSecondCategory = req.query.sc_category;
                 const filters = req.query.filters;
                 let sorting;
                 if (filters) {
@@ -427,12 +429,19 @@ function run() {
                 //   ? { category: productCategory }
                 //   : { sub_category: productSubCategory };
                 if (productCategory) {
-                    findQuery = { category: productCategory };
+                    findQuery = { "genre.category": productCategory };
                 }
                 if (productCategory && productSubCategory) {
                     findQuery = {
-                        category: productCategory,
-                        sub_category: productSubCategory,
+                        "genre.category": productCategory,
+                        "genre.sub_category": productSubCategory,
+                    };
+                }
+                if (productCategory && productSubCategory && productSecondCategory) {
+                    findQuery = {
+                        "genre.category": productCategory,
+                        "genre.sub_category": productSubCategory,
+                        "genre.second_category": productSecondCategory
                     };
                 }
                 const tt = yield productsCollection
@@ -441,9 +450,8 @@ function run() {
                     .toArray();
                 res.send(tt);
             }));
-            // upsert review in product
+            // Add rating and review in products
             app.put("/api/add-product-rating/:productId", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                var _a, _b, _c, _d, _e;
                 const productId = req.params.productId;
                 const email = req.decoded.email;
                 const body = req.body;
@@ -457,49 +465,60 @@ function run() {
                     _id: ObjectId(productId),
                 });
                 const point = parseInt(body === null || body === void 0 ? void 0 : body.rating_point);
-                let newRatingPoint = (products === null || products === void 0 ? void 0 : products.rating) || [];
-                let rat1 = parseInt((_a = newRatingPoint[4]) === null || _a === void 0 ? void 0 : _a.count) || 0;
-                let rat2 = parseInt((_b = newRatingPoint[3]) === null || _b === void 0 ? void 0 : _b.count) || 0;
-                let rat3 = parseInt((_c = newRatingPoint[2]) === null || _c === void 0 ? void 0 : _c.count) || 0;
-                let rat4 = parseInt((_d = newRatingPoint[1]) === null || _d === void 0 ? void 0 : _d.count) || 0;
-                let rat5 = parseInt((_e = newRatingPoint[0]) === null || _e === void 0 ? void 0 : _e.count) || 0;
-                if (point === 5) {
-                    rat5 += 1;
+                let ratingPoints = (products === null || products === void 0 ? void 0 : products.rating) && (products === null || products === void 0 ? void 0 : products.rating.length) > 0
+                    ? products === null || products === void 0 ? void 0 : products.rating
+                    : [
+                        { weight: 5, count: 0 },
+                        { weight: 4, count: 0 },
+                        { weight: 3, count: 0 },
+                        { weight: 2, count: 0 },
+                        { weight: 1, count: 0 },
+                    ];
+                let counter = 0;
+                let newRatingArray = [];
+                for (let i = 0; i < ratingPoints.length; i++) {
+                    let count = ratingPoints[i].count;
+                    let weight = ratingPoints[i].weight;
+                    if (point === weight) {
+                        counter = count;
+                        count += 1;
+                    }
+                    newRatingArray.push({ weight, count: count });
                 }
-                else if (point === 4) {
-                    rat4 += 1;
-                }
-                else if (point === 3) {
-                    rat3 += 1;
-                }
-                else if (point === 2) {
-                    rat2 += 1;
-                }
-                else {
-                    rat1 += 1;
-                }
-                let ratingArr = [
-                    { weight: 5, count: rat5 },
-                    { weight: 4, count: rat4 },
-                    { weight: 3, count: rat3 },
-                    { weight: 2, count: rat2 },
-                    { weight: 1, count: rat1 },
-                ];
                 let weightVal = 0;
                 let countValue = 0;
-                ratingArr &&
-                    ratingArr.length > 0 &&
-                    ratingArr.forEach((rat) => {
+                newRatingArray &&
+                    newRatingArray.length > 0 &&
+                    newRatingArray.forEach((rat) => {
                         const multiWeight = parseInt(rat === null || rat === void 0 ? void 0 : rat.weight) * parseInt(rat === null || rat === void 0 ? void 0 : rat.count);
                         weightVal += multiWeight;
                         countValue += rat === null || rat === void 0 ? void 0 : rat.count;
                     });
                 const ava = weightVal / countValue;
-                const average = parseFloat(ava.toFixed(2));
-                const result = yield productsCollection.updateOne({ _id: ObjectId(productId) }, {
-                    $set: { rating: ratingArr, rating_average: average },
-                    $push: { reviews: body },
-                }, { upsert: true });
+                const average = parseFloat(ava.toFixed(1));
+                let filters;
+                let options;
+                if ((products === null || products === void 0 ? void 0 : products.rating) && (products === null || products === void 0 ? void 0 : products.rating.length) > 0) {
+                    filters = {
+                        $set: {
+                            "rating.$[i].count": counter + 1,
+                            rating_average: average,
+                        },
+                        $push: { reviews: body },
+                    };
+                    options = { upsert: true, arrayFilters: [{ "i.weight": point }] };
+                }
+                else {
+                    filters = {
+                        $set: {
+                            rating: newRatingArray,
+                            rating_average: average,
+                        },
+                        $push: { reviews: body },
+                    };
+                    options = { upsert: true };
+                }
+                const result = yield productsCollection.updateOne({ _id: ObjectId(productId) }, filters, options);
                 if (result) {
                     return res.status(200).send({ message: "Thanks for your review !" });
                 }
@@ -694,14 +713,14 @@ function run() {
                 res.send(yield orderCollection.findOne({ user_email: email }));
             }));
             // cancel orders from admin
-            app.delete("/api/remove-order/:email/:orderId", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const email = req.params.email;
+            app.delete("/api/remove-order/:orderId", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const email = req.decoded.email;
                 const id = parseInt(req.params.orderId);
                 const result = yield orderCollection.updateOne({ user_email: email }, { $pull: { orders: { orderId: id } } });
-                res.send({ result, message: "Order Removed successfully" });
+                res.status(200).send({ result, message: "Order Removed successfully" });
             }));
             // cancel my orders
-            app.put("/api/cancel-my-order/:userEmail/:orderId", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.put("/api/cancel-my-order/:userEmail/:orderId", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const userEmail = req.params.userEmail;
                 const orderId = parseInt(req.params.orderId);
                 const { status, cancel_reason, time_canceled } = req.body;
