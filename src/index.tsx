@@ -55,6 +55,7 @@ async function run() {
     const cartCollection = dbh.db("Products").collection("cart");
     const orderCollection = dbh.db("Products").collection("orders");
     const userCollection = dbh.db("Users").collection("user");
+    const productPolicy = dbh.db("Products").collection("policy");
 
     // // verify owner
     const verifyAuth = async (req: Request, res: Response, next: any) => {
@@ -84,12 +85,42 @@ async function run() {
       }
     };
 
+    /// privacy policy fetch
+    app.get("/api/privacy-policy", async (req: Request, res: Response) => {
+      res.status(200).send(await productPolicy.findOne({}));
+    });
+
+    /// update policy
+    app.put(
+      "/api/update-policy/:policyId",
+      verifyJWT,
+      async (req: Request, res: Response) => {
+        const policyId: string = req.params.policyId;
+        const body = req.body;
+        const result = await productPolicy.updateOne(
+          { _id: ObjectId(policyId) },
+          { $set: body },
+          { upsert: true }
+        );
+
+        if (result) {
+          return res
+            .status(200)
+            .send({ message: "Policy updated successfully" });
+        } else {
+          return res.status(400).send({ message: "Update failed" });
+        }
+      }
+    );
+
     /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     ++++++++++ Authorization api request endpoints Start ++++++++++++
     +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
     // add user to the database
     app.put("/api/sign-user/:email", async (req: Request, res: Response) => {
       const email: string = req.params.email;
+      const { name } = req.body;
+
       const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
         algorithm: "HS256",
         expiresIn: "1h",
@@ -109,7 +140,7 @@ async function run() {
         } else {
           await userCollection.updateOne(
             { email: email },
-            { $set: { email, role: "user" } },
+            { $set: { email, displayName: name, role: "user" } },
             { upsert: true }
           );
 
@@ -242,6 +273,7 @@ async function run() {
       } else {
         result = await cursor.toArray();
       }
+
       res.status(200).send(result);
     });
 
@@ -304,8 +336,6 @@ async function run() {
                 "product.$.slug": body.slug,
                 "product.$.brand": body.brand,
                 "product.$.image": body.image,
-                "product.$.category": body.category,
-                "product.$.sub_category": body.sub_category,
                 "product.$.quantity": quantity,
                 "product.$.price": productPrice,
                 "product.$.price_total": price_total,
@@ -315,7 +345,6 @@ async function run() {
                 "product.$.discount_amount_total": discount_amount_total,
                 "product.$.stock": body?.stock,
                 "product.$.available": available,
-                "product.$.modifiedAt": body?.modifiedAt,
               },
             },
             { upsert: true }
@@ -489,7 +518,7 @@ async function run() {
       const totalLimits = parseInt(req.params.limits);
       const results = await productsCollection
         .find({})
-        .skip(0)
+        .sort({ _id: -1 })
         .limit(totalLimits)
         .toArray();
       res.status(200).send(results);
@@ -502,30 +531,32 @@ async function run() {
       async (req: Request, res: Response) => {
         const email = req.params.email;
         const product_slug = req.params.product_slug;
+        let inCart: boolean;
 
-        const filterP = await cartCollection
-          .aggregate([
-            { $unwind: "$product" },
-            { $match: { user_email: email, "product.slug": product_slug } },
-          ])
-          .toArray();
-        await productsCollection.createIndex({ slug: 1 });
         let result = await productsCollection.findOne({
           slug: product_slug,
         });
 
-        const exist = filterP.some(
-          (f: any) => f?.product?.slug === product_slug
-        );
+        if (result) {
+          const policy = await productPolicy.findOne({});
 
-        let cardHandler: boolean;
-        if (exist) {
-          cardHandler = true;
+          const existProductInCart = await cartCollection.findOne(
+            { user_email: email, "product.slug": product_slug },
+            { "product.$": 1 }
+          );
+          await productsCollection.createIndex({ slug: 1 });
+
+          if (existProductInCart) {
+            inCart = true;
+          } else {
+            inCart = false;
+          }
+          result["inCart"] = inCart;
+          result["policy"] = policy;
+          res.status(200).send(result);
         } else {
-          cardHandler = false;
+          return res.status(404).send({ message: "Not Found" });
         }
-        result["cardHandler"] = cardHandler;
-        res.send(result);
       }
     );
 
@@ -548,10 +579,6 @@ async function run() {
         }
       }
 
-      // findQuery = productCategory
-      //   ? { category: productCategory }
-      //   : { sub_category: productSubCategory };
-
       if (productCategory) {
         findQuery = { "genre.category": productCategory };
       }
@@ -567,7 +594,7 @@ async function run() {
         findQuery = {
           "genre.category": productCategory,
           "genre.sub_category": productSubCategory,
-          "genre.second_category" : productSecondCategory
+          "genre.second_category": productSecondCategory,
         };
       }
 
@@ -575,7 +602,7 @@ async function run() {
         .find(findQuery, { price_fixed: { $exists: 1 } })
         .sort(sorting)
         .toArray();
-      res.send(tt);
+      res.status(200).send(tt);
     });
 
     // Add rating and review in products
@@ -754,7 +781,7 @@ async function run() {
         if (cart_types === "buy") {
           updateDocuments = await cartCollection.updateOne(
             { user_email: userEmail },
-            { $set: { buy_product: {} } }
+            { $unset: { buy_product: "" } }
           );
         } else {
           updateDocuments = await cartCollection.updateOne(
@@ -781,39 +808,30 @@ async function run() {
         const query = { user_email: email };
 
         if (body?.stock === "in" && body?.available > 0) {
-          const existsProduct = await cartCollection.findOne({
-            user_email: email,
-          });
-          if (existsProduct) {
-            const productArr: any[] = existsProduct?.product
-              ? existsProduct?.product
-              : [];
-            if (productArr.length > 0) {
-              for (let i = 0; i < productArr.length; i++) {
-                let elem = productArr[i]._id;
-                if (elem === body?._id) {
-                  res.send({ message: "Product Has Already In Your Cart" });
-                  return;
-                } else {
-                  newProduct = [...productArr, body];
-                }
-              }
-            } else {
-              newProduct = [body];
+          const existsProduct = await cartCollection.findOne(
+            {
+              user_email: email,
+              "product._id": body?._id,
+            },
+            {
+              "product.$": 1,
             }
+          );
+          if (existsProduct) {
+            return res
+              .status(200)
+              .send({ message: "Product Has Already In Your Cart" });
           } else {
-            newProduct = [body];
+            const up = {
+              $push: { product: body },
+            };
+
+            const cartRes = await cartCollection.updateOne(query, up, options);
+            res.status(200).send({
+              data: cartRes,
+              message: "Product Successfully Added To Your Cart",
+            });
           }
-
-          const up = {
-            $set: { product: newProduct },
-          };
-
-          const cartRes = await cartCollection.updateOne(query, up, options);
-          res.send({
-            data: cartRes,
-            message: "Product Successfully Added To Your Cart",
-          });
         }
       }
     );
@@ -923,7 +941,7 @@ async function run() {
           { user_email: email },
           { $pull: { address: { addressId } } }
         );
-        res.send(result);
+        if (result) return res.send(result);
       }
     );
 

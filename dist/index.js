@@ -60,6 +60,7 @@ function run() {
             const cartCollection = dbh.db("Products").collection("cart");
             const orderCollection = dbh.db("Products").collection("orders");
             const userCollection = dbh.db("Users").collection("user");
+            const productPolicy = dbh.db("Products").collection("policy");
             // // verify owner
             const verifyAuth = (req, res, next) => __awaiter(this, void 0, void 0, function* () {
                 const authEmail = req.decoded.email;
@@ -86,12 +87,31 @@ function run() {
                     res.status(403).send({ message: "Forbidden" });
                 }
             });
+            /// privacy policy fetch
+            app.get("/api/privacy-policy", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                res.status(200).send(yield productPolicy.findOne({}));
+            }));
+            /// update policy
+            app.put("/api/update-policy/:policyId", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const policyId = req.params.policyId;
+                const body = req.body;
+                const result = yield productPolicy.updateOne({ _id: ObjectId(policyId) }, { $set: body }, { upsert: true });
+                if (result) {
+                    return res
+                        .status(200)
+                        .send({ message: "Policy updated successfully" });
+                }
+                else {
+                    return res.status(400).send({ message: "Update failed" });
+                }
+            }));
             /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
             ++++++++++ Authorization api request endpoints Start ++++++++++++
             +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
             // add user to the database
             app.put("/api/sign-user/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
+                const { name } = req.body;
                 const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
                     algorithm: "HS256",
                     expiresIn: "1h",
@@ -108,7 +128,7 @@ function run() {
                         res.status(200).send({ message: "Login success" });
                     }
                     else {
-                        yield userCollection.updateOne({ email: email }, { $set: { email, role: "user" } }, { upsert: true });
+                        yield userCollection.updateOne({ email: email }, { $set: { email, displayName: name, role: "user" } }, { upsert: true });
                         res.cookie("token", token, {
                             maxAge: 3600000,
                             httpOnly: true,
@@ -265,8 +285,6 @@ function run() {
                             "product.$.slug": body.slug,
                             "product.$.brand": body.brand,
                             "product.$.image": body.image,
-                            "product.$.category": body.category,
-                            "product.$.sub_category": body.sub_category,
                             "product.$.quantity": quantity,
                             "product.$.price": productPrice,
                             "product.$.price_total": price_total,
@@ -276,7 +294,6 @@ function run() {
                             "product.$.discount_amount_total": discount_amount_total,
                             "product.$.stock": body === null || body === void 0 ? void 0 : body.stock,
                             "product.$.available": available,
-                            "product.$.modifiedAt": body === null || body === void 0 ? void 0 : body.modifiedAt,
                         },
                     }, { upsert: true });
                 }
@@ -375,7 +392,7 @@ function run() {
                 const totalLimits = parseInt(req.params.limits);
                 const results = yield productsCollection
                     .find({})
-                    .skip(0)
+                    .sort({ _id: -1 })
                     .limit(totalLimits)
                     .toArray();
                 res.status(200).send(results);
@@ -385,26 +402,27 @@ function run() {
             app.get("/api/fetch-single-product/:product_slug/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.params.email;
                 const product_slug = req.params.product_slug;
-                const filterP = yield cartCollection
-                    .aggregate([
-                    { $unwind: "$product" },
-                    { $match: { user_email: email, "product.slug": product_slug } },
-                ])
-                    .toArray();
-                yield productsCollection.createIndex({ slug: 1 });
+                let inCart;
                 let result = yield productsCollection.findOne({
                     slug: product_slug,
                 });
-                const exist = filterP.some((f) => { var _a; return ((_a = f === null || f === void 0 ? void 0 : f.product) === null || _a === void 0 ? void 0 : _a.slug) === product_slug; });
-                let cardHandler;
-                if (exist) {
-                    cardHandler = true;
+                if (result) {
+                    const policy = yield productPolicy.findOne({});
+                    const existProductInCart = yield cartCollection.findOne({ user_email: email, "product.slug": product_slug }, { "product.$": 1 });
+                    yield productsCollection.createIndex({ slug: 1 });
+                    if (existProductInCart) {
+                        inCart = true;
+                    }
+                    else {
+                        inCart = false;
+                    }
+                    result["inCart"] = inCart;
+                    result["policy"] = policy;
+                    res.status(200).send(result);
                 }
                 else {
-                    cardHandler = false;
+                    return res.status(404).send({ message: "Not Found" });
                 }
-                result["cardHandler"] = cardHandler;
-                res.send(result);
             }));
             // fetch product by category
             app.get("/api/product-by-category", (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -425,9 +443,6 @@ function run() {
                         sorting = {};
                     }
                 }
-                // findQuery = productCategory
-                //   ? { category: productCategory }
-                //   : { sub_category: productSubCategory };
                 if (productCategory) {
                     findQuery = { "genre.category": productCategory };
                 }
@@ -441,14 +456,14 @@ function run() {
                     findQuery = {
                         "genre.category": productCategory,
                         "genre.sub_category": productSubCategory,
-                        "genre.second_category": productSecondCategory
+                        "genre.second_category": productSecondCategory,
                     };
                 }
                 const tt = yield productsCollection
                     .find(findQuery, { price_fixed: { $exists: 1 } })
                     .sort(sorting)
                     .toArray();
-                res.send(tt);
+                res.status(200).send(tt);
             }));
             // Add rating and review in products
             app.put("/api/add-product-rating/:productId", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -575,7 +590,7 @@ function run() {
                 const cart_types = req.params.cartTypes;
                 let updateDocuments;
                 if (cart_types === "buy") {
-                    updateDocuments = yield cartCollection.updateOne({ user_email: userEmail }, { $set: { buy_product: {} } });
+                    updateDocuments = yield cartCollection.updateOne({ user_email: userEmail }, { $unset: { buy_product: "" } });
                 }
                 else {
                     updateDocuments = yield cartCollection.updateOne({ user_email: userEmail }, { $pull: { product: { _id: productId } } });
@@ -594,38 +609,25 @@ function run() {
                 if ((body === null || body === void 0 ? void 0 : body.stock) === "in" && (body === null || body === void 0 ? void 0 : body.available) > 0) {
                     const existsProduct = yield cartCollection.findOne({
                         user_email: email,
+                        "product._id": body === null || body === void 0 ? void 0 : body._id,
+                    }, {
+                        "product.$": 1,
                     });
                     if (existsProduct) {
-                        const productArr = (existsProduct === null || existsProduct === void 0 ? void 0 : existsProduct.product)
-                            ? existsProduct === null || existsProduct === void 0 ? void 0 : existsProduct.product
-                            : [];
-                        if (productArr.length > 0) {
-                            for (let i = 0; i < productArr.length; i++) {
-                                let elem = productArr[i]._id;
-                                if (elem === (body === null || body === void 0 ? void 0 : body._id)) {
-                                    res.send({ message: "Product Has Already In Your Cart" });
-                                    return;
-                                }
-                                else {
-                                    newProduct = [...productArr, body];
-                                }
-                            }
-                        }
-                        else {
-                            newProduct = [body];
-                        }
+                        return res
+                            .status(200)
+                            .send({ message: "Product Has Already In Your Cart" });
                     }
                     else {
-                        newProduct = [body];
+                        const up = {
+                            $push: { product: body },
+                        };
+                        const cartRes = yield cartCollection.updateOne(query, up, options);
+                        res.status(200).send({
+                            data: cartRes,
+                            message: "Product Successfully Added To Your Cart",
+                        });
                     }
-                    const up = {
-                        $set: { product: newProduct },
-                    };
-                    const cartRes = yield cartCollection.updateOne(query, up, options);
-                    res.send({
-                        data: cartRes,
-                        message: "Product Successfully Added To Your Cart",
-                    });
                 }
             }));
             // buy single product
@@ -683,7 +685,8 @@ function run() {
                 const email = req.decoded.email;
                 const addressId = parseInt(req.params.addressId);
                 const result = yield cartCollection.updateOne({ user_email: email }, { $pull: { address: { addressId } } });
-                res.send(result);
+                if (result)
+                    return res.send(result);
             }));
             /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
             +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
