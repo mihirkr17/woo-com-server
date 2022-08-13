@@ -156,13 +156,27 @@ function run() {
                 res.clearCookie("token");
                 res.status(200).send({ message: "Sign out successfully" });
             }));
+            app.put("/api/switch-to-user/:userID", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const userEmail = req.decoded.email;
+                const userID = req.params.userID;
+                const result = yield userCollection.updateOne({ _id: ObjectId(userID), email: userEmail }, { $set: { role: "user" } }, { upsert: true });
+                if (result)
+                    return res.status(200).send(result);
+            }));
+            app.put("/api/switch-to-seller/:userID", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const userEmail = req.decoded.email;
+                const userID = req.params.userID;
+                const result = yield userCollection.updateOne({ _id: ObjectId(userID), email: userEmail }, { $set: { role: "seller" } }, { upsert: true });
+                if (result)
+                    return res.status(200).send(result);
+            }));
             /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
             ++++++++++ Authorization api request endpoints End ++++++++++++
             +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
             // search product api
             app.get("/api/search-products/:q", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const q = req.params.q;
-                const searchQuery = (sTxt, seller_name = "") => {
+                const searchQuery = (sTxt) => {
                     let findProduct = {
                         $or: [
                             { title: { $regex: sTxt, $options: "i" } },
@@ -170,9 +184,6 @@ function run() {
                             { brand: { $regex: sTxt, $options: "i" } },
                         ],
                     };
-                    if (seller_name) {
-                        findProduct["seller"] = seller_name;
-                    }
                     return findProduct;
                 };
                 const result = yield productsCollection.find(searchQuery(q)).toArray();

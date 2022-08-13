@@ -176,6 +176,38 @@ async function run() {
       res.clearCookie("token");
       res.status(200).send({ message: "Sign out successfully" });
     });
+
+    app.put(
+      "/api/switch-to-user/:userID",
+      verifyJWT,
+      async (req: Request, res: Response) => {
+        const userEmail = req.decoded.email;
+        const userID = req.params.userID;
+        const result = await userCollection.updateOne(
+          { _id: ObjectId(userID), email: userEmail },
+          { $set: { role: "user" } },
+          { upsert: true }
+        );
+
+        if (result) return res.status(200).send(result);
+      }
+    );
+
+    app.put(
+      "/api/switch-to-seller/:userID",
+      verifyJWT,
+      async (req: Request, res: Response) => {
+        const userEmail = req.decoded.email;
+        const userID = req.params.userID;
+        const result = await userCollection.updateOne(
+          { _id: ObjectId(userID), email: userEmail },
+          { $set: { role: "seller" } },
+          { upsert: true }
+        );
+
+        if (result) return res.status(200).send(result);
+      }
+    );
     /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     ++++++++++ Authorization api request endpoints End ++++++++++++
     +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
@@ -183,7 +215,7 @@ async function run() {
     // search product api
     app.get("/api/search-products/:q", async (req: Request, res: Response) => {
       const q = req.params.q;
-      const searchQuery = (sTxt: string, seller_name: string = "") => {
+      const searchQuery = (sTxt: string) => {
         let findProduct: any = {
           $or: [
             { title: { $regex: sTxt, $options: "i" } },
@@ -191,9 +223,6 @@ async function run() {
             { brand: { $regex: sTxt, $options: "i" } },
           ],
         };
-        if (seller_name) {
-          findProduct["seller"] = seller_name;
-        }
         return findProduct;
       };
 
