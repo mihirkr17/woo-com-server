@@ -318,14 +318,24 @@ async function run() {
     // Delete product from manage product page
     app.delete(
       "/api/delete-product/:productId",
+      verifyJWT,
       async (req: Request, res: Response) => {
         const productId: string = req.params.productId;
         const result = await productsCollection.deleteOne({
           _id: ObjectId(productId),
         });
-        result
-          ? res.status(200).send({ message: "Product deleted successfully." })
-          : res.status(503).send({ message: "Service unavailable" });
+
+        if (result) {
+          await cartCollection.updateMany(
+            { "product._id": productId },
+            { $pull: { product: { _id: productId } } }
+          );
+          return res
+            .status(200)
+            .send({ message: "Product deleted successfully." });
+        } else {
+          return res.status(503).send({ message: "Service unavailable" });
+        }
       }
     );
 
@@ -352,9 +362,9 @@ async function run() {
           body["stock"] = "out";
         }
 
-        const exists = await cartCollection
-          .find({ "product._id": productId })
-          .toArray();
+        const exists =
+          (await cartCollection.find({ "product._id": productId }).toArray()) ||
+          [];
 
         if (exists && exists.length > 0) {
           await cartCollection.updateMany(
@@ -396,7 +406,7 @@ async function run() {
 
     // update data
     app.put(
-      "/update-profile-data/:email",
+      "/api/update-profile-data/:email",
       verifyJWT,
       async (req: Request, res: Response) => {
         const email: string = req.decoded.email;
@@ -561,6 +571,7 @@ async function run() {
         const email = req.params.email;
         const product_slug = req.params.product_slug;
         let inCart: boolean;
+        let inWishlist: boolean;
 
         let result = await productsCollection.findOne({
           slug: product_slug,
@@ -573,6 +584,16 @@ async function run() {
             { user_email: email, "product.slug": product_slug },
             { "product.$": 1 }
           );
+
+          const existProductInWishlist = await userCollection.findOne(
+            { email: email, "wishlist.slug": product_slug },
+            { "wishlist.$": 1 }
+          );
+          if (existProductInWishlist) {
+            inWishlist = true;
+          } else {
+            inWishlist = false;
+          }
           await productsCollection.createIndex({ slug: 1 });
 
           if (existProductInCart) {
@@ -582,6 +603,7 @@ async function run() {
           }
           result["inCart"] = inCart;
           result["policy"] = policy;
+          result["inWishlist"] = inWishlist;
           res.status(200).send(result);
         } else {
           return res.status(404).send({ message: "Not Found" });
@@ -822,6 +844,70 @@ async function run() {
         res
           .status(200)
           .send({ updateDocuments, message: `removed successfully from cart` });
+      }
+    );
+
+    // add to wishlist
+    app.put(
+      "/api/add-to-wishlist/:email", verifyJWT,
+      async (req: Request, res: Response) => {
+        const userEmail = req.params.email;
+        const verifiedEmail = req.decoded.email;
+        const body = req.body;
+
+        if (userEmail !== verifiedEmail) {
+          return res.status(403).send({message: "Forbidden"});
+        }
+        const existsProduct = await userCollection.findOne(
+          {
+            email: userEmail,
+            "wishlist._id": body?._id,
+          },
+          {
+            "wishlist.$": 1,
+          }
+        );
+        if (existsProduct) {
+          return res
+            .status(200)
+            .send({ message: "Product Has Already In Your Wishlist" });
+        } else {
+          const up = {
+            $push: { wishlist: body },
+          };
+
+          const wishlistRes = await userCollection.updateOne(
+            { email: userEmail },
+            up,
+            { upsert: true }
+          );
+          res.status(200).send({
+            data: wishlistRes,
+            message: "Product Added To Your wishlist",
+          });
+        }
+      }
+    );
+
+    // remove from wishlist
+    app.delete(
+      "/api/remove-to-wishlist/:productId",
+      verifyJWT,
+      async (req: Request, res: Response) => {
+        const productId = req.params.productId;
+        const userEmail = req.decoded.email;
+        const result = await userCollection.updateOne(
+          { email: userEmail },
+          { $pull: { wishlist: { _id: productId } } }
+        );
+
+        if (result) {
+          return res
+            .status(200)
+            .send({ message: "Product removed from your wishlist" });
+        } else {
+          return res.status(501).send({ message: "Service unavailable" });
+        }
       }
     );
 
@@ -1131,6 +1217,24 @@ async function run() {
               { $set: { available, stock, top_sell } },
               { upsert: true }
             );
+
+            const cartProduct =
+              (await cartCollection
+                .find({ "product._id": productId })
+                .toArray()) || [];
+
+            if (cartProduct.length > 0) {
+              await cartCollection.updateMany(
+                { "product._id": productId },
+                {
+                  $set: {
+                    "product.$.stock": stock,
+                    "product.$.available": available,
+                  },
+                },
+                { upsert: true }
+              );
+            }
           }
         }
 

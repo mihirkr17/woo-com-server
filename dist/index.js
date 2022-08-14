@@ -120,8 +120,8 @@ function run() {
                     const existsUser = yield userCollection.findOne({ email: email });
                     if (existsUser) {
                         res.cookie("token", token, {
-                            // sameSite: "none",
-                            // secure: true,
+                            sameSite: "none",
+                            secure: true,
                             maxAge: 3600000,
                             httpOnly: true,
                         });
@@ -132,8 +132,8 @@ function run() {
                         res.cookie("token", token, {
                             maxAge: 3600000,
                             httpOnly: true,
-                            // sameSite: "none",
-                            // secure: true,
+                            sameSite: "none",
+                            secure: true,
                         });
                         res.status(200).send({ message: "Login success" });
                     }
@@ -259,14 +259,20 @@ function run() {
                 res.status(200).send({ count: result });
             }));
             // Delete product from manage product page
-            app.delete("/api/delete-product/:productId", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.delete("/api/delete-product/:productId", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const productId = req.params.productId;
                 const result = yield productsCollection.deleteOne({
                     _id: ObjectId(productId),
                 });
-                result
-                    ? res.status(200).send({ message: "Product deleted successfully." })
-                    : res.status(503).send({ message: "Service unavailable" });
+                if (result) {
+                    yield cartCollection.updateMany({ "product._id": productId }, { $pull: { product: { _id: productId } } });
+                    return res
+                        .status(200)
+                        .send({ message: "Product deleted successfully." });
+                }
+                else {
+                    return res.status(503).send({ message: "Service unavailable" });
+                }
             }));
             // update product information
             app.put("/api/update-product/:productId", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -286,9 +292,8 @@ function run() {
                 else {
                     body["stock"] = "out";
                 }
-                const exists = yield cartCollection
-                    .find({ "product._id": productId })
-                    .toArray();
+                const exists = (yield cartCollection.find({ "product._id": productId }).toArray()) ||
+                    [];
                 if (exists && exists.length > 0) {
                     yield cartCollection.updateMany({ "product._id": productId }, {
                         $set: {
@@ -316,7 +321,7 @@ function run() {
                     .send(result && { message: "Product updated successfully" });
             }));
             // update data
-            app.put("/update-profile-data/:email", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.put("/api/update-profile-data/:email", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.decoded.email;
                 const result = yield userCollection.updateOne({ email: email }, { $set: req.body }, { upsert: true });
                 res.status(200).send(result);
@@ -414,12 +419,20 @@ function run() {
                 const email = req.params.email;
                 const product_slug = req.params.product_slug;
                 let inCart;
+                let inWishlist;
                 let result = yield productsCollection.findOne({
                     slug: product_slug,
                 });
                 if (result) {
                     const policy = yield productPolicy.findOne({});
                     const existProductInCart = yield cartCollection.findOne({ user_email: email, "product.slug": product_slug }, { "product.$": 1 });
+                    const existProductInWishlist = yield userCollection.findOne({ email: email, "wishlist.slug": product_slug }, { "wishlist.$": 1 });
+                    if (existProductInWishlist) {
+                        inWishlist = true;
+                    }
+                    else {
+                        inWishlist = false;
+                    }
                     yield productsCollection.createIndex({ slug: 1 });
                     if (existProductInCart) {
                         inCart = true;
@@ -429,6 +442,7 @@ function run() {
                     }
                     result["inCart"] = inCart;
                     result["policy"] = policy;
+                    result["inWishlist"] = inWishlist;
                     res.status(200).send(result);
                 }
                 else {
@@ -609,6 +623,50 @@ function run() {
                 res
                     .status(200)
                     .send({ updateDocuments, message: `removed successfully from cart` });
+            }));
+            // add to wishlist
+            app.put("/api/add-to-wishlist/:email", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const userEmail = req.params.email;
+                const verifiedEmail = req.decoded.email;
+                const body = req.body;
+                if (userEmail !== verifiedEmail) {
+                    return res.status(403).send({ message: "Forbidden" });
+                }
+                const existsProduct = yield userCollection.findOne({
+                    email: userEmail,
+                    "wishlist._id": body === null || body === void 0 ? void 0 : body._id,
+                }, {
+                    "wishlist.$": 1,
+                });
+                if (existsProduct) {
+                    return res
+                        .status(200)
+                        .send({ message: "Product Has Already In Your Wishlist" });
+                }
+                else {
+                    const up = {
+                        $push: { wishlist: body },
+                    };
+                    const wishlistRes = yield userCollection.updateOne({ email: userEmail }, up, { upsert: true });
+                    res.status(200).send({
+                        data: wishlistRes,
+                        message: "Product Added To Your wishlist",
+                    });
+                }
+            }));
+            // remove from wishlist
+            app.delete("/api/remove-to-wishlist/:productId", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const productId = req.params.productId;
+                const userEmail = req.decoded.email;
+                const result = yield userCollection.updateOne({ email: userEmail }, { $pull: { wishlist: { _id: productId } } });
+                if (result) {
+                    return res
+                        .status(200)
+                        .send({ message: "Product removed from your wishlist" });
+                }
+                else {
+                    return res.status(501).send({ message: "Service unavailable" });
+                }
             }));
             // inserting product into my cart api
             app.put("/api/add-to-cart", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -804,6 +862,17 @@ function run() {
                             stock = "out";
                         }
                         yield productsCollection.updateOne({ _id: ObjectId(productId) }, { $set: { available, stock, top_sell } }, { upsert: true });
+                        const cartProduct = (yield cartCollection
+                            .find({ "product._id": productId })
+                            .toArray()) || [];
+                        if (cartProduct.length > 0) {
+                            yield cartCollection.updateMany({ "product._id": productId }, {
+                                $set: {
+                                    "product.$.stock": stock,
+                                    "product.$.available": available,
+                                },
+                            }, { upsert: true });
+                        }
                     }
                 }
                 const result = yield orderCollection.updateOne({ user_email: userEmail }, upDoc, { arrayFilters: [{ "i.orderId": orderId }] });
