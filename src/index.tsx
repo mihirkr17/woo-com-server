@@ -117,17 +117,17 @@ async function run() {
     ++++++++++ Authorization api request endpoints Start ++++++++++++
     +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
     // add user to the database
-    app.put("/api/sign-user/:email", async (req: Request, res: Response) => {
-      const email: string = req.params.email;
+    app.put("/api/sign-user", async (req: Request, res: Response) => {
+      const authEmail = req.headers.authorization?.split(" ")[1];
       const { name } = req.body;
 
-      const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
+      const token = jwt.sign({ email: authEmail }, process.env.ACCESS_TOKEN, {
         algorithm: "HS256",
         expiresIn: "1h",
       });
 
-      if (email) {
-        const existsUser = await userCollection.findOne({ email: email });
+      if (authEmail) {
+        const existsUser = await userCollection.findOne({ email: authEmail });
 
         if (existsUser) {
           res.cookie("token", token, {
@@ -139,8 +139,8 @@ async function run() {
           res.status(200).send({ message: "Login success" });
         } else {
           await userCollection.updateOne(
-            { email: email },
-            { $set: { email, displayName: name, role: "user" } },
+            { email: authEmail },
+            { $set: { email: authEmail, displayName: name, role: "user" } },
             { upsert: true }
           );
 
@@ -156,21 +156,16 @@ async function run() {
     });
 
     // fetch user information from database and send to client
-    app.get(
-      "/api/fetch-auth-user/:email",
-      async (req: Request, res: Response) => {
-        const email: string = req.params.email;
+    app.get("/api/fetch-auth-user/", async (req: Request, res: Response) => {
+      const authEmail = req.headers.authorization?.split(" ")[1];
 
-        if (email) {
-          const result = await userCollection.findOne({ email: email });
-          return res.status(200).send({ result });
-        } else {
-          return res
-            .status(403)
-            .send({ message: "Forbidden. Email not found" });
-        }
+      if (authEmail) {
+        const result = await userCollection.findOne({ email: authEmail });
+        return res.status(200).send({ result });
+      } else {
+        return res.status(403).send({ message: "Forbidden. Email not found" });
       }
-    );
+    });
 
     app.get("/api/sign-out", async (req: Request, res: Response) => {
       res.clearCookie("token");
@@ -178,34 +173,37 @@ async function run() {
     });
 
     app.put(
-      "/api/switch-to-user/:userID",
+      "/api/switch-role/:role",
       verifyJWT,
       async (req: Request, res: Response) => {
         const userEmail = req.decoded.email;
-        const userID = req.params.userID;
-        const result = await userCollection.updateOne(
-          { _id: ObjectId(userID), email: userEmail },
-          { $set: { role: "user" } },
-          { upsert: true }
-        );
+        const userID = req.headers.authorization?.split(" ")[1];
+        const userRole: string = req.params.role;
+        let roleModel: any;
 
-        if (result) return res.status(200).send(result);
-      }
-    );
+        if (!userID) {
+          return res
+            .status(400)
+            .send({ message: "Bad request! headers is missing" });
+        }
 
-    app.put(
-      "/api/switch-to-seller/:userID",
-      verifyJWT,
-      async (req: Request, res: Response) => {
-        const userEmail = req.decoded.email;
-        const userID = req.params.userID;
-        const result = await userCollection.updateOne(
-          { _id: ObjectId(userID), email: userEmail },
-          { $set: { role: "seller" } },
-          { upsert: true }
-        );
+        if (userRole === "user") {
+          roleModel = { role: "user" };
+        }
 
-        if (result) return res.status(200).send(result);
+        if (userRole === "seller") {
+          roleModel = { role: "seller" };
+        }
+
+        if (userID) {
+          const result = await userCollection.updateOne(
+            { _id: ObjectId(userID), email: userEmail },
+            { $set: roleModel },
+            { upsert: true }
+          );
+
+          if (result) return res.status(200).send(result);
+        }
       }
     );
     /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -755,33 +753,43 @@ async function run() {
     );
 
     // fetch my added product in my cart page
-    app.get(
-      "/my-cart-items/:userEmail",
-      async (req: Request, res: Response) => {
-        const userEmail = req.params.userEmail;
-        const result = await cartCollection.findOne({ user_email: userEmail });
+    app.get("/api/my-cart-items", async (req: Request, res: Response) => {
+      const userEmail = req.headers.authorization?.split(" ")[1];
 
-        if (result) {
-          await cartCollection.updateOne(
-            { user_email: userEmail },
-            { $pull: { product: { stock: "out" } } }
-          );
-        }
-        res.status(200).send(result);
+      if (!userEmail) {
+        return res
+          .status(400)
+          .send({ message: "Bad request! headers missing" });
+      };
+
+      const result = await cartCollection.findOne({ user_email: userEmail });
+
+      if (result) {
+        await cartCollection.updateOne(
+          { user_email: userEmail },
+          { $pull: { product: { stock: "out" } } }
+        );
       }
-    );
+      res.status(200).send(result);
+    });
 
     // update quantity of product in my-cart
     app.put(
-      "/api/update-product-quantity/:productId/:cartTypes",
+      "/api/update-product-quantity/:cartTypes",
       verifyJWT,
       async (req: Request, res: Response) => {
-        const productId: string = req.params.productId;
         const userEmail: string = req.decoded.email;
         const cart_types: string = req.params.cartTypes;
+        const productId = req.headers.authorization;
         const { quantity, price_total, discount_amount_total } = req.body;
         let updateDocuments: any;
         let filters: any;
+
+        if (!productId) {
+          return res
+            .status(400)
+            .send({ message: "Bad request! headers missing" });
+        };
 
         if (cart_types === "buy") {
           updateDocuments = {
@@ -795,7 +803,9 @@ async function run() {
           filters = {
             user_email: userEmail,
           };
-        } else {
+        } 
+        
+        if (cart_types === "toCart"){
           updateDocuments = {
             $set: {
               "product.$.quantity": quantity,
@@ -821,13 +831,19 @@ async function run() {
 
     // remove item form cart with item cart id and email
     app.delete(
-      "/delete-cart-item/:productId/:cartTypes",
+      "/delete-cart-item/:cartTypes",
       verifyJWT,
       async (req: Request, res: Response) => {
-        const productId = req.params.productId;
+        const productId = req.headers.authorization;
         const userEmail = req.decoded.email;
         const cart_types = req.params.cartTypes;
         let updateDocuments;
+
+        if (!productId) {
+          return res
+            .status(400)
+            .send({ message: "Bad request! headers missing" });
+        };
 
         if (cart_types === "buy") {
           updateDocuments = await cartCollection.updateOne(
@@ -849,14 +865,15 @@ async function run() {
 
     // add to wishlist
     app.put(
-      "/api/add-to-wishlist/:email", verifyJWT,
+      "/api/add-to-wishlist/:email",
+      verifyJWT,
       async (req: Request, res: Response) => {
         const userEmail = req.params.email;
         const verifiedEmail = req.decoded.email;
         const body = req.body;
 
         if (userEmail !== verifiedEmail) {
-          return res.status(403).send({message: "Forbidden"});
+          return res.status(403).send({ message: "Forbidden" });
         }
         const existsProduct = await userCollection.findOne(
           {

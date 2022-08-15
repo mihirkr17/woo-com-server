@@ -109,66 +109,75 @@ function run() {
             ++++++++++ Authorization api request endpoints Start ++++++++++++
             +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
             // add user to the database
-            app.put("/api/sign-user/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const email = req.params.email;
+            app.put("/api/sign-user", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                var _a;
+                const authEmail = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1];
                 const { name } = req.body;
-                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
+                const token = jwt.sign({ email: authEmail }, process.env.ACCESS_TOKEN, {
                     algorithm: "HS256",
                     expiresIn: "1h",
                 });
-                if (email) {
-                    const existsUser = yield userCollection.findOne({ email: email });
+                if (authEmail) {
+                    const existsUser = yield userCollection.findOne({ email: authEmail });
                     if (existsUser) {
                         res.cookie("token", token, {
-                            sameSite: "none",
-                            secure: true,
+                            // sameSite: "none",
+                            // secure: true,
                             maxAge: 3600000,
                             httpOnly: true,
                         });
                         res.status(200).send({ message: "Login success" });
                     }
                     else {
-                        yield userCollection.updateOne({ email: email }, { $set: { email, displayName: name, role: "user" } }, { upsert: true });
+                        yield userCollection.updateOne({ email: authEmail }, { $set: { email: authEmail, displayName: name, role: "user" } }, { upsert: true });
                         res.cookie("token", token, {
                             maxAge: 3600000,
                             httpOnly: true,
-                            sameSite: "none",
-                            secure: true,
+                            // sameSite: "none",
+                            // secure: true,
                         });
                         res.status(200).send({ message: "Login success" });
                     }
                 }
             }));
             // fetch user information from database and send to client
-            app.get("/api/fetch-auth-user/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const email = req.params.email;
-                if (email) {
-                    const result = yield userCollection.findOne({ email: email });
+            app.get("/api/fetch-auth-user/", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                var _b;
+                const authEmail = (_b = req.headers.authorization) === null || _b === void 0 ? void 0 : _b.split(" ")[1];
+                if (authEmail) {
+                    const result = yield userCollection.findOne({ email: authEmail });
                     return res.status(200).send({ result });
                 }
                 else {
-                    return res
-                        .status(403)
-                        .send({ message: "Forbidden. Email not found" });
+                    return res.status(403).send({ message: "Forbidden. Email not found" });
                 }
             }));
             app.get("/api/sign-out", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 res.clearCookie("token");
                 res.status(200).send({ message: "Sign out successfully" });
             }));
-            app.put("/api/switch-to-user/:userID", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.put("/api/switch-role/:role", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                var _c;
                 const userEmail = req.decoded.email;
-                const userID = req.params.userID;
-                const result = yield userCollection.updateOne({ _id: ObjectId(userID), email: userEmail }, { $set: { role: "user" } }, { upsert: true });
-                if (result)
-                    return res.status(200).send(result);
-            }));
-            app.put("/api/switch-to-seller/:userID", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const userEmail = req.decoded.email;
-                const userID = req.params.userID;
-                const result = yield userCollection.updateOne({ _id: ObjectId(userID), email: userEmail }, { $set: { role: "seller" } }, { upsert: true });
-                if (result)
-                    return res.status(200).send(result);
+                const userID = (_c = req.headers.authorization) === null || _c === void 0 ? void 0 : _c.split(" ")[1];
+                const userRole = req.params.role;
+                let roleModel;
+                if (!userID) {
+                    return res
+                        .status(400)
+                        .send({ message: "Bad request! headers is missing" });
+                }
+                if (userRole === "user") {
+                    roleModel = { role: "user" };
+                }
+                if (userRole === "seller") {
+                    roleModel = { role: "seller" };
+                }
+                if (userID) {
+                    const result = yield userCollection.updateOne({ _id: ObjectId(userID), email: userEmail }, { $set: roleModel }, { upsert: true });
+                    if (result)
+                        return res.status(200).send(result);
+                }
             }));
             /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
             ++++++++++ Authorization api request endpoints End ++++++++++++
@@ -564,8 +573,15 @@ function run() {
                 }
             }));
             // fetch my added product in my cart page
-            app.get("/my-cart-items/:userEmail", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const userEmail = req.params.userEmail;
+            app.get("/api/my-cart-items", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                var _d;
+                const userEmail = (_d = req.headers.authorization) === null || _d === void 0 ? void 0 : _d.split(" ")[1];
+                if (!userEmail) {
+                    return res
+                        .status(400)
+                        .send({ message: "Bad request! headers missing" });
+                }
+                ;
                 const result = yield cartCollection.findOne({ user_email: userEmail });
                 if (result) {
                     yield cartCollection.updateOne({ user_email: userEmail }, { $pull: { product: { stock: "out" } } });
@@ -573,13 +589,19 @@ function run() {
                 res.status(200).send(result);
             }));
             // update quantity of product in my-cart
-            app.put("/api/update-product-quantity/:productId/:cartTypes", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const productId = req.params.productId;
+            app.put("/api/update-product-quantity/:cartTypes", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const userEmail = req.decoded.email;
                 const cart_types = req.params.cartTypes;
+                const productId = req.headers.authorization;
                 const { quantity, price_total, discount_amount_total } = req.body;
                 let updateDocuments;
                 let filters;
+                if (!productId) {
+                    return res
+                        .status(400)
+                        .send({ message: "Bad request! headers missing" });
+                }
+                ;
                 if (cart_types === "buy") {
                     updateDocuments = {
                         $set: {
@@ -592,7 +614,7 @@ function run() {
                         user_email: userEmail,
                     };
                 }
-                else {
+                if (cart_types === "toCart") {
                     updateDocuments = {
                         $set: {
                             "product.$.quantity": quantity,
@@ -609,11 +631,17 @@ function run() {
                 res.status(200).send(result);
             }));
             // remove item form cart with item cart id and email
-            app.delete("/delete-cart-item/:productId/:cartTypes", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const productId = req.params.productId;
+            app.delete("/delete-cart-item/:cartTypes", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const productId = req.headers.authorization;
                 const userEmail = req.decoded.email;
                 const cart_types = req.params.cartTypes;
                 let updateDocuments;
+                if (!productId) {
+                    return res
+                        .status(400)
+                        .send({ message: "Bad request! headers missing" });
+                }
+                ;
                 if (cart_types === "buy") {
                     updateDocuments = yield cartCollection.updateOne({ user_email: userEmail }, { $unset: { buy_product: "" } });
                 }
