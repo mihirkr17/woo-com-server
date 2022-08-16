@@ -130,18 +130,16 @@ async function run() {
         expiresIn: "1h",
       });
 
-      let tokenObj = {
-        sameSite: "none",
-        secure: true,
-        maxAge: 3600000,
-        httpOnly: true,
-      };
-
       if (authEmail) {
         const existsUser = await userCollection.findOne({ email: authEmail });
 
         if (existsUser) {
-          res.cookie("token", token, tokenObj);
+          res.cookie("token", token, {
+            sameSite: "none",
+            secure: true,
+            maxAge: 3600000,
+            httpOnly: true,
+          });
           return res.status(200).send({ message: "Login success" });
         } else {
           await userCollection.updateOne(
@@ -150,7 +148,12 @@ async function run() {
             { upsert: true }
           );
 
-          res.cookie("token", token, tokenObj);
+          res.cookie("token", token, {
+            sameSite: "none",
+            secure: true,
+            maxAge: 3600000,
+            httpOnly: true,
+          });
           return res.status(200).send({ message: "Login success" });
         }
       }
@@ -782,8 +785,7 @@ async function run() {
         const userEmail: string = req.decoded.email;
         const cart_types: string = req.params.cartTypes;
         const productId = req.headers.authorization;
-        const { quantity, price_total, discount_amount_total } =
-          req.body;
+        const { quantity, price_total, discount_amount_total } = req.body;
         let updateDocuments: any;
         let filters: any;
 
@@ -808,7 +810,6 @@ async function run() {
         }
 
         if (cart_types === "toCart") {
-
           updateDocuments = {
             $set: {
               "product.$.quantity": quantity,
