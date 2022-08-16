@@ -113,30 +113,29 @@ function run() {
                 var _a;
                 const authEmail = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1];
                 const { name } = req.body;
+                if (!authEmail) {
+                    return res.status(400).send({ message: "Bad request" });
+                }
                 const token = jwt.sign({ email: authEmail }, process.env.ACCESS_TOKEN, {
                     algorithm: "HS256",
                     expiresIn: "1h",
                 });
+                let tokenObj = {
+                    // sameSite: "none",
+                    // secure: true,
+                    maxAge: 3600000,
+                    httpOnly: true,
+                };
                 if (authEmail) {
                     const existsUser = yield userCollection.findOne({ email: authEmail });
                     if (existsUser) {
-                        res.cookie("token", token, {
-                            // sameSite: "none",
-                            // secure: true,
-                            maxAge: 3600000,
-                            httpOnly: true,
-                        });
-                        res.status(200).send({ message: "Login success" });
+                        res.cookie("token", token, tokenObj);
+                        return res.status(200).send({ message: "Login success" });
                     }
                     else {
                         yield userCollection.updateOne({ email: authEmail }, { $set: { email: authEmail, displayName: name, role: "user" } }, { upsert: true });
-                        res.cookie("token", token, {
-                            maxAge: 3600000,
-                            httpOnly: true,
-                            // sameSite: "none",
-                            // secure: true,
-                        });
-                        res.status(200).send({ message: "Login success" });
+                        res.cookie("token", token, tokenObj);
+                        return res.status(200).send({ message: "Login success" });
                     }
                 }
             }));
@@ -581,7 +580,6 @@ function run() {
                         .status(400)
                         .send({ message: "Bad request! headers missing" });
                 }
-                ;
                 const result = yield cartCollection.findOne({ user_email: userEmail });
                 if (result) {
                     yield cartCollection.updateOne({ user_email: userEmail }, { $pull: { product: { stock: "out" } } });
@@ -601,7 +599,6 @@ function run() {
                         .status(400)
                         .send({ message: "Bad request! headers missing" });
                 }
-                ;
                 if (cart_types === "buy") {
                     updateDocuments = {
                         $set: {
@@ -641,7 +638,6 @@ function run() {
                         .status(400)
                         .send({ message: "Bad request! headers missing" });
                 }
-                ;
                 if (cart_types === "buy") {
                     updateDocuments = yield cartCollection.updateOne({ user_email: userEmail }, { $unset: { buy_product: "" } });
                 }
