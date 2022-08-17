@@ -130,16 +130,18 @@ async function run() {
         expiresIn: "1h",
       });
 
+      const cookieObject: any = {
+        sameSite: "none",
+        secure: true,
+        maxAge: 3600000,
+        httpOnly: true,
+      };
+
       if (authEmail) {
         const existsUser = await userCollection.findOne({ email: authEmail });
 
         if (existsUser) {
-          res.cookie("token", token, {
-            sameSite: "none",
-            secure: true,
-            maxAge: 3600000,
-            httpOnly: true,
-          });
+          res.cookie("token", token, cookieObject);
           return res.status(200).send({ message: "Login success" });
         } else {
           await userCollection.updateOne(
@@ -148,12 +150,7 @@ async function run() {
             { upsert: true }
           );
 
-          res.cookie("token", token, {
-            sameSite: "none",
-            secure: true,
-            maxAge: 3600000,
-            httpOnly: true,
-          });
+          res.cookie("token", token, cookieObject);
           return res.status(200).send({ message: "Login success" });
         }
       }

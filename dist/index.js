@@ -120,7 +120,7 @@ function run() {
                     algorithm: "HS256",
                     expiresIn: "1h",
                 });
-                let tokenObj = {
+                const cookieObject = {
                     // sameSite: "none",
                     // secure: true,
                     maxAge: 3600000,
@@ -129,12 +129,12 @@ function run() {
                 if (authEmail) {
                     const existsUser = yield userCollection.findOne({ email: authEmail });
                     if (existsUser) {
-                        res.cookie("token", token, tokenObj);
+                        res.cookie("token", token, cookieObject);
                         return res.status(200).send({ message: "Login success" });
                     }
                     else {
                         yield userCollection.updateOne({ email: authEmail }, { $set: { email: authEmail, displayName: name, role: "user" } }, { upsert: true });
-                        res.cookie("token", token, tokenObj);
+                        res.cookie("token", token, cookieObject);
                         return res.status(200).send({ message: "Login success" });
                     }
                 }
