@@ -952,6 +952,26 @@ function run() {
                 }
                 res.status(200).send(result);
             }));
+            // fetch top selling product in my dashboard
+            app.get("/api/fetch-top-selling-product", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const seller = req.query.seller;
+                let result;
+                if (seller) {
+                    result = yield productsCollection
+                        .find({ seller: seller })
+                        .sort({ top_sell: -1 })
+                        .limit(6)
+                        .toArray();
+                }
+                else {
+                    result = yield productsCollection
+                        .find({})
+                        .sort({ top_sell: -1 })
+                        .limit(6)
+                        .toArray();
+                }
+                res.status(200).send(result);
+            }));
         }
         finally {
         }

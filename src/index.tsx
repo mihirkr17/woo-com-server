@@ -1329,6 +1329,31 @@ async function run() {
 
       res.status(200).send(result);
     });
+
+    // fetch top selling product in my dashboard
+    app.get(
+      "/api/fetch-top-selling-product",
+      async (req: Request, res: Response) => {
+        const seller: any = req.query.seller;
+        let result: any;
+
+        if (seller) {
+          result = await productsCollection
+            .find({ seller: seller })
+            .sort({ top_sell: -1 })
+            .limit(6)
+            .toArray();
+
+        } else {
+          result = await productsCollection
+            .find({})
+            .sort({ top_sell: -1 })
+            .limit(6)
+            .toArray();
+        }
+        res.status(200).send(result);
+      }
+    );
   } finally {
   }
 }
