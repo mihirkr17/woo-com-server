@@ -220,6 +220,7 @@ async function run() {
             { title: { $regex: sTxt, $options: "i" } },
             { seller: { $regex: sTxt, $options: "i" } },
             { brand: { $regex: sTxt, $options: "i" } },
+            { "genre.category": { $regex: sTxt, $options: "i" } },
           ],
         };
         return findProduct;
@@ -284,6 +285,8 @@ async function run() {
         return findProduct;
       };
 
+      page = parseInt(page) === 1 ? 0 : parseInt(page) - 1;
+
       cursor =
         searchText && searchText.length > 0
           ? productsCollection.find(searchQuery(searchText, seller_name || ""))
@@ -295,7 +298,7 @@ async function run() {
 
       if (item || page) {
         result = await cursor
-          .skip(parseInt(page) * parseInt(item))
+          .skip(page * parseInt(item))
           .limit(parseInt(item))
           .toArray();
       } else {
@@ -1158,11 +1161,13 @@ async function run() {
 
     // update order status by admin or product owner
     app.put(
-      "/update-order-status/:status/:user_email/:id",
+      "/update-order-status/:status/:id",
+      verifyJWT,
+      verifySeller,
       async (req: Request, res: Response) => {
         const orderId = parseInt(req.params.id);
         const status = req.params.status;
-        const userEmail = req.params.user_email;
+        const userEmail = req.headers.authorization;
         const { ownerCommission, totalEarn, productId, quantity, seller } =
           req.body;
         let time: string = new Date().toLocaleString();
@@ -1306,22 +1311,10 @@ async function run() {
             {
               $match: {
                 $and: [
-                  {
-                    $or: [{ "orders.status": "pending" }],
-                  },
-                  { "orders.dispatch": { $ne: true } },
+                  { "orders.dispatch": true },
                   { "orders.seller": seller },
                 ],
               },
-            },
-          ])
-          .toArray();
-      } else {
-        result = await orderCollection
-          .aggregate([
-            { $unwind: "$orders" },
-            {
-              $match: { "orders.dispatch": true },
             },
           ])
           .toArray();
@@ -1343,7 +1336,6 @@ async function run() {
             .sort({ top_sell: -1 })
             .limit(6)
             .toArray();
-
         } else {
           result = await productsCollection
             .find({})

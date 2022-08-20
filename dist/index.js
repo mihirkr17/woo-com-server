@@ -190,6 +190,7 @@ function run() {
                             { title: { $regex: sTxt, $options: "i" } },
                             { seller: { $regex: sTxt, $options: "i" } },
                             { brand: { $regex: sTxt, $options: "i" } },
+                            { "genre.category": { $regex: sTxt, $options: "i" } },
                         ],
                     };
                     return findProduct;
@@ -243,6 +244,7 @@ function run() {
                     }
                     return findProduct;
                 };
+                page = parseInt(page) === 1 ? 0 : parseInt(page) - 1;
                 cursor =
                     searchText && searchText.length > 0
                         ? productsCollection.find(searchQuery(searchText, seller_name || ""))
@@ -251,7 +253,7 @@ function run() {
                             : productsCollection.find((seller_name && { seller: seller_name }) || {});
                 if (item || page) {
                     result = yield cursor
-                        .skip(parseInt(page) * parseInt(item))
+                        .skip(page * parseInt(item))
                         .limit(parseInt(item))
                         .toArray();
                 }
@@ -830,10 +832,10 @@ function run() {
                 res.send({ result, message: "Order canceled successfully" });
             }));
             // update order status by admin or product owner
-            app.put("/update-order-status/:status/:user_email/:id", (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.put("/update-order-status/:status/:id", verifyJWT, verifySeller, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const orderId = parseInt(req.params.id);
                 const status = req.params.status;
-                const userEmail = req.params.user_email;
+                const userEmail = req.headers.authorization;
                 const { ownerCommission, totalEarn, productId, quantity, seller } = req.body;
                 let time = new Date().toLocaleString();
                 let upDoc;
@@ -929,23 +931,10 @@ function run() {
                         {
                             $match: {
                                 $and: [
-                                    {
-                                        $or: [{ "orders.status": "pending" }],
-                                    },
-                                    { "orders.dispatch": { $ne: true } },
+                                    { "orders.dispatch": true },
                                     { "orders.seller": seller },
                                 ],
                             },
-                        },
-                    ])
-                        .toArray();
-                }
-                else {
-                    result = yield orderCollection
-                        .aggregate([
-                        { $unwind: "$orders" },
-                        {
-                            $match: { "orders.dispatch": true },
                         },
                     ])
                         .toArray();
