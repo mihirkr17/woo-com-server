@@ -349,13 +349,6 @@ async function run() {
         const productId = req.params.productId;
         const body = req.body;
 
-        let quantity = 1;
-        let productPrice = parseInt(body?.price);
-        let discount_amount_fixed = parseFloat(body?.discount_amount_fixed);
-        let discount_amount_total = discount_amount_fixed * quantity;
-        let discount = parseInt(body?.discount);
-        let price_total = productPrice * quantity - discount_amount_total;
-        let price_fixed = body?.price_fixed;
         let available = body?.available;
 
         if (available && available >= 1) {
@@ -372,23 +365,8 @@ async function run() {
           await cartCollection.updateMany(
             { "product._id": productId },
             {
-              $set: {
-                "product.$.title": body.title,
-                "product.$.slug": body.slug,
-                "product.$.brand": body.brand,
-                "product.$.image": body.image,
-                "product.$.quantity": quantity,
-                "product.$.price": productPrice,
-                "product.$.price_total": price_total,
-                "product.$.price_fixed": price_fixed,
-                "product.$.discount": discount,
-                "product.$.discount_amount_fixed": discount_amount_fixed,
-                "product.$.discount_amount_total": discount_amount_total,
-                "product.$.stock": body?.stock,
-                "product.$.available": available,
-              },
-            },
-            { upsert: true }
+              $pull: { product: { _id: productId } },
+            }
           );
         }
 
@@ -618,7 +596,7 @@ async function run() {
       let findQuery;
       const productCategory = req.query.category;
       const productSubCategory = req.query.sb_category;
-      const productSecondCategory = req.query.sc_category;
+      const productPostCategory = req.query.pt_category;
       const filters = req.query.filters;
       let sorting;
 
@@ -643,11 +621,11 @@ async function run() {
         };
       }
 
-      if (productCategory && productSubCategory && productSecondCategory) {
+      if (productCategory && productSubCategory && productPostCategory) {
         findQuery = {
           "genre.category": productCategory,
           "genre.sub_category": productSubCategory,
-          "genre.second_category": productSecondCategory,
+          "genre.post_category": productPostCategory,
         };
       }
 
@@ -769,12 +747,28 @@ async function run() {
       const result = await cartCollection.findOne({ user_email: userEmail });
 
       if (result) {
+        const cartProduct = result?.product || [];
+
+        let cartTotalPrice = cartProduct
+          .map((p: any) => p?.price_total)
+          .reduce((a: number, b: number) => a + b, 0);
+
+        let cartTotalQuantity = cartProduct
+          .map((p: any) => p?.quantity)
+          .reduce((a: number, b: number) => a + b, 0);
+
+        let cartTotalDiscount = cartProduct
+          .map((p: any) => p?.discount_amount_total)
+          .reduce((a: number, b: number) => a + b, 0);
+
         await cartCollection.updateOne(
           { user_email: userEmail },
-          { $pull: { product: { stock: "out" } } }
+          { $set: { cartTotalPrice, cartTotalQuantity, cartTotalDiscount } },
+          { $pull: { product: { stock: "out" } } },
+          { upsert: true }
         );
+        res.status(200).send(result);
       }
-      res.status(200).send(result);
     });
 
     // update quantity of product in my-cart
@@ -785,7 +779,7 @@ async function run() {
         const userEmail: string = req.decoded.email;
         const cart_types: string = req.params.cartTypes;
         const productId = req.headers.authorization;
-        const { quantity, price_total, discount_amount_total } = req.body;
+        const { quantity } = req.body;
         let updateDocuments: any;
         let filters: any;
 
@@ -795,41 +789,83 @@ async function run() {
             .send({ message: "Bad request! headers missing" });
         }
 
-        if (cart_types === "buy") {
-          updateDocuments = {
-            $set: {
-              "buy_product.quantity": quantity,
-              "buy_product.price_total": price_total,
-              "buy_product.discount_amount_total": discount_amount_total,
-            },
-          };
+        const availableProduct = await productsCollection.findOne({
+          _id: ObjectId(productId),
+          available: { $gte: 1 },
+          stock: "in",
+        });
 
-          filters = {
-            user_email: userEmail,
-          };
+        if (quantity >= availableProduct?.available - 1) {
+          return res.status(200).send({
+            message: "Your selected quantity out of range in available product",
+          });
         }
 
-        if (cart_types === "toCart") {
-          updateDocuments = {
-            $set: {
-              "product.$.quantity": quantity,
-              "product.$.price_total": price_total,
-              "product.$.discount_amount_total": discount_amount_total,
-            },
-          };
+        const cart = await cartCollection.findOne({
+          user_email: userEmail,
+        });
 
-          filters = {
-            user_email: userEmail,
-            "product._id": productId,
-          };
+        if (availableProduct) {
+          if (cart_types === "buy") {
+            updateDocuments = {
+              $set: {
+                "buy_product.quantity": quantity,
+                "buy_product.price_total":
+                  parseFloat(cart?.buy_product?.price_fixed) * quantity,
+                "buy_product.discount_amount_total":
+                  parseFloat(cart?.buy_product?.discount_amount_fixed) *
+                  quantity,
+              },
+            };
+
+            filters = {
+              user_email: userEmail,
+            };
+          }
+
+          if (cart_types === "toCart") {
+            const cartProduct = cart?.product || [];
+            let price_total;
+            let discountTotal;
+
+            for (let i = 0; i < cartProduct.length; i++) {
+              let items = cartProduct[i];
+              if (items?._id === productId) {
+                price_total = items?.price_fixed * quantity;
+                discountTotal = items?.discount_amount_fixed * quantity;
+              }
+            }
+
+            updateDocuments = {
+              $set: {
+                "product.$.quantity": quantity,
+                "product.$.price_total": price_total,
+                "product.$.discount_amount_total": discountTotal,
+              },
+            };
+
+            filters = {
+              user_email: userEmail,
+              "product._id": productId,
+            };
+          }
+
+          const result = await cartCollection.updateOne(
+            filters,
+            updateDocuments,
+            { upsert: true }
+          );
+          return res.status(200).send(result);
+        } else {
+          await cartCollection.updateOne(
+            { user_email: userEmail },
+            { $pull: { product: { _id: productId } } }
+          );
+          return res.status(200).send({
+            message:
+              "This product is out of stock now and removed from your cart",
+          });
         }
-
-        const result = await cartCollection.updateOne(
-          filters,
-          updateDocuments,
-          { upsert: true }
-        );
-        res.status(200).send(result);
       }
     );
 
@@ -937,13 +973,19 @@ async function run() {
       "/api/add-to-cart",
       verifyJWT,
       async (req: Request, res: Response) => {
-        let newProduct: any;
         const email: string = req.decoded.email;
         const body = req.body;
         const options = { upsert: true };
         const query = { user_email: email };
 
-        if (body?.stock === "in" && body?.available > 0) {
+        const availableProduct = await productsCollection.findOne({
+          _id: ObjectId(body?._id),
+        });
+
+        if (
+          availableProduct?.stock === "in" &&
+          availableProduct?.available > 0
+        ) {
           const existsProduct = await cartCollection.findOne(
             {
               user_email: email,
@@ -953,6 +995,7 @@ async function run() {
               "product.$": 1,
             }
           );
+
           if (existsProduct) {
             return res
               .status(200)
