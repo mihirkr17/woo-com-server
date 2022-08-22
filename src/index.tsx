@@ -131,8 +131,8 @@ async function run() {
       });
 
       const cookieObject: any = {
-        sameSite: "none",
-        secure: true,
+        // sameSite: "none",
+        // secure: true,
         maxAge: 3600000,
         httpOnly: true,
       };
