@@ -14,7 +14,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const { dbh } = require("./database/db");
+const { errorHandlers } = require("./errors/errors");
 const cookieParser = require("cookie-parser");
+const { verifyJWT, verifyAuth, verifySeller, } = require("./authentication/auth");
 // Server setup
 const { ObjectId } = require("mongodb");
 const cors = require("cors");
@@ -29,82 +31,15 @@ app.use(cors({
 app.use(cookieParser());
 app.use(express_1.default.json());
 const port = process.env.PORT || 5000;
-// verifying jwt token
-const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    // const authHeader = req.headers.authorization;
-    // if (!authHeader) return res.status(403).send({ message: "Forbidden" });
-    const token = req.cookies.token;
-    // const token = authHeader.split(" ")[1];
-    if (token) {
-        jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
-            if (err) {
-                res.clearCookie("token");
-                return res.status(401).send({
-                    message: err.message,
-                });
-            }
-            req.decoded = decoded;
-            next();
-        });
-    }
-    else {
-        return res.status(403).send({ message: "Forbidden" });
-    }
-});
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             // product collection
             yield dbh.connect();
             const productsCollection = dbh.db("Products").collection("product");
-            const cartCollection = dbh.db("Products").collection("cart");
             const orderCollection = dbh.db("Products").collection("orders");
             const userCollection = dbh.db("Users").collection("user");
             const productPolicy = dbh.db("Products").collection("policy");
-            // // verify owner
-            const verifyAuth = (req, res, next) => __awaiter(this, void 0, void 0, function* () {
-                const authEmail = req.decoded.email;
-                const findAuthInDB = yield userCollection.findOne({
-                    email: authEmail && authEmail,
-                });
-                if (findAuthInDB.role === "owner" || findAuthInDB.role === "admin") {
-                    next();
-                }
-                else {
-                    res.status(403).send({ message: "Forbidden" });
-                }
-            });
-            // verify seller
-            const verifySeller = (req, res, next) => __awaiter(this, void 0, void 0, function* () {
-                const authEmail = req.decoded.email;
-                const findAuthInDB = yield userCollection.findOne({
-                    email: authEmail && authEmail,
-                });
-                if (findAuthInDB.role === "seller") {
-                    next();
-                }
-                else {
-                    res.status(403).send({ message: "Forbidden" });
-                }
-            });
-            /// privacy policy fetch
-            app.get("/api/privacy-policy", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                res.status(200).send(yield productPolicy.findOne({}));
-            }));
-            /// update policy
-            app.put("/api/update-policy/:policyId", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const policyId = req.params.policyId;
-                const body = req.body;
-                const result = yield productPolicy.updateOne({ _id: ObjectId(policyId) }, { $set: body }, { upsert: true });
-                if (result) {
-                    return res
-                        .status(200)
-                        .send({ message: "Policy updated successfully" });
-                }
-                else {
-                    return res.status(400).send({ message: "Update failed" });
-                }
-            }));
             /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
             ++++++++++ Authorization api request endpoints Start ++++++++++++
             +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
@@ -113,42 +48,55 @@ function run() {
                 var _a;
                 const authEmail = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1];
                 const { name } = req.body;
-                if (!authEmail) {
-                    return res.status(400).send({ message: "Bad request" });
+                try {
+                    if (!authEmail) {
+                        return res.status(400).send({ message: "Bad request" });
+                    }
+                    const token = jwt.sign({ email: authEmail }, process.env.ACCESS_TOKEN, {
+                        algorithm: "HS256",
+                        expiresIn: "1h",
+                    });
+                    const cookieObject = {
+                        sameSite: "none",
+                        secure: true,
+                        maxAge: 3600000,
+                        httpOnly: true,
+                    };
+                    if (authEmail) {
+                        const existsUser = yield userCollection.findOne({ email: authEmail });
+                        if (existsUser) {
+                            res.cookie("token", token, cookieObject);
+                            return res.status(200).send({ message: "Login success" });
+                        }
+                        else {
+                            yield userCollection.updateOne({ email: authEmail }, { $set: { email: authEmail, displayName: name, role: "user" } }, { upsert: true });
+                            res.cookie("token", token, cookieObject);
+                            return res.status(200).send({ message: "Login success" });
+                        }
+                    }
                 }
-                const token = jwt.sign({ email: authEmail }, process.env.ACCESS_TOKEN, {
-                    algorithm: "HS256",
-                    expiresIn: "1h",
-                });
-                const cookieObject = {
-                    // sameSite: "none",
-                    // secure: true,
-                    maxAge: 3600000,
-                    httpOnly: true,
-                };
-                if (authEmail) {
-                    const existsUser = yield userCollection.findOne({ email: authEmail });
-                    if (existsUser) {
-                        res.cookie("token", token, cookieObject);
-                        return res.status(200).send({ message: "Login success" });
-                    }
-                    else {
-                        yield userCollection.updateOne({ email: authEmail }, { $set: { email: authEmail, displayName: name, role: "user" } }, { upsert: true });
-                        res.cookie("token", token, cookieObject);
-                        return res.status(200).send({ message: "Login success" });
-                    }
+                catch (error) {
+                    res.status(500).send({ message: error.message });
                 }
             }));
             // fetch user information from database and send to client
             app.get("/api/fetch-auth-user/", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 var _b;
                 const authEmail = (_b = req.headers.authorization) === null || _b === void 0 ? void 0 : _b.split(" ")[1];
-                if (authEmail) {
-                    const result = yield userCollection.findOne({ email: authEmail });
-                    return res.status(200).send({ result });
+                try {
+                    if (authEmail) {
+                        yield userCollection.updateOne({ email: authEmail }, { $pull: { myCartProduct: { stock: "out" } } }, { upsert: true });
+                        const result = yield userCollection.findOne({ email: authEmail });
+                        return res.status(200).send({ result });
+                    }
+                    else {
+                        return res
+                            .status(403)
+                            .send({ message: "Forbidden. Email not found" });
+                    }
                 }
-                else {
-                    return res.status(403).send({ message: "Forbidden. Email not found" });
+                catch (error) {
+                    res.status(500).send({ message: error.message });
                 }
             }));
             app.get("/api/sign-out", (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -181,6 +129,24 @@ function run() {
             /*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
             ++++++++++ Authorization api request endpoints End ++++++++++++
             +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+            /// privacy policy fetch
+            app.get("/api/privacy-policy", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                res.status(200).send(yield productPolicy.findOne({}));
+            }));
+            /// update policy
+            app.put("/api/update-policy/:policyId", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const policyId = req.params.policyId;
+                const body = req.body;
+                const result = yield productPolicy.updateOne({ _id: ObjectId(policyId) }, { $set: body }, { upsert: true });
+                if (result) {
+                    return res
+                        .status(200)
+                        .send({ message: "Policy updated successfully" });
+                }
+                else {
+                    return res.status(400).send({ message: "Update failed" });
+                }
+            }));
             // search product api
             app.get("/api/search-products/:q", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const q = req.params.q;
@@ -203,8 +169,8 @@ function run() {
                 res
                     .status(200)
                     .send(yield productsCollection
-                    .find({})
-                    .sort({ rating_average: -1, top_sell: -1 })
+                    .find({ status: "active", save_as: "fulfilled" })
+                    .sort({ rating_average: -1 })
                     .limit(6)
                     .toArray());
             }));
@@ -245,22 +211,27 @@ function run() {
                     return findProduct;
                 };
                 page = parseInt(page) === 1 ? 0 : parseInt(page) - 1;
-                cursor =
-                    searchText && searchText.length > 0
-                        ? productsCollection.find(searchQuery(searchText, seller_name || ""))
-                        : filters && filters !== "all"
-                            ? productsCollection.find(filterQuery(filters, seller_name || ""))
-                            : productsCollection.find((seller_name && { seller: seller_name }) || {});
-                if (item || page) {
-                    result = yield cursor
-                        .skip(page * parseInt(item))
-                        .limit(parseInt(item))
-                        .toArray();
+                try {
+                    cursor =
+                        searchText && searchText.length > 0
+                            ? productsCollection.find(searchQuery(searchText, seller_name || ""))
+                            : filters && filters !== "all"
+                                ? productsCollection.find(filterQuery(filters, seller_name || ""))
+                                : productsCollection.find((seller_name && { seller: seller_name }) || {});
+                    if (item || page) {
+                        result = yield cursor
+                            .skip(page * parseInt(item))
+                            .limit(parseInt(item))
+                            .toArray();
+                    }
+                    else {
+                        result = yield cursor.toArray();
+                    }
+                    res.status(200).send(result);
                 }
-                else {
-                    result = yield cursor.toArray();
+                catch (error) {
+                    res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
                 }
-                res.status(200).send(result);
             }));
             // product count
             app.get("/api/product-count", (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -271,39 +242,76 @@ function run() {
             // Delete product from manage product page
             app.delete("/api/delete-product/:productId", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const productId = req.params.productId;
-                const result = yield productsCollection.deleteOne({
-                    _id: ObjectId(productId),
-                });
-                if (result) {
-                    yield cartCollection.updateMany({ "product._id": productId }, { $pull: { product: { _id: productId } } });
-                    return res
-                        .status(200)
-                        .send({ message: "Product deleted successfully." });
+                try {
+                    const result = yield productsCollection.deleteOne({
+                        _id: ObjectId(productId),
+                    });
+                    if (result) {
+                        yield userCollection.updateMany({ "myCartProduct._id": productId }, { $pull: { myCartProduct: { _id: productId } } });
+                        return res
+                            .status(200)
+                            .send({ message: "Product deleted successfully." });
+                    }
+                    else {
+                        return res.status(503).send({ message: "Service unavailable" });
+                    }
                 }
-                else {
-                    return res.status(503).send({ message: "Service unavailable" });
+                catch (error) {
+                    res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
                 }
             }));
             // update product information
             app.put("/api/update-product/:productId", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const productId = req.params.productId;
                 const body = req.body;
-                let available = body === null || body === void 0 ? void 0 : body.available;
+                let available = parseInt(body === null || body === void 0 ? void 0 : body.available);
+                const newDate = new Date().toLocaleString();
+                let productModel = {
+                    title: (body === null || body === void 0 ? void 0 : body.title) || "",
+                    slug: (body === null || body === void 0 ? void 0 : body.slug) || "",
+                    image: (body === null || body === void 0 ? void 0 : body.images) || [],
+                    info: {
+                        description: (body === null || body === void 0 ? void 0 : body.description) || "",
+                        short_description: (body === null || body === void 0 ? void 0 : body.short_description) || "",
+                        specification: (body === null || body === void 0 ? void 0 : body.specification) || "",
+                        size: (body === null || body === void 0 ? void 0 : body.size) || [],
+                    },
+                    price: parseFloat((body === null || body === void 0 ? void 0 : body.price) || 0),
+                    price_fixed: (body === null || body === void 0 ? void 0 : body.price_fixed) || 0,
+                    discount: parseFloat((body === null || body === void 0 ? void 0 : body.discount) || 0),
+                    discount_amount_fixed: (body === null || body === void 0 ? void 0 : body.discount_amount_fixed) || 0,
+                    available,
+                    package_dimension: {
+                        weight: parseFloat((body === null || body === void 0 ? void 0 : body.packageWeight) || 0),
+                        length: parseFloat((body === null || body === void 0 ? void 0 : body.packageLength) || 0),
+                        width: parseFloat((body === null || body === void 0 ? void 0 : body.packageWidth) || 0),
+                        height: parseFloat((body === null || body === void 0 ? void 0 : body.packageHeight) || 0),
+                    },
+                    delivery_service: {
+                        in_box: (body === null || body === void 0 ? void 0 : body.inBox) || "",
+                    },
+                    payment_option: body === null || body === void 0 ? void 0 : body.payment_option,
+                    sku: (body === null || body === void 0 ? void 0 : body.sku) || "",
+                    status: (body === null || body === void 0 ? void 0 : body.status) || "",
+                    save_as: "fulfilled",
+                    modifiedAt: newDate,
+                };
                 if (available && available >= 1) {
-                    body["stock"] = "in";
+                    productModel["stock"] = "in";
                 }
                 else {
-                    body["stock"] = "out";
+                    productModel["stock"] = "out";
                 }
-                const exists = (yield cartCollection.find({ "product._id": productId }).toArray()) ||
-                    [];
+                const exists = (yield userCollection
+                    .find({ "myCartProduct._id": productId })
+                    .toArray()) || [];
                 if (exists && exists.length > 0) {
-                    yield cartCollection.updateMany({ "product._id": productId }, {
-                        $pull: { product: { _id: productId } },
+                    yield userCollection.updateMany({ "myCartProduct._id": productId }, {
+                        $pull: { myCartProduct: { _id: productId } },
                     });
                 }
                 const result = yield productsCollection.updateOne({ _id: ObjectId(productId) }, {
-                    $set: body,
+                    $set: productModel,
                 }, { upsert: true });
                 res
                     .status(200)
@@ -314,11 +322,6 @@ function run() {
                 const email = req.decoded.email;
                 const result = yield userCollection.updateOne({ email: email }, { $set: req.body }, { upsert: true });
                 res.status(200).send(result);
-            }));
-            // fetch myProfile data in my profile page
-            app.get("/my-profile/:email", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const email = req.params.email;
-                res.status(200).send(yield userCollection.findOne({ email: email }));
             }));
             // make admin request
             app.put("/make-admin/:userId", verifyJWT, verifyAuth, (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -383,20 +386,72 @@ function run() {
             // inserting product into database
             app.post("/api/add-product", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const body = req.body;
-                let available = body === null || body === void 0 ? void 0 : body.available;
-                if (available && available >= 1) {
-                    body["stock"] = "in";
+                try {
+                    let available = (body === null || body === void 0 ? void 0 : body.available) || 0;
+                    const newDate = new Date();
+                    let productModel = {
+                        title: (body === null || body === void 0 ? void 0 : body.title) || "",
+                        slug: (body === null || body === void 0 ? void 0 : body.slug) || "",
+                        brand: (body === null || body === void 0 ? void 0 : body.brand) || "",
+                        image: (body === null || body === void 0 ? void 0 : body.images) || [],
+                        info: {
+                            description: (body === null || body === void 0 ? void 0 : body.description) || "",
+                            short_description: (body === null || body === void 0 ? void 0 : body.short_description) || "",
+                            specification: (body === null || body === void 0 ? void 0 : body.specification) || "",
+                            size: (body === null || body === void 0 ? void 0 : body.size) || [],
+                        },
+                        price: parseFloat((body === null || body === void 0 ? void 0 : body.price) || 0),
+                        price_fixed: (body === null || body === void 0 ? void 0 : body.price_fixed) || 0,
+                        discount: parseFloat((body === null || body === void 0 ? void 0 : body.discount) || 0),
+                        discount_amount_fixed: (body === null || body === void 0 ? void 0 : body.discount_amount_fixed) || 0,
+                        available: parseInt((body === null || body === void 0 ? void 0 : body.available) || 0),
+                        package_dimension: {
+                            weight: parseFloat((body === null || body === void 0 ? void 0 : body.packageWeight) || 0),
+                            length: parseFloat((body === null || body === void 0 ? void 0 : body.packageLength) || 0),
+                            width: parseFloat((body === null || body === void 0 ? void 0 : body.packageWidth) || 0),
+                            height: parseFloat((body === null || body === void 0 ? void 0 : body.packageHeight) || 0),
+                        },
+                        delivery_service: {
+                            in_box: (body === null || body === void 0 ? void 0 : body.inBox) || "",
+                        },
+                        payment_option: body === null || body === void 0 ? void 0 : body.payment_option,
+                        sku: (body === null || body === void 0 ? void 0 : body.sku) || "",
+                        status: (body === null || body === void 0 ? void 0 : body.status) || "",
+                        save_as: "fulfilled",
+                        genre: {
+                            category: (body === null || body === void 0 ? void 0 : body.category) || "",
+                            sub_category: (body === null || body === void 0 ? void 0 : body.subCategory) || "",
+                            post_category: (body === null || body === void 0 ? void 0 : body.postCategory) || "", // third category
+                        },
+                        seller: (body === null || body === void 0 ? void 0 : body.seller) || "unknown",
+                        rating: [
+                            { weight: 5, count: 0 },
+                            { weight: 4, count: 0 },
+                            { weight: 3, count: 0 },
+                            { weight: 2, count: 0 },
+                            { weight: 1, count: 0 },
+                        ],
+                        rating_average: 0,
+                        createAt: newDate.toLocaleString(),
+                    };
+                    if (available && available >= 1) {
+                        productModel["stock"] = "in";
+                    }
+                    else {
+                        productModel["stock"] = "out";
+                    }
+                    yield productsCollection.insertOne(productModel);
+                    res.status(200).send({ message: "Product added successfully" });
                 }
-                else {
-                    body["stock"] = "out";
+                catch (error) {
+                    res.status(500).send({ message: error.message });
                 }
-                res.status(200).send(yield productsCollection.insertOne(body));
             }));
             // finding all Products
             app.get("/all-products/:limits", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const totalLimits = parseInt(req.params.limits);
                 const results = yield productsCollection
-                    .find({})
+                    .find({ status: "active", save_as: "fulfilled" })
                     .sort({ _id: -1 })
                     .limit(totalLimits)
                     .toArray();
@@ -411,10 +466,12 @@ function run() {
                 let inWishlist;
                 let result = yield productsCollection.findOne({
                     slug: product_slug,
+                    status: "active",
+                    save_as: "fulfilled",
                 });
                 if (result) {
                     const policy = yield productPolicy.findOne({});
-                    const existProductInCart = yield cartCollection.findOne({ user_email: email, "product.slug": product_slug }, { "product.$": 1 });
+                    const existProductInCart = yield userCollection.findOne({ email: email, "myCartProduct.slug": product_slug }, { "myCartProduct.$": 1 });
                     const existProductInWishlist = yield userCollection.findOne({ email: email, "wishlist.slug": product_slug }, { "wishlist.$": 1 });
                     if (existProductInWishlist) {
                         inWishlist = true;
@@ -438,6 +495,20 @@ function run() {
                     return res.status(404).send({ message: "Not Found" });
                 }
             }));
+            // fetch single product by id and seller
+            app.get("/api/fetch-single-product-by-pid", (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const productId = req.query.pid;
+                const seller = req.query.seller;
+                try {
+                    return res.status(200).send(yield productsCollection.findOne({
+                        _id: ObjectId(productId),
+                        seller: seller,
+                    }));
+                }
+                catch (error) {
+                    return res.status(500).send({ message: error });
+                }
+            }));
             // fetch product by category
             app.get("/api/product-by-category", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 let findQuery;
@@ -458,12 +529,18 @@ function run() {
                     }
                 }
                 if (productCategory) {
-                    findQuery = { "genre.category": productCategory };
+                    findQuery = {
+                        "genre.category": productCategory,
+                        status: "active",
+                        save_as: "fulfilled",
+                    };
                 }
                 if (productCategory && productSubCategory) {
                     findQuery = {
                         "genre.category": productCategory,
                         "genre.sub_category": productSubCategory,
+                        status: "active",
+                        save_as: "fulfilled",
                     };
                 }
                 if (productCategory && productSubCategory && productPostCategory) {
@@ -471,6 +548,8 @@ function run() {
                         "genre.category": productCategory,
                         "genre.sub_category": productSubCategory,
                         "genre.post_category": productPostCategory,
+                        status: "active",
+                        save_as: "fulfilled",
                     };
                 }
                 const tt = yield productsCollection
@@ -492,6 +571,8 @@ function run() {
                 }, { upsert: true, arrayFilters: [{ "i.orderId": orderId }] });
                 const products = yield productsCollection.findOne({
                     _id: ObjectId(productId),
+                    status: "active",
+                    save_as: "fulfilled",
                 });
                 const point = parseInt(body === null || body === void 0 ? void 0 : body.rating_point);
                 let ratingPoints = (products === null || products === void 0 ? void 0 : products.rating) && (products === null || products === void 0 ? void 0 : products.rating.length) > 0
@@ -552,34 +633,9 @@ function run() {
                     return res.status(200).send({ message: "Thanks for your review !" });
                 }
             }));
-            // fetch my added product in my cart page
-            app.get("/api/my-cart-items", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                var _d;
-                const userEmail = (_d = req.headers.authorization) === null || _d === void 0 ? void 0 : _d.split(" ")[1];
-                if (!userEmail) {
-                    return res
-                        .status(400)
-                        .send({ message: "Bad request! headers missing" });
-                }
-                const result = yield cartCollection.findOne({ user_email: userEmail });
-                if (result) {
-                    const cartProduct = (result === null || result === void 0 ? void 0 : result.product) || [];
-                    let cartTotalPrice = cartProduct
-                        .map((p) => p === null || p === void 0 ? void 0 : p.price_total)
-                        .reduce((a, b) => a + b, 0);
-                    let cartTotalQuantity = cartProduct
-                        .map((p) => p === null || p === void 0 ? void 0 : p.quantity)
-                        .reduce((a, b) => a + b, 0);
-                    let cartTotalDiscount = cartProduct
-                        .map((p) => p === null || p === void 0 ? void 0 : p.discount_amount_total)
-                        .reduce((a, b) => a + b, 0);
-                    yield cartCollection.updateOne({ user_email: userEmail }, { $set: { cartTotalPrice, cartTotalQuantity, cartTotalDiscount } }, { $pull: { product: { stock: "out" } } }, { upsert: true });
-                    res.status(200).send(result);
-                }
-            }));
             // update quantity of product in my-cart
             app.put("/api/update-product-quantity/:cartTypes", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                var _e, _f;
+                var _d;
                 const userEmail = req.decoded.email;
                 const cart_types = req.params.cartTypes;
                 const productId = req.headers.authorization;
@@ -595,57 +651,54 @@ function run() {
                     _id: ObjectId(productId),
                     available: { $gte: 1 },
                     stock: "in",
+                    status: "active",
+                    save_as: "fulfilled",
                 });
                 if (quantity >= (availableProduct === null || availableProduct === void 0 ? void 0 : availableProduct.available) - 1) {
                     return res.status(200).send({
                         message: "Your selected quantity out of range in available product",
                     });
                 }
-                const cart = yield cartCollection.findOne({
-                    user_email: userEmail,
+                const cart = yield userCollection.findOne({
+                    email: userEmail,
                 });
                 if (availableProduct) {
                     if (cart_types === "buy") {
                         updateDocuments = {
                             $set: {
                                 "buy_product.quantity": quantity,
-                                "buy_product.price_total": parseFloat((_e = cart === null || cart === void 0 ? void 0 : cart.buy_product) === null || _e === void 0 ? void 0 : _e.price_fixed) * quantity,
-                                "buy_product.discount_amount_total": parseFloat((_f = cart === null || cart === void 0 ? void 0 : cart.buy_product) === null || _f === void 0 ? void 0 : _f.discount_amount_fixed) *
-                                    quantity,
+                                "buy_product.totalAmount": parseFloat((_d = cart === null || cart === void 0 ? void 0 : cart.buy_product) === null || _d === void 0 ? void 0 : _d.price) * quantity,
                             },
                         };
                         filters = {
-                            user_email: userEmail,
+                            email: userEmail,
                         };
                     }
                     if (cart_types === "toCart") {
-                        const cartProduct = (cart === null || cart === void 0 ? void 0 : cart.product) || [];
-                        let price_total;
-                        let discountTotal;
+                        const cartProduct = (cart === null || cart === void 0 ? void 0 : cart.myCartProduct) || [];
+                        let amount;
                         for (let i = 0; i < cartProduct.length; i++) {
                             let items = cartProduct[i];
                             if ((items === null || items === void 0 ? void 0 : items._id) === productId) {
-                                price_total = (items === null || items === void 0 ? void 0 : items.price_fixed) * quantity;
-                                discountTotal = (items === null || items === void 0 ? void 0 : items.discount_amount_fixed) * quantity;
+                                amount = (items === null || items === void 0 ? void 0 : items.price) * quantity;
                             }
                         }
                         updateDocuments = {
                             $set: {
-                                "product.$.quantity": quantity,
-                                "product.$.price_total": price_total,
-                                "product.$.discount_amount_total": discountTotal,
+                                "myCartProduct.$.quantity": quantity,
+                                "myCartProduct.$.totalAmount": amount,
                             },
                         };
                         filters = {
-                            user_email: userEmail,
-                            "product._id": productId,
+                            email: userEmail,
+                            "myCartProduct._id": productId,
                         };
                     }
-                    const result = yield cartCollection.updateOne(filters, updateDocuments, { upsert: true });
+                    const result = yield userCollection.updateOne(filters, updateDocuments, { upsert: true });
                     return res.status(200).send(result);
                 }
                 else {
-                    yield cartCollection.updateOne({ user_email: userEmail }, { $pull: { product: { _id: productId } } });
+                    yield userCollection.updateOne({ email: userEmail }, { $pull: { myCartProduct: { _id: productId } } });
                     return res.status(200).send({
                         message: "This product is out of stock now and removed from your cart",
                     });
@@ -663,10 +716,10 @@ function run() {
                         .send({ message: "Bad request! headers missing" });
                 }
                 if (cart_types === "buy") {
-                    updateDocuments = yield cartCollection.updateOne({ user_email: userEmail }, { $unset: { buy_product: "" } });
+                    updateDocuments = yield userCollection.updateOne({ email: userEmail }, { $unset: { buy_product: "" } });
                 }
                 else {
-                    updateDocuments = yield cartCollection.updateOne({ user_email: userEmail }, { $pull: { product: { _id: productId } } });
+                    updateDocuments = yield userCollection.updateOne({ email: userEmail }, { $pull: { myCartProduct: { _id: productId } } });
                 }
                 res
                     .status(200)
@@ -720,29 +773,24 @@ function run() {
             app.put("/api/add-to-cart", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.decoded.email;
                 const body = req.body;
-                const options = { upsert: true };
-                const query = { user_email: email };
                 const availableProduct = yield productsCollection.findOne({
                     _id: ObjectId(body === null || body === void 0 ? void 0 : body._id),
+                    status: "active",
+                    save_as: "fulfilled",
                 });
                 if ((availableProduct === null || availableProduct === void 0 ? void 0 : availableProduct.stock) === "in" &&
                     (availableProduct === null || availableProduct === void 0 ? void 0 : availableProduct.available) > 0) {
-                    const existsProduct = yield cartCollection.findOne({
-                        user_email: email,
-                        "product._id": body === null || body === void 0 ? void 0 : body._id,
-                    }, {
-                        "product.$": 1,
-                    });
+                    const existsProduct = yield userCollection.findOne({ email: email, "myCartProduct._id": body === null || body === void 0 ? void 0 : body._id }, { "myCartProduct.$": 1 });
                     if (existsProduct) {
                         return res
                             .status(200)
                             .send({ message: "Product Has Already In Your Cart" });
                     }
                     else {
-                        const up = {
-                            $push: { product: body },
-                        };
-                        const cartRes = yield cartCollection.updateOne(query, up, options);
+                        body["addedAt"] = new Date(Date.now());
+                        const cartRes = yield userCollection.updateOne({ email: email }, {
+                            $push: { myCartProduct: body },
+                        }, { upsert: true });
                         res.status(200).send({
                             data: cartRes,
                             message: "Product Successfully Added To Your Cart",
@@ -754,21 +802,21 @@ function run() {
             app.put("/api/add-buy-product", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const userEmail = req.decoded.email;
                 const body = req.body;
-                const cartRes = yield cartCollection.updateOne({ user_email: userEmail }, { $set: { buy_product: body } }, { upsert: true });
+                const cartRes = yield userCollection.updateOne({ email: userEmail }, { $set: { buy_product: body } }, { upsert: true });
                 res.status(200).send(cartRes);
             }));
             // inserting address in cart
             app.post("/api/add-cart-address", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const userEmail = req.decoded.email;
                 const body = req.body;
-                const result = yield cartCollection.updateOne({ user_email: userEmail }, { $push: { address: body } }, { upsert: true });
+                const result = yield userCollection.updateOne({ email: userEmail }, { $push: { address: body } }, { upsert: true });
                 res.send(result);
             }));
             // order address add api
             app.put("/api/update-cart-address", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const userEmail = req.decoded.email;
                 const body = req.body;
-                const result = yield cartCollection.updateOne({ user_email: userEmail }, {
+                const result = yield userCollection.updateOne({ email: userEmail }, {
                     $set: {
                         "address.$[i]": body,
                     },
@@ -779,11 +827,11 @@ function run() {
             app.put("/api/select-address", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const userEmail = req.decoded.email;
                 const { addressId, select_address } = req.body;
-                const addr = yield cartCollection.findOne({ user_email: userEmail });
+                const addr = yield userCollection.findOne({ email: userEmail });
                 if (addr) {
                     const addressArr = addr === null || addr === void 0 ? void 0 : addr.address;
                     if (addressArr && addressArr.length > 0) {
-                        yield cartCollection.updateOne({ user_email: userEmail }, {
+                        yield userCollection.updateOne({ email: userEmail }, {
                             $set: {
                                 "address.$[j].select_address": false,
                             },
@@ -793,7 +841,7 @@ function run() {
                         });
                     }
                 }
-                let result = yield cartCollection.updateOne({ user_email: userEmail }, {
+                let result = yield userCollection.updateOne({ email: userEmail }, {
                     $set: {
                         "address.$[i].select_address": select_address,
                     },
@@ -804,7 +852,7 @@ function run() {
             app.delete("/api/delete-cart-address/:addressId", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const email = req.decoded.email;
                 const addressId = parseInt(req.params.addressId);
-                const result = yield cartCollection.updateOne({ user_email: email }, { $pull: { address: { addressId } } });
+                const result = yield userCollection.updateOne({ email: email }, { $pull: { address: { addressId } } });
                 if (result)
                     return res.send(result);
             }));
@@ -836,11 +884,18 @@ function run() {
                 res.send(yield orderCollection.findOne({ user_email: email }));
             }));
             // cancel orders from admin
-            app.delete("/api/remove-order/:orderId", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const email = req.decoded.email;
+            app.delete("/api/remove-order/:email/:orderId/", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                const orderUserEmail = req.params.email;
                 const id = parseInt(req.params.orderId);
-                const result = yield orderCollection.updateOne({ user_email: email }, { $pull: { orders: { orderId: id } } });
-                res.status(200).send({ result, message: "Order Removed successfully" });
+                try {
+                    const result = yield orderCollection.updateOne({ user_email: orderUserEmail }, { $pull: { orders: { orderId: id } } });
+                    res
+                        .status(200)
+                        .send({ result, message: "Order Removed successfully" });
+                }
+                catch (error) {
+                    res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+                }
             }));
             // cancel my orders
             app.put("/api/cancel-my-order/:userEmail/:orderId", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -902,6 +957,8 @@ function run() {
                     if (productId) {
                         let product = yield productsCollection.findOne({
                             _id: ObjectId(productId),
+                            status: "active",
+                            save_as: "fulfilled",
                         });
                         let available = parseInt(product === null || product === void 0 ? void 0 : product.available) - parseInt(quantity);
                         let top_sell = (parseInt(product === null || product === void 0 ? void 0 : product.top_sell) || 0) + parseInt(quantity);
@@ -913,14 +970,14 @@ function run() {
                             stock = "out";
                         }
                         yield productsCollection.updateOne({ _id: ObjectId(productId) }, { $set: { available, stock, top_sell } }, { upsert: true });
-                        const cartProduct = (yield cartCollection
-                            .find({ "product._id": productId })
+                        const cartProduct = (yield userCollection
+                            .find({ "myCartProduct._id": productId })
                             .toArray()) || [];
                         if (cartProduct.length > 0) {
-                            yield cartCollection.updateMany({ "product._id": productId }, {
+                            yield userCollection.updateMany({ "myCartProduct._id": productId }, {
                                 $set: {
-                                    "product.$.stock": stock,
-                                    "product.$.available": available,
+                                    "myCartProduct.$.stock": stock,
+                                    "myCartProduct.$.available": available,
                                 },
                             }, { upsert: true });
                         }
@@ -939,12 +996,6 @@ function run() {
                     },
                 }, { arrayFilters: [{ "i.orderId": orderId }] })) && { message: "Successfully order dispatched" });
             }));
-            // get order list
-            app.get("/api/checkout/:cartId", (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const cartId = req.params.cartId;
-                const result = yield cartCollection.findOne({ _id: ObjectId(cartId) });
-                res.send(result);
-            }));
             /// find orderId
             app.get("/manage-orders", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const seller = req.query.seller;
@@ -955,10 +1006,7 @@ function run() {
                         { $unwind: "$orders" },
                         {
                             $match: {
-                                $and: [
-                                    { "orders.dispatch": true },
-                                    { "orders.seller": seller },
-                                ],
+                                $and: [{ "orders.seller": seller }],
                             },
                         },
                     ])
@@ -969,21 +1017,31 @@ function run() {
             // fetch top selling product in my dashboard
             app.get("/api/fetch-top-selling-product", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const seller = req.query.seller;
-                let result;
+                let filterQuery = {
+                    status: "active",
+                    save_as: "fulfilled",
+                };
                 if (seller) {
-                    result = yield productsCollection
-                        .find({ seller: seller })
-                        .sort({ top_sell: -1 })
-                        .limit(6)
-                        .toArray();
+                    filterQuery["seller"] = seller;
                 }
-                else {
-                    result = yield productsCollection
-                        .find({})
-                        .sort({ top_sell: -1 })
-                        .limit(6)
-                        .toArray();
-                }
+                const result = yield productsCollection
+                    .find(filterQuery)
+                    .sort({ top_sell: -1 })
+                    .limit(6)
+                    .toArray();
+                // if (seller) {
+                //   result = await productsCollection
+                //     .find({ seller: seller, status: "active", save_as: "fulfilled" })
+                //     .sort({ top_sell: -1 })
+                //     .limit(6)
+                //     .toArray();
+                // } else {
+                //   result = await productsCollection
+                //     .find({ status: "active", save_as: "fulfilled" })
+                //     .sort({ top_sell: -1 })
+                //     .limit(6)
+                //     .toArray();
+                // }
                 res.status(200).send(result);
             }));
         }

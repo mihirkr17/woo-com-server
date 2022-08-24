@@ -1,6 +1,12 @@
 import express, { Express, Request, Response } from "express";
 const { dbh } = require("./database/db");
+const { errorHandlers } = require("./errors/errors");
 const cookieParser = require("cookie-parser");
+const {
+  verifyJWT,
+  verifyAuth,
+  verifySeller,
+} = require("./authentication/auth");
 
 // Server setup
 const { ObjectId } = require("mongodb");
@@ -20,98 +26,14 @@ app.use(cookieParser());
 app.use(express.json());
 const port = process.env.PORT || 5000;
 
-// verifying jwt token
-const verifyJWT = async (req: Request, res: Response, next: any) => {
-  // const authHeader = req.headers.authorization;
-  // if (!authHeader) return res.status(403).send({ message: "Forbidden" });
-  const token = req.cookies.token;
-  // const token = authHeader.split(" ")[1];
-
-  if (token) {
-    jwt.verify(
-      token,
-      process.env.ACCESS_TOKEN,
-      function (err: any, decoded: any) {
-        if (err) {
-          res.clearCookie("token");
-          return res.status(401).send({
-            message: err.message,
-          });
-        }
-        req.decoded = decoded;
-        next();
-      }
-    );
-  } else {
-    return res.status(403).send({ message: "Forbidden" });
-  }
-};
-
 async function run() {
   try {
     // product collection
     await dbh.connect();
     const productsCollection = dbh.db("Products").collection("product");
-    const cartCollection = dbh.db("Products").collection("cart");
     const orderCollection = dbh.db("Products").collection("orders");
     const userCollection = dbh.db("Users").collection("user");
     const productPolicy = dbh.db("Products").collection("policy");
-
-    // // verify owner
-    const verifyAuth = async (req: Request, res: Response, next: any) => {
-      const authEmail = req.decoded.email;
-      const findAuthInDB = await userCollection.findOne({
-        email: authEmail && authEmail,
-      });
-
-      if (findAuthInDB.role === "owner" || findAuthInDB.role === "admin") {
-        next();
-      } else {
-        res.status(403).send({ message: "Forbidden" });
-      }
-    };
-
-    // verify seller
-    const verifySeller = async (req: Request, res: Response, next: any) => {
-      const authEmail = req.decoded.email;
-      const findAuthInDB = await userCollection.findOne({
-        email: authEmail && authEmail,
-      });
-
-      if (findAuthInDB.role === "seller") {
-        next();
-      } else {
-        res.status(403).send({ message: "Forbidden" });
-      }
-    };
-
-    /// privacy policy fetch
-    app.get("/api/privacy-policy", async (req: Request, res: Response) => {
-      res.status(200).send(await productPolicy.findOne({}));
-    });
-
-    /// update policy
-    app.put(
-      "/api/update-policy/:policyId",
-      verifyJWT,
-      async (req: Request, res: Response) => {
-        const policyId: string = req.params.policyId;
-        const body = req.body;
-        const result = await productPolicy.updateOne(
-          { _id: ObjectId(policyId) },
-          { $set: body },
-          { upsert: true }
-        );
-
-        if (result) {
-          return res
-            .status(200)
-            .send({ message: "Policy updated successfully" });
-        } else {
-          return res.status(400).send({ message: "Update failed" });
-        }
-      }
-    );
 
     /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     ++++++++++ Authorization api request endpoints Start ++++++++++++
@@ -120,39 +42,42 @@ async function run() {
     app.put("/api/sign-user", async (req: Request, res: Response) => {
       const authEmail = req.headers.authorization?.split(" ")[1];
       const { name } = req.body;
-
-      if (!authEmail) {
-        return res.status(400).send({ message: "Bad request" });
-      }
-
-      const token = jwt.sign({ email: authEmail }, process.env.ACCESS_TOKEN, {
-        algorithm: "HS256",
-        expiresIn: "1h",
-      });
-
-      const cookieObject: any = {
-        // sameSite: "none",
-        // secure: true,
-        maxAge: 3600000,
-        httpOnly: true,
-      };
-
-      if (authEmail) {
-        const existsUser = await userCollection.findOne({ email: authEmail });
-
-        if (existsUser) {
-          res.cookie("token", token, cookieObject);
-          return res.status(200).send({ message: "Login success" });
-        } else {
-          await userCollection.updateOne(
-            { email: authEmail },
-            { $set: { email: authEmail, displayName: name, role: "user" } },
-            { upsert: true }
-          );
-
-          res.cookie("token", token, cookieObject);
-          return res.status(200).send({ message: "Login success" });
+      try {
+        if (!authEmail) {
+          return res.status(400).send({ message: "Bad request" });
         }
+
+        const token = jwt.sign({ email: authEmail }, process.env.ACCESS_TOKEN, {
+          algorithm: "HS256",
+          expiresIn: "1h",
+        });
+
+        const cookieObject: any = {
+          sameSite: "none",
+          secure: true,
+          maxAge: 3600000,
+          httpOnly: true,
+        };
+
+        if (authEmail) {
+          const existsUser = await userCollection.findOne({ email: authEmail });
+
+          if (existsUser) {
+            res.cookie("token", token, cookieObject);
+            return res.status(200).send({ message: "Login success" });
+          } else {
+            await userCollection.updateOne(
+              { email: authEmail },
+              { $set: { email: authEmail, displayName: name, role: "user" } },
+              { upsert: true }
+            );
+
+            res.cookie("token", token, cookieObject);
+            return res.status(200).send({ message: "Login success" });
+          }
+        }
+      } catch (error: any) {
+        res.status(500).send({ message: error.message });
       }
     });
 
@@ -160,11 +85,22 @@ async function run() {
     app.get("/api/fetch-auth-user/", async (req: Request, res: Response) => {
       const authEmail = req.headers.authorization?.split(" ")[1];
 
-      if (authEmail) {
-        const result = await userCollection.findOne({ email: authEmail });
-        return res.status(200).send({ result });
-      } else {
-        return res.status(403).send({ message: "Forbidden. Email not found" });
+      try {
+        if (authEmail) {
+          await userCollection.updateOne(
+            { email: authEmail },
+            { $pull: { myCartProduct: { stock: "out" } } },
+            { upsert: true }
+          );
+          const result = await userCollection.findOne({ email: authEmail });
+          return res.status(200).send({ result });
+        } else {
+          return res
+            .status(403)
+            .send({ message: "Forbidden. Email not found" });
+        }
+      } catch (error: any) {
+        res.status(500).send({ message: error.message });
       }
     });
 
@@ -211,6 +147,34 @@ async function run() {
     ++++++++++ Authorization api request endpoints End ++++++++++++
     +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
+    /// privacy policy fetch
+    app.get("/api/privacy-policy", async (req: Request, res: Response) => {
+      res.status(200).send(await productPolicy.findOne({}));
+    });
+
+    /// update policy
+    app.put(
+      "/api/update-policy/:policyId",
+      verifyJWT,
+      async (req: Request, res: Response) => {
+        const policyId: string = req.params.policyId;
+        const body = req.body;
+        const result = await productPolicy.updateOne(
+          { _id: ObjectId(policyId) },
+          { $set: body },
+          { upsert: true }
+        );
+
+        if (result) {
+          return res
+            .status(200)
+            .send({ message: "Policy updated successfully" });
+        } else {
+          return res.status(400).send({ message: "Update failed" });
+        }
+      }
+    );
+
     // search product api
     app.get("/api/search-products/:q", async (req: Request, res: Response) => {
       const q = req.params.q;
@@ -238,8 +202,8 @@ async function run() {
           .status(200)
           .send(
             await productsCollection
-              .find({})
-              .sort({ rating_average: -1, top_sell: -1 })
+              .find({ status: "active", save_as: "fulfilled" })
+              .sort({ rating_average: -1 })
               .limit(6)
               .toArray()
           );
@@ -287,25 +251,31 @@ async function run() {
 
       page = parseInt(page) === 1 ? 0 : parseInt(page) - 1;
 
-      cursor =
-        searchText && searchText.length > 0
-          ? productsCollection.find(searchQuery(searchText, seller_name || ""))
-          : filters && filters !== "all"
-          ? productsCollection.find(filterQuery(filters, seller_name || ""))
-          : productsCollection.find(
-              (seller_name && { seller: seller_name }) || {}
-            );
+      try {
+        cursor =
+          searchText && searchText.length > 0
+            ? productsCollection.find(
+                searchQuery(searchText, seller_name || "")
+              )
+            : filters && filters !== "all"
+            ? productsCollection.find(filterQuery(filters, seller_name || ""))
+            : productsCollection.find(
+                (seller_name && { seller: seller_name }) || {}
+              );
 
-      if (item || page) {
-        result = await cursor
-          .skip(page * parseInt(item))
-          .limit(parseInt(item))
-          .toArray();
-      } else {
-        result = await cursor.toArray();
+        if (item || page) {
+          result = await cursor
+            .skip(page * parseInt(item))
+            .limit(parseInt(item))
+            .toArray();
+        } else {
+          result = await cursor.toArray();
+        }
+
+        res.status(200).send(result);
+      } catch (error: any) {
+        res.status(500).send({ message: error?.message });
       }
-
-      res.status(200).send(result);
     });
 
     // product count
@@ -323,20 +293,24 @@ async function run() {
       verifyJWT,
       async (req: Request, res: Response) => {
         const productId: string = req.params.productId;
-        const result = await productsCollection.deleteOne({
-          _id: ObjectId(productId),
-        });
+        try {
+          const result = await productsCollection.deleteOne({
+            _id: ObjectId(productId),
+          });
 
-        if (result) {
-          await cartCollection.updateMany(
-            { "product._id": productId },
-            { $pull: { product: { _id: productId } } }
-          );
-          return res
-            .status(200)
-            .send({ message: "Product deleted successfully." });
-        } else {
-          return res.status(503).send({ message: "Service unavailable" });
+          if (result) {
+            await userCollection.updateMany(
+              { "myCartProduct._id": productId },
+              { $pull: { myCartProduct: { _id: productId } } }
+            );
+            return res
+              .status(200)
+              .send({ message: "Product deleted successfully." });
+          } else {
+            return res.status(503).send({ message: "Service unavailable" });
+          }
+        } catch (error: any) {
+          res.status(500).send({ message: error?.message });
         }
       }
     );
@@ -348,24 +322,56 @@ async function run() {
       async (req: Request, res: Response) => {
         const productId = req.params.productId;
         const body = req.body;
+        let available = parseInt(body?.available);
+        const newDate = new Date().toLocaleString();
 
-        let available = body?.available;
+        let productModel: any = {
+          title: body?.title || "",
+          slug: body?.slug || "",
+          image: body?.images || [],
+          info: {
+            description: body?.description || "",
+            short_description: body?.short_description || "",
+            specification: body?.specification || "",
+            size: body?.size || [],
+          },
+          price: parseFloat(body?.price || 0),
+          price_fixed: body?.price_fixed || 0,
+          discount: parseFloat(body?.discount || 0),
+          discount_amount_fixed: body?.discount_amount_fixed || 0,
+          available,
+          package_dimension: {
+            weight: parseFloat(body?.packageWeight || 0),
+            length: parseFloat(body?.packageLength || 0),
+            width: parseFloat(body?.packageWidth || 0),
+            height: parseFloat(body?.packageHeight || 0),
+          },
+          delivery_service: {
+            in_box: body?.inBox || "",
+          },
+          payment_option: body?.payment_option,
+          sku: body?.sku || "",
+          status: body?.status || "",
+          save_as: "fulfilled",
+          modifiedAt: newDate,
+        };
 
         if (available && available >= 1) {
-          body["stock"] = "in";
+          productModel["stock"] = "in";
         } else {
-          body["stock"] = "out";
+          productModel["stock"] = "out";
         }
 
         const exists =
-          (await cartCollection.find({ "product._id": productId }).toArray()) ||
-          [];
+          (await userCollection
+            .find({ "myCartProduct._id": productId })
+            .toArray()) || [];
 
         if (exists && exists.length > 0) {
-          await cartCollection.updateMany(
-            { "product._id": productId },
+          await userCollection.updateMany(
+            { "myCartProduct._id": productId },
             {
-              $pull: { product: { _id: productId } },
+              $pull: { myCartProduct: { _id: productId } },
             }
           );
         }
@@ -373,7 +379,7 @@ async function run() {
         const result = await productsCollection.updateOne(
           { _id: ObjectId(productId) },
           {
-            $set: body,
+            $set: productModel,
           },
           { upsert: true }
         );
@@ -398,12 +404,6 @@ async function run() {
         res.status(200).send(result);
       }
     );
-
-    // fetch myProfile data in my profile page
-    app.get("/my-profile/:email", async (req: Request, res: Response) => {
-      const email = req.params.email;
-      res.status(200).send(await userCollection.findOne({ email: email }));
-    });
 
     // make admin request
     app.put(
@@ -521,14 +521,67 @@ async function run() {
       verifyJWT,
       async (req: Request, res: Response) => {
         const body = req.body;
-        let available = body?.available;
+        try {
+          let available = body?.available || 0;
+          const newDate = new Date();
 
-        if (available && available >= 1) {
-          body["stock"] = "in";
-        } else {
-          body["stock"] = "out";
+          let productModel: any = {
+            title: body?.title || "",
+            slug: body?.slug || "",
+            brand: body?.brand || "",
+            image: body?.images || [],
+            info: {
+              description: body?.description || "",
+              short_description: body?.short_description || "",
+              specification: body?.specification || "",
+              size: body?.size || [],
+            },
+            price: parseFloat(body?.price || 0),
+            price_fixed: body?.price_fixed || 0,
+            discount: parseFloat(body?.discount || 0),
+            discount_amount_fixed: body?.discount_amount_fixed || 0,
+            available: parseInt(body?.available || 0),
+            package_dimension: {
+              weight: parseFloat(body?.packageWeight || 0),
+              length: parseFloat(body?.packageLength || 0),
+              width: parseFloat(body?.packageWidth || 0),
+              height: parseFloat(body?.packageHeight || 0),
+            },
+            delivery_service: {
+              in_box: body?.inBox || "",
+            },
+            payment_option: body?.payment_option,
+            sku: body?.sku || "",
+            status: body?.status || "",
+            save_as: "fulfilled",
+
+            genre: {
+              category: body?.category || "", // category
+              sub_category: body?.subCategory || "", // sub category
+              post_category: body?.postCategory || "", // third category
+            },
+            seller: body?.seller || "unknown",
+            rating: [
+              { weight: 5, count: 0 },
+              { weight: 4, count: 0 },
+              { weight: 3, count: 0 },
+              { weight: 2, count: 0 },
+              { weight: 1, count: 0 },
+            ],
+            rating_average: 0,
+            createAt: newDate.toLocaleString(),
+          };
+
+          if (available && available >= 1) {
+            productModel["stock"] = "in";
+          } else {
+            productModel["stock"] = "out";
+          }
+          await productsCollection.insertOne(productModel);
+          res.status(200).send({ message: "Product added successfully" });
+        } catch (error: any) {
+          res.status(500).send({ message: error.message });
         }
-        res.status(200).send(await productsCollection.insertOne(body));
       }
     );
 
@@ -536,7 +589,7 @@ async function run() {
     app.get("/all-products/:limits", async (req: Request, res: Response) => {
       const totalLimits = parseInt(req.params.limits);
       const results = await productsCollection
-        .find({})
+        .find({ status: "active", save_as: "fulfilled" })
         .sort({ _id: -1 })
         .limit(totalLimits)
         .toArray();
@@ -555,14 +608,16 @@ async function run() {
 
         let result = await productsCollection.findOne({
           slug: product_slug,
+          status: "active",
+          save_as: "fulfilled",
         });
 
         if (result) {
           const policy = await productPolicy.findOne({});
 
-          const existProductInCart = await cartCollection.findOne(
-            { user_email: email, "product.slug": product_slug },
-            { "product.$": 1 }
+          const existProductInCart = await userCollection.findOne(
+            { email: email, "myCartProduct.slug": product_slug },
+            { "myCartProduct.$": 1 }
           );
 
           const existProductInWishlist = await userCollection.findOne(
@@ -591,9 +646,29 @@ async function run() {
       }
     );
 
+    // fetch single product by id and seller
+    app.get(
+      "/api/fetch-single-product-by-pid",
+      async (req: Request, res: Response) => {
+        const productId = req.query.pid;
+        const seller = req.query.seller;
+
+        try {
+          return res.status(200).send(
+            await productsCollection.findOne({
+              _id: ObjectId(productId),
+              seller: seller,
+            })
+          );
+        } catch (error) {
+          return res.status(500).send({ message: error });
+        }
+      }
+    );
+
     // fetch product by category
     app.get("/api/product-by-category", async (req: Request, res: Response) => {
-      let findQuery;
+      let findQuery: any;
       const productCategory = req.query.category;
       const productSubCategory = req.query.sb_category;
       const productPostCategory = req.query.pt_category;
@@ -611,13 +686,19 @@ async function run() {
       }
 
       if (productCategory) {
-        findQuery = { "genre.category": productCategory };
+        findQuery = {
+          "genre.category": productCategory,
+          status: "active",
+          save_as: "fulfilled",
+        };
       }
 
       if (productCategory && productSubCategory) {
         findQuery = {
           "genre.category": productCategory,
           "genre.sub_category": productSubCategory,
+          status: "active",
+          save_as: "fulfilled",
         };
       }
 
@@ -626,6 +707,8 @@ async function run() {
           "genre.category": productCategory,
           "genre.sub_category": productSubCategory,
           "genre.post_category": productPostCategory,
+          status: "active",
+          save_as: "fulfilled",
         };
       }
 
@@ -658,6 +741,8 @@ async function run() {
 
         const products = await productsCollection.findOne({
           _id: ObjectId(productId),
+          status: "active",
+          save_as: "fulfilled",
         });
 
         const point = parseInt(body?.rating_point);
@@ -734,43 +819,6 @@ async function run() {
       }
     );
 
-    // fetch my added product in my cart page
-    app.get("/api/my-cart-items", async (req: Request, res: Response) => {
-      const userEmail = req.headers.authorization?.split(" ")[1];
-
-      if (!userEmail) {
-        return res
-          .status(400)
-          .send({ message: "Bad request! headers missing" });
-      }
-
-      const result = await cartCollection.findOne({ user_email: userEmail });
-
-      if (result) {
-        const cartProduct = result?.product || [];
-
-        let cartTotalPrice = cartProduct
-          .map((p: any) => p?.price_total)
-          .reduce((a: number, b: number) => a + b, 0);
-
-        let cartTotalQuantity = cartProduct
-          .map((p: any) => p?.quantity)
-          .reduce((a: number, b: number) => a + b, 0);
-
-        let cartTotalDiscount = cartProduct
-          .map((p: any) => p?.discount_amount_total)
-          .reduce((a: number, b: number) => a + b, 0);
-
-        await cartCollection.updateOne(
-          { user_email: userEmail },
-          { $set: { cartTotalPrice, cartTotalQuantity, cartTotalDiscount } },
-          { $pull: { product: { stock: "out" } } },
-          { upsert: true }
-        );
-        res.status(200).send(result);
-      }
-    });
-
     // update quantity of product in my-cart
     app.put(
       "/api/update-product-quantity/:cartTypes",
@@ -793,6 +841,8 @@ async function run() {
           _id: ObjectId(productId),
           available: { $gte: 1 },
           stock: "in",
+          status: "active",
+          save_as: "fulfilled",
         });
 
         if (quantity >= availableProduct?.available - 1) {
@@ -801,8 +851,8 @@ async function run() {
           });
         }
 
-        const cart = await cartCollection.findOne({
-          user_email: userEmail,
+        const cart = await userCollection.findOne({
+          email: userEmail,
         });
 
         if (availableProduct) {
@@ -810,56 +860,50 @@ async function run() {
             updateDocuments = {
               $set: {
                 "buy_product.quantity": quantity,
-                "buy_product.price_total":
-                  parseFloat(cart?.buy_product?.price_fixed) * quantity,
-                "buy_product.discount_amount_total":
-                  parseFloat(cart?.buy_product?.discount_amount_fixed) *
-                  quantity,
+                "buy_product.totalAmount":
+                  parseFloat(cart?.buy_product?.price) * quantity,
               },
             };
 
             filters = {
-              user_email: userEmail,
+              email: userEmail,
             };
           }
 
           if (cart_types === "toCart") {
-            const cartProduct = cart?.product || [];
-            let price_total;
-            let discountTotal;
+            const cartProduct = cart?.myCartProduct || [];
+            let amount;
 
             for (let i = 0; i < cartProduct.length; i++) {
               let items = cartProduct[i];
               if (items?._id === productId) {
-                price_total = items?.price_fixed * quantity;
-                discountTotal = items?.discount_amount_fixed * quantity;
+                amount = items?.price * quantity;
               }
             }
 
             updateDocuments = {
               $set: {
-                "product.$.quantity": quantity,
-                "product.$.price_total": price_total,
-                "product.$.discount_amount_total": discountTotal,
+                "myCartProduct.$.quantity": quantity,
+                "myCartProduct.$.totalAmount": amount,
               },
             };
 
             filters = {
-              user_email: userEmail,
-              "product._id": productId,
+              email: userEmail,
+              "myCartProduct._id": productId,
             };
           }
 
-          const result = await cartCollection.updateOne(
+          const result = await userCollection.updateOne(
             filters,
             updateDocuments,
             { upsert: true }
           );
           return res.status(200).send(result);
         } else {
-          await cartCollection.updateOne(
-            { user_email: userEmail },
-            { $pull: { product: { _id: productId } } }
+          await userCollection.updateOne(
+            { email: userEmail },
+            { $pull: { myCartProduct: { _id: productId } } }
           );
           return res.status(200).send({
             message:
@@ -886,14 +930,14 @@ async function run() {
         }
 
         if (cart_types === "buy") {
-          updateDocuments = await cartCollection.updateOne(
-            { user_email: userEmail },
+          updateDocuments = await userCollection.updateOne(
+            { email: userEmail },
             { $unset: { buy_product: "" } }
           );
         } else {
-          updateDocuments = await cartCollection.updateOne(
-            { user_email: userEmail },
-            { $pull: { product: { _id: productId } } }
+          updateDocuments = await userCollection.updateOne(
+            { email: userEmail },
+            { $pull: { myCartProduct: { _id: productId } } }
           );
         }
 
@@ -975,25 +1019,20 @@ async function run() {
       async (req: Request, res: Response) => {
         const email: string = req.decoded.email;
         const body = req.body;
-        const options = { upsert: true };
-        const query = { user_email: email };
 
         const availableProduct = await productsCollection.findOne({
           _id: ObjectId(body?._id),
+          status: "active",
+          save_as: "fulfilled",
         });
 
         if (
           availableProduct?.stock === "in" &&
           availableProduct?.available > 0
         ) {
-          const existsProduct = await cartCollection.findOne(
-            {
-              user_email: email,
-              "product._id": body?._id,
-            },
-            {
-              "product.$": 1,
-            }
+          const existsProduct = await userCollection.findOne(
+            { email: email, "myCartProduct._id": body?._id },
+            { "myCartProduct.$": 1 }
           );
 
           if (existsProduct) {
@@ -1001,11 +1040,15 @@ async function run() {
               .status(200)
               .send({ message: "Product Has Already In Your Cart" });
           } else {
-            const up = {
-              $push: { product: body },
-            };
+            body["addedAt"] = new Date(Date.now());
 
-            const cartRes = await cartCollection.updateOne(query, up, options);
+            const cartRes = await userCollection.updateOne(
+              { email: email },
+              {
+                $push: { myCartProduct: body },
+              },
+              { upsert: true }
+            );
             res.status(200).send({
               data: cartRes,
               message: "Product Successfully Added To Your Cart",
@@ -1022,8 +1065,8 @@ async function run() {
       async (req: Request, res: Response) => {
         const userEmail = req.decoded.email;
         const body = req.body;
-        const cartRes = await cartCollection.updateOne(
-          { user_email: userEmail },
+        const cartRes = await userCollection.updateOne(
+          { email: userEmail },
           { $set: { buy_product: body } },
           { upsert: true }
         );
@@ -1038,8 +1081,8 @@ async function run() {
       async (req: Request, res: Response) => {
         const userEmail = req.decoded.email;
         const body = req.body;
-        const result = await cartCollection.updateOne(
-          { user_email: userEmail },
+        const result = await userCollection.updateOne(
+          { email: userEmail },
           { $push: { address: body } },
           { upsert: true }
         );
@@ -1055,8 +1098,8 @@ async function run() {
         const userEmail = req.decoded.email;
         const body = req.body;
 
-        const result = await cartCollection.updateOne(
-          { user_email: userEmail },
+        const result = await userCollection.updateOne(
+          { email: userEmail },
           {
             $set: {
               "address.$[i]": body,
@@ -1076,13 +1119,13 @@ async function run() {
         const userEmail = req.decoded.email;
         const { addressId, select_address } = req.body;
 
-        const addr = await cartCollection.findOne({ user_email: userEmail });
+        const addr = await userCollection.findOne({ email: userEmail });
         if (addr) {
           const addressArr = addr?.address;
 
           if (addressArr && addressArr.length > 0) {
-            await cartCollection.updateOne(
-              { user_email: userEmail },
+            await userCollection.updateOne(
+              { email: userEmail },
               {
                 $set: {
                   "address.$[j].select_address": false,
@@ -1096,8 +1139,8 @@ async function run() {
           }
         }
 
-        let result = await cartCollection.updateOne(
-          { user_email: userEmail },
+        let result = await userCollection.updateOne(
+          { email: userEmail },
           {
             $set: {
               "address.$[i].select_address": select_address,
@@ -1116,8 +1159,8 @@ async function run() {
       async (req: Request, res: Response) => {
         const email = req.decoded.email;
         const addressId = parseInt(req.params.addressId);
-        const result = await cartCollection.updateOne(
-          { user_email: email },
+        const result = await userCollection.updateOne(
+          { email: email },
           { $pull: { address: { addressId } } }
         );
         if (result) return res.send(result);
@@ -1164,18 +1207,24 @@ async function run() {
 
     // cancel orders from admin
     app.delete(
-      "/api/remove-order/:orderId",
+      "/api/remove-order/:email/:orderId/",
       verifyJWT,
       async (req: Request, res: Response) => {
-        const email = req.decoded.email;
+        const orderUserEmail = req.params.email;
         const id = parseInt(req.params.orderId);
 
-        const result = await orderCollection.updateOne(
-          { user_email: email },
-          { $pull: { orders: { orderId: id } } }
-        );
+        try {
+          const result = await orderCollection.updateOne(
+            { user_email: orderUserEmail },
+            { $pull: { orders: { orderId: id } } }
+          );
 
-        res.status(200).send({ result, message: "Order Removed successfully" });
+          res
+            .status(200)
+            .send({ result, message: "Order Removed successfully" });
+        } catch (error: any) {
+          res.status(500).send({ message: error?.message });
+        }
       }
     );
 
@@ -1266,6 +1315,8 @@ async function run() {
           if (productId) {
             let product = await productsCollection.findOne({
               _id: ObjectId(productId),
+              status: "active",
+              save_as: "fulfilled",
             });
             let available = parseInt(product?.available) - parseInt(quantity);
             let top_sell =
@@ -1285,17 +1336,17 @@ async function run() {
             );
 
             const cartProduct =
-              (await cartCollection
-                .find({ "product._id": productId })
+              (await userCollection
+                .find({ "myCartProduct._id": productId })
                 .toArray()) || [];
 
             if (cartProduct.length > 0) {
-              await cartCollection.updateMany(
-                { "product._id": productId },
+              await userCollection.updateMany(
+                { "myCartProduct._id": productId },
                 {
                   $set: {
-                    "product.$.stock": stock,
-                    "product.$.available": available,
+                    "myCartProduct.$.stock": stock,
+                    "myCartProduct.$.available": available,
                   },
                 },
                 { upsert: true }
@@ -1335,13 +1386,6 @@ async function run() {
       }
     );
 
-    // get order list
-    app.get("/api/checkout/:cartId", async (req: Request, res: Response) => {
-      const cartId = req.params.cartId;
-      const result = await cartCollection.findOne({ _id: ObjectId(cartId) });
-      res.send(result);
-    });
-
     /// find orderId
     app.get("/manage-orders", async (req: Request, res: Response) => {
       const seller = req.query.seller;
@@ -1353,10 +1397,7 @@ async function run() {
             { $unwind: "$orders" },
             {
               $match: {
-                $and: [
-                  { "orders.dispatch": true },
-                  { "orders.seller": seller },
-                ],
+                $and: [{ "orders.seller": seller }],
               },
             },
           ])
@@ -1371,21 +1412,33 @@ async function run() {
       "/api/fetch-top-selling-product",
       async (req: Request, res: Response) => {
         const seller: any = req.query.seller;
-        let result: any;
-
+        let filterQuery: any = {
+          status: "active",
+          save_as: "fulfilled",
+        };
         if (seller) {
-          result = await productsCollection
-            .find({ seller: seller })
-            .sort({ top_sell: -1 })
-            .limit(6)
-            .toArray();
-        } else {
-          result = await productsCollection
-            .find({})
-            .sort({ top_sell: -1 })
-            .limit(6)
-            .toArray();
+          filterQuery["seller"] = seller;
         }
+
+        const result = await productsCollection
+          .find(filterQuery)
+          .sort({ top_sell: -1 })
+          .limit(6)
+          .toArray();
+
+        // if (seller) {
+        //   result = await productsCollection
+        //     .find({ seller: seller, status: "active", save_as: "fulfilled" })
+        //     .sort({ top_sell: -1 })
+        //     .limit(6)
+        //     .toArray();
+        // } else {
+        //   result = await productsCollection
+        //     .find({ status: "active", save_as: "fulfilled" })
+        //     .sort({ top_sell: -1 })
+        //     .limit(6)
+        //     .toArray();
+        // }
         res.status(200).send(result);
       }
     );
