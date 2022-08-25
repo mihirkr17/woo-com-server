@@ -59,7 +59,7 @@ function run() {
                     const cookieObject = {
                         sameSite: "none",
                         secure: true,
-                        maxAge: 3600000,
+                        maxAge: 9000000,
                         httpOnly: true,
                     };
                     if (authEmail) {
@@ -276,10 +276,7 @@ function run() {
                         specification: (body === null || body === void 0 ? void 0 : body.specification) || "",
                         size: (body === null || body === void 0 ? void 0 : body.size) || [],
                     },
-                    price: parseFloat((body === null || body === void 0 ? void 0 : body.price) || 0),
-                    price_fixed: (body === null || body === void 0 ? void 0 : body.price_fixed) || 0,
-                    discount: parseFloat((body === null || body === void 0 ? void 0 : body.discount) || 0),
-                    discount_amount_fixed: (body === null || body === void 0 ? void 0 : body.discount_amount_fixed) || 0,
+                    pricing: body === null || body === void 0 ? void 0 : body.pricing,
                     available,
                     package_dimension: {
                         weight: parseFloat((body === null || body === void 0 ? void 0 : body.packageWeight) || 0),
@@ -289,6 +286,8 @@ function run() {
                     },
                     delivery_service: {
                         in_box: (body === null || body === void 0 ? void 0 : body.inBox) || "",
+                        warrantyType: (body === null || body === void 0 ? void 0 : body.warrantyType) || "",
+                        warrantyTime: (body === null || body === void 0 ? void 0 : body.warrantyTime) || "",
                     },
                     payment_option: body === null || body === void 0 ? void 0 : body.payment_option,
                     sku: (body === null || body === void 0 ? void 0 : body.sku) || "",
@@ -316,6 +315,20 @@ function run() {
                 res
                     .status(200)
                     .send(result && { message: "Product updated successfully" });
+            }));
+            // update stock
+            app.put("/api/update-stock/", verifyJWT, verifySeller, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    const productId = req.headers.authorization;
+                    const body = req.body;
+                    if (productId && body) {
+                        const result = yield productsCollection.updateOne({ _id: ObjectId(productId) }, { $set: body }, { upsert: true });
+                        res.status(200).send(result);
+                    }
+                }
+                catch (error) {
+                    res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+                }
             }));
             // update data
             app.put("/api/update-profile-data/:email", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -400,10 +413,7 @@ function run() {
                             specification: (body === null || body === void 0 ? void 0 : body.specification) || "",
                             size: (body === null || body === void 0 ? void 0 : body.size) || [],
                         },
-                        price: parseFloat((body === null || body === void 0 ? void 0 : body.price) || 0),
-                        price_fixed: (body === null || body === void 0 ? void 0 : body.price_fixed) || 0,
-                        discount: parseFloat((body === null || body === void 0 ? void 0 : body.discount) || 0),
-                        discount_amount_fixed: (body === null || body === void 0 ? void 0 : body.discount_amount_fixed) || 0,
+                        pricing: body === null || body === void 0 ? void 0 : body.pricing,
                         available: parseInt((body === null || body === void 0 ? void 0 : body.available) || 0),
                         package_dimension: {
                             weight: parseFloat((body === null || body === void 0 ? void 0 : body.packageWeight) || 0),
@@ -413,6 +423,8 @@ function run() {
                         },
                         delivery_service: {
                             in_box: (body === null || body === void 0 ? void 0 : body.inBox) || "",
+                            warrantyType: (body === null || body === void 0 ? void 0 : body.warrantyType) || "",
+                            warrantyTime: (body === null || body === void 0 ? void 0 : body.warrantyTime) || "",
                         },
                         payment_option: body === null || body === void 0 ? void 0 : body.payment_option,
                         sku: (body === null || body === void 0 ? void 0 : body.sku) || "",
@@ -800,10 +812,15 @@ function run() {
             }));
             // buy single product
             app.put("/api/add-buy-product", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const userEmail = req.decoded.email;
-                const body = req.body;
-                const cartRes = yield userCollection.updateOne({ email: userEmail }, { $set: { buy_product: body } }, { upsert: true });
-                res.status(200).send(cartRes);
+                try {
+                    const userEmail = req.decoded.email;
+                    const body = req.body;
+                    const cartRes = yield userCollection.updateOne({ email: userEmail }, { $set: { buy_product: body } }, { upsert: true });
+                    res.status(200).send(cartRes);
+                }
+                catch (error) {
+                    res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+                }
             }));
             // inserting address in cart
             app.post("/api/add-cart-address", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -863,19 +880,34 @@ function run() {
             +++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
             // set order api call
             app.post("/set-order/:userEmail", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                const userEmail = req.params.userEmail;
-                const verifiedEmail = req.decoded.email;
-                const body = req.body;
-                if (userEmail !== verifiedEmail)
-                    return res.status(401).send({ message: "Unauthorized access" });
-                if (!body) {
-                    res.send({
-                        message: "Order Cancelled. You Have To Select At least One Product",
+                try {
+                    const userEmail = req.params.userEmail;
+                    const verifiedEmail = req.decoded.email;
+                    const body = req.body;
+                    const products = yield productsCollection.findOne({
+                        _id: ObjectId(body === null || body === void 0 ? void 0 : body.productId),
                     });
+                    if (userEmail !== verifiedEmail)
+                        return res.status(401).send({ message: "Unauthorized access" });
+                    if (!body) {
+                        res.send({
+                            message: "Order Cancelled. You Have To Select At least One Product",
+                        });
+                    }
+                    else {
+                        if (products && (products === null || products === void 0 ? void 0 : products.available) > (body === null || body === void 0 ? void 0 : body.quantity)) {
+                            const result = yield orderCollection.updateOne({ user_email: userEmail }, { $push: { orders: body } }, { upsert: true });
+                            res.status(200).send(result && { message: "Order success" });
+                        }
+                        else {
+                            return res.status(400).send({
+                                message: "Order not taken because this product not available rights now!",
+                            });
+                        }
+                    }
                 }
-                else {
-                    const result = yield orderCollection.updateOne({ user_email: userEmail }, { $push: { orders: body } }, { upsert: true });
-                    res.status(200).send(result && { message: "Order success" });
+                catch (error) {
+                    res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
                 }
             }));
             // get my order list in my-order page

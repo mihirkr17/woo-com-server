@@ -55,7 +55,7 @@ async function run() {
         const cookieObject: any = {
           sameSite: "none",
           secure: true,
-          maxAge: 3600000,
+          maxAge: 9000000, //3600000
           httpOnly: true,
         };
 
@@ -335,10 +335,7 @@ async function run() {
             specification: body?.specification || "",
             size: body?.size || [],
           },
-          price: parseFloat(body?.price || 0),
-          price_fixed: body?.price_fixed || 0,
-          discount: parseFloat(body?.discount || 0),
-          discount_amount_fixed: body?.discount_amount_fixed || 0,
+          pricing: body?.pricing,
           available,
           package_dimension: {
             weight: parseFloat(body?.packageWeight || 0),
@@ -348,6 +345,8 @@ async function run() {
           },
           delivery_service: {
             in_box: body?.inBox || "",
+            warrantyType: body?.warrantyType || "",
+            warrantyTime: body?.warrantyTime || "",
           },
           payment_option: body?.payment_option,
           sku: body?.sku || "",
@@ -387,6 +386,31 @@ async function run() {
         res
           .status(200)
           .send(result && { message: "Product updated successfully" });
+      }
+    );
+
+    // update stock
+    app.put(
+      "/api/update-stock/",
+      verifyJWT,
+      verifySeller,
+      async (req: Request, res: Response) => {
+        try {
+          const productId = req.headers.authorization;
+          const body = req.body;
+
+          if (productId && body) {
+            const result = await productsCollection.updateOne(
+              { _id: ObjectId(productId) },
+              { $set: body },
+              { upsert: true }
+            );
+
+            res.status(200).send(result);
+          }
+        } catch (error: any) {
+          res.status(500).send({ message: error?.message });
+        }
       }
     );
 
@@ -536,10 +560,7 @@ async function run() {
               specification: body?.specification || "",
               size: body?.size || [],
             },
-            price: parseFloat(body?.price || 0),
-            price_fixed: body?.price_fixed || 0,
-            discount: parseFloat(body?.discount || 0),
-            discount_amount_fixed: body?.discount_amount_fixed || 0,
+            pricing: body?.pricing,
             available: parseInt(body?.available || 0),
             package_dimension: {
               weight: parseFloat(body?.packageWeight || 0),
@@ -549,6 +570,8 @@ async function run() {
             },
             delivery_service: {
               in_box: body?.inBox || "",
+              warrantyType: body?.warrantyType || "",
+              warrantyTime: body?.warrantyTime || "",
             },
             payment_option: body?.payment_option,
             sku: body?.sku || "",
@@ -1063,14 +1086,18 @@ async function run() {
       "/api/add-buy-product",
       verifyJWT,
       async (req: Request, res: Response) => {
-        const userEmail = req.decoded.email;
-        const body = req.body;
-        const cartRes = await userCollection.updateOne(
-          { email: userEmail },
-          { $set: { buy_product: body } },
-          { upsert: true }
-        );
-        res.status(200).send(cartRes);
+        try {
+          const userEmail = req.decoded.email;
+          const body = req.body;
+          const cartRes = await userCollection.updateOne(
+            { email: userEmail },
+            { $set: { buy_product: body } },
+            { upsert: true }
+          );
+          res.status(200).send(cartRes);
+        } catch (error: any) {
+          res.status(500).send({ message: error?.message });
+        }
       }
     );
 
@@ -1177,24 +1204,40 @@ async function run() {
       "/set-order/:userEmail",
       verifyJWT,
       async (req: Request, res: Response) => {
-        const userEmail: string = req.params.userEmail;
-        const verifiedEmail: string = req.decoded.email;
-        const body: string = req.body;
+        try {
+          const userEmail: string = req.params.userEmail;
+          const verifiedEmail: string = req.decoded.email;
+          const body: any = req.body;
 
-        if (userEmail !== verifiedEmail)
-          return res.status(401).send({ message: "Unauthorized access" });
-
-        if (!body) {
-          res.send({
-            message: "Order Cancelled. You Have To Select At least One Product",
+          const products = await productsCollection.findOne({
+            _id: ObjectId(body?.productId),
           });
-        } else {
-          const result = await orderCollection.updateOne(
-            { user_email: userEmail },
-            { $push: { orders: body } },
-            { upsert: true }
-          );
-          res.status(200).send(result && { message: "Order success" });
+
+          if (userEmail !== verifiedEmail)
+            return res.status(401).send({ message: "Unauthorized access" });
+
+          if (!body) {
+            res.send({
+              message:
+                "Order Cancelled. You Have To Select At least One Product",
+            });
+          } else {
+            if (products && products?.available > body?.quantity) {
+              const result = await orderCollection.updateOne(
+                { user_email: userEmail },
+                { $push: { orders: body } },
+                { upsert: true }
+              );
+              res.status(200).send(result && { message: "Order success" });
+            } else {
+              return res.status(400).send({
+                message:
+                  "Order not taken because this product not available rights now!",
+              });
+            }
+          }
+        } catch (error: any) {
+          res.status(500).send({ message: error?.message });
         }
       }
     );
