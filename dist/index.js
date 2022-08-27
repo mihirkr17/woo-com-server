@@ -16,7 +16,9 @@ const express_1 = __importDefault(require("express"));
 const { dbh } = require("./database/db");
 const { errorHandlers } = require("./errors/errors");
 const cookieParser = require("cookie-parser");
-const { verifyJWT, verifyAuth, verifySeller, } = require("./authentication/auth");
+const { productModel, productUpdateModel } = require("./model/product");
+const { orderModel } = require("./model/order");
+const { verifyJWT, verifyAuth, verifySeller, verifyUser, } = require("./authentication/auth");
 // Server setup
 const { ObjectId } = require("mongodb");
 const cors = require("cors");
@@ -40,15 +42,30 @@ function run() {
             const orderCollection = dbh.db("Products").collection("orders");
             const userCollection = dbh.db("Users").collection("user");
             const productPolicy = dbh.db("Products").collection("policy");
+            const updateProducts = (productId, quantity = 0) => __awaiter(this, void 0, void 0, function* () {
+                const products = yield productsCollection.findOne({
+                    _id: ObjectId(productId),
+                });
+                let availableProduct = products === null || products === void 0 ? void 0 : products.available;
+                let restAvailable = availableProduct - quantity;
+                let stock = restAvailable <= 1 ? "out" : "in";
+                yield productsCollection.updateOne({ _id: ObjectId(productId) }, { $set: { available: restAvailable, stock } }, { upsert: true });
+                yield userCollection.updateMany({ "myCartProduct._id": productId }, {
+                    $set: {
+                        "myCartProduct.$.available": restAvailable,
+                        "myCartProduct.$.stock": stock,
+                    },
+                }, { upsert: true });
+            });
             /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
             ++++++++++ Authorization api request endpoints Start ++++++++++++
             +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
             // add user to the database
             app.put("/api/sign-user", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 var _a;
-                const authEmail = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1];
-                const { name } = req.body;
                 try {
+                    const authEmail = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1];
+                    const { name } = req.body;
                     if (!authEmail) {
                         return res.status(400).send({ message: "Bad request" });
                     }
@@ -82,17 +99,15 @@ function run() {
             // fetch user information from database and send to client
             app.get("/api/fetch-auth-user/", (req, res) => __awaiter(this, void 0, void 0, function* () {
                 var _b;
-                const authEmail = (_b = req.headers.authorization) === null || _b === void 0 ? void 0 : _b.split(" ")[1];
                 try {
+                    const authEmail = (_b = req.headers.authorization) === null || _b === void 0 ? void 0 : _b.split(" ")[1];
                     if (authEmail) {
-                        yield userCollection.updateOne({ email: authEmail }, { $pull: { myCartProduct: { stock: "out" } } }, { upsert: true });
+                        yield userCollection.updateOne({ email: authEmail }, { $pull: { myCartProduct: { stock: "out" } } });
                         const result = yield userCollection.findOne({ email: authEmail });
                         return res.status(200).send({ result });
                     }
                     else {
-                        return res
-                            .status(403)
-                            .send({ message: "Forbidden. Email not found" });
+                        return res.status(400).send({ message: "Bad request" });
                     }
                 }
                 catch (error) {
@@ -264,43 +279,7 @@ function run() {
             app.put("/api/update-product/:productId", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const productId = req.params.productId;
                 const body = req.body;
-                let available = parseInt(body === null || body === void 0 ? void 0 : body.available);
-                const newDate = new Date().toLocaleString();
-                let productModel = {
-                    title: (body === null || body === void 0 ? void 0 : body.title) || "",
-                    slug: (body === null || body === void 0 ? void 0 : body.slug) || "",
-                    image: (body === null || body === void 0 ? void 0 : body.images) || [],
-                    info: {
-                        description: (body === null || body === void 0 ? void 0 : body.description) || "",
-                        short_description: (body === null || body === void 0 ? void 0 : body.short_description) || "",
-                        specification: (body === null || body === void 0 ? void 0 : body.specification) || "",
-                        size: (body === null || body === void 0 ? void 0 : body.size) || [],
-                    },
-                    pricing: body === null || body === void 0 ? void 0 : body.pricing,
-                    available,
-                    package_dimension: {
-                        weight: parseFloat((body === null || body === void 0 ? void 0 : body.packageWeight) || 0),
-                        length: parseFloat((body === null || body === void 0 ? void 0 : body.packageLength) || 0),
-                        width: parseFloat((body === null || body === void 0 ? void 0 : body.packageWidth) || 0),
-                        height: parseFloat((body === null || body === void 0 ? void 0 : body.packageHeight) || 0),
-                    },
-                    delivery_service: {
-                        in_box: (body === null || body === void 0 ? void 0 : body.inBox) || "",
-                        warrantyType: (body === null || body === void 0 ? void 0 : body.warrantyType) || "",
-                        warrantyTime: (body === null || body === void 0 ? void 0 : body.warrantyTime) || "",
-                    },
-                    payment_option: body === null || body === void 0 ? void 0 : body.payment_option,
-                    sku: (body === null || body === void 0 ? void 0 : body.sku) || "",
-                    status: (body === null || body === void 0 ? void 0 : body.status) || "",
-                    save_as: "fulfilled",
-                    modifiedAt: newDate,
-                };
-                if (available && available >= 1) {
-                    productModel["stock"] = "in";
-                }
-                else {
-                    productModel["stock"] = "out";
-                }
+                const model = productUpdateModel(body);
                 const exists = (yield userCollection
                     .find({ "myCartProduct._id": productId })
                     .toArray()) || [];
@@ -309,9 +288,7 @@ function run() {
                         $pull: { myCartProduct: { _id: productId } },
                     });
                 }
-                const result = yield productsCollection.updateOne({ _id: ObjectId(productId) }, {
-                    $set: productModel,
-                }, { upsert: true });
+                const result = yield productsCollection.updateOne({ _id: ObjectId(productId) }, { $set: model }, { upsert: true });
                 res
                     .status(200)
                     .send(result && { message: "Product updated successfully" });
@@ -321,8 +298,9 @@ function run() {
                 try {
                     const productId = req.headers.authorization;
                     const body = req.body;
+                    let stock = (body === null || body === void 0 ? void 0 : body.available) <= 1 ? "out" : "in";
                     if (productId && body) {
-                        const result = yield productsCollection.updateOne({ _id: ObjectId(productId) }, { $set: body }, { upsert: true });
+                        const result = yield productsCollection.updateOne({ _id: ObjectId(productId) }, { $set: { available: body === null || body === void 0 ? void 0 : body.available, stock } }, { upsert: true });
                         res.status(200).send(result);
                     }
                 }
@@ -388,7 +366,6 @@ function run() {
             // api/make-seller-request
             app.put("/api/permit-seller-request/:userId", verifyJWT, verifyAuth, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const userId = req.params.userId;
-                console.log(userId);
                 const result = yield userCollection.updateOne({ _id: ObjectId(userId) }, {
                     $set: { role: "seller", seller_request: "ok", isSeller: true },
                 }, { upsert: true });
@@ -400,59 +377,8 @@ function run() {
             app.post("/api/add-product", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 const body = req.body;
                 try {
-                    let available = (body === null || body === void 0 ? void 0 : body.available) || 0;
-                    const newDate = new Date();
-                    let productModel = {
-                        title: (body === null || body === void 0 ? void 0 : body.title) || "",
-                        slug: (body === null || body === void 0 ? void 0 : body.slug) || "",
-                        brand: (body === null || body === void 0 ? void 0 : body.brand) || "",
-                        image: (body === null || body === void 0 ? void 0 : body.images) || [],
-                        info: {
-                            description: (body === null || body === void 0 ? void 0 : body.description) || "",
-                            short_description: (body === null || body === void 0 ? void 0 : body.short_description) || "",
-                            specification: (body === null || body === void 0 ? void 0 : body.specification) || "",
-                            size: (body === null || body === void 0 ? void 0 : body.size) || [],
-                        },
-                        pricing: body === null || body === void 0 ? void 0 : body.pricing,
-                        available: parseInt((body === null || body === void 0 ? void 0 : body.available) || 0),
-                        package_dimension: {
-                            weight: parseFloat((body === null || body === void 0 ? void 0 : body.packageWeight) || 0),
-                            length: parseFloat((body === null || body === void 0 ? void 0 : body.packageLength) || 0),
-                            width: parseFloat((body === null || body === void 0 ? void 0 : body.packageWidth) || 0),
-                            height: parseFloat((body === null || body === void 0 ? void 0 : body.packageHeight) || 0),
-                        },
-                        delivery_service: {
-                            in_box: (body === null || body === void 0 ? void 0 : body.inBox) || "",
-                            warrantyType: (body === null || body === void 0 ? void 0 : body.warrantyType) || "",
-                            warrantyTime: (body === null || body === void 0 ? void 0 : body.warrantyTime) || "",
-                        },
-                        payment_option: body === null || body === void 0 ? void 0 : body.payment_option,
-                        sku: (body === null || body === void 0 ? void 0 : body.sku) || "",
-                        status: (body === null || body === void 0 ? void 0 : body.status) || "",
-                        save_as: "fulfilled",
-                        genre: {
-                            category: (body === null || body === void 0 ? void 0 : body.category) || "",
-                            sub_category: (body === null || body === void 0 ? void 0 : body.subCategory) || "",
-                            post_category: (body === null || body === void 0 ? void 0 : body.postCategory) || "", // third category
-                        },
-                        seller: (body === null || body === void 0 ? void 0 : body.seller) || "unknown",
-                        rating: [
-                            { weight: 5, count: 0 },
-                            { weight: 4, count: 0 },
-                            { weight: 3, count: 0 },
-                            { weight: 2, count: 0 },
-                            { weight: 1, count: 0 },
-                        ],
-                        rating_average: 0,
-                        createAt: newDate.toLocaleString(),
-                    };
-                    if (available && available >= 1) {
-                        productModel["stock"] = "in";
-                    }
-                    else {
-                        productModel["stock"] = "out";
-                    }
-                    yield productsCollection.insertOne(productModel);
+                    const model = productModel(body);
+                    yield productsCollection.insertOne(model);
                     res.status(200).send({ message: "Product added successfully" });
                 }
                 catch (error) {
@@ -879,9 +805,9 @@ function run() {
             +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
             +++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
             // set order api call
-            app.post("/set-order/:userEmail", verifyJWT, (req, res) => __awaiter(this, void 0, void 0, function* () {
+            app.post("/api/set-order", verifyJWT, verifyUser, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 try {
-                    const userEmail = req.params.userEmail;
+                    const userEmail = req.headers.authorization || "";
                     const verifiedEmail = req.decoded.email;
                     const body = req.body;
                     const products = yield productsCollection.findOne({
@@ -889,14 +815,11 @@ function run() {
                     });
                     if (userEmail !== verifiedEmail)
                         return res.status(401).send({ message: "Unauthorized access" });
-                    if (!body) {
-                        res.send({
-                            message: "Order Cancelled. You Have To Select At least One Product",
-                        });
-                    }
-                    else {
+                    if (body) {
                         if (products && (products === null || products === void 0 ? void 0 : products.available) > (body === null || body === void 0 ? void 0 : body.quantity)) {
-                            const result = yield orderCollection.updateOne({ user_email: userEmail }, { $push: { orders: body } }, { upsert: true });
+                            yield updateProducts(body === null || body === void 0 ? void 0 : body.productId, body === null || body === void 0 ? void 0 : body.quantity);
+                            let model = orderModel(body);
+                            const result = yield orderCollection.updateOne({ user_email: userEmail }, { $push: { orders: model } }, { upsert: true });
                             res.status(200).send(result && { message: "Order success" });
                         }
                         else {
@@ -904,6 +827,9 @@ function run() {
                                 message: "Order not taken because this product not available rights now!",
                             });
                         }
+                    }
+                    else {
+                        return res.status(400).send({ message: "Bad request!" });
                     }
                 }
                 catch (error) {
@@ -1024,7 +950,7 @@ function run() {
                 const userEmail = req.params.userEmail;
                 res.status(200).send((yield orderCollection.updateOne({ user_email: userEmail }, {
                     $set: {
-                        "orders.$[i].dispatch": true,
+                        "orders.$[i].status": "dispatch",
                     },
                 }, { arrayFilters: [{ "i.orderId": orderId }] })) && { message: "Successfully order dispatched" });
             }));
@@ -1061,19 +987,6 @@ function run() {
                     .sort({ top_sell: -1 })
                     .limit(6)
                     .toArray();
-                // if (seller) {
-                //   result = await productsCollection
-                //     .find({ seller: seller, status: "active", save_as: "fulfilled" })
-                //     .sort({ top_sell: -1 })
-                //     .limit(6)
-                //     .toArray();
-                // } else {
-                //   result = await productsCollection
-                //     .find({ status: "active", save_as: "fulfilled" })
-                //     .sort({ top_sell: -1 })
-                //     .limit(6)
-                //     .toArray();
-                // }
                 res.status(200).send(result);
             }));
         }

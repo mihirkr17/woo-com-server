@@ -62,4 +62,19 @@ const verifySeller = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
         res.status(403).send({ message: "Forbidden" });
     }
 });
-module.exports = { verifyJWT, verifyAuth, verifySeller };
+// verify seller
+const verifyUser = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    yield dbh.connect();
+    const userCollection = dbh.db("Users").collection("user");
+    const authEmail = req.decoded.email;
+    const findAuthInDB = yield userCollection.findOne({
+        email: authEmail && authEmail,
+    });
+    if (findAuthInDB.role === "user") {
+        next();
+    }
+    else {
+        res.status(403).send({ message: "Forbidden" });
+    }
+});
+module.exports = { verifyJWT, verifyAuth, verifySeller, verifyUser };

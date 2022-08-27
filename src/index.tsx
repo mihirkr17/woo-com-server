@@ -2,10 +2,14 @@ import express, { Express, Request, Response } from "express";
 const { dbh } = require("./database/db");
 const { errorHandlers } = require("./errors/errors");
 const cookieParser = require("cookie-parser");
+const { productModel, productUpdateModel } = require("./model/product");
+const { orderModel } = require("./model/order");
+
 const {
   verifyJWT,
   verifyAuth,
   verifySeller,
+  verifyUser,
 } = require("./authentication/auth");
 
 // Server setup
@@ -35,14 +39,47 @@ async function run() {
     const userCollection = dbh.db("Users").collection("user");
     const productPolicy = dbh.db("Products").collection("policy");
 
+    const updateProducts = async (
+      productId: string,
+      quantity: number = 0
+    ) => {
+      const products = await productsCollection.findOne({
+        _id: ObjectId(productId),
+      });
+
+      let availableProduct = products?.available;
+
+      let restAvailable = availableProduct - quantity;
+
+      let stock = restAvailable <= 1 ? "out" : "in";
+
+      await productsCollection.updateOne(
+        { _id: ObjectId(productId) },
+        { $set: { available: restAvailable, stock } },
+        { upsert: true }
+      );
+
+      await userCollection.updateMany(
+        { "myCartProduct._id": productId },
+        {
+          $set: {
+            "myCartProduct.$.available": restAvailable,
+            "myCartProduct.$.stock": stock,
+          },
+        },
+        { upsert: true }
+      );
+    };
+
     /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     ++++++++++ Authorization api request endpoints Start ++++++++++++
     +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
     // add user to the database
     app.put("/api/sign-user", async (req: Request, res: Response) => {
-      const authEmail = req.headers.authorization?.split(" ")[1];
-      const { name } = req.body;
       try {
+        const authEmail = req.headers.authorization?.split(" ")[1];
+        const { name } = req.body;
+
         if (!authEmail) {
           return res.status(400).send({ message: "Bad request" });
         }
@@ -83,21 +120,19 @@ async function run() {
 
     // fetch user information from database and send to client
     app.get("/api/fetch-auth-user/", async (req: Request, res: Response) => {
-      const authEmail = req.headers.authorization?.split(" ")[1];
-
       try {
+        const authEmail = req.headers.authorization?.split(" ")[1];
+
         if (authEmail) {
           await userCollection.updateOne(
             { email: authEmail },
-            { $pull: { myCartProduct: { stock: "out" } } },
-            { upsert: true }
+            { $pull: { myCartProduct: { stock: "out" } } }
           );
+
           const result = await userCollection.findOne({ email: authEmail });
           return res.status(200).send({ result });
         } else {
-          return res
-            .status(403)
-            .send({ message: "Forbidden. Email not found" });
+          return res.status(400).send({ message: "Bad request" });
         }
       } catch (error: any) {
         res.status(500).send({ message: error.message });
@@ -322,44 +357,7 @@ async function run() {
       async (req: Request, res: Response) => {
         const productId = req.params.productId;
         const body = req.body;
-        let available = parseInt(body?.available);
-        const newDate = new Date().toLocaleString();
-
-        let productModel: any = {
-          title: body?.title || "",
-          slug: body?.slug || "",
-          image: body?.images || [],
-          info: {
-            description: body?.description || "",
-            short_description: body?.short_description || "",
-            specification: body?.specification || "",
-            size: body?.size || [],
-          },
-          pricing: body?.pricing,
-          available,
-          package_dimension: {
-            weight: parseFloat(body?.packageWeight || 0),
-            length: parseFloat(body?.packageLength || 0),
-            width: parseFloat(body?.packageWidth || 0),
-            height: parseFloat(body?.packageHeight || 0),
-          },
-          delivery_service: {
-            in_box: body?.inBox || "",
-            warrantyType: body?.warrantyType || "",
-            warrantyTime: body?.warrantyTime || "",
-          },
-          payment_option: body?.payment_option,
-          sku: body?.sku || "",
-          status: body?.status || "",
-          save_as: "fulfilled",
-          modifiedAt: newDate,
-        };
-
-        if (available && available >= 1) {
-          productModel["stock"] = "in";
-        } else {
-          productModel["stock"] = "out";
-        }
+        const model = productUpdateModel(body);
 
         const exists =
           (await userCollection
@@ -377,9 +375,7 @@ async function run() {
 
         const result = await productsCollection.updateOne(
           { _id: ObjectId(productId) },
-          {
-            $set: productModel,
-          },
+          { $set: model },
           { upsert: true }
         );
 
@@ -399,10 +395,12 @@ async function run() {
           const productId = req.headers.authorization;
           const body = req.body;
 
+          let stock = body?.available <= 1 ? "out" : "in";
+
           if (productId && body) {
             const result = await productsCollection.updateOne(
               { _id: ObjectId(productId) },
-              { $set: body },
+              { $set: { available: body?.available, stock } },
               { upsert: true }
             );
 
@@ -525,7 +523,7 @@ async function run() {
       verifyAuth,
       async (req: Request, res: Response) => {
         const userId: string = req.params.userId;
-        console.log(userId);
+
         const result = await userCollection.updateOne(
           { _id: ObjectId(userId) },
           {
@@ -546,61 +544,8 @@ async function run() {
       async (req: Request, res: Response) => {
         const body = req.body;
         try {
-          let available = body?.available || 0;
-          const newDate = new Date();
-
-          let productModel: any = {
-            title: body?.title || "",
-            slug: body?.slug || "",
-            brand: body?.brand || "",
-            image: body?.images || [],
-            info: {
-              description: body?.description || "",
-              short_description: body?.short_description || "",
-              specification: body?.specification || "",
-              size: body?.size || [],
-            },
-            pricing: body?.pricing,
-            available: parseInt(body?.available || 0),
-            package_dimension: {
-              weight: parseFloat(body?.packageWeight || 0),
-              length: parseFloat(body?.packageLength || 0),
-              width: parseFloat(body?.packageWidth || 0),
-              height: parseFloat(body?.packageHeight || 0),
-            },
-            delivery_service: {
-              in_box: body?.inBox || "",
-              warrantyType: body?.warrantyType || "",
-              warrantyTime: body?.warrantyTime || "",
-            },
-            payment_option: body?.payment_option,
-            sku: body?.sku || "",
-            status: body?.status || "",
-            save_as: "fulfilled",
-
-            genre: {
-              category: body?.category || "", // category
-              sub_category: body?.subCategory || "", // sub category
-              post_category: body?.postCategory || "", // third category
-            },
-            seller: body?.seller || "unknown",
-            rating: [
-              { weight: 5, count: 0 },
-              { weight: 4, count: 0 },
-              { weight: 3, count: 0 },
-              { weight: 2, count: 0 },
-              { weight: 1, count: 0 },
-            ],
-            rating_average: 0,
-            createAt: newDate.toLocaleString(),
-          };
-
-          if (available && available >= 1) {
-            productModel["stock"] = "in";
-          } else {
-            productModel["stock"] = "out";
-          }
-          await productsCollection.insertOne(productModel);
+          const model = productModel(body);
+          await productsCollection.insertOne(model);
           res.status(200).send({ message: "Product added successfully" });
         } catch (error: any) {
           res.status(500).send({ message: error.message });
@@ -1201,11 +1146,12 @@ async function run() {
     +++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
     // set order api call
     app.post(
-      "/set-order/:userEmail",
+      "/api/set-order",
       verifyJWT,
+      verifyUser,
       async (req: Request, res: Response) => {
         try {
-          const userEmail: string = req.params.userEmail;
+          const userEmail: string = req.headers.authorization || "";
           const verifiedEmail: string = req.decoded.email;
           const body: any = req.body;
 
@@ -1216,16 +1162,16 @@ async function run() {
           if (userEmail !== verifiedEmail)
             return res.status(401).send({ message: "Unauthorized access" });
 
-          if (!body) {
-            res.send({
-              message:
-                "Order Cancelled. You Have To Select At least One Product",
-            });
-          } else {
+          if (body) {
             if (products && products?.available > body?.quantity) {
+
+              await updateProducts(body?.productId, body?.quantity);
+
+              let model = orderModel(body);
+
               const result = await orderCollection.updateOne(
                 { user_email: userEmail },
-                { $push: { orders: body } },
+                { $push: { orders: model } },
                 { upsert: true }
               );
               res.status(200).send(result && { message: "Order success" });
@@ -1235,6 +1181,8 @@ async function run() {
                   "Order not taken because this product not available rights now!",
               });
             }
+          } else {
+            return res.status(400).send({ message: "Bad request!" });
           }
         } catch (error: any) {
           res.status(500).send({ message: error?.message });
@@ -1420,7 +1368,7 @@ async function run() {
             { user_email: userEmail },
             {
               $set: {
-                "orders.$[i].dispatch": true,
+                "orders.$[i].status": "dispatch",
               },
             },
             { arrayFilters: [{ "i.orderId": orderId }] }
@@ -1468,20 +1416,6 @@ async function run() {
           .sort({ top_sell: -1 })
           .limit(6)
           .toArray();
-
-        // if (seller) {
-        //   result = await productsCollection
-        //     .find({ seller: seller, status: "active", save_as: "fulfilled" })
-        //     .sort({ top_sell: -1 })
-        //     .limit(6)
-        //     .toArray();
-        // } else {
-        //   result = await productsCollection
-        //     .find({ status: "active", save_as: "fulfilled" })
-        //     .sort({ top_sell: -1 })
-        //     .limit(6)
-        //     .toArray();
-        // }
         res.status(200).send(result);
       }
     );
