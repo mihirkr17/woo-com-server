@@ -3,6 +3,7 @@ const { dbh } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const { productModel, productUpdateModel } = require("../../model/product");
 
+
 module.exports.searchProducts = async (req: Request, res: Response) => {
   try {
     await dbh.connect();

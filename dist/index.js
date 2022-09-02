@@ -25,6 +25,9 @@ app.use(cors({
 }));
 app.use(cookieParser());
 app.use(express_1.default.json());
+app.get("/", (req, res) => {
+    res.status(200).send("Woo-Com Server is running");
+});
 // all the routes
 app.use("/api/user", userRoutes);
 app.use("/api/product", productRoutes);
@@ -33,9 +36,6 @@ app.use("/api/order", orderRoutes);
 app.use("/api/review", reviewRoutes);
 app.use("/api/policy", policyRoutes);
 app.use("/api/wishlist", wishlistRoutes);
-app.get("/", (req, res) => {
-    res.status(200).send("Woo-Com Server is running");
-});
 const server = app.listen(port, () => {
     console.log(`Running port is ${port}`);
 });
