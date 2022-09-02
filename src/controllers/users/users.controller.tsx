@@ -41,8 +41,8 @@ module.exports.signUser = async (req: Request, res: Response) => {
     }
 
     const cookieObject: any = {
-      // sameSite: "none",
-      // secure: true,
+      sameSite: "none",
+      secure: true,
       maxAge: 9000000, //3600000
       httpOnly: true,
     };
