@@ -12,10 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var jwt = require("jsonwebtoken");
 const { dbh } = require("../database/db");
 const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    // const authHeader = req.headers.authorization;
-    // if (!authHeader) return res.status(403).send({ message: "Forbidden" });
     const token = req.cookies.token;
-    // const token = authHeader.split(" ")[1];
     if (token) {
         jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
             if (err) {
@@ -77,4 +74,9 @@ const verifyUser = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
         res.status(403).send({ message: "Forbidden" });
     }
 });
-module.exports = { verifyJWT, verifyAuth, verifySeller, verifyUser };
+module.exports = {
+    verifyJWT,
+    verifyAuth,
+    verifySeller,
+    verifyUser
+};

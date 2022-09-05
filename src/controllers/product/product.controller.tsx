@@ -3,7 +3,6 @@ const { dbh } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const { productModel, productUpdateModel } = require("../../model/product");
 
-
 module.exports.searchProducts = async (req: Request, res: Response) => {
   try {
     await dbh.connect();
@@ -179,12 +178,16 @@ module.exports.allProducts = async (req: Request, res: Response) => {
     await dbh.connect();
     const productsCollection = dbh.db("Products").collection("product");
     const totalLimits = parseInt(req.params.limits);
-    const results = await productsCollection
+
+    const result = await productsCollection
       .find({ status: "active" })
       .sort({ _id: -1 })
       .limit(totalLimits)
       .toArray();
-    res.status(200).send(results);
+
+    return result
+      ? res.status(200).send(result)
+      : res.status(500).send({ success: false, error: "Something went wrong" });
   } catch (error: any) {
     res.status(500).send({ message: error.message });
   }
@@ -313,7 +316,9 @@ module.exports.productByCategory = async (req: Request, res: Response) => {
       .find(findQuery, { price_fixed: { $exists: 1 } })
       .sort(sorting)
       .toArray();
-    res.status(200).send(tt);
+    return tt
+      ? res.status(200).send(tt)
+      : res.status(500).send({ success: false, error: "Something went wrong" });
   } catch (error: any) {
     return res.status(500).send({ message: error?.message });
   }
@@ -337,11 +342,10 @@ module.exports.fetchTopSellingProduct = async (req: Request, res: Response) => {
       .limit(6)
       .toArray();
     res.status(200).send(result);
-  } catch (error:any) {
+  } catch (error: any) {
     return res.status(500).send({ message: error?.message });
   }
 };
-
 
 module.exports.manageProduct = async (req: Request, res: Response) => {
   await dbh.connect();
@@ -404,7 +408,9 @@ module.exports.manageProduct = async (req: Request, res: Response) => {
       result = await cursor.toArray();
     }
 
-    res.status(200).send(result);
+    return result
+      ? res.status(200).send(result)
+      : res.status(200).send({ success: false, error: "Something went wrong" });
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
   }

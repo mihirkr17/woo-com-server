@@ -17,19 +17,21 @@ module.exports.fetchAuthUser = (req, res) => __awaiter(void 0, void 0, void 0, f
         yield dbh.connect();
         const userCollection = dbh.db("Users").collection("user");
         const authEmail = req.headers.authorization || "";
-        if (authEmail) {
-            yield userCollection.updateOne({ email: authEmail }, { $pull: { myCartProduct: { stock: "out" } } });
-            const result = yield userCollection.findOne({ email: authEmail });
-            return result
-                ? res.status(200).send({ success: true, statusCode: 200, data: result })
-                : res.status(500).send({ error: "Internal Server Error!" });
+        if (!authEmail || typeof authEmail === "undefined") {
+            return res
+                .status(400)
+                .send({ success: false, error: "Authorization header is missing!" });
         }
-        else {
-            return res.status(400).send({ error: "Bad request" });
-        }
+        yield userCollection.updateOne({ email: authEmail }, { $pull: { myCartProduct: { stock: "out" } } });
+        const result = yield userCollection.findOne({ email: authEmail });
+        return result
+            ? res.status(200).send({ success: true, statusCode: 200, data: result })
+            : res
+                .status(500)
+                .send({ success: false, error: "Something went wrong!" });
     }
     catch (error) {
-        res.status(500).send({ message: error.message });
+        res.status(500).send({ error: error.message });
     }
 });
 module.exports.signUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -38,9 +40,11 @@ module.exports.signUser = (req, res) => __awaiter(void 0, void 0, void 0, functi
         yield dbh.connect();
         const userCollection = dbh.db("Users").collection("user");
         const authEmail = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(" ")[1];
-        const { name } = req.body;
-        if (!authEmail) {
-            return res.status(400).send({ message: "Bad request" });
+        const { name, photoURL } = req.body;
+        if (!authEmail || typeof authEmail === "undefined") {
+            return res
+                .status(400)
+                .send({ success: false, error: "Authorization header is missing!" });
         }
         const cookieObject = {
             // sameSite: "none",
@@ -53,20 +57,29 @@ module.exports.signUser = (req, res) => __awaiter(void 0, void 0, void 0, functi
                 algorithm: "HS256",
                 expiresIn: "1h",
             });
+            const setToken = () => {
+                return res.cookie("token", token, cookieObject)
+                    ? res.status(200).send({ message: "Login success", statusCode: 200 })
+                    : res.status(400).send({ error: "Bad request" });
+            };
             const existsUser = yield userCollection.findOne({ email: authEmail });
             if (existsUser) {
-                res.cookie("token", token, cookieObject);
-                return res.status(200).send({ message: "Login success" });
+                return setToken();
             }
-            else {
-                yield userCollection.updateOne({ email: authEmail }, { $set: { email: authEmail, displayName: name, role: "user" } }, { upsert: true });
-                res.cookie("token", token, cookieObject);
-                return res.status(200).send({ message: "Login success" });
-            }
+            const newUser = yield userCollection.updateOne({ email: authEmail }, {
+                $set: {
+                    email: authEmail,
+                    displayName: name,
+                    photoURL,
+                    role: "user",
+                },
+            }, { upsert: true });
+            if (newUser)
+                return setToken();
         }
     }
     catch (error) {
-        res.status(500).send({ message: error.message });
+        res.status(500).send({ error: error.message });
     }
 });
 module.exports.signOutUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -105,7 +118,7 @@ module.exports.switchRole = (req, res) => __awaiter(void 0, void 0, void 0, func
         }
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        res.status(500).send({ error: error === null || error === void 0 ? void 0 : error.message });
     }
 });
 module.exports.updateProfileData = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -117,7 +130,7 @@ module.exports.updateProfileData = (req, res) => __awaiter(void 0, void 0, void 
         res.status(200).send(result);
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        res.status(500).send({ error: error === null || error === void 0 ? void 0 : error.message });
     }
 });
 module.exports.makeAdmin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -125,9 +138,15 @@ module.exports.makeAdmin = (req, res) => __awaiter(void 0, void 0, void 0, funct
         yield dbh.connect();
         const userCollection = dbh.db("Users").collection("user");
         const userId = req.params.userId;
-        res
-            .status(200)
-            .send(yield userCollection.updateOne({ _id: ObjectId(userId) }, { $set: { role: "admin" } }, { upsert: true }));
+        if (!ObjectId.isValid(userId)) {
+            return res
+                .status(400)
+                .send({ success: false, error: "User ID not valid" });
+        }
+        const result = yield userCollection.updateOne({ _id: ObjectId(userId) }, { $set: { role: "admin" } }, { upsert: true });
+        return result
+            ? res.status(200).send({ success: true, message: "Permission granted" })
+            : res.status(500).send({ success: false, error: "Failed" });
     }
     catch (error) {
         res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });

@@ -9,22 +9,26 @@ module.exports.fetchAuthUser = async (req: Request, res: Response) => {
     const userCollection = dbh.db("Users").collection("user");
     const authEmail: string = req.headers.authorization || "";
 
-    if (authEmail) {
-      await userCollection.updateOne(
-        { email: authEmail },
-        { $pull: { myCartProduct: { stock: "out" } } }
-      );
-
-      const result = await userCollection.findOne({ email: authEmail });
-
-      return result
-        ? res.status(200).send({ success: true, statusCode: 200, data: result })
-        : res.status(500).send({ error: "Internal Server Error!" });
-    } else {
-      return res.status(400).send({ error: "Bad request" });
+    if (!authEmail || typeof authEmail === "undefined") {
+      return res
+        .status(400)
+        .send({ success: false, error: "Authorization header is missing!" });
     }
+
+    await userCollection.updateOne(
+      { email: authEmail },
+      { $pull: { myCartProduct: { stock: "out" } } }
+    );
+
+    const result = await userCollection.findOne({ email: authEmail });
+
+    return result
+      ? res.status(200).send({ success: true, statusCode: 200, data: result })
+      : res
+          .status(500)
+          .send({ success: false, error: "Something went wrong!" });
   } catch (error: any) {
-    res.status(500).send({ message: error.message });
+    res.status(500).send({ error: error.message });
   }
 };
 
@@ -34,15 +38,17 @@ module.exports.signUser = async (req: Request, res: Response) => {
 
     const userCollection = dbh.db("Users").collection("user");
     const authEmail = req.headers.authorization?.split(" ")[1];
-    const { name } = req.body;
+    const { name, photoURL } = req.body;
 
-    if (!authEmail) {
-      return res.status(400).send({ message: "Bad request" });
+    if (!authEmail || typeof authEmail === "undefined") {
+      return res
+        .status(400)
+        .send({ success: false, error: "Authorization header is missing!" });
     }
 
     const cookieObject: any = {
-      sameSite: "none",
-      secure: true,
+      // sameSite: "none",
+      // secure: true,
       maxAge: 9000000, //3600000
       httpOnly: true,
     };
@@ -53,24 +59,35 @@ module.exports.signUser = async (req: Request, res: Response) => {
         expiresIn: "1h",
       });
 
+      const setToken = () => {
+        return res.cookie("token", token, cookieObject)
+          ? res.status(200).send({ message: "Login success", statusCode: 200 })
+          : res.status(400).send({ error: "Bad request" });
+      };
+
       const existsUser = await userCollection.findOne({ email: authEmail });
 
       if (existsUser) {
-        res.cookie("token", token, cookieObject);
-        return res.status(200).send({ message: "Login success" });
-      } else {
-        await userCollection.updateOne(
-          { email: authEmail },
-          { $set: { email: authEmail, displayName: name, role: "user" } },
-          { upsert: true }
-        );
-
-        res.cookie("token", token, cookieObject);
-        return res.status(200).send({ message: "Login success" });
+        return setToken();
       }
+
+      const newUser = await userCollection.updateOne(
+        { email: authEmail },
+        {
+          $set: {
+            email: authEmail,
+            displayName: name,
+            photoURL,
+            role: "user",
+          },
+        },
+        { upsert: true }
+      );
+
+      if (newUser) return setToken();
     }
   } catch (error: any) {
-    res.status(500).send({ message: error.message });
+    res.status(500).send({ error: error.message });
   }
 };
 
@@ -117,7 +134,7 @@ module.exports.switchRole = async (req: Request, res: Response) => {
       if (result) return res.status(200).send(result);
     }
   } catch (error: any) {
-    res.status(500).send({ message: error?.message });
+    res.status(500).send({ error: error?.message });
   }
 };
 
@@ -133,7 +150,7 @@ module.exports.updateProfileData = async (req: Request, res: Response) => {
     );
     res.status(200).send(result);
   } catch (error: any) {
-    res.status(500).send({ message: error?.message });
+    res.status(500).send({ error: error?.message });
   }
 };
 
@@ -142,15 +159,22 @@ module.exports.makeAdmin = async (req: Request, res: Response) => {
     await dbh.connect();
     const userCollection = dbh.db("Users").collection("user");
     const userId: string = req.params.userId;
-    res
-      .status(200)
-      .send(
-        await userCollection.updateOne(
-          { _id: ObjectId(userId) },
-          { $set: { role: "admin" } },
-          { upsert: true }
-        )
-      );
+
+    if (!ObjectId.isValid(userId)) {
+      return res
+        .status(400)
+        .send({ success: false, error: "User ID not valid" });
+    }
+
+    const result = await userCollection.updateOne(
+      { _id: ObjectId(userId) },
+      { $set: { role: "admin" } },
+      { upsert: true }
+    );
+
+    return result
+      ? res.status(200).send({ success: true, message: "Permission granted" })
+      : res.status(500).send({ success: false, error: "Failed" });
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
   }

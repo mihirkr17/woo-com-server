@@ -157,12 +157,14 @@ module.exports.allProducts = (req, res) => __awaiter(void 0, void 0, void 0, fun
         yield dbh.connect();
         const productsCollection = dbh.db("Products").collection("product");
         const totalLimits = parseInt(req.params.limits);
-        const results = yield productsCollection
+        const result = yield productsCollection
             .find({ status: "active" })
             .sort({ _id: -1 })
             .limit(totalLimits)
             .toArray();
-        res.status(200).send(results);
+        return result
+            ? res.status(200).send(result)
+            : res.status(500).send({ success: false, error: "Something went wrong" });
     }
     catch (error) {
         res.status(500).send({ message: error.message });
@@ -273,7 +275,9 @@ module.exports.productByCategory = (req, res) => __awaiter(void 0, void 0, void 
             .find(findQuery, { price_fixed: { $exists: 1 } })
             .sort(sorting)
             .toArray();
-        res.status(200).send(tt);
+        return tt
+            ? res.status(200).send(tt)
+            : res.status(500).send({ success: false, error: "Something went wrong" });
     }
     catch (error) {
         return res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
@@ -355,7 +359,9 @@ module.exports.manageProduct = (req, res) => __awaiter(void 0, void 0, void 0, f
         else {
             result = yield cursor.toArray();
         }
-        res.status(200).send(result);
+        return result
+            ? res.status(200).send(result)
+            : res.status(200).send({ success: false, error: "Something went wrong" });
     }
     catch (error) {
         res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });

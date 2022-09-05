@@ -3,10 +3,7 @@ var jwt = require("jsonwebtoken");
 const { dbh } = require("../database/db");
 
 const verifyJWT = async (req: Request, res: Response, next: any) => {
-  // const authHeader = req.headers.authorization;
-  // if (!authHeader) return res.status(403).send({ message: "Forbidden" });
   const token = req.cookies.token;
-  // const token = authHeader.split(" ")[1];
 
   if (token) {
     jwt.verify(
@@ -78,6 +75,9 @@ const verifyUser = async (req: Request, res: Response, next: any) => {
   }
 };
 
-
-
-module.exports = { verifyJWT, verifyAuth, verifySeller, verifyUser };
+module.exports = {
+  verifyJWT,
+  verifyAuth,
+  verifySeller,
+  verifyUser
+};
