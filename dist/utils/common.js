@@ -13,7 +13,7 @@ const { ObjectId } = require("mongodb");
 const { dbh } = require("./db");
 module.exports.updateProductStock = (productId, quantity, action) => __awaiter(void 0, void 0, void 0, function* () {
     yield dbh.connect();
-    const productsCollection = dbh.db("Products").collection("product");
+    const productsCollection = dbh.db("ecommerce-db").collection("products");
     const products = yield productsCollection.findOne({
         _id: ObjectId(productId),
     });

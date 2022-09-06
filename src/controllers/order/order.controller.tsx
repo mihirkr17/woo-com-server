@@ -1,21 +1,18 @@
 import { Request, Response } from "express";
-const { dbh } = require("../../utils/db");
+const { dbh, dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const { updateProductStock } = require("../../utils/common");
 const { orderModel } = require("../../model/order");
 
 module.exports.setOrderHandler = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const productsCollection = dbh.db("Products").collection("product");
-    const orderCollection = dbh.db("Products").collection("orders");
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
 
     const userEmail: string = req.headers.authorization || "";
     const verifiedEmail: string = req.decoded.email;
     const body: any = req.body;
 
-    const products = await productsCollection.findOne({
+    const products = await db.collection("products").findOne({
       _id: ObjectId(body?.productId),
     });
 
@@ -26,20 +23,20 @@ module.exports.setOrderHandler = async (req: Request, res: Response) => {
       if (products && products?.available > body?.quantity) {
         let model = orderModel(body);
 
-
-        const result = await orderCollection.updateOne(
-          { user_email: userEmail },
-          { $push: { orders: model } },
-          { upsert: true }
-        );
+        const result = await db
+          .collection("orders")
+          .updateOne(
+            { user_email: userEmail },
+            { $push: { orders: model } },
+            { upsert: true }
+          );
 
         if (result) {
           await updateProductStock(body?.productId, body?.quantity, "dec");
 
-          await userCollection.updateOne(
-            { email: userEmail },
-            { $unset: { myCartProduct: [] } }
-          );
+          await db
+            .collection("users")
+            .updateOne({ email: userEmail }, { $unset: { myCartProduct: [] } });
         }
         res.status(200).send(result && { message: "Order success" });
       } else {
@@ -58,10 +55,9 @@ module.exports.setOrderHandler = async (req: Request, res: Response) => {
 
 module.exports.myOrder = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const orderCollection = dbh.db("Products").collection("orders");
+    const db = await dbConnection();
     const email = req.params.email;
-    res.send(await orderCollection.findOne({ user_email: email }));
+    res.send(await db.collection("orders").findOne({ user_email: email }));
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
   }
@@ -69,15 +65,16 @@ module.exports.myOrder = async (req: Request, res: Response) => {
 
 module.exports.removeOrder = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const orderCollection = dbh.db("Products").collection("orders");
+    const db = await dbConnection();
 
     const orderUserEmail = req.params.email;
     const id = parseInt(req.params.orderId);
-    const result = await orderCollection.updateOne(
-      { user_email: orderUserEmail },
-      { $pull: { orders: { orderId: id } } }
-    );
+    const result = await db
+      .collection("orders")
+      .updateOne(
+        { user_email: orderUserEmail },
+        { $pull: { orders: { orderId: id } } }
+      );
 
     res.status(200).send({ result, message: "Order Removed successfully" });
   } catch (error: any) {
@@ -87,15 +84,14 @@ module.exports.removeOrder = async (req: Request, res: Response) => {
 
 module.exports.cancelMyOrder = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const orderCollection = dbh.db("Products").collection("orders");
+    const db = await dbConnection();
 
     const userEmail = req.params.userEmail;
     const orderId = parseInt(req.params.orderId);
     const { status, cancel_reason, time_canceled, quantity, productId } =
       req.body;
 
-    const result = await orderCollection.updateOne(
+    const result = await db.collection("orders").updateOne(
       { user_email: userEmail },
       {
         $set: {
@@ -119,13 +115,13 @@ module.exports.cancelMyOrder = async (req: Request, res: Response) => {
 
 module.exports.dispatchOrderRequest = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const orderCollection = dbh.db("Products").collection("orders");
+    const db = await dbConnection();
+
     const orderId: number = parseInt(req.params.orderId);
     const trackingId = req.params.trackingId;
     const userEmail: string = req.headers.authorization || "";
     res.status(200).send(
-      (await orderCollection.updateOne(
+      (await db.collection("orders").updateOne(
         { user_email: userEmail },
         {
           $set: {
@@ -144,13 +140,12 @@ module.exports.dispatchOrderRequest = async (req: Request, res: Response) => {
 
 module.exports.manageOrders = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const orderCollection = dbh.db("Products").collection("orders");
+    const db = await dbConnection();
     const seller = req.query.seller;
     let result: any;
 
     if (seller) {
-      result = await orderCollection
+      result = await db.collection("orders")
         .aggregate([
           { $unwind: "$orders" },
           {

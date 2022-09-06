@@ -9,13 +9,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const { dbh } = require("../../utils/db");
+const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 module.exports.privacyPolicy = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const productPolicy = dbh.db("Products").collection("policy");
-        res.status(200).send(yield productPolicy.findOne({}));
+        const db = yield dbConnection();
+        res.status(200).send(yield db.collection("privacy-policy").findOne({}));
     }
     catch (error) {
         res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
@@ -23,11 +22,12 @@ module.exports.privacyPolicy = (req, res) => __awaiter(void 0, void 0, void 0, f
 });
 module.exports.updatePolicy = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const productPolicy = dbh.db("Products").collection("policy");
+        const db = yield dbConnection();
         const policyId = req.params.policyId;
         const body = req.body;
-        const result = yield productPolicy.updateOne({ _id: ObjectId(policyId) }, { $set: body }, { upsert: true });
+        const result = yield db
+            .collection("privacy-policy")
+            .updateOne({ _id: ObjectId(policyId) }, { $set: body }, { upsert: true });
         if (result) {
             return res.status(200).send({ message: "Policy updated successfully" });
         }

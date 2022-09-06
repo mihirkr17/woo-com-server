@@ -35,7 +35,7 @@ const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function
 // // verify owner
 const verifyAuth = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     yield dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
+    const userCollection = dbh.db("ecommerce-db").collection("users");
     const authEmail = req.decoded.email;
     const findAuthInDB = yield userCollection.findOne({
         email: authEmail && authEmail,
@@ -50,7 +50,7 @@ const verifyAuth = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
 // verify seller
 const verifySeller = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     yield dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
+    const userCollection = dbh.db("ecommerce-db").collection("users");
     const authEmail = req.decoded.email;
     const findAuthInDB = yield userCollection.findOne({
         email: authEmail && authEmail,
@@ -65,7 +65,7 @@ const verifySeller = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
 // verify seller
 const verifyUser = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     yield dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
+    const userCollection = dbh.db("ecommerce-db").collection("users");
     const authEmail = req.decoded.email;
     const findAuthInDB = yield userCollection.findOne({
         email: authEmail && authEmail,

@@ -1,26 +1,33 @@
 import { Request, Response } from "express";
-const { dbh } = require("../../utils/db");
+const { dbConnection } = require("../../utils/db");
 var jwt = require("jsonwebtoken");
 const { ObjectId } = require("mongodb");
 
-module.exports.fetchAuthUser = async (req: Request, res: Response) => {
+module.exports.fetchAuthUser = async (
+  req: Request,
+  res: Response,
+  next: any
+) => {
   try {
-    await dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
     const authEmail: string = req.headers.authorization || "";
-
+    
     if (!authEmail || typeof authEmail === "undefined") {
       return res
         .status(400)
         .send({ success: false, error: "Authorization header is missing!" });
     }
 
-    await userCollection.updateOne(
-      { email: authEmail },
-      { $pull: { myCartProduct: { stock: "out" } } }
-    );
+    await db
+      .collection("users")
+      .updateOne(
+        { email: authEmail },
+        { $pull: { myCartProduct: { stock: "out" } } }
+      );
 
-    const result = await userCollection.findOne({ email: authEmail });
+    await db.collection("users").createIndex({ email: 1 });
+
+    const result = await db.collection("users").findOne({ email: authEmail });
 
     return result
       ? res.status(200).send({ success: true, statusCode: 200, data: result })
@@ -28,15 +35,15 @@ module.exports.fetchAuthUser = async (req: Request, res: Response) => {
           .status(500)
           .send({ success: false, error: "Something went wrong!" });
   } catch (error: any) {
-    res.status(500).send({ error: error.message });
+    // res.status(500).send({ error: error.message });
+    next(error);
   }
 };
 
 module.exports.signUser = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
+    const db = await dbConnection();
 
-    const userCollection = dbh.db("Users").collection("user");
     const authEmail = req.headers.authorization?.split(" ")[1];
     const { name, photoURL } = req.body;
 
@@ -65,13 +72,15 @@ module.exports.signUser = async (req: Request, res: Response) => {
           : res.status(400).send({ error: "Bad request" });
       };
 
-      const existsUser = await userCollection.findOne({ email: authEmail });
+      const existsUser = await db
+        .collection("users")
+        .findOne({ email: authEmail });
 
       if (existsUser) {
         return setToken();
       }
 
-      const newUser = await userCollection.updateOne(
+      const newUser = await db.collection("users").updateOne(
         { email: authEmail },
         {
           $set: {
@@ -102,8 +111,7 @@ module.exports.signOutUser = async (req: Request, res: Response) => {
 
 module.exports.switchRole = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
 
     const userEmail = req.decoded.email;
     const userID = req.headers.authorization?.split(" ")[1];
@@ -125,11 +133,13 @@ module.exports.switchRole = async (req: Request, res: Response) => {
     }
 
     if (userID && userEmail) {
-      const result = await userCollection.updateOne(
-        { _id: ObjectId(userID), email: userEmail },
-        { $set: roleModel },
-        { upsert: true }
-      );
+      const result = await db
+        .collection("users")
+        .updateOne(
+          { _id: ObjectId(userID), email: userEmail },
+          { $set: roleModel },
+          { upsert: true }
+        );
 
       if (result) return res.status(200).send(result);
     }
@@ -140,14 +150,11 @@ module.exports.switchRole = async (req: Request, res: Response) => {
 
 module.exports.updateProfileData = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
     const email: string = req.decoded.email;
-    const result = await userCollection.updateOne(
-      { email: email },
-      { $set: req.body },
-      { upsert: true }
-    );
+    const result = await db
+      .collection("users")
+      .updateOne({ email: email }, { $set: req.body }, { upsert: true });
     res.status(200).send(result);
   } catch (error: any) {
     res.status(500).send({ error: error?.message });
@@ -156,8 +163,8 @@ module.exports.updateProfileData = async (req: Request, res: Response) => {
 
 module.exports.makeAdmin = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
+
     const userId: string = req.params.userId;
 
     if (!ObjectId.isValid(userId)) {
@@ -166,11 +173,13 @@ module.exports.makeAdmin = async (req: Request, res: Response) => {
         .send({ success: false, error: "User ID not valid" });
     }
 
-    const result = await userCollection.updateOne(
-      { _id: ObjectId(userId) },
-      { $set: { role: "admin" } },
-      { upsert: true }
-    );
+    const result = await db
+      .collection("users")
+      .updateOne(
+        { _id: ObjectId(userId) },
+        { $set: { role: "admin" } },
+        { upsert: true }
+      );
 
     return result
       ? res.status(200).send({ success: true, message: "Permission granted" })
@@ -182,17 +191,19 @@ module.exports.makeAdmin = async (req: Request, res: Response) => {
 
 module.exports.demoteToUser = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
+
     const userId: string = req.params.userId;
     res
       .status(200)
       .send(
-        await userCollection.updateOne(
-          { _id: ObjectId(userId) },
-          { $set: { role: "user" } },
-          { upsert: true }
-        )
+        await db
+          .collection("users")
+          .updateOne(
+            { _id: ObjectId(userId) },
+            { $set: { role: "user" } },
+            { upsert: true }
+          )
       );
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
@@ -201,10 +212,12 @@ module.exports.demoteToUser = async (req: Request, res: Response) => {
 
 module.exports.manageUsers = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
+
     const uType = req.query.uTyp;
-    res.status(200).send(await userCollection.find({ role: uType }).toArray());
+    res
+      .status(200)
+      .send(await db.collection("users").find({ role: uType }).toArray());
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
   }
@@ -212,14 +225,14 @@ module.exports.manageUsers = async (req: Request, res: Response) => {
 
 module.exports.makeSellerRequest = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
+
     const userEmail = req.params.userEmail;
     let body = req.body;
     let existSellerName;
 
     if (body?.seller) {
-      existSellerName = await userCollection.findOne({
+      existSellerName = await db.collection("users").findOne({
         seller: body?.seller,
       });
     }
@@ -229,7 +242,7 @@ module.exports.makeSellerRequest = async (req: Request, res: Response) => {
         .status(200)
         .send({ message: "Seller name exists ! try to another" });
     } else {
-      const result = await userCollection.updateOne(
+      const result = await db.collection("users").updateOne(
         { email: userEmail },
         {
           $set: body,
@@ -245,11 +258,11 @@ module.exports.makeSellerRequest = async (req: Request, res: Response) => {
 
 module.exports.permitSellerRequest = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
+
     const userId: string = req.params.userId;
 
-    const result = await userCollection.updateOne(
+    const result = await db.collection("users").updateOne(
       { _id: ObjectId(userId) },
       {
         $set: { role: "seller", seller_request: "ok", isSeller: true },
@@ -266,11 +279,16 @@ module.exports.permitSellerRequest = async (req: Request, res: Response) => {
 
 module.exports.checkSellerRequest = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
+
     res
       .status(200)
-      .send(await userCollection.find({ seller_request: "pending" }).toArray());
+      .send(
+        await db
+          .collection("users")
+          .find({ seller_request: "pending" })
+          .toArray()
+      );
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
   }

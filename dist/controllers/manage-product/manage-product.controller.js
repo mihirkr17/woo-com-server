@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const { dbh } = require("../../utils/db");
 module.exports.manageProduct = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     yield dbh.connect();
-    const productsCollection = dbh.db("Products").collection("product");
+    const productsCollection = dbh.db("ecommerce-db").collection("products");
     let item;
     let page;
     let seller_name = req.query.seller;

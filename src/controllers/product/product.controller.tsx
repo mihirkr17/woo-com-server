@@ -1,12 +1,12 @@
 import { Request, Response } from "express";
-const { dbh } = require("../../utils/db");
+const { dbh, dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const { productModel, productUpdateModel } = require("../../model/product");
 
 module.exports.searchProducts = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const productsCollection = dbh.db("Products").collection("product");
+    const db = await dbConnection();
+
     const q = req.params.q;
     const searchQuery = (sTxt: string) => {
       let findProduct: any = {
@@ -20,7 +20,7 @@ module.exports.searchProducts = async (req: Request, res: Response) => {
       return findProduct;
     };
 
-    const result = await productsCollection.find(searchQuery(q)).toArray();
+    const result = await db.collection("products").find(searchQuery(q)).toArray();
     res.status(200).send(result);
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
@@ -29,12 +29,12 @@ module.exports.searchProducts = async (req: Request, res: Response) => {
 
 module.exports.topRatedProducts = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const productsCollection = dbh.db("Products").collection("product");
+    const db = await dbConnection();
+
     res
       .status(200)
       .send(
-        await productsCollection
+        await db.collection("products")
           .find({ status: "active" })
           .sort({ rating_average: -1 })
           .limit(6)
@@ -47,12 +47,12 @@ module.exports.topRatedProducts = async (req: Request, res: Response) => {
 
 module.exports.topSellingProducts = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const productsCollection = dbh.db("Products").collection("product");
+    const db = await dbConnection();
+    
     res
       .status(200)
       .send(
-        await productsCollection
+        await db.collection("products")
           .find({ status: "active" })
           .sort({ top_sell: -1 })
           .limit(6)
@@ -65,10 +65,10 @@ module.exports.topSellingProducts = async (req: Request, res: Response) => {
 
 module.exports.countProducts = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const productsCollection = dbh.db("Products").collection("product");
+    const db = await dbConnection();
+
     const seller = req.query.seller;
-    let result = await productsCollection.countDocuments(
+    let result = await db.collection("products").countDocuments(
       seller && { seller: seller }
     );
     res.status(200).send({ count: result });
@@ -79,17 +79,15 @@ module.exports.countProducts = async (req: Request, res: Response) => {
 
 module.exports.deleteProducts = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const productsCollection = dbh.db("Products").collection("product");
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
 
     const productId: string = req.params.productId;
-    const result = await productsCollection.deleteOne({
+    const result = await db.collection("products").deleteOne({
       _id: ObjectId(productId),
     });
 
     if (result) {
-      await userCollection.updateMany(
+      await db.collection("users").updateMany(
         { "myCartProduct._id": productId },
         { $pull: { myCartProduct: { _id: productId } } }
       );
@@ -104,20 +102,19 @@ module.exports.deleteProducts = async (req: Request, res: Response) => {
 
 module.exports.updateProduct = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const productsCollection = dbh.db("Products").collection("product");
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
+
     const productId = req.params.productId;
     const body = req.body;
     const model = productUpdateModel(body);
 
     const exists =
-      (await userCollection
+      (await db.collection("users")
         .find({ "myCartProduct._id": productId })
         .toArray()) || [];
 
     if (exists && exists.length > 0) {
-      await userCollection.updateMany(
+      await db.collection("users").updateMany(
         { "myCartProduct._id": productId },
         {
           $pull: { myCartProduct: { _id: productId } },
@@ -125,7 +122,7 @@ module.exports.updateProduct = async (req: Request, res: Response) => {
       );
     }
 
-    const result = await productsCollection.updateOne(
+    const result = await db.collection("products").updateOne(
       { _id: ObjectId(productId) },
       { $set: model },
       { upsert: true }
@@ -139,15 +136,15 @@ module.exports.updateProduct = async (req: Request, res: Response) => {
 
 module.exports.updateStock = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const productsCollection = dbh.db("Products").collection("product");
+    const db = await dbConnection();
+    
     const productId = req.headers.authorization;
     const body = req.body;
 
     let stock = body?.available <= 1 ? "out" : "in";
 
     if (productId && body) {
-      const result = await productsCollection.updateOne(
+      const result = await db.collection("products").updateOne(
         { _id: ObjectId(productId) },
         { $set: { available: body?.available, stock } },
         { upsert: true }
@@ -163,10 +160,10 @@ module.exports.updateStock = async (req: Request, res: Response) => {
 module.exports.addProductHandler = async (req: Request, res: Response) => {
   const body = req.body;
   try {
-    await dbh.connect();
-    const productsCollection = dbh.db("Products").collection("product");
+    const db = await dbConnection();
+    
     const model = productModel(body);
-    await productsCollection.insertOne(model);
+    await db.collection("products").insertOne(model);
     res.status(200).send({ message: "Product added successfully" });
   } catch (error: any) {
     res.status(500).send({ message: error.message });
@@ -175,11 +172,10 @@ module.exports.addProductHandler = async (req: Request, res: Response) => {
 
 module.exports.allProducts = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const productsCollection = dbh.db("Products").collection("product");
+    const db = await dbConnection();
     const totalLimits = parseInt(req.params.limits);
 
-    const result = await productsCollection
+    const result = await db.collection("products")
       .find({ status: "active" })
       .sort({ _id: -1 })
       .limit(totalLimits)
@@ -195,29 +191,34 @@ module.exports.allProducts = async (req: Request, res: Response) => {
 
 module.exports.fetchSingleProduct = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const productsCollection = dbh.db("Products").collection("product");
-    const productPolicy = dbh.db("Products").collection("policy");
-    const userCollection = dbh.db("Users").collection("user");
-    const email = req.params.email;
+    const db = await dbConnection();
+
+    const email = req.query.email;
     const product_slug = req.params.product_slug;
     let inCart: boolean;
     let inWishlist: boolean;
+    
 
-    let result = await productsCollection.findOne({
+    await db.collection("products").createIndex({ slug: 1, status: 1 });
+
+    let result = await db.collection("products").findOne({
       slug: product_slug,
       status: "active",
     });
 
-    if (result) {
-      const policy = await productPolicy.findOne({});
+    if (!result) {
+      return res
+        .status(400)
+        .send({ success: false, error: "Product not found!" });
+    }
 
-      const existProductInCart = await userCollection.findOne(
+    if (email) {
+      const existProductInCart = await db.collection("users").findOne(
         { email: email, "myCartProduct.slug": product_slug },
         { "myCartProduct.$": 1 }
       );
 
-      const existProductInWishlist = await userCollection.findOne(
+      const existProductInWishlist = await db.collection("users").findOne(
         { email: email, "wishlist.slug": product_slug },
         { "wishlist.$": 1 }
       );
@@ -228,20 +229,17 @@ module.exports.fetchSingleProduct = async (req: Request, res: Response) => {
         inWishlist = false;
       }
 
-      await productsCollection.createIndex({ slug: 1 });
-
       if (existProductInCart) {
         inCart = true;
       } else {
         inCart = false;
       }
       result["inCart"] = inCart;
-      result["policy"] = policy;
+      // result["policy"] = policy;
       result["inWishlist"] = inWishlist;
-      res.status(200).send(result);
-    } else {
-      return res.status(404).send({ message: "Not Found" });
     }
+
+    return res.status(200).send(result);
   } catch (error: any) {
     res.status(500).send({ message: error.message });
   }
@@ -252,12 +250,13 @@ module.exports.fetchSingleProductByPid = async (
   res: Response
 ) => {
   try {
-    await dbh.connect();
-    const productsCollection = dbh.db("Products").collection("product");
+    const db = await dbConnection();
+
+
     const productId = req.query.pid;
     const seller = req.query.seller;
     return res.status(200).send(
-      await productsCollection.findOne({
+      await db.collection("products").findOne({
         _id: ObjectId(productId),
         seller: seller,
       })
@@ -269,8 +268,8 @@ module.exports.fetchSingleProductByPid = async (
 
 module.exports.productByCategory = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const productsCollection = dbh.db("Products").collection("product");
+    const db = await dbConnection();
+
     let findQuery: any;
     const productCategory = req.query.category;
     const productSubCategory = req.query.sb_category;
@@ -312,7 +311,7 @@ module.exports.productByCategory = async (req: Request, res: Response) => {
       };
     }
 
-    const tt = await productsCollection
+    const tt = await db.collection("products")
       .find(findQuery, { price_fixed: { $exists: 1 } })
       .sort(sorting)
       .toArray();
@@ -326,8 +325,8 @@ module.exports.productByCategory = async (req: Request, res: Response) => {
 
 module.exports.fetchTopSellingProduct = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const productsCollection = dbh.db("Products").collection("product");
+    const db = await dbConnection();
+
     const seller: any = req.query.seller;
     let filterQuery: any = {
       status: "active",
@@ -336,7 +335,7 @@ module.exports.fetchTopSellingProduct = async (req: Request, res: Response) => {
       filterQuery["seller"] = seller;
     }
 
-    const result = await productsCollection
+    const result = await db.collection("products")
       .find(filterQuery)
       .sort({ top_sell: -1 })
       .limit(6)
@@ -348,8 +347,8 @@ module.exports.fetchTopSellingProduct = async (req: Request, res: Response) => {
 };
 
 module.exports.manageProduct = async (req: Request, res: Response) => {
-  await dbh.connect();
-  const productsCollection = dbh.db("Products").collection("product");
+  const db = await dbConnection();
+
   let item: any;
   let page: any;
   let seller_name: any = req.query.seller;
@@ -392,10 +391,10 @@ module.exports.manageProduct = async (req: Request, res: Response) => {
   try {
     cursor =
       searchText && searchText.length > 0
-        ? productsCollection.find(searchQuery(searchText, seller_name || ""))
+        ? db.collection("products").find(searchQuery(searchText, seller_name || ""))
         : filters && filters !== "all"
-        ? productsCollection.find(filterQuery(filters, seller_name || ""))
-        : productsCollection.find(
+        ? db.collection("products").find(filterQuery(filters, seller_name || ""))
+        : db.collection("products").find(
             (seller_name && { seller: seller_name }) || {}
           );
 

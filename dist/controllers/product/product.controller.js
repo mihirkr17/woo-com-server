@@ -9,13 +9,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const { dbh } = require("../../utils/db");
+const { dbh, dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const { productModel, productUpdateModel } = require("../../model/product");
 module.exports.searchProducts = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const productsCollection = dbh.db("Products").collection("product");
+        const db = yield dbConnection();
         const q = req.params.q;
         const searchQuery = (sTxt) => {
             let findProduct = {
@@ -28,7 +27,7 @@ module.exports.searchProducts = (req, res) => __awaiter(void 0, void 0, void 0, 
             };
             return findProduct;
         };
-        const result = yield productsCollection.find(searchQuery(q)).toArray();
+        const result = yield db.collection("products").find(searchQuery(q)).toArray();
         res.status(200).send(result);
     }
     catch (error) {
@@ -37,11 +36,10 @@ module.exports.searchProducts = (req, res) => __awaiter(void 0, void 0, void 0, 
 });
 module.exports.topRatedProducts = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const productsCollection = dbh.db("Products").collection("product");
+        const db = yield dbConnection();
         res
             .status(200)
-            .send(yield productsCollection
+            .send(yield db.collection("products")
             .find({ status: "active" })
             .sort({ rating_average: -1 })
             .limit(6)
@@ -53,11 +51,10 @@ module.exports.topRatedProducts = (req, res) => __awaiter(void 0, void 0, void 0
 });
 module.exports.topSellingProducts = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const productsCollection = dbh.db("Products").collection("product");
+        const db = yield dbConnection();
         res
             .status(200)
-            .send(yield productsCollection
+            .send(yield db.collection("products")
             .find({ status: "active" })
             .sort({ top_sell: -1 })
             .limit(6)
@@ -69,10 +66,9 @@ module.exports.topSellingProducts = (req, res) => __awaiter(void 0, void 0, void
 });
 module.exports.countProducts = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const productsCollection = dbh.db("Products").collection("product");
+        const db = yield dbConnection();
         const seller = req.query.seller;
-        let result = yield productsCollection.countDocuments(seller && { seller: seller });
+        let result = yield db.collection("products").countDocuments(seller && { seller: seller });
         res.status(200).send({ count: result });
     }
     catch (error) {
@@ -81,15 +77,13 @@ module.exports.countProducts = (req, res) => __awaiter(void 0, void 0, void 0, f
 });
 module.exports.deleteProducts = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const productsCollection = dbh.db("Products").collection("product");
-        const userCollection = dbh.db("Users").collection("user");
+        const db = yield dbConnection();
         const productId = req.params.productId;
-        const result = yield productsCollection.deleteOne({
+        const result = yield db.collection("products").deleteOne({
             _id: ObjectId(productId),
         });
         if (result) {
-            yield userCollection.updateMany({ "myCartProduct._id": productId }, { $pull: { myCartProduct: { _id: productId } } });
+            yield db.collection("users").updateMany({ "myCartProduct._id": productId }, { $pull: { myCartProduct: { _id: productId } } });
             return res.status(200).send({ message: "Product deleted successfully." });
         }
         else {
@@ -102,21 +96,19 @@ module.exports.deleteProducts = (req, res) => __awaiter(void 0, void 0, void 0, 
 });
 module.exports.updateProduct = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const productsCollection = dbh.db("Products").collection("product");
-        const userCollection = dbh.db("Users").collection("user");
+        const db = yield dbConnection();
         const productId = req.params.productId;
         const body = req.body;
         const model = productUpdateModel(body);
-        const exists = (yield userCollection
+        const exists = (yield db.collection("users")
             .find({ "myCartProduct._id": productId })
             .toArray()) || [];
         if (exists && exists.length > 0) {
-            yield userCollection.updateMany({ "myCartProduct._id": productId }, {
+            yield db.collection("users").updateMany({ "myCartProduct._id": productId }, {
                 $pull: { myCartProduct: { _id: productId } },
             });
         }
-        const result = yield productsCollection.updateOne({ _id: ObjectId(productId) }, { $set: model }, { upsert: true });
+        const result = yield db.collection("products").updateOne({ _id: ObjectId(productId) }, { $set: model }, { upsert: true });
         res.status(200).send(result && { message: "Product updated successfully" });
     }
     catch (error) {
@@ -125,13 +117,12 @@ module.exports.updateProduct = (req, res) => __awaiter(void 0, void 0, void 0, f
 });
 module.exports.updateStock = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const productsCollection = dbh.db("Products").collection("product");
+        const db = yield dbConnection();
         const productId = req.headers.authorization;
         const body = req.body;
         let stock = (body === null || body === void 0 ? void 0 : body.available) <= 1 ? "out" : "in";
         if (productId && body) {
-            const result = yield productsCollection.updateOne({ _id: ObjectId(productId) }, { $set: { available: body === null || body === void 0 ? void 0 : body.available, stock } }, { upsert: true });
+            const result = yield db.collection("products").updateOne({ _id: ObjectId(productId) }, { $set: { available: body === null || body === void 0 ? void 0 : body.available, stock } }, { upsert: true });
             res.status(200).send(result);
         }
     }
@@ -142,10 +133,9 @@ module.exports.updateStock = (req, res) => __awaiter(void 0, void 0, void 0, fun
 module.exports.addProductHandler = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const body = req.body;
     try {
-        yield dbh.connect();
-        const productsCollection = dbh.db("Products").collection("product");
+        const db = yield dbConnection();
         const model = productModel(body);
-        yield productsCollection.insertOne(model);
+        yield db.collection("products").insertOne(model);
         res.status(200).send({ message: "Product added successfully" });
     }
     catch (error) {
@@ -154,10 +144,9 @@ module.exports.addProductHandler = (req, res) => __awaiter(void 0, void 0, void 
 });
 module.exports.allProducts = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const productsCollection = dbh.db("Products").collection("product");
+        const db = yield dbConnection();
         const totalLimits = parseInt(req.params.limits);
-        const result = yield productsCollection
+        const result = yield db.collection("products")
             .find({ status: "active" })
             .sort({ _id: -1 })
             .limit(totalLimits)
@@ -172,29 +161,30 @@ module.exports.allProducts = (req, res) => __awaiter(void 0, void 0, void 0, fun
 });
 module.exports.fetchSingleProduct = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const productsCollection = dbh.db("Products").collection("product");
-        const productPolicy = dbh.db("Products").collection("policy");
-        const userCollection = dbh.db("Users").collection("user");
-        const email = req.params.email;
+        const db = yield dbConnection();
+        const email = req.query.email;
         const product_slug = req.params.product_slug;
         let inCart;
         let inWishlist;
-        let result = yield productsCollection.findOne({
+        yield db.collection("products").createIndex({ slug: 1, status: 1 });
+        let result = yield db.collection("products").findOne({
             slug: product_slug,
             status: "active",
         });
-        if (result) {
-            const policy = yield productPolicy.findOne({});
-            const existProductInCart = yield userCollection.findOne({ email: email, "myCartProduct.slug": product_slug }, { "myCartProduct.$": 1 });
-            const existProductInWishlist = yield userCollection.findOne({ email: email, "wishlist.slug": product_slug }, { "wishlist.$": 1 });
+        if (!result) {
+            return res
+                .status(400)
+                .send({ success: false, error: "Product not found!" });
+        }
+        if (email) {
+            const existProductInCart = yield db.collection("users").findOne({ email: email, "myCartProduct.slug": product_slug }, { "myCartProduct.$": 1 });
+            const existProductInWishlist = yield db.collection("users").findOne({ email: email, "wishlist.slug": product_slug }, { "wishlist.$": 1 });
             if (existProductInWishlist) {
                 inWishlist = true;
             }
             else {
                 inWishlist = false;
             }
-            yield productsCollection.createIndex({ slug: 1 });
             if (existProductInCart) {
                 inCart = true;
             }
@@ -202,13 +192,10 @@ module.exports.fetchSingleProduct = (req, res) => __awaiter(void 0, void 0, void
                 inCart = false;
             }
             result["inCart"] = inCart;
-            result["policy"] = policy;
+            // result["policy"] = policy;
             result["inWishlist"] = inWishlist;
-            res.status(200).send(result);
         }
-        else {
-            return res.status(404).send({ message: "Not Found" });
-        }
+        return res.status(200).send(result);
     }
     catch (error) {
         res.status(500).send({ message: error.message });
@@ -216,11 +203,10 @@ module.exports.fetchSingleProduct = (req, res) => __awaiter(void 0, void 0, void
 });
 module.exports.fetchSingleProductByPid = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const productsCollection = dbh.db("Products").collection("product");
+        const db = yield dbConnection();
         const productId = req.query.pid;
         const seller = req.query.seller;
-        return res.status(200).send(yield productsCollection.findOne({
+        return res.status(200).send(yield db.collection("products").findOne({
             _id: ObjectId(productId),
             seller: seller,
         }));
@@ -231,8 +217,7 @@ module.exports.fetchSingleProductByPid = (req, res) => __awaiter(void 0, void 0,
 });
 module.exports.productByCategory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const productsCollection = dbh.db("Products").collection("product");
+        const db = yield dbConnection();
         let findQuery;
         const productCategory = req.query.category;
         const productSubCategory = req.query.sb_category;
@@ -271,7 +256,7 @@ module.exports.productByCategory = (req, res) => __awaiter(void 0, void 0, void 
                 status: "active",
             };
         }
-        const tt = yield productsCollection
+        const tt = yield db.collection("products")
             .find(findQuery, { price_fixed: { $exists: 1 } })
             .sort(sorting)
             .toArray();
@@ -285,8 +270,7 @@ module.exports.productByCategory = (req, res) => __awaiter(void 0, void 0, void 
 });
 module.exports.fetchTopSellingProduct = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const productsCollection = dbh.db("Products").collection("product");
+        const db = yield dbConnection();
         const seller = req.query.seller;
         let filterQuery = {
             status: "active",
@@ -294,7 +278,7 @@ module.exports.fetchTopSellingProduct = (req, res) => __awaiter(void 0, void 0, 
         if (seller) {
             filterQuery["seller"] = seller;
         }
-        const result = yield productsCollection
+        const result = yield db.collection("products")
             .find(filterQuery)
             .sort({ top_sell: -1 })
             .limit(6)
@@ -306,8 +290,7 @@ module.exports.fetchTopSellingProduct = (req, res) => __awaiter(void 0, void 0, 
     }
 });
 module.exports.manageProduct = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    yield dbh.connect();
-    const productsCollection = dbh.db("Products").collection("product");
+    const db = yield dbConnection();
     let item;
     let page;
     let seller_name = req.query.seller;
@@ -346,10 +329,10 @@ module.exports.manageProduct = (req, res) => __awaiter(void 0, void 0, void 0, f
     try {
         cursor =
             searchText && searchText.length > 0
-                ? productsCollection.find(searchQuery(searchText, seller_name || ""))
+                ? db.collection("products").find(searchQuery(searchText, seller_name || ""))
                 : filters && filters !== "all"
-                    ? productsCollection.find(filterQuery(filters, seller_name || ""))
-                    : productsCollection.find((seller_name && { seller: seller_name }) || {});
+                    ? db.collection("products").find(filterQuery(filters, seller_name || ""))
+                    : db.collection("products").find((seller_name && { seller: seller_name }) || {});
         if (item || page) {
             result = yield cursor
                 .skip(page * parseInt(item))

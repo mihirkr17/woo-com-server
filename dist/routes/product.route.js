@@ -17,7 +17,7 @@ try {
     router.put("/update-stock", verifyJWT, verifySeller, updateStock);
     router.post("/add-product", verifyJWT, addProductHandler);
     router.get("/all-products/:limits", allProducts);
-    router.get("/fetch-single-product/:product_slug/:email", fetchSingleProduct);
+    router.get("/fetch-single-product/:product_slug", fetchSingleProduct);
     router.get("/fetch-single-product-by-pid", fetchSingleProductByPid);
     router.get("/product-by-category", productByCategory);
     router.get("/fetch-top-selling-product", fetchTopSellingProduct);

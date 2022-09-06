@@ -12,6 +12,7 @@ const orderRoutes = require("./routes/order.route");
 const reviewRoutes = require("./routes/review.route");
 const policyRoutes = require("./routes/policy.route");
 const wishlistRoutes = require("./routes/wishlist.route");
+const errorHandlers = require("./errors/errors");
 const port = process.env.PORT || 5000;
 // Server setup
 const cors = require("cors");
@@ -36,6 +37,7 @@ app.use("/api/order", orderRoutes);
 app.use("/api/review", reviewRoutes);
 app.use("/api/policy", policyRoutes);
 app.use("/api/wishlist", wishlistRoutes);
+app.use(errorHandlers);
 const server = app.listen(port, () => {
     console.log(`Running port is ${port}`);
 });

@@ -1,12 +1,10 @@
 import { Request, Response } from "express";
-const { dbh } = require("../../utils/db");
+const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 
 module.exports.updateProductQuantity = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const productsCollection = dbh.db("Products").collection("product");
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
 
     const userEmail: string = req.decoded.email;
     const cart_types: string = req.params.cartTypes;
@@ -19,7 +17,7 @@ module.exports.updateProductQuantity = async (req: Request, res: Response) => {
       return res.status(400).send({ message: "Bad request! headers missing" });
     }
 
-    const availableProduct = await productsCollection.findOne({
+    const availableProduct = await db.collection("products").findOne({
       _id: ObjectId(productId),
       available: { $gte: 1 },
       stock: "in",
@@ -32,7 +30,7 @@ module.exports.updateProductQuantity = async (req: Request, res: Response) => {
       });
     }
 
-    const cart = await userCollection.findOne({
+    const cart = await db.collection("users").findOne({
       email: userEmail,
     });
 
@@ -75,15 +73,19 @@ module.exports.updateProductQuantity = async (req: Request, res: Response) => {
         };
       }
 
-      const result = await userCollection.updateOne(filters, updateDocuments, {
-        upsert: true,
-      });
+      const result = await db
+        .collection("users")
+        .updateOne(filters, updateDocuments, {
+          upsert: true,
+        });
       return res.status(200).send(result);
     } else {
-      await userCollection.updateOne(
-        { email: userEmail },
-        { $pull: { myCartProduct: { _id: productId } } }
-      );
+      await db
+        .collection("users")
+        .updateOne(
+          { email: userEmail },
+          { $pull: { myCartProduct: { _id: productId } } }
+        );
       return res.status(200).send({
         message: "This product is out of stock now and removed from your cart",
       });
@@ -95,8 +97,7 @@ module.exports.updateProductQuantity = async (req: Request, res: Response) => {
 
 module.exports.deleteCartItem = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
 
     const productId = req.headers.authorization;
     const userEmail = req.decoded.email;
@@ -108,15 +109,16 @@ module.exports.deleteCartItem = async (req: Request, res: Response) => {
     }
 
     if (cart_types === "buy") {
-      updateDocuments = await userCollection.updateOne(
-        { email: userEmail },
-        { $unset: { buy_product: "" } }
-      );
+      updateDocuments = await db
+        .collection("users")
+        .updateOne({ email: userEmail }, { $unset: { buy_product: "" } });
     } else {
-      updateDocuments = await userCollection.updateOne(
-        { email: userEmail },
-        { $pull: { myCartProduct: { _id: productId } } }
-      );
+      updateDocuments = await db
+        .collection("users")
+        .updateOne(
+          { email: userEmail },
+          { $pull: { myCartProduct: { _id: productId } } }
+        );
     }
 
     res
@@ -129,22 +131,23 @@ module.exports.deleteCartItem = async (req: Request, res: Response) => {
 
 module.exports.addToCartHandler = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
-    const productsCollection = dbh.db("Products").collection("product");
+    const db = await dbConnection();
+
     const email: string = req.decoded.email;
     const body = req.body;
 
-    const availableProduct = await productsCollection.findOne({
+    const availableProduct = await db.collection("products").findOne({
       _id: ObjectId(body?._id),
       status: "active",
     });
 
     if (availableProduct?.stock === "in" && availableProduct?.available > 0) {
-      const existsProduct = await userCollection.findOne(
-        { email: email, "myCartProduct._id": body?._id },
-        { "myCartProduct.$": 1 }
-      );
+      const existsProduct = await db
+        .collection("users")
+        .findOne(
+          { email: email, "myCartProduct._id": body?._id },
+          { "myCartProduct.$": 1 }
+        );
 
       if (existsProduct) {
         return res
@@ -153,7 +156,7 @@ module.exports.addToCartHandler = async (req: Request, res: Response) => {
       } else {
         body["addedAt"] = new Date(Date.now());
 
-        const cartRes = await userCollection.updateOne(
+        const cartRes = await db.collection("users").updateOne(
           { email: email },
           {
             $push: { myCartProduct: body },
@@ -173,15 +176,17 @@ module.exports.addToCartHandler = async (req: Request, res: Response) => {
 
 module.exports.addToBuyHandler = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
+
     const userEmail = req.decoded.email;
     const body = req.body;
-    const cartRes = await userCollection.updateOne(
-      { email: userEmail },
-      { $set: { buy_product: body } },
-      { upsert: true }
-    );
+    const cartRes = await db
+      .collection("users")
+      .updateOne(
+        { email: userEmail },
+        { $set: { buy_product: body } },
+        { upsert: true }
+      );
     res.status(200).send(cartRes);
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
@@ -190,15 +195,17 @@ module.exports.addToBuyHandler = async (req: Request, res: Response) => {
 
 module.exports.addCartAddress = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
+
     const userEmail = req.decoded.email;
     const body = req.body;
-    const result = await userCollection.updateOne(
-      { email: userEmail },
-      { $push: { address: body } },
-      { upsert: true }
-    );
+    const result = await db
+      .collection("users")
+      .updateOne(
+        { email: userEmail },
+        { $push: { address: body } },
+        { upsert: true }
+      );
     res.send(result);
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
@@ -207,12 +214,12 @@ module.exports.addCartAddress = async (req: Request, res: Response) => {
 
 module.exports.updateCartAddress = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
+
     const userEmail = req.decoded.email;
     const body = req.body;
 
-    const result = await userCollection.updateOne(
+    const result = await db.collection("users").updateOne(
       { email: userEmail },
       {
         $set: {
@@ -229,17 +236,16 @@ module.exports.updateCartAddress = async (req: Request, res: Response) => {
 
 module.exports.selectCartAddress = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
     const userEmail = req.decoded.email;
     const { addressId, select_address } = req.body;
 
-    const addr = await userCollection.findOne({ email: userEmail });
+    const addr = await db.collection("users").findOne({ email: userEmail });
     if (addr) {
       const addressArr = addr?.address;
 
       if (addressArr && addressArr.length > 0) {
-        await userCollection.updateOne(
+        await db.collection("users").updateOne(
           { email: userEmail },
           {
             $set: {
@@ -254,7 +260,7 @@ module.exports.selectCartAddress = async (req: Request, res: Response) => {
       }
     }
 
-    let result = await userCollection.updateOne(
+    let result = await db.collection("users").updateOne(
       { email: userEmail },
       {
         $set: {
@@ -272,14 +278,13 @@ module.exports.selectCartAddress = async (req: Request, res: Response) => {
 
 module.exports.deleteCartAddress = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
+
     const email = req.decoded.email;
     const addressId = parseInt(req.params.addressId);
-    const result = await userCollection.updateOne(
-      { email: email },
-      { $pull: { address: { addressId } } }
-    );
+    const result = await db
+      .collection("users")
+      .updateOne({ email: email }, { $pull: { address: { addressId } } });
     if (result) return res.send(result);
   } catch (error: any) {
     res.status(500).send({ message: error?.message });

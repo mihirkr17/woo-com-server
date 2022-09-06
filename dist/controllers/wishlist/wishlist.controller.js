@@ -9,18 +9,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const { dbh } = require("../../utils/db");
+const { dbConnection } = require("../../utils/db");
 module.exports.addToWishlistHandler = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const userCollection = dbh.db("Users").collection("user");
+        const db = yield dbConnection();
         const userEmail = req.params.email;
         const verifiedEmail = req.decoded.email;
         const body = req.body;
         if (userEmail !== verifiedEmail) {
             return res.status(403).send({ message: "Forbidden" });
         }
-        const existsProduct = yield userCollection.findOne({
+        const existsProduct = yield db.collection("users").findOne({
             email: userEmail,
             "wishlist._id": body === null || body === void 0 ? void 0 : body._id,
         }, {
@@ -35,7 +34,9 @@ module.exports.addToWishlistHandler = (req, res) => __awaiter(void 0, void 0, vo
             const up = {
                 $push: { wishlist: body },
             };
-            const wishlistRes = yield userCollection.updateOne({ email: userEmail }, up, { upsert: true });
+            const wishlistRes = yield db
+                .collection("users")
+                .updateOne({ email: userEmail }, up, { upsert: true });
             res.status(200).send({
                 data: wishlistRes,
                 message: "Product Added To Your wishlist",
@@ -48,11 +49,12 @@ module.exports.addToWishlistHandler = (req, res) => __awaiter(void 0, void 0, vo
 });
 module.exports.removeFromWishlistHandler = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const userCollection = dbh.db("Users").collection("user");
+        const db = yield dbConnection();
         const productId = req.params.productId;
         const userEmail = req.decoded.email;
-        const result = yield userCollection.updateOne({ email: userEmail }, { $pull: { wishlist: { _id: productId } } });
+        const result = yield db
+            .collection("users")
+            .updateOne({ email: userEmail }, { $pull: { wishlist: { _id: productId } } });
         if (result) {
             return res
                 .status(200)

@@ -1,18 +1,17 @@
 import { Request, Response } from "express";
-const { dbh } = require("../../utils/db");
+const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 
 module.exports.addProductRating = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const productsCollection = dbh.db("Products").collection("product");
-    const orderCollection = dbh.db("Products").collection("orders");
+    const db = await dbConnection();
+
     const productId = req.params.productId;
     const email = req.decoded.email;
     const body = req.body;
     const orderId = parseInt(body?.orderId);
 
-    await orderCollection.updateOne(
+    await db.collection("orders").updateOne(
       { user_email: email },
       {
         $set: {
@@ -22,7 +21,7 @@ module.exports.addProductRating = async (req: Request, res: Response) => {
       { upsert: true, arrayFilters: [{ "i.orderId": orderId }] }
     );
 
-    const products = await productsCollection.findOne({
+    const products = await db.collection("products").findOne({
       _id: ObjectId(productId),
       status: "active",
     });
@@ -89,7 +88,7 @@ module.exports.addProductRating = async (req: Request, res: Response) => {
       options = { upsert: true };
     }
 
-    const result = await productsCollection.updateOne(
+    const result = await db.collection("products").updateOne(
       { _id: ObjectId(productId) },
       filters,
       options

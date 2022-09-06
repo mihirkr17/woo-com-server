@@ -8,4 +8,9 @@ let dbh = new MongoClient(uri, {
   serverApi: ServerApiVersion.v1,
 });
 
-module.exports = { dbh };
+const dbConnection = async () => {
+  await dbh.connect();
+  return dbh.db("ecommerce-db");
+};
+
+module.exports = { dbConnection };

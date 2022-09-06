@@ -28,7 +28,7 @@ const verifyJWT = async (req: Request, res: Response, next: any) => {
 // // verify owner
 const verifyAuth = async (req: Request, res: Response, next: any) => {
   await dbh.connect();
-  const userCollection = dbh.db("Users").collection("user");
+  const userCollection = dbh.db("ecommerce-db").collection("users");
   const authEmail = req.decoded.email;
   const findAuthInDB = await userCollection.findOne({
     email: authEmail && authEmail,
@@ -44,7 +44,7 @@ const verifyAuth = async (req: Request, res: Response, next: any) => {
 // verify seller
 const verifySeller = async (req: Request, res: Response, next: any) => {
   await dbh.connect();
-  const userCollection = dbh.db("Users").collection("user");
+  const userCollection = dbh.db("ecommerce-db").collection("users");
 
   const authEmail = req.decoded.email;
   const findAuthInDB = await userCollection.findOne({
@@ -61,7 +61,7 @@ const verifySeller = async (req: Request, res: Response, next: any) => {
 // verify seller
 const verifyUser = async (req: Request, res: Response, next: any) => {
   await dbh.connect();
-  const userCollection = dbh.db("Users").collection("user");
+  const userCollection = dbh.db("ecommerce-db").collection("users");
 
   const authEmail = req.decoded.email;
   const findAuthInDB = await userCollection.findOne({

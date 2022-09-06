@@ -9,14 +9,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const { dbh } = require("../../utils/db");
+const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 module.exports.updateProductQuantity = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        yield dbh.connect();
-        const productsCollection = dbh.db("Products").collection("product");
-        const userCollection = dbh.db("Users").collection("user");
+        const db = yield dbConnection();
         const userEmail = req.decoded.email;
         const cart_types = req.params.cartTypes;
         const productId = req.headers.authorization;
@@ -26,7 +24,7 @@ module.exports.updateProductQuantity = (req, res) => __awaiter(void 0, void 0, v
         if (!productId) {
             return res.status(400).send({ message: "Bad request! headers missing" });
         }
-        const availableProduct = yield productsCollection.findOne({
+        const availableProduct = yield db.collection("products").findOne({
             _id: ObjectId(productId),
             available: { $gte: 1 },
             stock: "in",
@@ -37,7 +35,7 @@ module.exports.updateProductQuantity = (req, res) => __awaiter(void 0, void 0, v
                 message: "Your selected quantity out of range in available product",
             });
         }
-        const cart = yield userCollection.findOne({
+        const cart = yield db.collection("users").findOne({
             email: userEmail,
         });
         if (availableProduct) {
@@ -72,13 +70,17 @@ module.exports.updateProductQuantity = (req, res) => __awaiter(void 0, void 0, v
                     "myCartProduct._id": productId,
                 };
             }
-            const result = yield userCollection.updateOne(filters, updateDocuments, {
+            const result = yield db
+                .collection("users")
+                .updateOne(filters, updateDocuments, {
                 upsert: true,
             });
             return res.status(200).send(result);
         }
         else {
-            yield userCollection.updateOne({ email: userEmail }, { $pull: { myCartProduct: { _id: productId } } });
+            yield db
+                .collection("users")
+                .updateOne({ email: userEmail }, { $pull: { myCartProduct: { _id: productId } } });
             return res.status(200).send({
                 message: "This product is out of stock now and removed from your cart",
             });
@@ -90,8 +92,7 @@ module.exports.updateProductQuantity = (req, res) => __awaiter(void 0, void 0, v
 });
 module.exports.deleteCartItem = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const userCollection = dbh.db("Users").collection("user");
+        const db = yield dbConnection();
         const productId = req.headers.authorization;
         const userEmail = req.decoded.email;
         const cart_types = req.params.cartTypes;
@@ -100,10 +101,14 @@ module.exports.deleteCartItem = (req, res) => __awaiter(void 0, void 0, void 0, 
             return res.status(400).send({ message: "Bad request! headers missing" });
         }
         if (cart_types === "buy") {
-            updateDocuments = yield userCollection.updateOne({ email: userEmail }, { $unset: { buy_product: "" } });
+            updateDocuments = yield db
+                .collection("users")
+                .updateOne({ email: userEmail }, { $unset: { buy_product: "" } });
         }
         else {
-            updateDocuments = yield userCollection.updateOne({ email: userEmail }, { $pull: { myCartProduct: { _id: productId } } });
+            updateDocuments = yield db
+                .collection("users")
+                .updateOne({ email: userEmail }, { $pull: { myCartProduct: { _id: productId } } });
         }
         res
             .status(200)
@@ -115,17 +120,17 @@ module.exports.deleteCartItem = (req, res) => __awaiter(void 0, void 0, void 0, 
 });
 module.exports.addToCartHandler = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const userCollection = dbh.db("Users").collection("user");
-        const productsCollection = dbh.db("Products").collection("product");
+        const db = yield dbConnection();
         const email = req.decoded.email;
         const body = req.body;
-        const availableProduct = yield productsCollection.findOne({
+        const availableProduct = yield db.collection("products").findOne({
             _id: ObjectId(body === null || body === void 0 ? void 0 : body._id),
             status: "active",
         });
         if ((availableProduct === null || availableProduct === void 0 ? void 0 : availableProduct.stock) === "in" && (availableProduct === null || availableProduct === void 0 ? void 0 : availableProduct.available) > 0) {
-            const existsProduct = yield userCollection.findOne({ email: email, "myCartProduct._id": body === null || body === void 0 ? void 0 : body._id }, { "myCartProduct.$": 1 });
+            const existsProduct = yield db
+                .collection("users")
+                .findOne({ email: email, "myCartProduct._id": body === null || body === void 0 ? void 0 : body._id }, { "myCartProduct.$": 1 });
             if (existsProduct) {
                 return res
                     .status(200)
@@ -133,7 +138,7 @@ module.exports.addToCartHandler = (req, res) => __awaiter(void 0, void 0, void 0
             }
             else {
                 body["addedAt"] = new Date(Date.now());
-                const cartRes = yield userCollection.updateOne({ email: email }, {
+                const cartRes = yield db.collection("users").updateOne({ email: email }, {
                     $push: { myCartProduct: body },
                 }, { upsert: true });
                 res.status(200).send({
@@ -149,11 +154,12 @@ module.exports.addToCartHandler = (req, res) => __awaiter(void 0, void 0, void 0
 });
 module.exports.addToBuyHandler = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const userCollection = dbh.db("Users").collection("user");
+        const db = yield dbConnection();
         const userEmail = req.decoded.email;
         const body = req.body;
-        const cartRes = yield userCollection.updateOne({ email: userEmail }, { $set: { buy_product: body } }, { upsert: true });
+        const cartRes = yield db
+            .collection("users")
+            .updateOne({ email: userEmail }, { $set: { buy_product: body } }, { upsert: true });
         res.status(200).send(cartRes);
     }
     catch (error) {
@@ -162,11 +168,12 @@ module.exports.addToBuyHandler = (req, res) => __awaiter(void 0, void 0, void 0,
 });
 module.exports.addCartAddress = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const userCollection = dbh.db("Users").collection("user");
+        const db = yield dbConnection();
         const userEmail = req.decoded.email;
         const body = req.body;
-        const result = yield userCollection.updateOne({ email: userEmail }, { $push: { address: body } }, { upsert: true });
+        const result = yield db
+            .collection("users")
+            .updateOne({ email: userEmail }, { $push: { address: body } }, { upsert: true });
         res.send(result);
     }
     catch (error) {
@@ -175,11 +182,10 @@ module.exports.addCartAddress = (req, res) => __awaiter(void 0, void 0, void 0, 
 });
 module.exports.updateCartAddress = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const userCollection = dbh.db("Users").collection("user");
+        const db = yield dbConnection();
         const userEmail = req.decoded.email;
         const body = req.body;
-        const result = yield userCollection.updateOne({ email: userEmail }, {
+        const result = yield db.collection("users").updateOne({ email: userEmail }, {
             $set: {
                 "address.$[i]": body,
             },
@@ -192,15 +198,14 @@ module.exports.updateCartAddress = (req, res) => __awaiter(void 0, void 0, void 
 });
 module.exports.selectCartAddress = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const userCollection = dbh.db("Users").collection("user");
+        const db = yield dbConnection();
         const userEmail = req.decoded.email;
         const { addressId, select_address } = req.body;
-        const addr = yield userCollection.findOne({ email: userEmail });
+        const addr = yield db.collection("users").findOne({ email: userEmail });
         if (addr) {
             const addressArr = addr === null || addr === void 0 ? void 0 : addr.address;
             if (addressArr && addressArr.length > 0) {
-                yield userCollection.updateOne({ email: userEmail }, {
+                yield db.collection("users").updateOne({ email: userEmail }, {
                     $set: {
                         "address.$[j].select_address": false,
                     },
@@ -210,7 +215,7 @@ module.exports.selectCartAddress = (req, res) => __awaiter(void 0, void 0, void 
                 });
             }
         }
-        let result = yield userCollection.updateOne({ email: userEmail }, {
+        let result = yield db.collection("users").updateOne({ email: userEmail }, {
             $set: {
                 "address.$[i].select_address": select_address,
             },
@@ -223,11 +228,12 @@ module.exports.selectCartAddress = (req, res) => __awaiter(void 0, void 0, void 
 });
 module.exports.deleteCartAddress = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const userCollection = dbh.db("Users").collection("user");
+        const db = yield dbConnection();
         const email = req.decoded.email;
         const addressId = parseInt(req.params.addressId);
-        const result = yield userCollection.updateOne({ email: email }, { $pull: { address: { addressId } } });
+        const result = yield db
+            .collection("users")
+            .updateOne({ email: email }, { $pull: { address: { addressId } } });
         if (result)
             return res.send(result);
     }

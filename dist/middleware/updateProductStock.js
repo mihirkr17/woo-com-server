@@ -4,7 +4,7 @@
 // module.exports.updateProductStock = async (req:Request, res:Response) => {
 //    const {body} = req;
 //   await dbh.connect();
-//   const productsCollection = dbh.db("Products").collection("product");
+//   const productsCollection = dbh.db("ecommerce-db").collection("products");
 //   const products = await productsCollection.findOne({
 //     _id: ObjectId(body?.productId),
 //   });

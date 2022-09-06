@@ -9,23 +9,21 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const { dbh } = require("../../utils/db");
+const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 module.exports.addProductRating = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const productsCollection = dbh.db("Products").collection("product");
-        const orderCollection = dbh.db("Products").collection("orders");
+        const db = yield dbConnection();
         const productId = req.params.productId;
         const email = req.decoded.email;
         const body = req.body;
         const orderId = parseInt(body === null || body === void 0 ? void 0 : body.orderId);
-        yield orderCollection.updateOne({ user_email: email }, {
+        yield db.collection("orders").updateOne({ user_email: email }, {
             $set: {
                 "orders.$[i].isRating": true,
             },
         }, { upsert: true, arrayFilters: [{ "i.orderId": orderId }] });
-        const products = yield productsCollection.findOne({
+        const products = yield db.collection("products").findOne({
             _id: ObjectId(productId),
             status: "active",
         });
@@ -83,7 +81,7 @@ module.exports.addProductRating = (req, res) => __awaiter(void 0, void 0, void 0
             };
             options = { upsert: true };
         }
-        const result = yield productsCollection.updateOne({ _id: ObjectId(productId) }, filters, options);
+        const result = yield db.collection("products").updateOne({ _id: ObjectId(productId) }, filters, options);
         if (result) {
             return res.status(200).send({ message: "Thanks for your review !" });
         }

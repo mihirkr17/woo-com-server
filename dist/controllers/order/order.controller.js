@@ -9,20 +9,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const { dbh } = require("../../utils/db");
+const { dbh, dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const { updateProductStock } = require("../../utils/common");
 const { orderModel } = require("../../model/order");
 module.exports.setOrderHandler = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const productsCollection = dbh.db("Products").collection("product");
-        const orderCollection = dbh.db("Products").collection("orders");
-        const userCollection = dbh.db("Users").collection("user");
+        const db = yield dbConnection();
         const userEmail = req.headers.authorization || "";
         const verifiedEmail = req.decoded.email;
         const body = req.body;
-        const products = yield productsCollection.findOne({
+        const products = yield db.collection("products").findOne({
             _id: ObjectId(body === null || body === void 0 ? void 0 : body.productId),
         });
         if (userEmail !== verifiedEmail)
@@ -30,10 +27,14 @@ module.exports.setOrderHandler = (req, res) => __awaiter(void 0, void 0, void 0,
         if (body) {
             if (products && (products === null || products === void 0 ? void 0 : products.available) > (body === null || body === void 0 ? void 0 : body.quantity)) {
                 let model = orderModel(body);
-                const result = yield orderCollection.updateOne({ user_email: userEmail }, { $push: { orders: model } }, { upsert: true });
+                const result = yield db
+                    .collection("orders")
+                    .updateOne({ user_email: userEmail }, { $push: { orders: model } }, { upsert: true });
                 if (result) {
                     yield updateProductStock(body === null || body === void 0 ? void 0 : body.productId, body === null || body === void 0 ? void 0 : body.quantity, "dec");
-                    yield userCollection.updateOne({ email: userEmail }, { $unset: { myCartProduct: [] } });
+                    yield db
+                        .collection("users")
+                        .updateOne({ email: userEmail }, { $unset: { myCartProduct: [] } });
                 }
                 res.status(200).send(result && { message: "Order success" });
             }
@@ -53,10 +54,9 @@ module.exports.setOrderHandler = (req, res) => __awaiter(void 0, void 0, void 0,
 });
 module.exports.myOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const orderCollection = dbh.db("Products").collection("orders");
+        const db = yield dbConnection();
         const email = req.params.email;
-        res.send(yield orderCollection.findOne({ user_email: email }));
+        res.send(yield db.collection("orders").findOne({ user_email: email }));
     }
     catch (error) {
         res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
@@ -64,11 +64,12 @@ module.exports.myOrder = (req, res) => __awaiter(void 0, void 0, void 0, functio
 });
 module.exports.removeOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const orderCollection = dbh.db("Products").collection("orders");
+        const db = yield dbConnection();
         const orderUserEmail = req.params.email;
         const id = parseInt(req.params.orderId);
-        const result = yield orderCollection.updateOne({ user_email: orderUserEmail }, { $pull: { orders: { orderId: id } } });
+        const result = yield db
+            .collection("orders")
+            .updateOne({ user_email: orderUserEmail }, { $pull: { orders: { orderId: id } } });
         res.status(200).send({ result, message: "Order Removed successfully" });
     }
     catch (error) {
@@ -77,12 +78,11 @@ module.exports.removeOrder = (req, res) => __awaiter(void 0, void 0, void 0, fun
 });
 module.exports.cancelMyOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const orderCollection = dbh.db("Products").collection("orders");
+        const db = yield dbConnection();
         const userEmail = req.params.userEmail;
         const orderId = parseInt(req.params.orderId);
         const { status, cancel_reason, time_canceled, quantity, productId } = req.body;
-        const result = yield orderCollection.updateOne({ user_email: userEmail }, {
+        const result = yield db.collection("orders").updateOne({ user_email: userEmail }, {
             $set: {
                 "orders.$[i].status": status,
                 "orders.$[i].cancel_reason": cancel_reason,
@@ -100,12 +100,11 @@ module.exports.cancelMyOrder = (req, res) => __awaiter(void 0, void 0, void 0, f
 });
 module.exports.dispatchOrderRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const orderCollection = dbh.db("Products").collection("orders");
+        const db = yield dbConnection();
         const orderId = parseInt(req.params.orderId);
         const trackingId = req.params.trackingId;
         const userEmail = req.headers.authorization || "";
-        res.status(200).send((yield orderCollection.updateOne({ user_email: userEmail }, {
+        res.status(200).send((yield db.collection("orders").updateOne({ user_email: userEmail }, {
             $set: {
                 "orders.$[i].status": "dispatch",
             },
@@ -119,12 +118,11 @@ module.exports.dispatchOrderRequest = (req, res) => __awaiter(void 0, void 0, vo
 });
 module.exports.manageOrders = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield dbh.connect();
-        const orderCollection = dbh.db("Products").collection("orders");
+        const db = yield dbConnection();
         const seller = req.query.seller;
         let result;
         if (seller) {
-            result = yield orderCollection
+            result = yield db.collection("orders")
                 .aggregate([
                 { $unwind: "$orders" },
                 {

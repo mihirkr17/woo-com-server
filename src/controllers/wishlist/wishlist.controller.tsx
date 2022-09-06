@@ -1,10 +1,10 @@
 import { Request, Response } from "express";
-const { dbh } = require("../../utils/db");
+const { dbConnection } = require("../../utils/db");
 
 module.exports.addToWishlistHandler = async (req: Request, res: Response) => {
   try {
-    await dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
+
     const userEmail = req.params.email;
     const verifiedEmail = req.decoded.email;
     const body = req.body;
@@ -12,7 +12,7 @@ module.exports.addToWishlistHandler = async (req: Request, res: Response) => {
     if (userEmail !== verifiedEmail) {
       return res.status(403).send({ message: "Forbidden" });
     }
-    const existsProduct = await userCollection.findOne(
+    const existsProduct = await db.collection("users").findOne(
       {
         email: userEmail,
         "wishlist._id": body?._id,
@@ -30,11 +30,9 @@ module.exports.addToWishlistHandler = async (req: Request, res: Response) => {
         $push: { wishlist: body },
       };
 
-      const wishlistRes = await userCollection.updateOne(
-        { email: userEmail },
-        up,
-        { upsert: true }
-      );
+      const wishlistRes = await db
+        .collection("users")
+        .updateOne({ email: userEmail }, up, { upsert: true });
       res.status(200).send({
         data: wishlistRes,
         message: "Product Added To Your wishlist",
@@ -50,14 +48,16 @@ module.exports.removeFromWishlistHandler = async (
   res: Response
 ) => {
   try {
-    await dbh.connect();
-    const userCollection = dbh.db("Users").collection("user");
+    const db = await dbConnection();
+
     const productId = req.params.productId;
     const userEmail = req.decoded.email;
-    const result = await userCollection.updateOne(
-      { email: userEmail },
-      { $pull: { wishlist: { _id: productId } } }
-    );
+    const result = await db
+      .collection("users")
+      .updateOne(
+        { email: userEmail },
+        { $pull: { wishlist: { _id: productId } } }
+      );
 
     if (result) {
       return res

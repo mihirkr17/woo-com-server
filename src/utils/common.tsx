@@ -8,7 +8,7 @@ module.exports.updateProductStock = async (
   action: string
 ) => {
   await dbh.connect();
-  const productsCollection = dbh.db("Products").collection("product");
+  const productsCollection = dbh.db("ecommerce-db").collection("products");
   const products = await productsCollection.findOne({
     _id: ObjectId(productId),
   });
