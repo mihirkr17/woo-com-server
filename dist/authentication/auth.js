@@ -33,7 +33,7 @@ const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function
     }
 });
 // // verify owner
-const verifyAuth = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+const checkingOwnerOrAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     yield dbh.connect();
     const userCollection = dbh.db("ecommerce-db").collection("users");
     const authEmail = req.decoded.email;
@@ -48,7 +48,7 @@ const verifyAuth = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
     }
 });
 // verify seller
-const verifySeller = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+const checkingSeller = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     yield dbh.connect();
     const userCollection = dbh.db("ecommerce-db").collection("users");
     const authEmail = req.decoded.email;
@@ -63,7 +63,7 @@ const verifySeller = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
     }
 });
 // verify seller
-const verifyUser = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+const checkingUser = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     yield dbh.connect();
     const userCollection = dbh.db("ecommerce-db").collection("users");
     const authEmail = req.decoded.email;
@@ -77,4 +77,4 @@ const verifyUser = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
         res.status(403).send({ message: "Forbidden" });
     }
 });
-module.exports = { verifyJWT, verifyAuth, verifySeller, verifyUser };
+module.exports = { verifyJWT, checkingOwnerOrAdmin, checkingSeller, checkingUser };

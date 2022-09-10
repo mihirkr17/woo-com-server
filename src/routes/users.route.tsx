@@ -1,5 +1,5 @@
 import express, { Router } from "express";
-const { verifyJWT, verifyAuth } = require("../middleware/auth");
+const { verifyJWT, checkingOwnerOrAdmin } = require("../middleware/auth");
 const router: Router = express.Router();
 const {
   fetchAuthUser,
@@ -35,18 +35,18 @@ try {
    * @apiParams no params required.
    * @apiSuccess sending success message.
    */
-  router.put("/sign-user", signUser);
+  router.post("/sign-user", signUser);
   router.get("/sign-out", signOutUser);
   router.put("/switch-role/:role", verifyJWT, switchRole);
   router.put("/update-profile-data/:email", verifyJWT, updateProfileData);
-  router.put("/make-admin/:userId", verifyJWT, verifyAuth, makeAdmin);
-  router.put("/demote-to-user/:userId", verifyJWT, verifyAuth, demoteToUser);
+  router.put("/make-admin/:userId", verifyJWT, checkingOwnerOrAdmin, makeAdmin);
+  router.put("/demote-to-user/:userId", verifyJWT, checkingOwnerOrAdmin, demoteToUser);
   router.get("/manage-user", manageUsers);
   router.put("/make-seller-request/:userEmail", makeSellerRequest);
   router.put(
     "/permit-seller-request/:userId",
     verifyJWT,
-    verifyAuth,
+    checkingOwnerOrAdmin,
     permitSellerRequest
   );
   router.get("/check-seller-request", checkSellerRequest);

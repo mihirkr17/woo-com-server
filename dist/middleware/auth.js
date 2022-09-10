@@ -10,73 +10,78 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 var jwt = require("jsonwebtoken");
-const { dbh } = require("../database/db");
+const { dbConnection } = require("../utils/db");
 const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     const token = req.cookies.token;
-    if (token) {
-        jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
-            if (err) {
-                res.clearCookie("token");
-                return res.status(401).send({
-                    message: err.message,
-                });
-            }
-            req.decoded = decoded;
-            next();
-        });
+    if (!token || typeof token === "undefined") {
+        return res
+            .status(403)
+            .send({ success: false, statusCode: 403, error: "Login Expired !" });
     }
-    else {
-        return res.status(403).send({ message: "Forbidden" });
-    }
+    jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
+        if (err) {
+            res.clearCookie("token");
+            return res.status(401).send({
+                success: false,
+                statusCode: 401,
+                error: err.message,
+            });
+        }
+        req.decoded = decoded;
+        next();
+    });
 });
 // // verify owner
-const verifyAuth = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    yield dbh.connect();
-    const userCollection = dbh.db("ecommerce-db").collection("users");
+const checkingOwnerOrAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    const db = yield dbConnection();
     const authEmail = req.decoded.email;
-    const findAuthInDB = yield userCollection.findOne({
+    const findAuthInDB = yield db.collection("users").findOne({
         email: authEmail && authEmail,
     });
-    if (findAuthInDB.role === "owner" || findAuthInDB.role === "admin") {
-        next();
+    if (findAuthInDB.role !== "owner" || findAuthInDB.role !== "admin") {
+        return res.status(400).send({
+            success: false,
+            statusCode: 400,
+            error: "You are not a owner or admin, So you are not authorized for process this.",
+        });
     }
-    else {
-        res.status(403).send({ message: "Forbidden" });
-    }
+    next();
 });
 // verify seller
-const verifySeller = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    yield dbh.connect();
-    const userCollection = dbh.db("ecommerce-db").collection("users");
+const checkingSeller = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    const db = yield dbConnection();
     const authEmail = req.decoded.email;
-    const findAuthInDB = yield userCollection.findOne({
+    const findAuthInDB = yield db.collection("users").findOne({
         email: authEmail && authEmail,
     });
-    if (findAuthInDB.role === "seller") {
-        next();
+    if (findAuthInDB.role !== "seller") {
+        return res.status(400).send({
+            success: false,
+            statusCode: 400,
+            error: "You are not a seller, So you are not authorized for process this.",
+        });
     }
-    else {
-        res.status(403).send({ message: "Forbidden" });
-    }
+    next();
 });
 // verify seller
-const verifyUser = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    yield dbh.connect();
-    const userCollection = dbh.db("ecommerce-db").collection("users");
+const checkingUser = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    const db = yield dbConnection();
     const authEmail = req.decoded.email;
-    const findAuthInDB = yield userCollection.findOne({
+    const findAuthInDB = yield db.collection("users").findOne({
         email: authEmail && authEmail,
     });
-    if (findAuthInDB.role === "user") {
-        next();
+    if (findAuthInDB.role !== "user") {
+        return res.status(400).send({
+            success: false,
+            statusCode: 400,
+            error: "You are not a user, So you are not authorized for process this.",
+        });
     }
-    else {
-        res.status(403).send({ message: "Forbidden" });
-    }
+    next();
 });
 module.exports = {
     verifyJWT,
-    verifyAuth,
-    verifySeller,
-    verifyUser
+    checkingOwnerOrAdmin,
+    checkingSeller,
+    checkingUser,
 };

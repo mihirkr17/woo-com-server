@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 
+// update product quantity controller
 module.exports.updateProductQuantity = async (req: Request, res: Response) => {
   try {
     const db = await dbConnection();
@@ -10,11 +11,17 @@ module.exports.updateProductQuantity = async (req: Request, res: Response) => {
     const cart_types: string = req.params.cartTypes;
     const productId = req.headers.authorization;
     const { quantity } = req.body;
+
+    // undefined variables
     let updateDocuments: any;
     let filters: any;
 
-    if (!productId) {
-      return res.status(400).send({ message: "Bad request! headers missing" });
+    if (!productId || typeof productId === "undefined") {
+      return res.status(400).send({
+        success: false,
+        statusCode: 400,
+        error: "Bad request! headers missing",
+      });
     }
 
     const availableProduct = await db.collection("products").findOne({
@@ -25,8 +32,10 @@ module.exports.updateProductQuantity = async (req: Request, res: Response) => {
     });
 
     if (quantity >= availableProduct?.available - 1) {
-      return res.status(200).send({
-        message: "Your selected quantity out of range in available product",
+      return res.status(400).send({
+        success: false,
+        statusCode: 400,
+        error: "Your selected quantity out of range in available product",
       });
     }
 
@@ -78,17 +87,20 @@ module.exports.updateProductQuantity = async (req: Request, res: Response) => {
         .updateOne(filters, updateDocuments, {
           upsert: true,
         });
-      return res.status(200).send(result);
-    } else {
-      await db
-        .collection("users")
-        .updateOne(
-          { email: userEmail },
-          { $pull: { myCartProduct: { _id: productId } } }
-        );
-      return res.status(200).send({
-        message: "This product is out of stock now and removed from your cart",
-      });
+
+      if (result) {
+        return res.status(200).send({
+          success: true,
+          statusCode: 200,
+          message: "Quantity updated",
+        });
+      } else {
+        return res.status(400).send({
+          success: false,
+          statusCode: 400,
+          error: "Failed to update quantity",
+        });
+      }
     }
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
@@ -104,8 +116,12 @@ module.exports.deleteCartItem = async (req: Request, res: Response) => {
     const cart_types = req.params.cartTypes;
     let updateDocuments;
 
-    if (!productId) {
-      return res.status(400).send({ message: "Bad request! headers missing" });
+    if (!ObjectId.isValid(productId) || !productId) {
+      return res.status(400).send({
+        success: false,
+        statusCode: 400,
+        error: "Bad request! headers missing",
+      });
     }
 
     if (cart_types === "buy") {
@@ -121,9 +137,19 @@ module.exports.deleteCartItem = async (req: Request, res: Response) => {
         );
     }
 
-    res
-      .status(200)
-      .send({ updateDocuments, message: `removed successfully from cart` });
+    if (updateDocuments) {
+      return res.status(200).send({
+        success: true,
+        statusCode: 200,
+        message: `Item removed successfully from your cart`,
+      });
+    } else {
+      return res.status(400).send({
+        success: false,
+        statusCode: 400,
+        error: `Sorry! failed to remove.`,
+      });
+    }
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
   }
@@ -141,34 +167,46 @@ module.exports.addToCartHandler = async (req: Request, res: Response) => {
       status: "active",
     });
 
-    if (availableProduct?.stock === "in" && availableProduct?.available > 0) {
-      const existsProduct = await db
-        .collection("users")
-        .findOne(
-          { email: email, "myCartProduct._id": body?._id },
-          { "myCartProduct.$": 1 }
-        );
-
-      if (existsProduct) {
-        return res
-          .status(200)
-          .send({ message: "Product Has Already In Your Cart" });
-      } else {
-        body["addedAt"] = new Date(Date.now());
-
-        const cartRes = await db.collection("users").updateOne(
-          { email: email },
-          {
-            $push: { myCartProduct: body },
-          },
-          { upsert: true }
-        );
-        res.status(200).send({
-          data: cartRes,
-          message: "Product Successfully Added To Your Cart",
+    if (availableProduct?.stock === "out" && availableProduct?.available <= 0) {
+      return res
+        .status(400)
+        .send({
+          success: false,
+          statusCode: 400,
+          error: "This product out of stock now",
         });
-      }
     }
+
+    const existsProduct = await db
+      .collection("users")
+      .findOne(
+        { email: email, "myCartProduct._id": body?._id },
+        { "myCartProduct.$": 1 }
+      );
+
+    if (existsProduct) {
+      return res.status(400).send({
+        success: false,
+        statusCode: 400,
+        error: "Product Has Already In Your Cart",
+      });
+    }
+
+    body["addedAt"] = new Date(Date.now());
+
+    const cartRes = await db.collection("users").updateOne(
+      { email: email },
+      {
+        $push: { myCartProduct: body },
+      },
+      { upsert: true }
+    );
+    res.status(200).send({
+      success: true,
+      statusCode: 200,
+      data: cartRes,
+      message: "Product successfully added to your cart",
+    });
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
   }
@@ -180,6 +218,7 @@ module.exports.addToBuyHandler = async (req: Request, res: Response) => {
 
     const userEmail = req.decoded.email;
     const body = req.body;
+
     const cartRes = await db
       .collection("users")
       .updateOne(
@@ -187,7 +226,20 @@ module.exports.addToBuyHandler = async (req: Request, res: Response) => {
         { $set: { buy_product: body } },
         { upsert: true }
       );
-    res.status(200).send(cartRes);
+
+    if (cartRes) {
+      return res
+        .status(200)
+        .send({
+          success: true,
+          statusCode: 200,
+          message: "Product ready to buy.",
+        });
+    } else {
+      return res
+        .status(400)
+        .send({ success: false, statusCode: 400, error: "Failed to buy" });
+    }
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
   }
@@ -206,7 +258,20 @@ module.exports.addCartAddress = async (req: Request, res: Response) => {
         { $push: { address: body } },
         { upsert: true }
       );
-    res.send(result);
+
+    if (!result) {
+      return res.status(400).send({
+        success: false,
+        statusCode: 400,
+        error: "Failed to add address in this cart",
+      });
+    }
+
+    res.status(200).send({
+      success: true,
+      statusCode: 200,
+      message: "Successfully shipping address added in your cart.",
+    });
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
   }
@@ -228,7 +293,13 @@ module.exports.updateCartAddress = async (req: Request, res: Response) => {
       },
       { arrayFilters: [{ "i.addressId": body?.addressId }] }
     );
-    res.send(result);
+
+    if (result) {
+      return res.status(200).send({success: true, statusCode: 200, message: "Shipping address updated."});
+    } else {
+      return res.status(400).send({success: false, statusCode: 400, error: "Failed to update shipping address."});
+    }
+    
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
   }
@@ -260,7 +331,7 @@ module.exports.selectCartAddress = async (req: Request, res: Response) => {
       }
     }
 
-    let result = await db.collection("users").updateOne(
+    const result = await db.collection("users").updateOne(
       { email: userEmail },
       {
         $set: {
@@ -270,7 +341,17 @@ module.exports.selectCartAddress = async (req: Request, res: Response) => {
       { arrayFilters: [{ "i.addressId": addressId }] }
     );
 
-    res.status(200).send(result);
+    if (!result) {
+      return res.status(400).send({
+        success: false,
+        statusCode: 400,
+        error: "Failed to select the address",
+      });
+    }
+
+    return res
+      .status(200)
+      .send({ success: true, statusCode: 200, message: "Saved" });
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
   }

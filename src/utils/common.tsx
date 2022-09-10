@@ -1,15 +1,15 @@
 import express from "express";
 const { ObjectId } = require("mongodb");
-const { dbh } = require("./db");
+const { dbConnection } = require("./db");
 
 module.exports.updateProductStock = async (
   productId: string,
   quantity: number,
   action: string
 ) => {
-  await dbh.connect();
-  const productsCollection = dbh.db("ecommerce-db").collection("products");
-  const products = await productsCollection.findOne({
+  const db = await dbConnection();
+
+  const products = await db.collection("products").findOne({
     _id: ObjectId(productId),
   });
 
@@ -25,7 +25,7 @@ module.exports.updateProductStock = async (
 
   let stock = restAvailable <= 1 ? "out" : "in";
 
-  await productsCollection.updateOne(
+  await db.collection("products").updateOne(
     { _id: ObjectId(productId) },
     { $set: { available: restAvailable, stock } },
     { upsert: true }

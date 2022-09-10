@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 const { dbConnection } = require("../../utils/db");
 var jwt = require("jsonwebtoken");
 const { ObjectId } = require("mongodb");
+const userModel = require("../../model/UserModel");
 
 module.exports.fetchAuthUser = async (
   req: Request,
@@ -11,11 +12,17 @@ module.exports.fetchAuthUser = async (
   try {
     const db = await dbConnection();
     const authEmail: string = req.headers.authorization || "";
-    
+
     if (!authEmail || typeof authEmail === "undefined") {
       return res
         .status(400)
         .send({ success: false, error: "Authorization header is missing!" });
+    }
+
+    const result = await db.collection("users").findOne({ email: authEmail });
+
+    if (!result || typeof result !== "object") {
+      return res.status(404).send({ success: false, error: "User not found!" });
     }
 
     await db
@@ -25,29 +32,21 @@ module.exports.fetchAuthUser = async (
         { $pull: { myCartProduct: { stock: "out" } } }
       );
 
-    await db.collection("users").createIndex({ email: 1 });
-
-    const result = await db.collection("users").findOne({ email: authEmail });
-
-    return result
-      ? res.status(200).send({ success: true, statusCode: 200, data: result })
-      : res
-          .status(500)
-          .send({ success: false, error: "Something went wrong!" });
+    return res
+      .status(200)
+      .send({ success: true, statusCode: 200, data: result });
   } catch (error: any) {
-    // res.status(500).send({ error: error.message });
     next(error);
   }
 };
 
-module.exports.signUser = async (req: Request, res: Response) => {
+module.exports.signUser = async (req: Request, res: Response, next: any) => {
   try {
     const db = await dbConnection();
 
-    const authEmail = req.headers.authorization?.split(" ")[1];
-    const { name, photoURL } = req.body;
+    const authEmail: string = req.headers.authorization || "";
 
-    if (!authEmail || typeof authEmail === "undefined") {
+    if (!authEmail || typeof authEmail !== "string") {
       return res
         .status(400)
         .send({ success: false, error: "Authorization header is missing!" });
@@ -60,43 +59,40 @@ module.exports.signUser = async (req: Request, res: Response) => {
       httpOnly: true,
     };
 
-    if (authEmail) {
-      const token = jwt.sign({ email: authEmail }, process.env.ACCESS_TOKEN, {
-        algorithm: "HS256",
-        expiresIn: "1h",
-      });
+    const token = jwt.sign({ email: authEmail }, process.env.ACCESS_TOKEN, {
+      algorithm: "HS256",
+      expiresIn: "1h",
+    });
 
-      const setToken = () => {
-        return res.cookie("token", token, cookieObject)
-          ? res.status(200).send({ message: "Login success", statusCode: 200 })
-          : res.status(400).send({ error: "Bad request" });
-      };
+    const setToken = () => {
+      return res.cookie("token", token, cookieObject)
+        ? res
+            .status(200)
+            .send({ message: "Login success", statusCode: 200, success: true })
+        : res.status(400).send({ error: "Bad request", success: false });
+    };
 
-      const existsUser = await db
-        .collection("users")
-        .findOne({ email: authEmail });
+    const existsUser = await db
+      .collection("users")
+      .findOne({ email: authEmail });
 
-      if (existsUser) {
-        return setToken();
-      }
-
-      const newUser = await db.collection("users").updateOne(
-        { email: authEmail },
-        {
-          $set: {
-            email: authEmail,
-            displayName: name,
-            photoURL,
-            role: "user",
-          },
-        },
-        { upsert: true }
-      );
-
-      if (newUser) return setToken();
+    if (existsUser && typeof existsUser === "object") {
+      return setToken();
     }
+
+    // user model
+    const model = new userModel(req.body, authEmail);
+    const errs = model.errorReports();
+
+    if (errs) {
+      return res.status(400).send({ success: false, error: errs });
+    }
+
+    const newUser = await db.collection("users").insertOne(model);
+
+    if (newUser?.insertedId) return setToken();
   } catch (error: any) {
-    res.status(500).send({ error: error.message });
+    next(error);
   }
 };
 
@@ -189,11 +185,20 @@ module.exports.makeAdmin = async (req: Request, res: Response) => {
   }
 };
 
-module.exports.demoteToUser = async (req: Request, res: Response) => {
+module.exports.demoteToUser = async (
+  req: Request,
+  res: Response,
+  next: any
+) => {
   try {
     const db = await dbConnection();
 
     const userId: string = req.params.userId;
+
+    if (!ObjectId.isValid(userId)) {
+      return res.status(400).send({ error: "User Id is not valid" });
+    }
+
     res
       .status(200)
       .send(
@@ -206,11 +211,11 @@ module.exports.demoteToUser = async (req: Request, res: Response) => {
           )
       );
   } catch (error: any) {
-    res.status(500).send({ message: error?.message });
+    next(error);
   }
 };
 
-module.exports.manageUsers = async (req: Request, res: Response) => {
+module.exports.manageUsers = async (req: Request, res: Response, next: any) => {
   try {
     const db = await dbConnection();
 
@@ -219,7 +224,7 @@ module.exports.manageUsers = async (req: Request, res: Response) => {
       .status(200)
       .send(await db.collection("users").find({ role: uType }).toArray());
   } catch (error: any) {
-    res.status(500).send({ message: error?.message });
+    next(error);
   }
 };
 

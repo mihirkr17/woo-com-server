@@ -20,7 +20,10 @@ module.exports.searchProducts = async (req: Request, res: Response) => {
       return findProduct;
     };
 
-    const result = await db.collection("products").find(searchQuery(q)).toArray();
+    const result = await db
+      .collection("products")
+      .find(searchQuery(q))
+      .toArray();
     res.status(200).send(result);
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
@@ -34,7 +37,8 @@ module.exports.topRatedProducts = async (req: Request, res: Response) => {
     res
       .status(200)
       .send(
-        await db.collection("products")
+        await db
+          .collection("products")
           .find({ status: "active" })
           .sort({ rating_average: -1 })
           .limit(6)
@@ -48,11 +52,12 @@ module.exports.topRatedProducts = async (req: Request, res: Response) => {
 module.exports.topSellingProducts = async (req: Request, res: Response) => {
   try {
     const db = await dbConnection();
-    
+
     res
       .status(200)
       .send(
-        await db.collection("products")
+        await db
+          .collection("products")
           .find({ status: "active" })
           .sort({ top_sell: -1 })
           .limit(6)
@@ -68,9 +73,9 @@ module.exports.countProducts = async (req: Request, res: Response) => {
     const db = await dbConnection();
 
     const seller = req.query.seller;
-    let result = await db.collection("products").countDocuments(
-      seller && { seller: seller }
-    );
+    let result = await db
+      .collection("products")
+      .countDocuments(seller && { seller: seller });
     res.status(200).send({ count: result });
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
@@ -87,10 +92,12 @@ module.exports.deleteProducts = async (req: Request, res: Response) => {
     });
 
     if (result) {
-      await db.collection("users").updateMany(
-        { "myCartProduct._id": productId },
-        { $pull: { myCartProduct: { _id: productId } } }
-      );
+      await db
+        .collection("users")
+        .updateMany(
+          { "myCartProduct._id": productId },
+          { $pull: { myCartProduct: { _id: productId } } }
+        );
       return res.status(200).send({ message: "Product deleted successfully." });
     } else {
       return res.status(503).send({ message: "Service unavailable" });
@@ -109,7 +116,8 @@ module.exports.updateProduct = async (req: Request, res: Response) => {
     const model = productUpdateModel(body);
 
     const exists =
-      (await db.collection("users")
+      (await db
+        .collection("users")
         .find({ "myCartProduct._id": productId })
         .toArray()) || [];
 
@@ -122,11 +130,13 @@ module.exports.updateProduct = async (req: Request, res: Response) => {
       );
     }
 
-    const result = await db.collection("products").updateOne(
-      { _id: ObjectId(productId) },
-      { $set: model },
-      { upsert: true }
-    );
+    const result = await db
+      .collection("products")
+      .updateOne(
+        { _id: ObjectId(productId) },
+        { $set: model },
+        { upsert: true }
+      );
 
     res.status(200).send(result && { message: "Product updated successfully" });
   } catch (error: any) {
@@ -137,18 +147,20 @@ module.exports.updateProduct = async (req: Request, res: Response) => {
 module.exports.updateStock = async (req: Request, res: Response) => {
   try {
     const db = await dbConnection();
-    
+
     const productId = req.headers.authorization;
     const body = req.body;
 
     let stock = body?.available <= 1 ? "out" : "in";
 
     if (productId && body) {
-      const result = await db.collection("products").updateOne(
-        { _id: ObjectId(productId) },
-        { $set: { available: body?.available, stock } },
-        { upsert: true }
-      );
+      const result = await db
+        .collection("products")
+        .updateOne(
+          { _id: ObjectId(productId) },
+          { $set: { available: body?.available, stock } },
+          { upsert: true }
+        );
 
       res.status(200).send(result);
     }
@@ -161,7 +173,7 @@ module.exports.addProductHandler = async (req: Request, res: Response) => {
   const body = req.body;
   try {
     const db = await dbConnection();
-    
+
     const model = productModel(body);
     await db.collection("products").insertOne(model);
     res.status(200).send({ message: "Product added successfully" });
@@ -175,7 +187,8 @@ module.exports.allProducts = async (req: Request, res: Response) => {
     const db = await dbConnection();
     const totalLimits = parseInt(req.params.limits);
 
-    const result = await db.collection("products")
+    const result = await db
+      .collection("products")
       .find({ status: "active" })
       .sort({ _id: -1 })
       .limit(totalLimits)
@@ -197,9 +210,6 @@ module.exports.fetchSingleProduct = async (req: Request, res: Response) => {
     const product_slug = req.params.product_slug;
     let inCart: boolean;
     let inWishlist: boolean;
-    
-
-    await db.collection("products").createIndex({ slug: 1, status: 1 });
 
     let result = await db.collection("products").findOne({
       slug: product_slug,
@@ -213,14 +223,14 @@ module.exports.fetchSingleProduct = async (req: Request, res: Response) => {
     }
 
     if (email) {
-      const existProductInCart = await db.collection("users").findOne(
-        { email: email, "myCartProduct.slug": product_slug },
-        { "myCartProduct.$": 1 }
-      );
+      const existProductInCart = await db
+        .collection("users")
+        .findOne({ email: email, "myCartProduct.slug": product_slug });
+        
 
       const existProductInWishlist = await db.collection("users").findOne(
-        { email: email, "wishlist.slug": product_slug },
-        { "wishlist.$": 1 }
+        { email: email, "wishlist.slug": product_slug},
+        // { "wishlist.$": 1 }
       );
 
       if (existProductInWishlist) {
@@ -229,7 +239,7 @@ module.exports.fetchSingleProduct = async (req: Request, res: Response) => {
         inWishlist = false;
       }
 
-      if (existProductInCart) {
+      if (existProductInCart && typeof existProductInCart === "object") {
         inCart = true;
       } else {
         inCart = false;
@@ -251,7 +261,6 @@ module.exports.fetchSingleProductByPid = async (
 ) => {
   try {
     const db = await dbConnection();
-
 
     const productId = req.query.pid;
     const seller = req.query.seller;
@@ -311,7 +320,8 @@ module.exports.productByCategory = async (req: Request, res: Response) => {
       };
     }
 
-    const tt = await db.collection("products")
+    const tt = await db
+      .collection("products")
       .find(findQuery, { price_fixed: { $exists: 1 } })
       .sort(sorting)
       .toArray();
@@ -335,7 +345,8 @@ module.exports.fetchTopSellingProduct = async (req: Request, res: Response) => {
       filterQuery["seller"] = seller;
     }
 
-    const result = await db.collection("products")
+    const result = await db
+      .collection("products")
       .find(filterQuery)
       .sort({ top_sell: -1 })
       .limit(6)
@@ -391,12 +402,16 @@ module.exports.manageProduct = async (req: Request, res: Response) => {
   try {
     cursor =
       searchText && searchText.length > 0
-        ? db.collection("products").find(searchQuery(searchText, seller_name || ""))
+        ? db
+            .collection("products")
+            .find(searchQuery(searchText, seller_name || ""))
         : filters && filters !== "all"
-        ? db.collection("products").find(filterQuery(filters, seller_name || ""))
-        : db.collection("products").find(
-            (seller_name && { seller: seller_name }) || {}
-          );
+        ? db
+            .collection("products")
+            .find(filterQuery(filters, seller_name || ""))
+        : db
+            .collection("products")
+            .find((seller_name && { seller: seller_name }) || {});
 
     if (item || page) {
       result = await cursor

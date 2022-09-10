@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const errorHandlers = (error, req, res) => {
-    console.log(error);
-    return res.status(500).send({ error: error === null || error === void 0 ? void 0 : error.message });
+const errorHandlers = (err, req, res, next) => {
+    res.status(500).send({ error: err === null || err === void 0 ? void 0 : err.message });
 };
 module.exports = errorHandlers;

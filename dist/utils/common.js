@@ -10,11 +10,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const { ObjectId } = require("mongodb");
-const { dbh } = require("./db");
+const { dbConnection } = require("./db");
 module.exports.updateProductStock = (productId, quantity, action) => __awaiter(void 0, void 0, void 0, function* () {
-    yield dbh.connect();
-    const productsCollection = dbh.db("ecommerce-db").collection("products");
-    const products = yield productsCollection.findOne({
+    const db = yield dbConnection();
+    const products = yield db.collection("products").findOne({
         _id: ObjectId(productId),
     });
     let availableProduct = products === null || products === void 0 ? void 0 : products.available;
@@ -26,5 +25,5 @@ module.exports.updateProductStock = (productId, quantity, action) => __awaiter(v
         restAvailable = availableProduct - quantity;
     }
     let stock = restAvailable <= 1 ? "out" : "in";
-    yield productsCollection.updateOne({ _id: ObjectId(productId) }, { $set: { available: restAvailable, stock } }, { upsert: true });
+    yield db.collection("products").updateOne({ _id: ObjectId(productId) }, { $set: { available: restAvailable, stock } }, { upsert: true });
 });

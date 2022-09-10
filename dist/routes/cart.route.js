@@ -8,7 +8,7 @@ const router = express_1.default.Router();
 const { verifyJWT } = require("../middleware/auth");
 const { updateProductQuantity, deleteCartItem, addToCartHandler, addToBuyHandler, addCartAddress, updateCartAddress, selectCartAddress, deleteCartAddress, } = require("../controllers/cart/cart.controller");
 try {
-    router.put("/add-to-cart", verifyJWT, addToCartHandler);
+    router.post("/add-to-cart", verifyJWT, addToCartHandler);
     router.put("/add-buy-product", verifyJWT, addToBuyHandler);
     router.put("/update-product-quantity/:cartTypes", verifyJWT, updateProductQuantity);
     router.post("/add-cart-address", verifyJWT, addCartAddress);

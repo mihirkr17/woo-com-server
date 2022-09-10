@@ -4,7 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
-const { verifyJWT, verifyAuth } = require("../middleware/auth");
+const { verifyJWT, checkingOwnerOrAdmin } = require("../middleware/auth");
 const router = express_1.default.Router();
 const { fetchAuthUser, signUser, signOutUser, switchRole, updateProfileData, makeAdmin, demoteToUser, manageUsers, makeSellerRequest, permitSellerRequest, checkSellerRequest, } = require("../controllers/users/users.controller");
 try {
@@ -26,15 +26,15 @@ try {
      * @apiParams no params required.
      * @apiSuccess sending success message.
      */
-    router.put("/sign-user", signUser);
+    router.post("/sign-user", signUser);
     router.get("/sign-out", signOutUser);
     router.put("/switch-role/:role", verifyJWT, switchRole);
     router.put("/update-profile-data/:email", verifyJWT, updateProfileData);
-    router.put("/make-admin/:userId", verifyJWT, verifyAuth, makeAdmin);
-    router.put("/demote-to-user/:userId", verifyJWT, verifyAuth, demoteToUser);
+    router.put("/make-admin/:userId", verifyJWT, checkingOwnerOrAdmin, makeAdmin);
+    router.put("/demote-to-user/:userId", verifyJWT, checkingOwnerOrAdmin, demoteToUser);
     router.get("/manage-user", manageUsers);
     router.put("/make-seller-request/:userEmail", makeSellerRequest);
-    router.put("/permit-seller-request/:userId", verifyJWT, verifyAuth, permitSellerRequest);
+    router.put("/permit-seller-request/:userId", verifyJWT, checkingOwnerOrAdmin, permitSellerRequest);
     router.get("/check-seller-request", checkSellerRequest);
 }
 catch (error) {

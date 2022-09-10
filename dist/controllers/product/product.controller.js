@@ -27,7 +27,10 @@ module.exports.searchProducts = (req, res) => __awaiter(void 0, void 0, void 0, 
             };
             return findProduct;
         };
-        const result = yield db.collection("products").find(searchQuery(q)).toArray();
+        const result = yield db
+            .collection("products")
+            .find(searchQuery(q))
+            .toArray();
         res.status(200).send(result);
     }
     catch (error) {
@@ -39,7 +42,8 @@ module.exports.topRatedProducts = (req, res) => __awaiter(void 0, void 0, void 0
         const db = yield dbConnection();
         res
             .status(200)
-            .send(yield db.collection("products")
+            .send(yield db
+            .collection("products")
             .find({ status: "active" })
             .sort({ rating_average: -1 })
             .limit(6)
@@ -54,7 +58,8 @@ module.exports.topSellingProducts = (req, res) => __awaiter(void 0, void 0, void
         const db = yield dbConnection();
         res
             .status(200)
-            .send(yield db.collection("products")
+            .send(yield db
+            .collection("products")
             .find({ status: "active" })
             .sort({ top_sell: -1 })
             .limit(6)
@@ -68,7 +73,9 @@ module.exports.countProducts = (req, res) => __awaiter(void 0, void 0, void 0, f
     try {
         const db = yield dbConnection();
         const seller = req.query.seller;
-        let result = yield db.collection("products").countDocuments(seller && { seller: seller });
+        let result = yield db
+            .collection("products")
+            .countDocuments(seller && { seller: seller });
         res.status(200).send({ count: result });
     }
     catch (error) {
@@ -83,7 +90,9 @@ module.exports.deleteProducts = (req, res) => __awaiter(void 0, void 0, void 0, 
             _id: ObjectId(productId),
         });
         if (result) {
-            yield db.collection("users").updateMany({ "myCartProduct._id": productId }, { $pull: { myCartProduct: { _id: productId } } });
+            yield db
+                .collection("users")
+                .updateMany({ "myCartProduct._id": productId }, { $pull: { myCartProduct: { _id: productId } } });
             return res.status(200).send({ message: "Product deleted successfully." });
         }
         else {
@@ -100,7 +109,8 @@ module.exports.updateProduct = (req, res) => __awaiter(void 0, void 0, void 0, f
         const productId = req.params.productId;
         const body = req.body;
         const model = productUpdateModel(body);
-        const exists = (yield db.collection("users")
+        const exists = (yield db
+            .collection("users")
             .find({ "myCartProduct._id": productId })
             .toArray()) || [];
         if (exists && exists.length > 0) {
@@ -108,7 +118,9 @@ module.exports.updateProduct = (req, res) => __awaiter(void 0, void 0, void 0, f
                 $pull: { myCartProduct: { _id: productId } },
             });
         }
-        const result = yield db.collection("products").updateOne({ _id: ObjectId(productId) }, { $set: model }, { upsert: true });
+        const result = yield db
+            .collection("products")
+            .updateOne({ _id: ObjectId(productId) }, { $set: model }, { upsert: true });
         res.status(200).send(result && { message: "Product updated successfully" });
     }
     catch (error) {
@@ -122,7 +134,9 @@ module.exports.updateStock = (req, res) => __awaiter(void 0, void 0, void 0, fun
         const body = req.body;
         let stock = (body === null || body === void 0 ? void 0 : body.available) <= 1 ? "out" : "in";
         if (productId && body) {
-            const result = yield db.collection("products").updateOne({ _id: ObjectId(productId) }, { $set: { available: body === null || body === void 0 ? void 0 : body.available, stock } }, { upsert: true });
+            const result = yield db
+                .collection("products")
+                .updateOne({ _id: ObjectId(productId) }, { $set: { available: body === null || body === void 0 ? void 0 : body.available, stock } }, { upsert: true });
             res.status(200).send(result);
         }
     }
@@ -146,7 +160,8 @@ module.exports.allProducts = (req, res) => __awaiter(void 0, void 0, void 0, fun
     try {
         const db = yield dbConnection();
         const totalLimits = parseInt(req.params.limits);
-        const result = yield db.collection("products")
+        const result = yield db
+            .collection("products")
             .find({ status: "active" })
             .sort({ _id: -1 })
             .limit(totalLimits)
@@ -166,7 +181,6 @@ module.exports.fetchSingleProduct = (req, res) => __awaiter(void 0, void 0, void
         const product_slug = req.params.product_slug;
         let inCart;
         let inWishlist;
-        yield db.collection("products").createIndex({ slug: 1, status: 1 });
         let result = yield db.collection("products").findOne({
             slug: product_slug,
             status: "active",
@@ -177,15 +191,17 @@ module.exports.fetchSingleProduct = (req, res) => __awaiter(void 0, void 0, void
                 .send({ success: false, error: "Product not found!" });
         }
         if (email) {
-            const existProductInCart = yield db.collection("users").findOne({ email: email, "myCartProduct.slug": product_slug }, { "myCartProduct.$": 1 });
-            const existProductInWishlist = yield db.collection("users").findOne({ email: email, "wishlist.slug": product_slug }, { "wishlist.$": 1 });
+            const existProductInCart = yield db
+                .collection("users")
+                .findOne({ email: email, "myCartProduct.slug": product_slug });
+            const existProductInWishlist = yield db.collection("users").findOne({ email: email, "wishlist.slug": product_slug });
             if (existProductInWishlist) {
                 inWishlist = true;
             }
             else {
                 inWishlist = false;
             }
-            if (existProductInCart) {
+            if (existProductInCart && typeof existProductInCart === "object") {
                 inCart = true;
             }
             else {
@@ -256,7 +272,8 @@ module.exports.productByCategory = (req, res) => __awaiter(void 0, void 0, void 
                 status: "active",
             };
         }
-        const tt = yield db.collection("products")
+        const tt = yield db
+            .collection("products")
             .find(findQuery, { price_fixed: { $exists: 1 } })
             .sort(sorting)
             .toArray();
@@ -278,7 +295,8 @@ module.exports.fetchTopSellingProduct = (req, res) => __awaiter(void 0, void 0, 
         if (seller) {
             filterQuery["seller"] = seller;
         }
-        const result = yield db.collection("products")
+        const result = yield db
+            .collection("products")
             .find(filterQuery)
             .sort({ top_sell: -1 })
             .limit(6)
@@ -329,10 +347,16 @@ module.exports.manageProduct = (req, res) => __awaiter(void 0, void 0, void 0, f
     try {
         cursor =
             searchText && searchText.length > 0
-                ? db.collection("products").find(searchQuery(searchText, seller_name || ""))
+                ? db
+                    .collection("products")
+                    .find(searchQuery(searchText, seller_name || ""))
                 : filters && filters !== "all"
-                    ? db.collection("products").find(filterQuery(filters, seller_name || ""))
-                    : db.collection("products").find((seller_name && { seller: seller_name }) || {});
+                    ? db
+                        .collection("products")
+                        .find(filterQuery(filters, seller_name || ""))
+                    : db
+                        .collection("products")
+                        .find((seller_name && { seller: seller_name }) || {});
         if (item || page) {
             result = yield cursor
                 .skip(page * parseInt(item))

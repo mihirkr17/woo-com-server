@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const { dbh, dbConnection } = require("../../utils/db");
+const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const { updateProductStock } = require("../../utils/common");
 const { orderModel } = require("../../model/order");
@@ -19,33 +19,43 @@ module.exports.setOrderHandler = (req, res) => __awaiter(void 0, void 0, void 0,
         const userEmail = req.headers.authorization || "";
         const verifiedEmail = req.decoded.email;
         const body = req.body;
+        if (userEmail !== verifiedEmail) {
+            return res.status(401).send({ error: "Unauthorized access" });
+        }
+        if (!body || typeof body === "undefined") {
+            return res.status(400).send({
+                success: false,
+                statusCode: 400,
+                error: "Something went wrong !",
+            });
+        }
         const products = yield db.collection("products").findOne({
             _id: ObjectId(body === null || body === void 0 ? void 0 : body.productId),
         });
-        if (userEmail !== verifiedEmail)
-            return res.status(401).send({ message: "Unauthorized access" });
-        if (body) {
-            if (products && (products === null || products === void 0 ? void 0 : products.available) > (body === null || body === void 0 ? void 0 : body.quantity)) {
-                let model = orderModel(body);
-                const result = yield db
-                    .collection("orders")
-                    .updateOne({ user_email: userEmail }, { $push: { orders: model } }, { upsert: true });
-                if (result) {
-                    yield updateProductStock(body === null || body === void 0 ? void 0 : body.productId, body === null || body === void 0 ? void 0 : body.quantity, "dec");
-                    yield db
-                        .collection("users")
-                        .updateOne({ email: userEmail }, { $unset: { myCartProduct: [] } });
-                }
-                res.status(200).send(result && { message: "Order success" });
-            }
-            else {
-                return res.status(400).send({
-                    message: "Order not taken because this product not available rights now!",
-                });
-            }
+        if (!products || typeof products === "undefined") {
+            return res.status(400).send({
+                success: false,
+                statuscode: 400,
+                error: "Sorry! Can't place this order",
+            });
         }
-        else {
-            return res.status(400).send({ message: "Bad request!" });
+        if ((products === null || products === void 0 ? void 0 : products.available) < (body === null || body === void 0 ? void 0 : body.quantity) && products.stock !== "in") {
+            return res.status(400).send({
+                success: false,
+                statuscode: 400,
+                error: "Sorry! Order not taken because this product not available rights now!",
+            });
+        }
+        let model = orderModel(body);
+        const result = yield db
+            .collection("orders")
+            .updateOne({ user_email: userEmail }, { $push: { orders: model } }, { upsert: true });
+        if (result) {
+            yield updateProductStock(body === null || body === void 0 ? void 0 : body.productId, body === null || body === void 0 ? void 0 : body.quantity, "dec");
+            yield db
+                .collection("users")
+                .updateOne({ email: userEmail }, { $unset: { myCartProduct: [] } });
+            res.status(200).send(result && { message: "Order success" });
         }
     }
     catch (error) {
@@ -122,7 +132,8 @@ module.exports.manageOrders = (req, res) => __awaiter(void 0, void 0, void 0, fu
         const seller = req.query.seller;
         let result;
         if (seller) {
-            result = yield db.collection("orders")
+            result = yield db
+                .collection("orders")
                 .aggregate([
                 { $unwind: "$orders" },
                 {

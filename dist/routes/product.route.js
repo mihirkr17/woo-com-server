@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const router = express_1.default.Router();
-const { verifyJWT, verifySeller } = require("../middleware/auth");
+const { verifyJWT, checkingSeller } = require("../middleware/auth");
 const { searchProducts, topRatedProducts, topSellingProducts, countProducts, deleteProducts, updateProduct, updateStock, addProductHandler, allProducts, fetchSingleProduct, fetchSingleProductByPid, productByCategory, fetchTopSellingProduct, manageProduct } = require("../controllers/product/product.controller");
 try {
     router.get("/search-products/:q", searchProducts);
@@ -14,7 +14,7 @@ try {
     router.get("/product-count", countProducts);
     router.delete("/delete-product/:productId", verifyJWT, deleteProducts);
     router.put("/update-product/:productId", verifyJWT, updateProduct);
-    router.put("/update-stock", verifyJWT, verifySeller, updateStock);
+    router.put("/update-stock", verifyJWT, checkingSeller, updateStock);
     router.post("/add-product", verifyJWT, addProductHandler);
     router.get("/all-products/:limits", allProducts);
     router.get("/fetch-single-product/:product_slug", fetchSingleProduct);

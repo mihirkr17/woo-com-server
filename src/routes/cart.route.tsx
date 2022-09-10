@@ -13,7 +13,7 @@ const {
 } = require("../controllers/cart/cart.controller");
 
 try {
-  router.put("/add-to-cart", verifyJWT, addToCartHandler);
+  router.post("/add-to-cart", verifyJWT, addToCartHandler);
   router.put("/add-buy-product", verifyJWT, addToBuyHandler);
   router.put(
     "/update-product-quantity/:cartTypes",

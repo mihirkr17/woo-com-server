@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-const { dbh, dbConnection } = require("../../utils/db");
+const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const { updateProductStock } = require("../../utils/common");
 const { orderModel } = require("../../model/order");
@@ -12,41 +12,56 @@ module.exports.setOrderHandler = async (req: Request, res: Response) => {
     const verifiedEmail: string = req.decoded.email;
     const body: any = req.body;
 
+    if (userEmail !== verifiedEmail) {
+      return res.status(401).send({ error: "Unauthorized access" });
+    }
+
+    if (!body || typeof body === "undefined") {
+      return res.status(400).send({
+        success: false,
+        statusCode: 400,
+        error: "Something went wrong !",
+      });
+    }
+
     const products = await db.collection("products").findOne({
       _id: ObjectId(body?.productId),
     });
 
-    if (userEmail !== verifiedEmail)
-      return res.status(401).send({ message: "Unauthorized access" });
+    if (!products || typeof products === "undefined") {
+      return res.status(400).send({
+        success: false,
+        statuscode: 400,
+        error: "Sorry! Can't place this order",
+      });
+    }
 
-    if (body) {
-      if (products && products?.available > body?.quantity) {
-        let model = orderModel(body);
+    if (products?.available < body?.quantity && products.stock !== "in") {
+      return res.status(400).send({
+        success: false,
+        statuscode: 400,
+        error:
+          "Sorry! Order not taken because this product not available rights now!",
+      });
+    }
 
-        const result = await db
-          .collection("orders")
-          .updateOne(
-            { user_email: userEmail },
-            { $push: { orders: model } },
-            { upsert: true }
-          );
+    let model = orderModel(body);
 
-        if (result) {
-          await updateProductStock(body?.productId, body?.quantity, "dec");
+    const result = await db
+      .collection("orders")
+      .updateOne(
+        { user_email: userEmail },
+        { $push: { orders: model } },
+        { upsert: true }
+      );
 
-          await db
-            .collection("users")
-            .updateOne({ email: userEmail }, { $unset: { myCartProduct: [] } });
-        }
-        res.status(200).send(result && { message: "Order success" });
-      } else {
-        return res.status(400).send({
-          message:
-            "Order not taken because this product not available rights now!",
-        });
-      }
-    } else {
-      return res.status(400).send({ message: "Bad request!" });
+    if (result) {
+      await updateProductStock(body?.productId, body?.quantity, "dec");
+
+      await db
+        .collection("users")
+        .updateOne({ email: userEmail }, { $unset: { myCartProduct: [] } });
+      res.status(200).send(result && { message: "Order success" });
     }
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
@@ -145,7 +160,8 @@ module.exports.manageOrders = async (req: Request, res: Response) => {
     let result: any;
 
     if (seller) {
-      result = await db.collection("orders")
+      result = await db
+        .collection("orders")
         .aggregate([
           { $unwind: "$orders" },
           {

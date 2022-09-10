@@ -1,83 +1,100 @@
-import express, { Express, Request, Response } from "express";
+import { Request, Response } from "express";
 var jwt = require("jsonwebtoken");
-const { dbh } = require("../database/db");
+const { dbConnection } = require("../utils/db");
 
 const verifyJWT = async (req: Request, res: Response, next: any) => {
   const token = req.cookies.token;
 
-  if (token) {
-    jwt.verify(
-      token,
-      process.env.ACCESS_TOKEN,
-      function (err: any, decoded: any) {
-        if (err) {
-          res.clearCookie("token");
-          return res.status(401).send({
-            message: err.message,
-          });
-        }
-        req.decoded = decoded;
-        next();
-      }
-    );
-  } else {
-    return res.status(403).send({ message: "Forbidden" });
+  if (!token || typeof token === "undefined") {
+    return res
+      .status(403)
+      .send({ success: false, statusCode: 403, error: "Login Expired !" });
   }
+
+  jwt.verify(
+    token,
+    process.env.ACCESS_TOKEN,
+    function (err: any, decoded: any) {
+      if (err) {
+        res.clearCookie("token");
+        return res.status(401).send({
+          success: false,
+          statusCode: 401,
+          error: err.message,
+        });
+      }
+      req.decoded = decoded;
+      next();
+    }
+  );
 };
 
 // // verify owner
-const verifyAuth = async (req: Request, res: Response, next: any) => {
-  await dbh.connect();
-  const userCollection = dbh.db("ecommerce-db").collection("users");
+const checkingOwnerOrAdmin = async (req: Request, res: Response, next: any) => {
+  const db = await dbConnection();
+
   const authEmail = req.decoded.email;
-  const findAuthInDB = await userCollection.findOne({
+  const findAuthInDB = await db.collection("users").findOne({
     email: authEmail && authEmail,
   });
 
-  if (findAuthInDB.role === "owner" || findAuthInDB.role === "admin") {
-    next();
-  } else {
-    res.status(403).send({ message: "Forbidden" });
+  if (findAuthInDB.role !== "owner" || findAuthInDB.role !== "admin") {
+    return res.status(400).send({
+      success: false,
+      statusCode: 400,
+      error:
+        "You are not a owner or admin, So you are not authorized for process this.",
+    });
   }
+
+  next();
 };
 
 // verify seller
-const verifySeller = async (req: Request, res: Response, next: any) => {
-  await dbh.connect();
-  const userCollection = dbh.db("ecommerce-db").collection("users");
+const checkingSeller = async (req: Request, res: Response, next: any) => {
+  const db = await dbConnection();
 
   const authEmail = req.decoded.email;
-  const findAuthInDB = await userCollection.findOne({
+  const findAuthInDB = await db.collection("users").findOne({
     email: authEmail && authEmail,
   });
 
-  if (findAuthInDB.role === "seller") {
-    next();
-  } else {
-    res.status(403).send({ message: "Forbidden" });
+  if (findAuthInDB.role !== "seller") {
+    return res.status(400).send({
+      success: false,
+      statusCode: 400,
+      error:
+        "You are not a seller, So you are not authorized for process this.",
+    });
   }
+
+  next();
 };
 
 // verify seller
-const verifyUser = async (req: Request, res: Response, next: any) => {
-  await dbh.connect();
-  const userCollection = dbh.db("ecommerce-db").collection("users");
+const checkingUser = async (req: Request, res: Response, next: any) => {
+  const db = await dbConnection();
 
   const authEmail = req.decoded.email;
-  const findAuthInDB = await userCollection.findOne({
+  const findAuthInDB = await db.collection("users").findOne({
     email: authEmail && authEmail,
   });
 
-  if (findAuthInDB.role === "user") {
-    next();
-  } else {
-    res.status(403).send({ message: "Forbidden" });
+  if (findAuthInDB.role !== "user") {
+    return res.status(400).send({
+      success: false,
+      statusCode: 400,
+      error:
+        "You are not a user, So you are not authorized for process this.",
+    });
   }
+
+  next();
 };
 
 module.exports = {
   verifyJWT,
-  verifyAuth,
-  verifySeller,
-  verifyUser
+  checkingOwnerOrAdmin,
+  checkingSeller,
+  checkingUser,
 };

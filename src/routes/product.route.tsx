@@ -1,6 +1,6 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
-const { verifyJWT, verifySeller } = require("../middleware/auth");
+const { verifyJWT, checkingSeller } = require("../middleware/auth");
 const {
   searchProducts,
   topRatedProducts,
@@ -25,7 +25,7 @@ try {
   router.get("/product-count", countProducts);
   router.delete("/delete-product/:productId", verifyJWT, deleteProducts);
   router.put("/update-product/:productId", verifyJWT, updateProduct);
-  router.put("/update-stock", verifyJWT, verifySeller, updateStock);
+  router.put("/update-stock", verifyJWT, checkingSeller, updateStock);
   router.post("/add-product", verifyJWT, addProductHandler);
   router.get("/all-products/:limits", allProducts);
   router.get("/fetch-single-product/:product_slug", fetchSingleProduct);
