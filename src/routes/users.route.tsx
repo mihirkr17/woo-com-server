@@ -40,7 +40,12 @@ try {
   router.put("/switch-role/:role", verifyJWT, switchRole);
   router.put("/update-profile-data/:email", verifyJWT, updateProfileData);
   router.put("/make-admin/:userId", verifyJWT, checkingOwnerOrAdmin, makeAdmin);
-  router.put("/demote-to-user/:userId", verifyJWT, checkingOwnerOrAdmin, demoteToUser);
+  router.put(
+    "/demote-to-user/:userId",
+    verifyJWT,
+    checkingOwnerOrAdmin,
+    demoteToUser
+  );
   router.get("/manage-user", manageUsers);
   router.put("/make-seller-request/:userEmail", makeSellerRequest);
   router.put(

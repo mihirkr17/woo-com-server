@@ -12,13 +12,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var jwt = require("jsonwebtoken");
 const { dbConnection } = require("../utils/db");
 const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    const token = req.cookies.token;
+    const token = req.cookies.token; // finding token in http only on cookies.
+    // if token not present in cookies then return 403 status code and terminate the request here....
     if (!token || typeof token === "undefined") {
         return res
             .status(403)
             .send({ success: false, statusCode: 403, error: "Login Expired !" });
     }
     jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
+        // verifying the token with jwt verify method and if token broken then 401 status code will send and terminate the request
         if (err) {
             res.clearCookie("token");
             return res.status(401).send({
@@ -27,6 +29,7 @@ const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function
                 error: err.message,
             });
         }
+        // if success then return email throw req.decoded
         req.decoded = decoded;
         next();
     });

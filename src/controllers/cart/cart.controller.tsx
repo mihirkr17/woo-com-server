@@ -2,6 +2,37 @@ import { Request, Response } from "express";
 const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 
+const checkProductAvailability = async (db: any, productId: string) => {
+  return await db.collection("products").findOne({
+    _id: ObjectId(productId),
+    available: { $gte: 1 },
+    stock: "in",
+    status: "active",
+  });
+};
+
+const responseSender = (
+  res: any,
+  success: boolean,
+  message: string,
+  data: any = null
+) => {
+  return success
+    ? res.status(200).send({ success: true, statusCode: 200, message, data })
+    : res.status(400).send({
+        success: false,
+        statusCode: 400,
+        error: message,
+      });
+};
+
+const saveToDBHandler = async (filter: any, documents: any) => {
+  const db = await dbConnection();
+  return await db.collection("users").updateOne(filter, documents, {
+    upsert: true,
+  });
+};
+
 // update product quantity controller
 module.exports.updateProductQuantity = async (req: Request, res: Response) => {
   try {
@@ -16,91 +47,76 @@ module.exports.updateProductQuantity = async (req: Request, res: Response) => {
     let updateDocuments: any;
     let filters: any;
 
-    if (!productId || typeof productId === "undefined") {
-      return res.status(400).send({
-        success: false,
-        statusCode: 400,
-        error: "Bad request! headers missing",
-      });
+    if (!productId || typeof productId === "undefined" || productId === null) {
+      return responseSender(res, false, "Bad request! headers missing");
     }
 
-    const availableProduct = await db.collection("products").findOne({
-      _id: ObjectId(productId),
-      available: { $gte: 1 },
-      stock: "in",
-      status: "active",
-    });
+    const availableProduct = await checkProductAvailability(db, productId);
+
+    if (
+      !availableProduct ||
+      typeof availableProduct === "undefined" ||
+      availableProduct === null
+    ) {
+      return responseSender(res, false, "Product not available");
+    }
 
     if (quantity >= availableProduct?.available - 1) {
-      return res.status(400).send({
-        success: false,
-        statusCode: 400,
-        error: "Your selected quantity out of range in available product",
-      });
+      return responseSender(
+        res,
+        false,
+        "Your selected quantity out of range in available product"
+      );
     }
 
     const cart = await db.collection("users").findOne({
       email: userEmail,
     });
 
-    if (availableProduct) {
-      if (cart_types === "buy") {
-        updateDocuments = {
-          $set: {
-            "buy_product.quantity": quantity,
-            "buy_product.totalAmount":
-              parseFloat(cart?.buy_product?.price) * quantity,
-          },
-        };
+    if (cart_types === "buy") {
+      updateDocuments = {
+        $set: {
+          "buy_product.quantity": quantity,
+          "buy_product.totalAmount":
+            parseFloat(cart?.buy_product?.price) * quantity,
+        },
+      };
 
-        filters = {
-          email: userEmail,
-        };
-      }
+      filters = {
+        email: userEmail,
+      };
+    }
 
-      if (cart_types === "toCart") {
-        const cartProduct = cart?.myCartProduct || [];
-        let amount;
+    if (cart_types === "toCart") {
+      const cartProduct = cart?.myCartProduct || [];
+      let amount;
 
-        for (let i = 0; i < cartProduct.length; i++) {
-          let items = cartProduct[i];
-          if (items?._id === productId) {
-            amount = items?.price * quantity;
-          }
+      for (let i = 0; i < cartProduct.length; i++) {
+        let items = cartProduct[i];
+        if (items?._id === productId) {
+          amount = items?.price * quantity;
         }
-
-        updateDocuments = {
-          $set: {
-            "myCartProduct.$.quantity": quantity,
-            "myCartProduct.$.totalAmount": amount,
-          },
-        };
-
-        filters = {
-          email: userEmail,
-          "myCartProduct._id": productId,
-        };
       }
 
-      const result = await db
-        .collection("users")
-        .updateOne(filters, updateDocuments, {
-          upsert: true,
-        });
+      updateDocuments = {
+        $set: {
+          "myCartProduct.$.quantity": quantity,
+          "myCartProduct.$.totalAmount": amount,
+        },
+      };
 
-      if (result) {
-        return res.status(200).send({
-          success: true,
-          statusCode: 200,
-          message: "Quantity updated",
-        });
-      } else {
-        return res.status(400).send({
-          success: false,
-          statusCode: 400,
-          error: "Failed to update quantity",
-        });
-      }
+      filters = {
+        email: userEmail,
+        "myCartProduct._id": productId,
+      };
+    }
+
+    const result = await saveToDBHandler(filters, updateDocuments);
+
+    if (result?.modifiedCount) {
+      return responseSender(res, true, "Quantity updated.");
+    } else {
+      return responseSender(res, false, "Failed to update this quantity!");
     }
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
@@ -109,46 +125,37 @@ module.exports.updateProductQuantity = async (req: Request, res: Response) => {
 
 module.exports.deleteCartItem = async (req: Request, res: Response) => {
   try {
-    const db = await dbConnection();
-
     const productId = req.headers.authorization;
     const userEmail = req.decoded.email;
     const cart_types = req.params.cartTypes;
     let updateDocuments;
 
     if (!ObjectId.isValid(productId) || !productId) {
-      return res.status(400).send({
-        success: false,
-        statusCode: 400,
-        error: "Bad request! headers missing",
-      });
+      return responseSender(res, false, "Bad request! headers missing");
     }
 
     if (cart_types === "buy") {
-      updateDocuments = await db
-        .collection("users")
-        .updateOne({ email: userEmail }, { $unset: { buy_product: "" } });
-    } else {
-      updateDocuments = await db
-        .collection("users")
-        .updateOne(
-          { email: userEmail },
-          { $pull: { myCartProduct: { _id: productId } } }
-        );
+      updateDocuments = await saveToDBHandler(
+        { email: userEmail },
+        { $unset: { buy_product: "" } }
+      );
     }
 
-    if (updateDocuments) {
-      return res.status(200).send({
-        success: true,
-        statusCode: 200,
-        message: `Item removed successfully from your cart`,
-      });
+    if (cart_types === "toCart") {
+      updateDocuments = await saveToDBHandler(
+        { email: userEmail },
+        { $pull: { myCartProduct: { _id: productId } } }
+      );
+    }
+
+    if (updateDocuments?.modifiedCount) {
+      return responseSender(
+        res,
+        true,
+        "Item removed successfully from your cart."
+      );
     } else {
-      return res.status(400).send({
-        success: false,
-        statusCode: 400,
-        error: `Sorry! failed to remove.`,
-      });
+      return responseSender(res, false, "Sorry! failed to remove.");
     }
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
@@ -162,19 +169,10 @@ module.exports.addToCartHandler = async (req: Request, res: Response) => {
     const email: string = req.decoded.email;
     const body = req.body;
 
-    const availableProduct = await db.collection("products").findOne({
-      _id: ObjectId(body?._id),
-      status: "active",
-    });
+    const availableProduct = await checkProductAvailability(db, body?._id);
 
     if (availableProduct?.stock === "out" && availableProduct?.available <= 0) {
-      return res
-        .status(400)
-        .send({
-          success: false,
-          statusCode: 400,
-          error: "This product out of stock now",
-        });
+      return responseSender(res, false, "This product out of stock now!");
     }
 
     const existsProduct = await db
@@ -185,28 +183,24 @@ module.exports.addToCartHandler = async (req: Request, res: Response) => {
       );
 
     if (existsProduct) {
-      return res.status(400).send({
-        success: false,
-        statusCode: 400,
-        error: "Product Has Already In Your Cart",
-      });
+      return responseSender(res, false, "Product Has Already In Your Cart");
     }
 
     body["addedAt"] = new Date(Date.now());
 
-    const cartRes = await db.collection("users").updateOne(
+    const cartRes = await saveToDBHandler(
       { email: email },
       {
         $push: { myCartProduct: body },
-      },
-      { upsert: true }
+      }
     );
-    res.status(200).send({
-      success: true,
-      statusCode: 200,
-      data: cartRes,
-      message: "Product successfully added to your cart",
-    });
+
+    return responseSender(
+      res,
+      true,
+      "Product successfully added to your cart",
+      cartRes
+    );
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
   }
@@ -228,13 +222,11 @@ module.exports.addToBuyHandler = async (req: Request, res: Response) => {
       );
 
     if (cartRes) {
-      return res
-        .status(200)
-        .send({
-          success: true,
-          statusCode: 200,
-          message: "Product ready to buy.",
-        });
+      return res.status(200).send({
+        success: true,
+        statusCode: 200,
+        message: "Product ready to buy.",
+      });
     } else {
       return res
         .status(400)
@@ -295,11 +287,18 @@ module.exports.updateCartAddress = async (req: Request, res: Response) => {
     );
 
     if (result) {
-      return res.status(200).send({success: true, statusCode: 200, message: "Shipping address updated."});
+      return res.status(200).send({
+        success: true,
+        statusCode: 200,
+        message: "Shipping address updated.",
+      });
     } else {
-      return res.status(400).send({success: false, statusCode: 400, error: "Failed to update shipping address."});
+      return res.status(400).send({
+        success: false,
+        statusCode: 400,
+        error: "Failed to update shipping address.",
+      });
     }
-    
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
   }

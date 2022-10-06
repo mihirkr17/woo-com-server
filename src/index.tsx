@@ -1,4 +1,6 @@
 import express, { Express, Request, Response } from "express";
+var mongoose = require("mongoose");
+require("dotenv").config();
 const cookieParser = require("cookie-parser");
 const userRoutes = require("./routes/users.route");
 const productRoutes = require("./routes/product.route");
@@ -10,9 +12,9 @@ const wishlistRoutes = require("./routes/wishlist.route");
 const errorHandlers = require("./errors/errors");
 const port = process.env.PORT || 5000;
 
+
 // Server setup
 const cors = require("cors");
-require("dotenv").config();
 const app: Express = express();
 
 // middleware
@@ -25,6 +27,16 @@ app.use(
 );
 app.use(cookieParser());
 app.use(express.json());
+
+// Set up default mongoose connection
+const mongoUri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PWD}@cluster0.8bccj.mongodb.net/ecommerce-db?retryWrites=true&w=majority`;
+
+mongoose.connect(mongoUri, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  // serverApi: ServerApiVersion.v1,
+}).then(() => console.log("connection successful"))
+.catch((err:any) => console.log(err));
 
 app.get("/", (req: Request, res: Response) => {
   res.status(200).send("Woo-Com Server is running");

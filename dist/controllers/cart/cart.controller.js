@@ -11,6 +11,29 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
+const checkProductAvailability = (db, productId) => __awaiter(void 0, void 0, void 0, function* () {
+    return yield db.collection("products").findOne({
+        _id: ObjectId(productId),
+        available: { $gte: 1 },
+        stock: "in",
+        status: "active",
+    });
+});
+const responseSender = (res, success, message, data = null) => {
+    return success
+        ? res.status(200).send({ success: true, statusCode: 200, message, data })
+        : res.status(400).send({
+            success: false,
+            statusCode: 400,
+            error: message,
+        });
+};
+const saveToDBHandler = (filter, documents) => __awaiter(void 0, void 0, void 0, function* () {
+    const db = yield dbConnection();
+    return yield db.collection("users").updateOne(filter, documents, {
+        upsert: true,
+    });
+});
 // update product quantity controller
 module.exports.updateProductQuantity = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
@@ -23,80 +46,58 @@ module.exports.updateProductQuantity = (req, res) => __awaiter(void 0, void 0, v
         // undefined variables
         let updateDocuments;
         let filters;
-        if (!productId || typeof productId === "undefined") {
-            return res.status(400).send({
-                success: false,
-                statusCode: 400,
-                error: "Bad request! headers missing",
-            });
+        if (!productId || typeof productId === "undefined" || productId === null) {
+            return responseSender(res, false, "Bad request! headers missing");
         }
-        const availableProduct = yield db.collection("products").findOne({
-            _id: ObjectId(productId),
-            available: { $gte: 1 },
-            stock: "in",
-            status: "active",
-        });
+        const availableProduct = yield checkProductAvailability(db, productId);
+        if (!availableProduct ||
+            typeof availableProduct === "undefined" ||
+            availableProduct === null) {
+            return responseSender(res, false, "Product not available");
+        }
         if (quantity >= (availableProduct === null || availableProduct === void 0 ? void 0 : availableProduct.available) - 1) {
-            return res.status(400).send({
-                success: false,
-                statusCode: 400,
-                error: "Your selected quantity out of range in available product",
-            });
+            return responseSender(res, false, "Your selected quantity out of range in available product");
         }
         const cart = yield db.collection("users").findOne({
             email: userEmail,
         });
-        if (availableProduct) {
-            if (cart_types === "buy") {
-                updateDocuments = {
-                    $set: {
-                        "buy_product.quantity": quantity,
-                        "buy_product.totalAmount": parseFloat((_a = cart === null || cart === void 0 ? void 0 : cart.buy_product) === null || _a === void 0 ? void 0 : _a.price) * quantity,
-                    },
-                };
-                filters = {
-                    email: userEmail,
-                };
-            }
-            if (cart_types === "toCart") {
-                const cartProduct = (cart === null || cart === void 0 ? void 0 : cart.myCartProduct) || [];
-                let amount;
-                for (let i = 0; i < cartProduct.length; i++) {
-                    let items = cartProduct[i];
-                    if ((items === null || items === void 0 ? void 0 : items._id) === productId) {
-                        amount = (items === null || items === void 0 ? void 0 : items.price) * quantity;
-                    }
+        if (cart_types === "buy") {
+            updateDocuments = {
+                $set: {
+                    "buy_product.quantity": quantity,
+                    "buy_product.totalAmount": parseFloat((_a = cart === null || cart === void 0 ? void 0 : cart.buy_product) === null || _a === void 0 ? void 0 : _a.price) * quantity,
+                },
+            };
+            filters = {
+                email: userEmail,
+            };
+        }
+        if (cart_types === "toCart") {
+            const cartProduct = (cart === null || cart === void 0 ? void 0 : cart.myCartProduct) || [];
+            let amount;
+            for (let i = 0; i < cartProduct.length; i++) {
+                let items = cartProduct[i];
+                if ((items === null || items === void 0 ? void 0 : items._id) === productId) {
+                    amount = (items === null || items === void 0 ? void 0 : items.price) * quantity;
                 }
-                updateDocuments = {
-                    $set: {
-                        "myCartProduct.$.quantity": quantity,
-                        "myCartProduct.$.totalAmount": amount,
-                    },
-                };
-                filters = {
-                    email: userEmail,
-                    "myCartProduct._id": productId,
-                };
             }
-            const result = yield db
-                .collection("users")
-                .updateOne(filters, updateDocuments, {
-                upsert: true,
-            });
-            if (result) {
-                return res.status(200).send({
-                    success: true,
-                    statusCode: 200,
-                    message: "Quantity updated",
-                });
-            }
-            else {
-                return res.status(400).send({
-                    success: false,
-                    statusCode: 400,
-                    error: "Failed to update quantity",
-                });
-            }
+            updateDocuments = {
+                $set: {
+                    "myCartProduct.$.quantity": quantity,
+                    "myCartProduct.$.totalAmount": amount,
+                },
+            };
+            filters = {
+                email: userEmail,
+                "myCartProduct._id": productId,
+            };
+        }
+        const result = yield saveToDBHandler(filters, updateDocuments);
+        if (result === null || result === void 0 ? void 0 : result.modifiedCount) {
+            return responseSender(res, true, "Quantity updated.");
+        }
+        else {
+            return responseSender(res, false, "Failed to update this quantity!");
         }
     }
     catch (error) {
@@ -105,41 +106,24 @@ module.exports.updateProductQuantity = (req, res) => __awaiter(void 0, void 0, v
 });
 module.exports.deleteCartItem = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const db = yield dbConnection();
         const productId = req.headers.authorization;
         const userEmail = req.decoded.email;
         const cart_types = req.params.cartTypes;
         let updateDocuments;
         if (!ObjectId.isValid(productId) || !productId) {
-            return res.status(400).send({
-                success: false,
-                statusCode: 400,
-                error: "Bad request! headers missing",
-            });
+            return responseSender(res, false, "Bad request! headers missing");
         }
         if (cart_types === "buy") {
-            updateDocuments = yield db
-                .collection("users")
-                .updateOne({ email: userEmail }, { $unset: { buy_product: "" } });
+            updateDocuments = yield saveToDBHandler({ email: userEmail }, { $unset: { buy_product: "" } });
+        }
+        if (cart_types === "toCart") {
+            updateDocuments = yield saveToDBHandler({ email: userEmail }, { $pull: { myCartProduct: { _id: productId } } });
+        }
+        if (updateDocuments === null || updateDocuments === void 0 ? void 0 : updateDocuments.modifiedCount) {
+            return responseSender(res, true, "Item removed successfully from your cart.");
         }
         else {
-            updateDocuments = yield db
-                .collection("users")
-                .updateOne({ email: userEmail }, { $pull: { myCartProduct: { _id: productId } } });
-        }
-        if (updateDocuments) {
-            return res.status(200).send({
-                success: true,
-                statusCode: 200,
-                message: `Item removed successfully from your cart`,
-            });
-        }
-        else {
-            return res.status(400).send({
-                success: false,
-                statusCode: 400,
-                error: `Sorry! failed to remove.`,
-            });
+            return responseSender(res, false, "Sorry! failed to remove.");
         }
     }
     catch (error) {
@@ -151,39 +135,21 @@ module.exports.addToCartHandler = (req, res) => __awaiter(void 0, void 0, void 0
         const db = yield dbConnection();
         const email = req.decoded.email;
         const body = req.body;
-        const availableProduct = yield db.collection("products").findOne({
-            _id: ObjectId(body === null || body === void 0 ? void 0 : body._id),
-            status: "active",
-        });
+        const availableProduct = yield checkProductAvailability(db, body === null || body === void 0 ? void 0 : body._id);
         if ((availableProduct === null || availableProduct === void 0 ? void 0 : availableProduct.stock) === "out" && (availableProduct === null || availableProduct === void 0 ? void 0 : availableProduct.available) <= 0) {
-            return res
-                .status(400)
-                .send({
-                success: false,
-                statusCode: 400,
-                error: "This product out of stock now",
-            });
+            return responseSender(res, false, "This product out of stock now!");
         }
         const existsProduct = yield db
             .collection("users")
             .findOne({ email: email, "myCartProduct._id": body === null || body === void 0 ? void 0 : body._id }, { "myCartProduct.$": 1 });
         if (existsProduct) {
-            return res.status(400).send({
-                success: false,
-                statusCode: 400,
-                error: "Product Has Already In Your Cart",
-            });
+            return responseSender(res, false, "Product Has Already In Your Cart");
         }
         body["addedAt"] = new Date(Date.now());
-        const cartRes = yield db.collection("users").updateOne({ email: email }, {
+        const cartRes = yield saveToDBHandler({ email: email }, {
             $push: { myCartProduct: body },
-        }, { upsert: true });
-        res.status(200).send({
-            success: true,
-            statusCode: 200,
-            data: cartRes,
-            message: "Product successfully added to your cart",
         });
+        return responseSender(res, true, "Product successfully added to your cart", cartRes);
     }
     catch (error) {
         res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
@@ -198,9 +164,7 @@ module.exports.addToBuyHandler = (req, res) => __awaiter(void 0, void 0, void 0,
             .collection("users")
             .updateOne({ email: userEmail }, { $set: { buy_product: body } }, { upsert: true });
         if (cartRes) {
-            return res
-                .status(200)
-                .send({
+            return res.status(200).send({
                 success: true,
                 statusCode: 200,
                 message: "Product ready to buy.",
@@ -252,10 +216,18 @@ module.exports.updateCartAddress = (req, res) => __awaiter(void 0, void 0, void 
             },
         }, { arrayFilters: [{ "i.addressId": body === null || body === void 0 ? void 0 : body.addressId }] });
         if (result) {
-            return res.status(200).send({ success: true, statusCode: 200, message: "Shipping address updated." });
+            return res.status(200).send({
+                success: true,
+                statusCode: 200,
+                message: "Shipping address updated.",
+            });
         }
         else {
-            return res.status(400).send({ success: false, statusCode: 400, error: "Failed to update shipping address." });
+            return res.status(400).send({
+                success: false,
+                statusCode: 400,
+                error: "Failed to update shipping address.",
+            });
         }
     }
     catch (error) {
