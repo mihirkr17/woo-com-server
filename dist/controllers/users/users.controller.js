@@ -47,9 +47,9 @@ module.exports.signUser = (req, res, next) => __awaiter(void 0, void 0, void 0, 
                 .send({ success: false, error: "Authorization header is missing!" });
         }
         const cookieObject = {
-            // sameSite: "none",
-            // secure: true,
-            maxAge: 9000000,
+            sameSite: "none",
+            secure: true,
+            maxAge: 7200000,
             httpOnly: true,
         };
         const token = jwt.sign({ email: authEmail }, process.env.ACCESS_TOKEN, {
