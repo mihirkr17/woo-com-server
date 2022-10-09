@@ -3,38 +3,163 @@ const { dbConnection } = require("../../utils/db");
 var jwt = require("jsonwebtoken");
 const { ObjectId } = require("mongodb");
 const userModel = require("../../model/UserModel");
+const User = require("../../model/user.model");
+const setToken = require("../../utils/setToken");
+const { comparePassword } = require("../../utils/comparePassword");
+const emailValidator = require("../../helpers/emailValidator");
 
+/**
+ * controller --> user login controller
+ * request method --> POST
+ * required --> BODY
+ */
+module.exports.userLoginController = async (req: Request, res: Response) => {
+  try {
+    const { username, password, loginCredential } = req.body;
+    let token: String;
+    let userData;
+    let credentials;
+
+    const cookieObject: any = {
+      // sameSite: "none",
+      // secure: true,
+      maxAge: 57600000, // 16hr [3600000 -> 1hr]
+      httpOnly: true,
+    };
+
+    if (typeof loginCredential === 'undefined' || !loginCredential) {
+      credentials = 'system';
+    } else {
+      credentials = loginCredential;
+    }
+
+    const existUser = await User.findOne({ $and: [{ $or: [{ username }, { email: username }] }, { loginCredential: credentials }] });
+
+    /// third party login system like --> Google
+    if (loginCredential === 'thirdParty') {
+
+      if (!existUser || typeof existUser === 'undefined') {
+        const user = new User({ email: username, username, loginCredential });
+        userData = await user.save();
+
+      } else {
+        userData = existUser;
+      }
+
+      token = setToken(userData);
+    }
+
+    // system login
+    else {
+
+      if (!existUser) {
+        return res.status(400).send({ success: false, statusCode: 400, error: 'User not found !!!' });
+      }
+
+      let comparedPassword = await comparePassword(password, existUser?.password);
+
+      if (!comparedPassword) {
+        return res.status(400).send({ success: false, statusCode: 400, error: "Password didn't match !!!" });
+      }
+
+      token = setToken(existUser);
+    }
+
+    if (token) {
+      res.cookie("token", token, cookieObject);
+      return res.status(200).send({ message: "Login success", statusCode: 200, success: true });
+    }
+  } catch (error: any) {
+    return res.status(400).send({ success: false, statusCode: 400, error: error.message });
+  }
+};
+
+/**
+ * controller --> user registration controller
+ * request method --> POST
+ * required --> BODY
+ */
+module.exports.userRegisterController = async (req: Request, res: Response, next: any) => {
+  try {
+    const { username, email, password } = req.body;
+
+    if (!req.body) {
+      return res.status(400).send({ success: false, statusCode: 400, error: "Information not found !!!" });
+    }
+
+    if (username.length <= 3 && username.length >= 9) {
+      return res.status(400).send({ success: false, statusCode: 400, error: 'Username length must between 4 to 8 characters !!!' });
+    }
+
+    if (email.length <= 0) {
+      return res.status(400).send({ success: false, statusCode: 400, error: 'Email address required !!!' });
+    }
+
+    if (!emailValidator(email)) {
+      return res.status(400).send({ success: false, statusCode: 400, error: 'Invalid email address !!!' });
+    }
+
+    if (password.length <= 0) {
+      return res.status(400).send({ success: false, statusCode: 400, error: 'Password required !!!' });
+    }
+
+    if (password.length <= 4) {
+      return res.status(400).send({ success: false, statusCode: 400, error: 'Password must be greater than 5 characters !!!' });
+    }
+
+    let existUser = await User.findOne({ $or: [{ username }, { email }] });
+
+    if (existUser) {
+      return res.status(400).send({ success: false, statusCode: 400, error: "User already exists ! Please try another username or email address." });
+    }
+
+    let user = new User(req.body);
+
+    const result = await user.save();
+
+    if (!result) {
+      return res.status(500).send({ success: false, statusCode: 500, error: "Internal error!" });
+    }
+
+    return res.status(200).send({
+      success: true,
+      statusCode: 200,
+      message: "Registration success. Thanks " + result?.username,
+      data: { username: result?.username }
+    });
+  } catch (error: any) {
+    return res.status(400).send({ success: false, statusCode: 400, error: error.message });
+  }
+};
+
+/**
+ * controller --> fetch authenticate user information
+ * request method --> GET
+ * required --> NONE
+ */
 module.exports.fetchAuthUser = async (
   req: Request,
   res: Response,
   next: any
 ) => {
   try {
-    const db = await dbConnection();
-    const authEmail: string = req.headers.authorization || "";
+    const authEmail = req.decoded.email;
+    const role = req.decoded.role;
 
-    if (!authEmail || typeof authEmail === "undefined") {
-      return res
-        .status(400)
-        .send({ success: false, error: "Authorization header is missing!" });
-    }
-
-    const result = await db.collection("users").findOne({ email: authEmail });
+    const result = await User.findOne({ $and: [{ email: authEmail }, { role: role }] }).exec();
 
     if (!result || typeof result !== "object") {
-      return res.status(404).send({ success: false, error: "User not found!" });
+      return res.status(404).send({ success: false, statusCode: 404, error: "User not found!" });
     }
 
-    await db
-      .collection("users")
-      .updateOne(
-        { email: authEmail },
-        { $pull: { myCartProduct: { stock: "out" } } }
-      );
+    await User.updateOne(
+      { email: authEmail },
+      { $pull: { myCartProduct: { stock: "out" } } }
+    )
 
     return res
       .status(200)
-      .send({ success: true, statusCode: 200, data: result });
+      .send({ success: true, statusCode: 200, message: 'Welcome ' + result?.username, data: result });
   } catch (error: any) {
     next(error);
   }
@@ -52,23 +177,28 @@ module.exports.signUser = async (req: Request, res: Response, next: any) => {
         .send({ success: false, error: "Authorization header is missing!" });
     }
 
-    const cookieObject: any = {
-      sameSite: "none",
-      secure: true,
-      maxAge: 7200000, //3600000
-      httpOnly: true,
-    };
+    const setToken = (role: String) => {
+      const cookieObject: any = {
+        // sameSite: "none",
+        // secure: true,
+        maxAge: 7200000, //3600000
+        httpOnly: true,
+      };
 
-    const token = jwt.sign({ email: authEmail }, process.env.ACCESS_TOKEN, {
-      algorithm: "HS256",
-      expiresIn: "1h",
-    });
+      const payload = {
+        email: authEmail,
+        role: role,
+      };
 
-    const setToken = () => {
+      const token = jwt.sign({ email: authEmail }, process.env.ACCESS_TOKEN, {
+        algorithm: "HS256",
+        expiresIn: "2h",
+      });
+
       return res.cookie("token", token, cookieObject)
         ? res
-            .status(200)
-            .send({ message: "Login success", statusCode: 200, success: true })
+          .status(200)
+          .send({ message: "Login success", statusCode: 200, success: true })
         : res.status(400).send({ error: "Bad request", success: false });
     };
 
@@ -77,7 +207,7 @@ module.exports.signUser = async (req: Request, res: Response, next: any) => {
       .findOne({ email: authEmail });
 
     if (existsUser && typeof existsUser === "object") {
-      return setToken();
+      return setToken(existsUser?.role);
     }
 
     // user model
@@ -88,9 +218,12 @@ module.exports.signUser = async (req: Request, res: Response, next: any) => {
       return res.status(400).send({ success: false, error: errs });
     }
 
-    const newUser = await db.collection("users").insertOne(model);
+    const newUser = await db
+      .collection("users")
+      .insertOne(model)
+      .then((d: any) => d[0]);
 
-    if (newUser?.insertedId) return setToken();
+    return setToken(newUser.role);
   } catch (error: any) {
     next(error);
   }
@@ -98,8 +231,16 @@ module.exports.signUser = async (req: Request, res: Response, next: any) => {
 
 module.exports.signOutUser = async (req: Request, res: Response) => {
   try {
+    let authEmail = req.decoded.email;
+
+    if (authEmail) {
+      // if user logout then cart will be empty
+      await User.updateOne({ email: authEmail }, { myCartProduct: [] }, { new: true });
+    }
+
     res.clearCookie("token");
-    res.status(200).send({ message: "Sign out successfully" });
+
+    res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
   }

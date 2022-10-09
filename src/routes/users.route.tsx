@@ -13,6 +13,8 @@ const {
   makeSellerRequest,
   permitSellerRequest,
   checkSellerRequest,
+  userLoginController,
+  userRegisterController
 } = require("../controllers/users/users.controller");
 
 try {
@@ -24,7 +26,7 @@ try {
    * @apiParams no params required.
    * @apiSuccess {one particular user object data}
    */
-  router.get("/fetch-auth-user", fetchAuthUser);
+  router.get("/fetch-auth-user", verifyJWT, fetchAuthUser);
 
   /**
    * @api {put} /sign in the user
@@ -36,7 +38,9 @@ try {
    * @apiSuccess sending success message.
    */
   router.post("/sign-user", signUser);
-  router.get("/sign-out", signOutUser);
+  router.post("/login-user", userLoginController);
+  router.post("/register-user", userRegisterController);
+  router.post("/sign-out", verifyJWT, signOutUser);
   router.put("/switch-role/:role", verifyJWT, switchRole);
   router.put("/update-profile-data/:email", verifyJWT, updateProfileData);
   router.put("/make-admin/:userId", verifyJWT, checkingOwnerOrAdmin, makeAdmin);
