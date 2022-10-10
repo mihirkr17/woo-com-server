@@ -5,6 +5,7 @@ const { ObjectId } = require("mongodb");
 const userModel = require("../../model/UserModel");
 const User = require("../../model/user.model");
 const setToken = require("../../utils/setToken");
+const generateVerifyToken = require("../../utils/generateVerifyToken");
 const { comparePassword } = require("../../utils/comparePassword");
 const emailValidator = require("../../helpers/emailValidator");
 
@@ -15,6 +16,7 @@ const emailValidator = require("../../helpers/emailValidator");
  */
 module.exports.userLoginController = async (req: Request, res: Response) => {
   try {
+    const verify_token = req.headers.authorization?.split(' ')[1] || undefined;
     const { username, password, loginCredential } = req.body;
     let token: String;
     let userData;
@@ -33,13 +35,18 @@ module.exports.userLoginController = async (req: Request, res: Response) => {
       credentials = loginCredential;
     }
 
-    const existUser = await User.findOne({ $and: [{ $or: [{ username }, { email: username }] }, { loginCredential: credentials }] });
+    const existUser = await User.findOne({
+      $and: [
+        { $or: [{ username }, { email: username }] },
+        { loginCredential: credentials }
+      ]
+    });
 
     /// third party login system like --> Google
     if (loginCredential === 'thirdParty') {
 
       if (!existUser || typeof existUser === 'undefined') {
-        const user = new User({ email: username, username, loginCredential });
+        const user = new User({ email: username, username, loginCredential, accountStatus: 'active' });
         userData = await user.save();
 
       } else {
@@ -62,12 +69,28 @@ module.exports.userLoginController = async (req: Request, res: Response) => {
         return res.status(400).send({ success: false, statusCode: 400, error: "Password didn't match !!!" });
       }
 
+      if (existUser.verifyToken && !verify_token) {
+        res.cookie("verifyToken", existUser.verifyToken, { maxAge: 3600000, httpOnly: false });
+        return res.send({ success: true, statusCode: 200, message: 'verifyTokenOnCookie' });
+      }
+
+      // next condition
+      if (existUser.verifyToken && (verify_token && typeof verify_token !== 'undefined')) {
+
+        if (existUser?.verifyToken !== verify_token) {
+          return res.status(400).send({ success: false, statusCode: 400, error: 'Required valid token !!!' });
+        }
+
+        await User.updateOne({ $or: [{ username }, { email: username }] }, { $unset: { verifyToken: 1 }, $set: { accountStatus: 'active' } });
+        res.clearCookie('verifyToken');
+      }
+
       token = setToken(existUser);
     }
 
     if (token) {
       res.cookie("token", token, cookieObject);
-      return res.status(200).send({ message: "Login success", statusCode: 200, success: true });
+      return res.status(200).send({ message: "isLogin", statusCode: 200, success: true });
     }
   } catch (error: any) {
     return res.status(400).send({ success: false, statusCode: 400, error: error.message });
@@ -113,7 +136,10 @@ module.exports.userRegisterController = async (req: Request, res: Response, next
       return res.status(400).send({ success: false, statusCode: 400, error: "User already exists ! Please try another username or email address." });
     }
 
-    let user = new User(req.body);
+    let body = req.body;
+    body['verifyToken'] = generateVerifyToken();
+
+    let user = new User(body);
 
     const result = await user.save();
 
@@ -121,16 +147,59 @@ module.exports.userRegisterController = async (req: Request, res: Response, next
       return res.status(500).send({ success: false, statusCode: 500, error: "Internal error!" });
     }
 
+    res.cookie("verifyToken", result?.verifyToken, { maxAge: 3600000, httpOnly: false });
+
     return res.status(200).send({
       success: true,
       statusCode: 200,
-      message: "Registration success. Thanks " + result?.username,
-      data: { username: result?.username }
+      message: "Registration success. Please verify your account.",
+      data: { username: result?.username, verifyToken: result?.verifyToken, email: result?.email }
     });
   } catch (error: any) {
     return res.status(400).send({ success: false, statusCode: 400, error: error.message });
   }
 };
+
+
+module.exports.userRegisterVerify = async (req: Request, res: Response, next: any) => {
+  try {
+    const verify_token = req.headers.authorization?.split(' ')[1] || undefined;
+
+    const existUser = await User.findOne({ verifyToken: verify_token });
+
+
+    if (!existUser) {
+      return res.status(400).send({ success: false, statusCode: 400, error: 'User not found !!!' });
+    }
+
+    if (existUser.verifyToken && !verify_token) {
+      res.cookie("verifyToken", existUser.verifyToken, { maxAge: 3600000, httpOnly: false });
+      return res.send({ success: true, statusCode: 200, message: 'verifyTokenOnCookie' });
+    }
+
+    // next condition
+    if (existUser.verifyToken && (verify_token && typeof verify_token !== 'undefined')) {
+
+      if (existUser?.verifyToken !== verify_token) {
+        return res.status(400).send({ success: false, statusCode: 400, error: 'Invalid token !!!' });
+      }
+
+      await User.updateOne(
+        { verifyToken: verify_token },
+        {
+          $unset: { verifyToken: 1 },
+          $set: { accountStatus: 'active' }
+        }
+      );
+
+      res.clearCookie('verifyToken');
+
+      return res.status(200).send({ success: true, statusCode: 200, message: "User verified.", data: { username: existUser?.username } });
+    }
+  } catch (error) {
+
+  }
+}
 
 /**
  * controller --> fetch authenticate user information
@@ -146,7 +215,7 @@ module.exports.fetchAuthUser = async (
     const authEmail = req.decoded.email;
     const role = req.decoded.role;
 
-    const result = await User.findOne({ $and: [{ email: authEmail }, { role: role }] }).exec();
+    const result = await User.findOne({ $and: [{ email: authEmail }, { role: role }, { accountStatus: 'active' }] }).exec();
 
     if (!result || typeof result !== "object") {
       return res.status(404).send({ success: false, statusCode: 404, error: "User not found!" });

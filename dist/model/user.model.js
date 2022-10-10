@@ -44,9 +44,10 @@ var UserSchema = new mongoose_1.Schema({
         }
     ],
     status: { type: String, enum: ["offline", "online"], default: "offline" },
-    accountStatus: { type: String, enum: ["active", "inactive", "blocked"], default: "active", },
+    accountStatus: { type: String, enum: ["active", "inactive", "blocked"], default: "inactive", },
     loginCredential: { type: String, enum: ['system', 'thirdParty'], default: 'system' },
     myCartProduct: [],
+    verifyToken: String,
     createdAt: { type: Date, default: Date.now },
 });
 // user password hashing before save into database

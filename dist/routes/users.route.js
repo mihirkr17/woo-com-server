@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const { verifyJWT, checkingOwnerOrAdmin } = require("../middleware/auth");
 const router = express_1.default.Router();
-const { fetchAuthUser, signUser, signOutUser, switchRole, updateProfileData, makeAdmin, demoteToUser, manageUsers, makeSellerRequest, permitSellerRequest, checkSellerRequest, userLoginController, userRegisterController } = require("../controllers/users/users.controller");
+const { fetchAuthUser, signUser, signOutUser, switchRole, updateProfileData, makeAdmin, demoteToUser, manageUsers, makeSellerRequest, permitSellerRequest, checkSellerRequest, userLoginController, userRegisterController, userRegisterVerify } = require("../controllers/users/users.controller");
 try {
     /**
      * @api {get} /fetch the authorize user data
@@ -29,6 +29,7 @@ try {
     router.post("/sign-user", signUser);
     router.post("/login-user", userLoginController);
     router.post("/register-user", userRegisterController);
+    router.post("/verify-register-user", userRegisterVerify);
     router.post("/sign-out", verifyJWT, signOutUser);
     router.put("/switch-role/:role", verifyJWT, switchRole);
     router.put("/update-profile-data/:email", verifyJWT, updateProfileData);

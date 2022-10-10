@@ -14,7 +14,8 @@ const {
   permitSellerRequest,
   checkSellerRequest,
   userLoginController,
-  userRegisterController
+  userRegisterController,
+  userRegisterVerify
 } = require("../controllers/users/users.controller");
 
 try {
@@ -40,6 +41,7 @@ try {
   router.post("/sign-user", signUser);
   router.post("/login-user", userLoginController);
   router.post("/register-user", userRegisterController);
+  router.post("/verify-register-user", userRegisterVerify);
   router.post("/sign-out", verifyJWT, signOutUser);
   router.put("/switch-role/:role", verifyJWT, switchRole);
   router.put("/update-profile-data/:email", verifyJWT, updateProfileData);

@@ -14,6 +14,7 @@ interface IUser {
   accountStatus: String;
   loginCredential: String;
   myCartProduct: any[],
+  verifyToken: String;
   createdAt: Date;
 }
 
@@ -48,9 +49,10 @@ var UserSchema = new Schema<IUser>({
     }
   ],
   status: { type: String, enum: ["offline", "online"], default: "offline" },
-  accountStatus: { type: String, enum: ["active", "inactive", "blocked"], default: "active", },
+  accountStatus: { type: String, enum: ["active", "inactive", "blocked"], default: "inactive", },
   loginCredential: { type: String, enum: ['system', 'thirdParty'], default: 'system' },
   myCartProduct: [],
+  verifyToken: String,
   createdAt: { type: Date, default: Date.now },
 });
 
