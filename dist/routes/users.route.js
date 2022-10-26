@@ -4,9 +4,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
-const { verifyJWT, checkingOwnerOrAdmin } = require("../middleware/auth");
+const { verifyJWT, checkingOwnerOrAdmin, verifyAuthUserByJWT } = require("../middleware/auth");
 const router = express_1.default.Router();
-const { fetchAuthUser, signUser, signOutUser, switchRole, updateProfileData, makeAdmin, demoteToUser, manageUsers, makeSellerRequest, permitSellerRequest, checkSellerRequest, userLoginController, userRegisterController, userRegisterVerify } = require("../controllers/users/users.controller");
+const { fetchAuthUser, signOutUser, updateProfileData, makeAdmin, demoteToUser, manageUsers, makeSellerRequest, permitSellerRequest, checkSellerRequest, userLoginController, userRegisterController, userRegisterVerify } = require("../controllers/users/users.controller");
 try {
     /**
      * @api {get} /fetch the authorize user data
@@ -16,7 +16,7 @@ try {
      * @apiParams no params required.
      * @apiSuccess {one particular user object data}
      */
-    router.get("/fetch-auth-user", verifyJWT, fetchAuthUser);
+    router.get("/fau", verifyAuthUserByJWT, fetchAuthUser);
     /**
      * @api {put} /sign in the user
      * @apiDescription this endpoint will save the currently login or sign up user data to the database with role
@@ -26,18 +26,16 @@ try {
      * @apiParams no params required.
      * @apiSuccess sending success message.
      */
-    router.post("/sign-user", signUser);
     router.post("/login-user", userLoginController);
     router.post("/register-user", userRegisterController);
     router.post("/verify-register-user", userRegisterVerify);
-    router.post("/sign-out", verifyJWT, signOutUser);
-    router.put("/switch-role/:role", verifyJWT, switchRole);
+    router.post("/sign-out", signOutUser);
     router.put("/update-profile-data/:email", verifyJWT, updateProfileData);
     router.put("/make-admin/:userId", verifyJWT, checkingOwnerOrAdmin, makeAdmin);
     router.put("/demote-to-user/:userId", verifyJWT, checkingOwnerOrAdmin, demoteToUser);
     router.get("/manage-user", manageUsers);
-    router.put("/make-seller-request/:userEmail", makeSellerRequest);
-    router.put("/permit-seller-request/:userId", verifyJWT, checkingOwnerOrAdmin, permitSellerRequest);
+    router.put("/make-seller-request", verifyJWT, makeSellerRequest);
+    router.put("/permit-seller-request", verifyJWT, checkingOwnerOrAdmin, permitSellerRequest);
     router.get("/check-seller-request", checkSellerRequest);
 }
 catch (error) {

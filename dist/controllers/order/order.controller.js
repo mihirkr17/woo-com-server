@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const { updateProductStock } = require("../../utils/common");
-const { orderModel } = require("../../model/order");
+const { orderModel } = require("../../templates/order.template");
 module.exports.setOrderHandler = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const db = yield dbConnection();
@@ -54,7 +54,7 @@ module.exports.setOrderHandler = (req, res) => __awaiter(void 0, void 0, void 0,
             yield updateProductStock(body === null || body === void 0 ? void 0 : body.productId, body === null || body === void 0 ? void 0 : body.quantity, "dec");
             yield db
                 .collection("users")
-                .updateOne({ email: userEmail }, { $unset: { myCartProduct: [] } });
+                .updateOne({ email: userEmail }, { $unset: { shoppingCartItems: [] } });
             res.status(200).send(result && { message: "Order success" });
         }
     }

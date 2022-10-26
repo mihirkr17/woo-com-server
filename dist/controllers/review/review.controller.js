@@ -65,7 +65,7 @@ module.exports.addProductRating = (req, res) => __awaiter(void 0, void 0, void 0
             filters = {
                 $set: {
                     "rating.$[i].count": counter + 1,
-                    rating_average: average,
+                    ratingAverage: average,
                 },
                 $push: { reviews: body },
             };
@@ -75,7 +75,7 @@ module.exports.addProductRating = (req, res) => __awaiter(void 0, void 0, void 0
             filters = {
                 $set: {
                     rating: newRatingArray,
-                    rating_average: average,
+                    ratingAverage: average,
                 },
                 $push: { reviews: body },
             };

@@ -17,7 +17,7 @@ const emailValidator = require("../../helpers/emailValidator");
 module.exports.userLoginController = async (req: Request, res: Response) => {
   try {
     const verify_token = req.headers.authorization?.split(' ')[1] || undefined;
-    const { username, password, loginCredential } = req.body;
+    const { username, password, authProvider } = req.body;
     let token: String;
     let userData;
     let credentials;
@@ -25,28 +25,28 @@ module.exports.userLoginController = async (req: Request, res: Response) => {
     const cookieObject: any = {
       // sameSite: "none",
       // secure: true,
-      maxAge: 57600000, // 16hr [3600000 -> 1hr]
+      maxAge: 57600000, // 16hr [3600000 -> 1hr]ms
       httpOnly: true,
     };
 
-    if (typeof loginCredential === 'undefined' || !loginCredential) {
+    if (typeof authProvider === 'undefined' || !authProvider) {
       credentials = 'system';
     } else {
-      credentials = loginCredential;
+      credentials = authProvider;
     }
 
     const existUser = await User.findOne({
       $and: [
         { $or: [{ username }, { email: username }] },
-        { loginCredential: credentials }
+        { authProvider: credentials }
       ]
     });
 
     /// third party login system like --> Google
-    if (loginCredential === 'thirdParty') {
+    if (authProvider === 'thirdParty') {
 
       if (!existUser || typeof existUser === 'undefined') {
-        const user = new User({ email: username, username, loginCredential, accountStatus: 'active' });
+        const user = new User({ email: username, username, authProvider, accountStatus: 'active' });
         userData = await user.save();
 
       } else {
@@ -71,6 +71,7 @@ module.exports.userLoginController = async (req: Request, res: Response) => {
 
       if (existUser.verifyToken && !verify_token) {
         res.cookie("verifyToken", existUser.verifyToken, { maxAge: 3600000, httpOnly: false });
+    
         return res.send({ success: true, statusCode: 200, message: 'verifyTokenOnCookie' });
       }
 
@@ -89,7 +90,8 @@ module.exports.userLoginController = async (req: Request, res: Response) => {
     }
 
     if (token) {
-      res.cookie("token", token, cookieObject);
+    res.cookie("token", token, cookieObject);
+      res.cookie("is_logged", existUser?._id, {httpOnly: false, maxAge: 57600000});
       return res.status(200).send({ message: "isLogin", statusCode: 200, success: true });
     }
   } catch (error: any) {
@@ -214,85 +216,29 @@ module.exports.fetchAuthUser = async (
   try {
     const authEmail = req.decoded.email;
     const role = req.decoded.role;
+    let result: any;
 
-    const result = await User.findOne({ $and: [{ email: authEmail }, { role: role }, { accountStatus: 'active' }] }).exec();
+    const db = await dbConnection();
+
+    result = await User.findOne({ $and: [{ email: authEmail }, { role: role }, { accountStatus: 'active' }] });
 
     if (!result || typeof result !== "object") {
       return res.status(404).send({ success: false, statusCode: 404, error: "User not found!" });
     }
 
-    await User.updateOne(
-      { email: authEmail },
-      { $pull: { myCartProduct: { stock: "out" } } }
-    )
+    result.password = undefined;
+    result.authProvider = undefined;
+    result.createdAt = undefined;
+
+    if (result?.role === 'user') {
+      const cartItems = await db.collection('shoppingCarts').countDocuments({ customerEmail: authEmail });
+      result['shoppingCartItems'] = cartItems || 0;
+    }
 
     return res
       .status(200)
       .send({ success: true, statusCode: 200, message: 'Welcome ' + result?.username, data: result });
-  } catch (error: any) {
-    next(error);
-  }
-};
 
-module.exports.signUser = async (req: Request, res: Response, next: any) => {
-  try {
-    const db = await dbConnection();
-
-    const authEmail: string = req.headers.authorization || "";
-
-    if (!authEmail || typeof authEmail !== "string") {
-      return res
-        .status(400)
-        .send({ success: false, error: "Authorization header is missing!" });
-    }
-
-    const setToken = (role: String) => {
-      const cookieObject: any = {
-        // sameSite: "none",
-        // secure: true,
-        maxAge: 7200000, //3600000
-        httpOnly: true,
-      };
-
-      const payload = {
-        email: authEmail,
-        role: role,
-      };
-
-      const token = jwt.sign({ email: authEmail }, process.env.ACCESS_TOKEN, {
-        algorithm: "HS256",
-        expiresIn: "2h",
-      });
-
-      return res.cookie("token", token, cookieObject)
-        ? res
-          .status(200)
-          .send({ message: "Login success", statusCode: 200, success: true })
-        : res.status(400).send({ error: "Bad request", success: false });
-    };
-
-    const existsUser = await db
-      .collection("users")
-      .findOne({ email: authEmail });
-
-    if (existsUser && typeof existsUser === "object") {
-      return setToken(existsUser?.role);
-    }
-
-    // user model
-    const model = new userModel(req.body, authEmail);
-    const errs = model.errorReports();
-
-    if (errs) {
-      return res.status(400).send({ success: false, error: errs });
-    }
-
-    const newUser = await db
-      .collection("users")
-      .insertOne(model)
-      .then((d: any) => d[0]);
-
-    return setToken(newUser.role);
   } catch (error: any) {
     next(error);
   }
@@ -300,57 +246,12 @@ module.exports.signUser = async (req: Request, res: Response, next: any) => {
 
 module.exports.signOutUser = async (req: Request, res: Response) => {
   try {
-    let authEmail = req.decoded.email;
-
-    if (authEmail) {
-      // if user logout then cart will be empty
-      await User.updateOne({ email: authEmail }, { myCartProduct: [] }, { new: true });
-    }
-
     res.clearCookie("token");
+    res.clearCookie('is_logged');
 
     res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
-  }
-};
-
-module.exports.switchRole = async (req: Request, res: Response) => {
-  try {
-    const db = await dbConnection();
-
-    const userEmail = req.decoded.email;
-    const userID = req.headers.authorization?.split(" ")[1];
-    const userRole: string = req.params.role;
-    let roleModel: any;
-
-    if (!userID) {
-      return res
-        .status(400)
-        .send({ message: "Bad request! headers is missing" });
-    }
-
-    if (userRole === "user") {
-      roleModel = { role: "user" };
-    }
-
-    if (userRole === "seller") {
-      roleModel = { role: "seller" };
-    }
-
-    if (userID && userEmail) {
-      const result = await db
-        .collection("users")
-        .updateOne(
-          { _id: ObjectId(userID), email: userEmail },
-          { $set: roleModel },
-          { upsert: true }
-        );
-
-      if (result) return res.status(200).send(result);
-    }
-  } catch (error: any) {
-    res.status(500).send({ error: error?.message });
   }
 };
 
@@ -440,71 +341,126 @@ module.exports.manageUsers = async (req: Request, res: Response, next: any) => {
 
 module.exports.makeSellerRequest = async (req: Request, res: Response) => {
   try {
-    const db = await dbConnection();
+    const authEmail = req.decoded.email;
+    const authRole = req.decoded.role;
 
-    const userEmail = req.params.userEmail;
-    let body = req.body;
-    let existSellerName;
+    let user = await User.findOne({ $and: [{ email: authEmail }, { role: 'user' }] });
 
-    if (body?.seller) {
-      existSellerName = await db.collection("users").findOne({
-        seller: body?.seller,
+    if (!user) {
+      return res.status(404).send({ success: false, statusCode: 404, error: 'User not found' });
+    }
+
+    if (user?.isSeller === 'pending') {
+      return res.status(200).send({
+        success: false,
+        statusCode: 200,
+        error: 'You already send a seller request. We are working for your request, and it will take sometime to verify'
       });
     }
 
-    if (existSellerName) {
+    let body = req.body;
+
+    let businessInfo = {
+      taxID: body?.taxID,
+      stateTaxID: body?.stateTaxID,
+      creditCard: body?.creditCard,
+    }
+
+    let sellerInfo = {
+      fName: body?.fName,
+      lName: body?.lName,
+      dateOfBirth: body?.dateOfBirth,
+      phone: body?.phone,
+      address: {
+        street: body?.street,
+        thana: body?.thana,
+        district: body?.district,
+        state: body?.state,
+        country: body?.country,
+        pinCode: body?.pinCode
+      }
+    }
+
+    let inventoryInfo = {
+      earn: 0,
+      totalSell: 0,
+      totalProducts: 0,
+      storeName: body?.storeName,
+      storeCategory: body?.categories,
+      storeAddress: {
+        street: body?.street,
+        thana: body?.thana,
+        district: body?.district,
+        state: body?.state,
+        country: body?.country,
+        pinCode: body?.pinCode
+      }
+    }
+
+    let isUpdate = await User.updateOne(
+      { $and: [{ email: authEmail }, { role: authRole }] },
+      { $set: { businessInfo, sellerInfo, inventoryInfo, isSeller: 'pending' } },
+      { new: true }
+    );
+
+    if (isUpdate) {
       return res
         .status(200)
-        .send({ message: "Seller name exists ! try to another" });
-    } else {
-      const result = await db.collection("users").updateOne(
-        { email: userEmail },
-        {
-          $set: body,
-        },
-        { upsert: true }
-      );
-      res.status(200).send({ result, message: "success" });
+        .send({ success: true, statusCode: 200, message: "Thanks for sending a seller request. We are working for your request" });
     }
+
   } catch (error: any) {
-    res.status(500).send({ message: error?.message });
+    res.status(400).send({ success: false, statusCode: 400, error: error?.message });
   }
 };
 
+
+// Permit the seller request
 module.exports.permitSellerRequest = async (req: Request, res: Response) => {
   try {
-    const db = await dbConnection();
+    const userId = req.headers.authorization?.split(',')[0];
+    const userEmail = req.headers.authorization?.split(',')[1];
 
-    const userId: string = req.params.userId;
+    const user = await User.findOne({ $and: [{ email: userEmail }, { _id: userId }, { isSeller: 'pending' }] });
 
-    const result = await db.collection("users").updateOne(
-      { _id: ObjectId(userId) },
+    if (!user) {
+      return res.status(400).send({ success: false, statusCode: 400, error: 'Sorry! request user not found.' });
+    }
+
+    let result = await User.updateOne(
+      { email: userEmail },
       {
-        $set: { role: "seller", seller_request: "ok", isSeller: true },
+        $set: { role: "seller", isSeller: 'fulfilled', becomeSellerAt: new Date() },
+        $unset: { shoppingCartItems: 1, shippingAddress: 1 }
       },
-      { upsert: true }
+      { new: true }
     );
+
     result?.acknowledged
-      ? res.status(200).send({ message: "Request Success" })
-      : res.status(400).send({ message: "Bad Request" });
+      ? res.status(200).send({ success: true, statusCode: 200, message: "Request Success" })
+      : res.status(400).send({ success: false, statusCode: 400, error: "Bad Request" });
+
   } catch (error: any) {
-    res.status(500).send({ message: error?.message });
+    res.status(500).send({ success: false, statusCode: 500, error: error?.message });
   }
 };
 
+
+/**
+ * controller --> fetch seller request in admin dashboard
+ * request method --> GET
+ * required --> NONE
+ */
 module.exports.checkSellerRequest = async (req: Request, res: Response) => {
   try {
-    const db = await dbConnection();
+    let sellers = await User.find({ isSeller: 'pending' });
 
-    res
-      .status(200)
-      .send(
-        await db
-          .collection("users")
-          .find({ seller_request: "pending" })
-          .toArray()
-      );
+    sellers.forEach((user: any) => {
+      delete user?.password;
+    });
+
+    return res.status(200).send({ success: true, statusCode: 200, data: sellers });
   } catch (error: any) {
-    res.status(500).send({ message: error?.message });
+    res.status(500).send({ success: false, statusCode: 500, error: error?.message });
   }
 };

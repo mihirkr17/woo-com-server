@@ -9,113 +9,122 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const { dbh, dbConnection } = require("../../utils/db");
+var { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
-const { productModel, productUpdateModel } = require("../../model/product");
+const { productUpdateModel, productIntroTemplate, productImagesModel, productRatingTemplate } = require("../../templates/product.template");
+const { productCounterAndSetter, productCounter, topSellingProducts, topRatedProducts } = require("../../model/product.model");
 module.exports.searchProducts = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const db = yield dbConnection();
         const q = req.params.q;
-        const searchQuery = (sTxt) => {
-            let findProduct = {
-                $or: [
-                    { title: { $regex: sTxt, $options: "i" } },
-                    { seller: { $regex: sTxt, $options: "i" } },
-                    { brand: { $regex: sTxt, $options: "i" } },
-                    { "genre.category": { $regex: sTxt, $options: "i" } },
-                ],
-            };
-            return findProduct;
-        };
-        const result = yield db
+        const result = (yield db
             .collection("products")
-            .find(searchQuery(q))
-            .toArray();
-        res.status(200).send(result);
+            .aggregate([
+            {
+                $match: {
+                    $and: [{ status: "active" }, { save_as: "fulfilled" }],
+                    $or: [
+                        { title: { $regex: q, $options: "i" } },
+                        { "seller.name": { $regex: q, $options: "i" } },
+                        { brand: { $regex: q, $options: "i" } },
+                        { categories: { $in: [q] } },
+                    ],
+                },
+            },
+            {
+                $project: {
+                    title: "$title",
+                    categories: "$categories",
+                    images: "$images",
+                },
+            },
+        ])
+            .toArray()) || [];
+        return result.length > 0
+            ? res.status(200).send(result)
+            : res.status(204).send();
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
-    }
-});
-module.exports.topRatedProducts = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const db = yield dbConnection();
         res
-            .status(200)
-            .send(yield db
-            .collection("products")
-            .find({ status: "active" })
-            .sort({ rating_average: -1 })
-            .limit(6)
-            .toArray());
-    }
-    catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+            .status(500)
+            .send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
     }
 });
-module.exports.topSellingProducts = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+/**
+ * @apiName --> count products
+ * @required --> Optional (If count by seller then pass the seller query on url)
+ */
+module.exports.countProductsController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const db = yield dbConnection();
-        res
-            .status(200)
-            .send(yield db
-            .collection("products")
-            .find({ status: "active" })
-            .sort({ top_sell: -1 })
-            .limit(6)
-            .toArray());
-    }
-    catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
-    }
-});
-module.exports.countProducts = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const db = yield dbConnection();
         const seller = req.query.seller;
-        let result = yield db
-            .collection("products")
-            .countDocuments(seller && { seller: seller });
-        res.status(200).send({ count: result });
-    }
-    catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
-    }
-});
-module.exports.deleteProducts = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const db = yield dbConnection();
-        const productId = req.params.productId;
-        const result = yield db.collection("products").deleteOne({
-            _id: ObjectId(productId),
-        });
-        if (result) {
-            yield db
-                .collection("users")
-                .updateMany({ "myCartProduct._id": productId }, { $pull: { myCartProduct: { _id: productId } } });
-            return res.status(200).send({ message: "Product deleted successfully." });
+        let result;
+        if (seller) {
+            result = yield productCounter(seller);
         }
         else {
-            return res.status(503).send({ message: "Service unavailable" });
+            result = yield productCounter();
         }
+        res.status(200).send({ success: true, statusCode: 200, count: result });
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        console.log(error === null || error === void 0 ? void 0 : error.message);
+        res
+            .status(500)
+            .send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
     }
 });
-module.exports.updateProduct = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+// Delete product by inventory management
+module.exports.deleteProductController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const db = yield dbConnection();
-        const productId = req.params.productId;
+        const user = req.decoded;
+        const productId = req.headers.authorization || "";
+        const deletedProduct = yield db
+            .collection("products")
+            .deleteOne({ _id: ObjectId(productId) }); //return --> "acknowledged" : true, "deletedCount" : 1
+        if (!deletedProduct.deletedCount) {
+            return res.status(503).send({
+                success: false,
+                statusCode: 503,
+                error: "Service unavailable",
+            });
+        }
+        yield productCounterAndSetter(user);
+        yield db
+            .collection("users")
+            .updateMany({ "shoppingCartItems._id": productId }, { $pull: { shoppingCartItems: { _id: productId } } });
+        return res.status(200).send({
+            success: true,
+            statusCode: 200,
+            message: "Product deleted successfully.",
+        });
+    }
+    catch (error) {
+        return res
+            .status(500)
+            .send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+    }
+});
+module.exports.updateProductController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const db = yield dbConnection();
+        const productId = ((_a = req.headers) === null || _a === void 0 ? void 0 : _a.authorization) || "";
         const body = req.body;
-        const model = productUpdateModel(body);
+        let model;
+        if (body === null || body === void 0 ? void 0 : body.images) {
+            model = productImagesModel(body);
+        }
+        else {
+            model = productUpdateModel(body);
+        }
         const exists = (yield db
             .collection("users")
-            .find({ "myCartProduct._id": productId })
+            .find({ "shoppingCartItems._id": productId })
             .toArray()) || [];
         if (exists && exists.length > 0) {
-            yield db.collection("users").updateMany({ "myCartProduct._id": productId }, {
-                $pull: { myCartProduct: { _id: productId } },
+            yield db.collection("users").updateMany({ "shoppingCartItems._id": productId }, {
+                $pull: { shoppingCartItems: { _id: productId } },
             });
         }
         const result = yield db
@@ -127,162 +136,327 @@ module.exports.updateProduct = (req, res) => __awaiter(void 0, void 0, void 0, f
         res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
     }
 });
-module.exports.updateStock = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+// Update Product Stock Controller
+module.exports.updateStockController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const db = yield dbConnection();
-        const productId = req.headers.authorization;
+        const productId = req.headers.authorization || "";
         const body = req.body;
-        let stock = (body === null || body === void 0 ? void 0 : body.available) <= 1 ? "out" : "in";
         if (productId && body) {
-            const result = yield db
-                .collection("products")
-                .updateOne({ _id: ObjectId(productId) }, { $set: { available: body === null || body === void 0 ? void 0 : body.available, stock } }, { upsert: true });
-            res.status(200).send(result);
+            let stock = (body === null || body === void 0 ? void 0 : body.available) <= 1 ? "out" : "in";
+            const result = yield db.collection("products").updateOne({ _id: ObjectId(productId) }, {
+                $set: {
+                    "stockInfo.available": body === null || body === void 0 ? void 0 : body.available,
+                    "stockInfo.stock": stock,
+                },
+            }, { upsert: true });
+            if (!result) {
+                return res.status(503).send({
+                    success: false,
+                    statusCode: 503,
+                    error: "Failed to update stock quantity !!!",
+                });
+            }
+            return res.status(200).send({
+                success: true,
+                statusCode: 200,
+                message: "Product stock updated successfully.",
+            });
         }
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        res
+            .status(500)
+            .send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
     }
 });
-module.exports.addProductHandler = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const body = req.body;
+/**
+ * Adding Product Title and slug first
+ */
+module.exports.setProductIntroController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const db = yield dbConnection();
-        const model = productModel(body);
-        yield db.collection("products").insertOne(model);
-        res.status(200).send({ message: "Product added successfully" });
+        const authEmail = req.decoded.email;
+        const formTypes = req.params.formTypes;
+        const body = req.body;
+        let model;
+        const user = yield db
+            .collection("users")
+            .findOne({ $and: [{ email: authEmail }, { role: "seller" }] });
+        if (!user) {
+            return res
+                .status(401)
+                .send({ success: false, statusCode: 401, error: "Unauthorized" });
+        }
+        if (formTypes === "update" && (body === null || body === void 0 ? void 0 : body.productId)) {
+            model = productIntroTemplate(body);
+            let result = yield db
+                .collection("products")
+                .updateOne({ $and: [{ _id: ObjectId(body === null || body === void 0 ? void 0 : body.productId) }, { save_as: "draft" }] }, { $set: model }, { upsert: true });
+            return (result === null || result === void 0 ? void 0 : result.acknowledged)
+                ? res.status(200).send({
+                    success: true,
+                    statusCode: 200,
+                    message: "Product updated successfully.",
+                })
+                : res.status(400).send({
+                    success: false,
+                    statusCode: 400,
+                    error: "Operation failed!!!",
+                });
+        }
+        if (formTypes === 'create') {
+            model = productIntroTemplate(body);
+            model["seller"] = {};
+            model.seller.uuid = user === null || user === void 0 ? void 0 : user._id;
+            model.seller.name = user === null || user === void 0 ? void 0 : user.username;
+            model['createdAt'] = new Date(Date.now());
+            model["rating"] = [
+                { weight: 5, count: 0 },
+                { weight: 4, count: 0 },
+                { weight: 3, count: 0 },
+                { weight: 2, count: 0 },
+                { weight: 1, count: 0 },
+            ];
+            model["ratingAverage"] = 0;
+            let result = yield db.collection('products').insertOne(model);
+            if (result) {
+                yield productCounterAndSetter(user);
+                return res.status(200).send({
+                    success: true,
+                    statusCode: 200,
+                    message: "Data saved.",
+                });
+            }
+        }
     }
     catch (error) {
-        res.status(500).send({ message: error.message });
+        res
+            .status(500)
+            .send({ success: false, statusCode: 500, error: error.message });
     }
 });
-module.exports.allProducts = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+/**
+ * @controller      --> Home store controller.
+ * @required        --> []
+ * @request_method  --> GET
+ */
+module.exports.homeStoreController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const db = yield dbConnection();
         const totalLimits = parseInt(req.params.limits);
-        const result = yield db
-            .collection("products")
-            .find({ status: "active" })
-            .sort({ _id: -1 })
-            .limit(totalLimits)
-            .toArray();
-        return result
-            ? res.status(200).send(result)
-            : res.status(500).send({ success: false, error: "Something went wrong" });
+        let allProducts = yield db.collection('products').aggregate([
+            { $unwind: { path: '$variations' } },
+            { $match: { 'variations.status': 'active' } },
+            { $sort: { 'variations.vId': -1 } },
+            { $limit: totalLimits }
+        ]).toArray();
+        const topSellingProduct = yield topSellingProducts();
+        const topRatedProduct = yield topRatedProducts();
+        return allProducts
+            ? res.status(200).send({
+                success: true, statusCode: 200, data: {
+                    store: allProducts,
+                    topSellingProducts: topSellingProduct,
+                    topRatedProducts: topRatedProduct
+                }
+            })
+            : res.status(500).send({ success: false, statusCode: 500, error: "Something went wrong" });
     }
     catch (error) {
-        res.status(500).send({ message: error.message });
+        return res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
     }
 });
-module.exports.fetchSingleProduct = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+/**
+ * @controller      --> Fetch the single product information in product details page.
+ * @required        --> [req.headers.authorization:email, req.query:productId, req.query:variationId, req.params:product slug]
+ * @request_method  --> GET
+ */
+module.exports.fetchSingleProductController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _b;
     try {
         const db = yield dbConnection();
-        const email = req.query.email;
+        const email = req.headers.authorization || '';
         const product_slug = req.params.product_slug;
-        let inCart;
-        let inWishlist;
-        let result = yield db.collection("products").findOne({
-            slug: product_slug,
-            status: "active",
-        });
-        if (!result) {
-            return res
-                .status(400)
-                .send({ success: false, error: "Product not found!" });
+        const productId = (_b = req.query) === null || _b === void 0 ? void 0 : _b.pId;
+        const variationId = req.query.vId;
+        let inCart = false;
+        let inWishlist = false;
+        // Product Details
+        let productDetail = yield db.collection('products').aggregate([
+            { $match: { _id: ObjectId(productId) } },
+            {
+                $project: {
+                    variations: '$variations', swatch: "$variations",
+                    brand: 1, categories: 1,
+                    seller: 1, rating: 1, ratingAverage: 1, save_as: 1, createdAt: 1, bodyInfo: 1, manufacturer: 1
+                }
+            },
+            { $unwind: { path: '$variations' } },
+            { $match: { 'variations.vId': variationId } }
+        ]).toArray();
+        productDetail = productDetail[0];
+        let newProduct = productDetail === null || productDetail === void 0 ? void 0 : productDetail.swatch;
+        let swatches = [];
+        for (let i = 0; i < newProduct.length; i++) {
+            let e = newProduct[i];
+            swatches.push({
+                vId: e.vId,
+                slug: e.slug,
+                attr: e.attributes
+            });
         }
+        productDetail.swatch = swatches;
+        // Related products
+        const relatedProducts = yield db.collection("products").aggregate([
+            { $unwind: { path: '$variations' } },
+            {
+                $match: {
+                    $and: [
+                        { categories: { $in: productDetail.categories } },
+                        { 'variations.vId': { $ne: variationId } },
+                        { 'variations.status': "active" },
+                    ],
+                },
+            },
+            {
+                $project: {
+                    ratingAverage: "$ratingAverage",
+                    brand: "$brand",
+                    variations: {
+                        vId: "$variations.vId",
+                        pricing: "$variations.pricing",
+                        title: "$variations.title",
+                        slug: "$variations.slug",
+                        attributes: "$variations.attributes",
+                        images: "$variations.images"
+                    }
+                },
+            },
+            { $limit: 5 },
+        ]).toArray();
+        // If user email address exists
         if (email) {
             const existProductInCart = yield db
+                .collection("shoppingCarts")
+                .findOne({ $and: [{ customerEmail: email }, { vId: variationId }] });
+            const existProductInWishlist = yield db
                 .collection("users")
-                .findOne({ email: email, "myCartProduct.slug": product_slug });
-            const existProductInWishlist = yield db.collection("users").findOne({ email: email, "wishlist.slug": product_slug });
+                .findOne({ $and: [{ email }, { "wishlist.slug": product_slug }] });
             if (existProductInWishlist) {
                 inWishlist = true;
-            }
-            else {
-                inWishlist = false;
             }
             if (existProductInCart && typeof existProductInCart === "object") {
                 inCart = true;
             }
-            else {
-                inCart = false;
-            }
-            result["inCart"] = inCart;
-            // result["policy"] = policy;
-            result["inWishlist"] = inWishlist;
+            productDetail["inCart"] = inCart;
+            productDetail["inWishlist"] = inWishlist;
         }
-        return res.status(200).send(result);
+        return res.status(200).send({
+            success: true,
+            statusCode: 200,
+            data: { product: productDetail, relatedProducts },
+        });
     }
     catch (error) {
-        res.status(500).send({ message: error.message });
+        return res.status(500).send({ success: false, statusCode: 500, error: error.message });
     }
 });
-module.exports.fetchSingleProductByPid = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+/**
+ * @controller      --> Fetch the single product in product edit page.
+ * @required        --> [req.query:seller, req.query:productId, req.query:variationId]
+ * @request_method  --> GET
+ */
+module.exports.fetchSingleProductByPidController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const db = yield dbConnection();
         const productId = req.query.pid;
+        const variationId = req.query.vId;
         const seller = req.query.seller;
-        return res.status(200).send(yield db.collection("products").findOne({
-            _id: ObjectId(productId),
-            seller: seller,
-        }));
+        let product;
+        if (variationId) {
+            product = yield db.collection('products').aggregate([
+                {
+                    $match: { $and: [{ _id: ObjectId(productId) }, { save_as: "draft" }] }
+                },
+                {
+                    $unwind: { path: "$variations" },
+                },
+                {
+                    $match: { 'variations.vId': variationId }
+                }
+            ]).toArray();
+            product = product[0];
+        }
+        else {
+            product = yield db.collection("products").findOne({
+                $and: [{ _id: ObjectId(productId) }, { "seller.name": seller }],
+            });
+        }
+        return product
+            ? res.status(200).send(product)
+            : res.status(404).send({
+                success: false,
+                statusCode: 404,
+                error: "Product not found!!!",
+            });
     }
     catch (error) {
         return res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
     }
 });
-module.exports.productByCategory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+/**
+ * @controller      --> productsByCategoryController
+ * @required        --> categories [Optional -> filters query]
+ */
+module.exports.productsByCategoryController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const db = yield dbConnection();
-        let findQuery;
-        const productCategory = req.query.category;
-        const productSubCategory = req.query.sb_category;
-        const productPostCategory = req.query.pt_category;
-        const filters = req.query.filters;
-        let sorting;
-        if (filters) {
-            if (filters === "lowest") {
-                sorting = { price_fixed: 1 };
-            }
-            else if (filters === "highest") {
-                sorting = { price_fixed: -1 };
-            }
-            else {
-                sorting = {};
-            }
+        const { categories, filters } = req.query;
+        let category = (categories && categories.toString().split(",")) || [];
+        let sorting = {};
+        if (filters && filters === "lowest") {
+            sorting = { $sort: { "variations.pricing.sellingPrice": 1 } };
         }
-        if (productCategory) {
-            findQuery = {
-                "genre.category": productCategory,
-                status: "active",
-            };
+        else if (filters && filters === "highest") {
+            sorting = { $sort: { "variations.pricing.sellingPrice": -1 } };
         }
-        if (productCategory && productSubCategory) {
-            findQuery = {
-                "genre.category": productCategory,
-                "genre.sub_category": productSubCategory,
-                status: "active",
-            };
+        else {
+            sorting = { $sort: { "variations.modifiedAt": 1 } };
         }
-        if (productCategory && productSubCategory && productPostCategory) {
-            findQuery = {
-                "genre.category": productCategory,
-                "genre.sub_category": productSubCategory,
-                "genre.post_category": productPostCategory,
-                status: "active",
-            };
-        }
-        const tt = yield db
-            .collection("products")
-            .find(findQuery, { price_fixed: { $exists: 1 } })
-            .sort(sorting)
-            .toArray();
-        return tt
-            ? res.status(200).send(tt)
-            : res.status(500).send({ success: false, error: "Something went wrong" });
+        const products = yield db.collection("products").aggregate([
+            { $unwind: { path: '$variations' } },
+            {
+                $match: {
+                    $and: [
+                        { categories: { $all: category } },
+                        { 'variations.status': "active" }
+                    ]
+                }
+            },
+            sorting
+        ]).toArray();
+        //   .find({
+        //   $and: [
+        //     { categories: { $all: category } },
+        //     { status: "active" },
+        //     { save_as: "fulfilled" },
+        //   ],
+        // })
+        // .sort(sorting)
+        // .toArray()) || [];
+        return products
+            ? res.status(200).send(products)
+            : res.status(404).send({
+                success: false,
+                statusCode: 404,
+                error: "Products not available.",
+            });
     }
     catch (error) {
-        return res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        return res
+            .status(500)
+            .send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
     }
 });
 module.exports.fetchTopSellingProduct = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -298,7 +472,7 @@ module.exports.fetchTopSellingProduct = (req, res) => __awaiter(void 0, void 0, 
         const result = yield db
             .collection("products")
             .find(filterQuery)
-            .sort({ top_sell: -1 })
+            .sort({ "stockInfo.sold": -1 })
             .limit(6)
             .toArray();
         res.status(200).send(result);
@@ -307,70 +481,231 @@ module.exports.fetchTopSellingProduct = (req, res) => __awaiter(void 0, void 0, 
         return res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
     }
 });
-module.exports.manageProduct = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const db = yield dbConnection();
-    let item;
-    let page;
-    let seller_name = req.query.seller;
-    item = req.query.items;
-    page = req.query.page;
-    let searchText = req.query.search;
-    let filters = req.query.category;
-    let cursor;
-    let result;
-    const searchQuery = (sTxt, seller_name = "") => {
-        item = "";
-        page = "";
-        let findProduct = {
-            $or: [
-                { title: { $regex: sTxt, $options: "i" } },
-                { seller: { $regex: sTxt, $options: "i" } },
-            ],
-        };
-        if (seller_name) {
-            findProduct["seller"] = seller_name;
-        }
-        return findProduct;
-    };
-    const filterQuery = (category, seller_name = "") => {
-        item = "";
-        page = "";
-        let findProduct = {
-            "genre.category": category,
-        };
-        if (seller_name) {
-            findProduct["seller"] = seller_name;
-        }
-        return findProduct;
-    };
-    page = parseInt(page) === 1 ? 0 : parseInt(page) - 1;
+module.exports.manageProductController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        const db = yield dbConnection();
+        const authEmail = req.decoded.email;
+        const role = req.decoded.role;
+        const isSeller = yield db
+            .collection("users")
+            .findOne({ $and: [{ email: authEmail }, { role }] });
+        let item;
+        let page;
+        item = req.query.items;
+        page = req.query.page;
+        let searchText = req.query.search;
+        let filters = req.query.category;
+        let cursor;
+        let products;
+        let draftProducts;
+        let showFor;
+        if (isSeller.role === "seller") {
+            showFor = [
+                { "seller.name": isSeller === null || isSeller === void 0 ? void 0 : isSeller.username },
+                { status: "active" },
+                { save_as: "fulfilled" },
+            ];
+        }
+        else {
+            showFor = [{ status: "active" }, { save_as: "fulfilled" }];
+        }
+        const searchQuery = (sTxt) => {
+            item = "";
+            page = "";
+            return {
+                $and: showFor,
+                $or: [
+                    { title: { $regex: sTxt, $options: "i" } },
+                    { "seller.name": { $regex: sTxt, $options: "i" } },
+                ],
+            };
+        };
+        const filterQuery = (category) => {
+            item = "";
+            page = "";
+            return {
+                $and: [
+                    { categories: { $all: [category] } },
+                    { status: "active" },
+                    { save_as: "fulfilled" },
+                ],
+            };
+        };
+        page = parseInt(page) === 1 ? 0 : parseInt(page) - 1;
         cursor =
             searchText && searchText.length > 0
-                ? db
-                    .collection("products")
-                    .find(searchQuery(searchText, seller_name || ""))
+                ? db.collection("products").find(searchQuery(searchText))
                 : filters && filters !== "all"
-                    ? db
-                        .collection("products")
-                        .find(filterQuery(filters, seller_name || ""))
-                    : db
-                        .collection("products")
-                        .find((seller_name && { seller: seller_name }) || {});
+                    ? db.collection("products").find(filterQuery(filters))
+                    : db.collection("products").find({ $and: showFor });
         if (item || page) {
-            result = yield cursor
+            products = yield cursor
                 .skip(page * parseInt(item))
                 .limit(parseInt(item))
                 .toArray();
         }
         else {
-            result = yield cursor.toArray();
+            products = yield cursor.toArray();
         }
-        return result
-            ? res.status(200).send(result)
-            : res.status(200).send({ success: false, error: "Something went wrong" });
+        if (isSeller) {
+            // draftProducts = await db.collection('products').aggregate([
+            //   {
+            //     $match: { $and: [{ "seller.name": isSeller?.username }, { save_as: "draft" }] }
+            //   },
+            //   {
+            //     $unwind: { path: "$variations" },
+            //   }
+            // ]).toArray();
+            draftProducts = yield db
+                .collection("products")
+                .find({
+                $and: [{ "seller.name": isSeller === null || isSeller === void 0 ? void 0 : isSeller.username }, { save_as: "draft" }],
+            })
+                .toArray();
+        }
+        return res.status(200).send({
+            success: true,
+            statusCode: 200,
+            data: { products: products, draftProducts },
+        });
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        return res
+            .status(500)
+            .send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+    }
+});
+// Dashboard Overview Controller
+module.exports.dashboardOverviewController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const db = yield dbConnection();
+        const authEmail = req.decoded.email;
+        const role = req.decoded.role;
+        let topSellers;
+        let topSoldProducts;
+        let matches;
+        const user = yield db.collection("users").findOne({ $and: [{ email: authEmail }, { role }] });
+        if ((user === null || user === void 0 ? void 0 : user.role) === 'seller') {
+            matches = { $match: { $and: [{ 'seller.name': user === null || user === void 0 ? void 0 : user.username }, { 'stockInfo.sold': { $exists: true } }] } };
+        }
+        if ((user === null || user === void 0 ? void 0 : user.role) === "admin") {
+            topSellers = yield db.collection('users').aggregate([
+                { $match: { role: "seller" } },
+                {
+                    $project: {
+                        totalSell: '$inventoryInfo.totalSell',
+                        username: '$username',
+                        email: '$email',
+                        totalProducts: '$inventoryInfo.totalProducts',
+                    }
+                },
+                { $sort: { totalSell: -1 } },
+                { $limit: 10 }
+            ]).toArray();
+            matches = { $match: { 'stockInfo.sold': { $exists: true } } };
+        }
+        topSoldProducts = yield db.collection('products').aggregate([
+            matches,
+            {
+                $project: {
+                    sold: '$stockInfo.sold',
+                    images: '$images',
+                    title: '$title',
+                    seller: '$seller.name',
+                    sku: '$sku',
+                    brand: '$brand',
+                    categories: '$categories',
+                    pricing: '$pricing'
+                }
+            },
+            { $sort: { sold: -1 } },
+            { $limit: 10 }
+        ]).toArray();
+        return res.status(200).send({ success: true, statusCode: 200, data: { topSellers, topSoldProducts } });
+    }
+    catch (error) {
+        return res
+            .status(500)
+            .send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+    }
+});
+// product variation controller
+module.exports.productVariationController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _c;
+    try {
+        const db = yield dbConnection();
+        const productId = ((_c = req.headers) === null || _c === void 0 ? void 0 : _c.authorization) || "";
+        const formTypes = req.query.formType || "";
+        const vId = req.query.vId;
+        const productAttr = req.query.attr;
+        let result;
+        let model = req.body;
+        if (formTypes === 'new-variation') {
+            result = yield db.collection('products').updateOne({
+                _id: ObjectId(productId)
+            }, {
+                $push: { variations: model }
+            }, { upsert: true });
+        }
+        // next condition
+        else if (formTypes === 'update') {
+            if (vId) {
+                if (productAttr === 'variationOne') {
+                    result = yield db.collection('products').updateOne({
+                        $and: [{ _id: ObjectId(productId) }, { 'variations.vId': vId }]
+                    }, {
+                        $set: {
+                            'variations.$[i].title': model.title,
+                            'variations.$[i].slug': model.slug,
+                            'variations.$[i].images': model.images,
+                            'variations.$[i].sku': model.sku,
+                            'variations.$[i].pricing': model.pricing,
+                            'variations.$[i].stock': model.stock,
+                            'variations.$[i].available': model.available,
+                            'variations.$[i].status': model.status,
+                        }
+                    }, { arrayFilters: [{ "i.vId": vId }] });
+                }
+                if (productAttr === 'variationTwo') {
+                    result = yield db.collection('products').updateOne({
+                        $and: [{ _id: ObjectId(productId) }, { 'variations.vId': vId }]
+                    }, {
+                        $set: { 'variations.$[i].attributes': model }
+                    }, { arrayFilters: [{ "i.vId": vId }] });
+                }
+                if (productAttr === 'variationThree') {
+                    result = yield db.collection('products').updateOne({ _id: ObjectId(productId) }, {
+                        $set: { bodyInfo: model }
+                    }, { upsert: true });
+                }
+            }
+        }
+        if (result) {
+            return res.status(200).send({ success: true, statusCode: 200, message: "Data Saved" });
+        }
+        return res.status(500).send({ success: false, statusCode: 500, error: "Failed" });
+    }
+    catch (error) {
+        return res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+    }
+});
+// delete product variation controller
+module.exports.deleteProductVariationController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const db = yield dbConnection();
+        const productId = req.params.productId;
+        const vId = req.params.vId;
+        const product = yield db.collection('products').findOne({ _id: ObjectId(productId) });
+        if (!product) {
+            return res.status(404).send({ success: false, statusCode: 404, error: 'Sorry! Product not found!!!' });
+        }
+        const result = yield db.collection('products').updateOne({ $and: [{ _id: ObjectId(productId) }, { 'variations.vId': vId }] }, { $pull: { variations: { vId: vId } } });
+        if (result) {
+            return res.status(200).send({ success: true, statusCode: 200, message: 'Variation deleted successfully.' });
+        }
+        return res.status(500).send({ success: false, statusCode: 500, message: 'Failed to delete!!!' });
+    }
+    catch (error) {
+        return res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
     }
 });

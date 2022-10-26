@@ -1,13 +1,20 @@
 import { Request, Response } from "express";
 const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
+const { cartTemplate } = require("../../templates/cart.template");
 
-const checkProductAvailability = async (db: any, productId: string) => {
+const checkProductAvailability = async (productId: string) => {
+  const db = await dbConnection();
+
+  const result = await db.collection('products').aggregate([]).toArray();
+
   return await db.collection("products").findOne({
-    _id: ObjectId(productId),
-    available: { $gte: 1 },
-    stock: "in",
-    status: "active",
+    $and: [
+      { _id: ObjectId(productId) },
+      { 'stockInfo.available': { $gte: 1 } },
+      { 'stockInfo.stock': "in" },
+      { status: "active" }
+    ]
   });
 };
 
@@ -20,10 +27,10 @@ const responseSender = (
   return success
     ? res.status(200).send({ success: true, statusCode: 200, message, data })
     : res.status(400).send({
-        success: false,
-        statusCode: 400,
-        error: message,
-      });
+      success: false,
+      statusCode: 400,
+      error: message,
+    });
 };
 
 const saveToDBHandler = async (filter: any, documents: any) => {
@@ -32,6 +39,23 @@ const saveToDBHandler = async (filter: any, documents: any) => {
     upsert: true,
   });
 };
+
+// Show My Cart Items;
+module.exports.showMyCartItemsController = async (req: Request, res: Response) => {
+  try {
+    const db = await dbConnection();
+
+    const authEmail = req.decoded.email;
+
+    const cartItems = await db.collection('shoppingCarts').find({ customerEmail: authEmail }).toArray();
+
+    if (cartItems) {
+      return res.status(200).send({ success: true, statusCode: 200, data: { items: cartItems.length, products: cartItems } });
+    }
+  } catch (error: any) {
+    return res.status(500).send({ success: false, statusCode: 500, error: error?.message })
+  }
+}
 
 // update product quantity controller
 module.exports.updateProductQuantity = async (req: Request, res: Response) => {
@@ -51,7 +75,7 @@ module.exports.updateProductQuantity = async (req: Request, res: Response) => {
       return responseSender(res, false, "Bad request! headers missing");
     }
 
-    const availableProduct = await checkProductAvailability(db, productId);
+    const availableProduct = await checkProductAvailability(productId);
 
     if (
       !availableProduct ||
@@ -88,7 +112,7 @@ module.exports.updateProductQuantity = async (req: Request, res: Response) => {
     }
 
     if (cart_types === "toCart") {
-      const cartProduct = cart?.myCartProduct || [];
+      const cartProduct = cart?.shoppingCartItems || [];
       let amount;
 
       for (let i = 0; i < cartProduct.length; i++) {
@@ -100,14 +124,14 @@ module.exports.updateProductQuantity = async (req: Request, res: Response) => {
 
       updateDocuments = {
         $set: {
-          "myCartProduct.$.quantity": quantity,
-          "myCartProduct.$.totalAmount": amount,
+          "shoppingCartItems.$.quantity": quantity,
+          "shoppingCartItems.$.totalAmount": amount,
         },
       };
 
       filters = {
         email: userEmail,
-        "myCartProduct._id": productId,
+        "shoppingCartItems._id": productId,
       };
     }
 
@@ -126,9 +150,11 @@ module.exports.updateProductQuantity = async (req: Request, res: Response) => {
 module.exports.deleteCartItem = async (req: Request, res: Response) => {
   try {
     const productId = req.headers.authorization;
-    const userEmail = req.decoded.email;
+    const authEmail = req.decoded.email;
     const cart_types = req.params.cartTypes;
     let updateDocuments;
+
+    const db = await dbConnection();
 
     if (!ObjectId.isValid(productId) || !productId) {
       return responseSender(res, false, "Bad request! headers missing");
@@ -136,19 +162,20 @@ module.exports.deleteCartItem = async (req: Request, res: Response) => {
 
     if (cart_types === "buy") {
       updateDocuments = await saveToDBHandler(
-        { email: userEmail },
+        { email: authEmail },
         { $unset: { buy_product: "" } }
       );
     }
 
     if (cart_types === "toCart") {
-      updateDocuments = await saveToDBHandler(
-        { email: userEmail },
-        { $pull: { myCartProduct: { _id: productId } } }
-      );
+      // updateDocuments = await saveToDBHandler(
+      //   { email: authEmail },
+      //   { $pull: { shoppingCartItems: { _id: productId } } }
+      // );
+      updateDocuments = await db.collection('shoppingCarts').deleteOne({ $and: [{ customerEmail: authEmail }, { productId }] })
     }
 
-    if (updateDocuments?.modifiedCount) {
+    if (updateDocuments) {
       return responseSender(
         res,
         true,
@@ -162,6 +189,7 @@ module.exports.deleteCartItem = async (req: Request, res: Response) => {
   }
 };
 
+// add to cart controller
 module.exports.addToCartHandler = async (req: Request, res: Response) => {
   try {
     const db = await dbConnection();
@@ -169,38 +197,28 @@ module.exports.addToCartHandler = async (req: Request, res: Response) => {
     const email: string = req.decoded.email;
     const body = req.body;
 
-    const availableProduct = await checkProductAvailability(db, body?._id);
+    const availableProduct = await checkProductAvailability(body?.productId);
 
-    if (availableProduct?.stock === "out" && availableProduct?.available <= 0) {
+    if (availableProduct?.stockInfo?.stock === "out" && availableProduct?.stockInfo?.available <= 0) {
       return responseSender(res, false, "This product out of stock now!");
     }
 
-    const existsProduct = await db
-      .collection("users")
-      .findOne(
-        { email: email, "myCartProduct._id": body?._id },
-        { "myCartProduct.$": 1 }
-      );
+    const existsProduct = await db.collection("shoppingCarts").findOne(
+      { $and: [{ customerEmail: email }, { productId: body?.productId }] }
+    );
 
     if (existsProduct) {
-      return responseSender(res, false, "Product Has Already In Your Cart");
+      return res.status(400).send({ success: false, statusCode: 400, error: "Product Has Already In Your Cart" });
     }
 
-    body["addedAt"] = new Date(Date.now());
+    const cartTem = cartTemplate(availableProduct, email, body?.productId);
 
-    const cartRes = await saveToDBHandler(
-      { email: email },
-      {
-        $push: { myCartProduct: body },
-      }
-    );
+    const result = await db.collection('shoppingCarts').insertOne(cartTem);
 
-    return responseSender(
-      res,
-      true,
-      "Product successfully added to your cart",
-      cartRes
-    );
+    if (result) {
+      return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart" });
+    }
+
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
   }
@@ -242,12 +260,14 @@ module.exports.addCartAddress = async (req: Request, res: Response) => {
     const db = await dbConnection();
 
     const userEmail = req.decoded.email;
+
     const body = req.body;
+
     const result = await db
       .collection("users")
       .updateOne(
         { email: userEmail },
-        { $push: { address: body } },
+        { $push: { shippingAddress: body } },
         { upsert: true }
       );
 
@@ -259,7 +279,7 @@ module.exports.addCartAddress = async (req: Request, res: Response) => {
       });
     }
 
-    res.status(200).send({
+    return res.status(200).send({
       success: true,
       statusCode: 200,
       message: "Successfully shipping address added in your cart.",
@@ -280,7 +300,7 @@ module.exports.updateCartAddress = async (req: Request, res: Response) => {
       { email: userEmail },
       {
         $set: {
-          "address.$[i]": body,
+          "shippingAddress.$[i]": body,
         },
       },
       { arrayFilters: [{ "i.addressId": body?.addressId }] }
@@ -310,49 +330,51 @@ module.exports.selectCartAddress = async (req: Request, res: Response) => {
     const userEmail = req.decoded.email;
     const { addressId, select_address } = req.body;
 
-    const addr = await db.collection("users").findOne({ email: userEmail });
-    if (addr) {
-      const addressArr = addr?.address;
+    const user = await db.collection("users").findOne({ email: userEmail });
 
-      if (addressArr && addressArr.length > 0) {
-        await db.collection("users").updateOne(
-          { email: userEmail },
-          {
-            $set: {
-              "address.$[j].select_address": false,
-            },
+    if (!user) {
+      return res.status(404).send({ success: false, statusCode: 404, error: 'User not found !!!' });
+    }
+
+    const shippingAddress = user?.shippingAddress || [];
+
+    if (shippingAddress && shippingAddress.length > 0) {
+
+      await db.collection("users").updateOne(
+        { email: userEmail },
+        {
+          $set: {
+            "shippingAddress.$[j].select_address": false,
           },
-          {
-            arrayFilters: [{ "j.addressId": { $ne: addressId } }],
-            multi: true,
-          }
-        );
-      }
-    }
-
-    const result = await db.collection("users").updateOne(
-      { email: userEmail },
-      {
-        $set: {
-          "address.$[i].select_address": select_address,
         },
-      },
-      { arrayFilters: [{ "i.addressId": addressId }] }
-    );
+        {
+          arrayFilters: [{ "j.addressId": { $ne: addressId } }],
+          multi: true,
+        }
+      );
 
-    if (!result) {
-      return res.status(400).send({
-        success: false,
-        statusCode: 400,
-        error: "Failed to select the address",
-      });
+      const result = await db.collection("users").updateOne(
+        { email: userEmail },
+        {
+          $set: {
+            "shippingAddress.$[i].select_address": select_address,
+          },
+        },
+        { arrayFilters: [{ "i.addressId": addressId }] }
+      );
+
+      if (!result) {
+        return res.status(400).send({
+          success: false,
+          statusCode: 400,
+          error: "Failed to select the address",
+        });
+      }
+
+      return res.status(200).send({ success: true, statusCode: 200, message: "Shipping address Saved." });
     }
-
-    return res
-      .status(200)
-      .send({ success: true, statusCode: 200, message: "Saved" });
   } catch (error: any) {
-    res.status(500).send({ message: error?.message });
+    res.status(500).send({ success: false, statusCode: 500, error: error?.message });
   }
 };
 
@@ -364,9 +386,93 @@ module.exports.deleteCartAddress = async (req: Request, res: Response) => {
     const addressId = parseInt(req.params.addressId);
     const result = await db
       .collection("users")
-      .updateOne({ email: email }, { $pull: { address: { addressId } } });
+      .updateOne({ email: email }, { $pull: { shippingAddress: { addressId } } });
     if (result) return res.send(result);
   } catch (error: any) {
     res.status(500).send({ message: error?.message });
   }
 };
+
+
+module.exports.checkCartItemExpirationController = async (req: Request, res: Response) => {
+  try {
+    let authEmail = req.decoded.email;
+    let productId = req.params.productId;
+    const db = await dbConnection();
+
+    const product = await db.collection('users').updateOne(
+      { email: authEmail },
+      { $pull: { shoppingCartItems: { _id: productId } } },
+      { upsert: true }
+    );
+
+    if (product) {
+      return res.status(200).send({ success: true, statusCode: 200, message: "Deleted Expired product from your cart" });
+    }
+
+
+  } catch (error: any) {
+    return res.status(500).send({ success: false, statusCode: 500, error: error?.message });
+  }
+}
+
+module.exports.updateCartProductQuantityController = async (req: Request, res: Response) => {
+  try {
+
+    const db = await dbConnection();
+
+    const authEmail = req.decoded.email || "";
+
+    const body = req.body;
+
+    const upsertRequest = body?.upsertRequest;
+
+    const cartContext = upsertRequest?.cartContext;
+
+    const { productId, cartId, quantity } = cartContext;
+
+    const cartProduct = await db.collection('shoppingCarts').findOne({ $and: [{ customerEmail: authEmail }, { productId }, { _id: ObjectId(cartId) }] });
+
+    if (!cartProduct) {
+      return res.status(404).send({ success: false, statusCode: 404, error: 'product not found !!!' });
+    }
+
+    const availableProduct = await checkProductAvailability(productId);
+
+    if (!availableProduct || typeof availableProduct === "undefined" || availableProduct === null) {
+      return res.status(400).send({ success: false, statusCode: 400, error: "Product not available" });
+    }
+
+    if (parseInt(quantity) >= availableProduct?.stockInfo?.available) {
+      return res.status(400).send({ success: false, statusCode: 400, error: "Sorry ! your selected quantity out of range." });
+    }
+
+
+    let price = parseFloat(cartProduct?.price) || 0;
+
+    let amount = (price * quantity);
+
+    const result = await db.collection('shoppingCarts').updateOne(
+      {
+        $and: [{ customerEmail: authEmail }, { productId }, { _id: ObjectId(cartId) }]
+      },
+      {
+        $set: {
+          quantity,
+          totalAmount: amount
+        }
+      },
+      {
+        upsert: true,
+      }
+    );
+
+
+    if (result) {
+      return res.status(200).send({ success: true, statusCode: 200, message: 'Quantity updated.' });
+    }
+
+  } catch (error: any) {
+    return res.status(500).send({ success: false, statusCode: 500, error: error?.message });
+  }
+}

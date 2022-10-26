@@ -27,7 +27,7 @@ module.exports.userLoginController = (req, res) => __awaiter(void 0, void 0, voi
     var _a;
     try {
         const verify_token = ((_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(' ')[1]) || undefined;
-        const { username, password, loginCredential } = req.body;
+        const { username, password, authProvider } = req.body;
         let token;
         let userData;
         let credentials;
@@ -37,22 +37,22 @@ module.exports.userLoginController = (req, res) => __awaiter(void 0, void 0, voi
             maxAge: 57600000,
             httpOnly: true,
         };
-        if (typeof loginCredential === 'undefined' || !loginCredential) {
+        if (typeof authProvider === 'undefined' || !authProvider) {
             credentials = 'system';
         }
         else {
-            credentials = loginCredential;
+            credentials = authProvider;
         }
         const existUser = yield User.findOne({
             $and: [
                 { $or: [{ username }, { email: username }] },
-                { loginCredential: credentials }
+                { authProvider: credentials }
             ]
         });
         /// third party login system like --> Google
-        if (loginCredential === 'thirdParty') {
+        if (authProvider === 'thirdParty') {
             if (!existUser || typeof existUser === 'undefined') {
-                const user = new User({ email: username, username, loginCredential, accountStatus: 'active' });
+                const user = new User({ email: username, username, authProvider, accountStatus: 'active' });
                 userData = yield user.save();
             }
             else {
@@ -85,6 +85,7 @@ module.exports.userLoginController = (req, res) => __awaiter(void 0, void 0, voi
         }
         if (token) {
             res.cookie("token", token, cookieObject);
+            res.cookie("is_logged", existUser === null || existUser === void 0 ? void 0 : existUser._id, { httpOnly: false, maxAge: 57600000 });
             return res.status(200).send({ message: "isLogin", statusCode: 200, success: true });
         }
     }
@@ -178,11 +179,19 @@ module.exports.fetchAuthUser = (req, res, next) => __awaiter(void 0, void 0, voi
     try {
         const authEmail = req.decoded.email;
         const role = req.decoded.role;
-        const result = yield User.findOne({ $and: [{ email: authEmail }, { role: role }, { accountStatus: 'active' }] }).exec();
+        let result;
+        const db = yield dbConnection();
+        result = yield User.findOne({ $and: [{ email: authEmail }, { role: role }, { accountStatus: 'active' }] });
         if (!result || typeof result !== "object") {
             return res.status(404).send({ success: false, statusCode: 404, error: "User not found!" });
         }
-        yield User.updateOne({ email: authEmail }, { $pull: { myCartProduct: { stock: "out" } } });
+        result.password = undefined;
+        result.authProvider = undefined;
+        result.createdAt = undefined;
+        if ((result === null || result === void 0 ? void 0 : result.role) === 'user') {
+            const cartItems = yield db.collection('shoppingCarts').countDocuments({ customerEmail: authEmail });
+            result['shoppingCartItems'] = cartItems || 0;
+        }
         return res
             .status(200)
             .send({ success: true, statusCode: 200, message: 'Welcome ' + (result === null || result === void 0 ? void 0 : result.username), data: result });
@@ -191,101 +200,14 @@ module.exports.fetchAuthUser = (req, res, next) => __awaiter(void 0, void 0, voi
         next(error);
     }
 });
-module.exports.signUser = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const db = yield dbConnection();
-        const authEmail = req.headers.authorization || "";
-        if (!authEmail || typeof authEmail !== "string") {
-            return res
-                .status(400)
-                .send({ success: false, error: "Authorization header is missing!" });
-        }
-        const setToken = (role) => {
-            const cookieObject = {
-                // sameSite: "none",
-                // secure: true,
-                maxAge: 7200000,
-                httpOnly: true,
-            };
-            const payload = {
-                email: authEmail,
-                role: role,
-            };
-            const token = jwt.sign({ email: authEmail }, process.env.ACCESS_TOKEN, {
-                algorithm: "HS256",
-                expiresIn: "2h",
-            });
-            return res.cookie("token", token, cookieObject)
-                ? res
-                    .status(200)
-                    .send({ message: "Login success", statusCode: 200, success: true })
-                : res.status(400).send({ error: "Bad request", success: false });
-        };
-        const existsUser = yield db
-            .collection("users")
-            .findOne({ email: authEmail });
-        if (existsUser && typeof existsUser === "object") {
-            return setToken(existsUser === null || existsUser === void 0 ? void 0 : existsUser.role);
-        }
-        // user model
-        const model = new userModel(req.body, authEmail);
-        const errs = model.errorReports();
-        if (errs) {
-            return res.status(400).send({ success: false, error: errs });
-        }
-        const newUser = yield db
-            .collection("users")
-            .insertOne(model)
-            .then((d) => d[0]);
-        return setToken(newUser.role);
-    }
-    catch (error) {
-        next(error);
-    }
-});
 module.exports.signOutUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        let authEmail = req.decoded.email;
-        if (authEmail) {
-            // if user logout then cart will be empty
-            yield User.updateOne({ email: authEmail }, { myCartProduct: [] }, { new: true });
-        }
         res.clearCookie("token");
+        res.clearCookie('is_logged');
         res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
     }
     catch (error) {
         res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
-    }
-});
-module.exports.switchRole = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _c;
-    try {
-        const db = yield dbConnection();
-        const userEmail = req.decoded.email;
-        const userID = (_c = req.headers.authorization) === null || _c === void 0 ? void 0 : _c.split(" ")[1];
-        const userRole = req.params.role;
-        let roleModel;
-        if (!userID) {
-            return res
-                .status(400)
-                .send({ message: "Bad request! headers is missing" });
-        }
-        if (userRole === "user") {
-            roleModel = { role: "user" };
-        }
-        if (userRole === "seller") {
-            roleModel = { role: "seller" };
-        }
-        if (userID && userEmail) {
-            const result = yield db
-                .collection("users")
-                .updateOne({ _id: ObjectId(userID), email: userEmail }, { $set: roleModel }, { upsert: true });
-            if (result)
-                return res.status(200).send(result);
-        }
-    }
-    catch (error) {
-        res.status(500).send({ error: error === null || error === void 0 ? void 0 : error.message });
     }
 });
 module.exports.updateProfileData = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -352,57 +274,101 @@ module.exports.manageUsers = (req, res, next) => __awaiter(void 0, void 0, void 
 });
 module.exports.makeSellerRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const db = yield dbConnection();
-        const userEmail = req.params.userEmail;
-        let body = req.body;
-        let existSellerName;
-        if (body === null || body === void 0 ? void 0 : body.seller) {
-            existSellerName = yield db.collection("users").findOne({
-                seller: body === null || body === void 0 ? void 0 : body.seller,
+        const authEmail = req.decoded.email;
+        const authRole = req.decoded.role;
+        let user = yield User.findOne({ $and: [{ email: authEmail }, { role: 'user' }] });
+        if (!user) {
+            return res.status(404).send({ success: false, statusCode: 404, error: 'User not found' });
+        }
+        if ((user === null || user === void 0 ? void 0 : user.isSeller) === 'pending') {
+            return res.status(200).send({
+                success: false,
+                statusCode: 200,
+                error: 'You already send a seller request. We are working for your request, and it will take sometime to verify'
             });
         }
-        if (existSellerName) {
+        let body = req.body;
+        let businessInfo = {
+            taxID: body === null || body === void 0 ? void 0 : body.taxID,
+            stateTaxID: body === null || body === void 0 ? void 0 : body.stateTaxID,
+            creditCard: body === null || body === void 0 ? void 0 : body.creditCard,
+        };
+        let sellerInfo = {
+            fName: body === null || body === void 0 ? void 0 : body.fName,
+            lName: body === null || body === void 0 ? void 0 : body.lName,
+            dateOfBirth: body === null || body === void 0 ? void 0 : body.dateOfBirth,
+            phone: body === null || body === void 0 ? void 0 : body.phone,
+            address: {
+                street: body === null || body === void 0 ? void 0 : body.street,
+                thana: body === null || body === void 0 ? void 0 : body.thana,
+                district: body === null || body === void 0 ? void 0 : body.district,
+                state: body === null || body === void 0 ? void 0 : body.state,
+                country: body === null || body === void 0 ? void 0 : body.country,
+                pinCode: body === null || body === void 0 ? void 0 : body.pinCode
+            }
+        };
+        let inventoryInfo = {
+            earn: 0,
+            totalSell: 0,
+            totalProducts: 0,
+            storeName: body === null || body === void 0 ? void 0 : body.storeName,
+            storeCategory: body === null || body === void 0 ? void 0 : body.categories,
+            storeAddress: {
+                street: body === null || body === void 0 ? void 0 : body.street,
+                thana: body === null || body === void 0 ? void 0 : body.thana,
+                district: body === null || body === void 0 ? void 0 : body.district,
+                state: body === null || body === void 0 ? void 0 : body.state,
+                country: body === null || body === void 0 ? void 0 : body.country,
+                pinCode: body === null || body === void 0 ? void 0 : body.pinCode
+            }
+        };
+        let isUpdate = yield User.updateOne({ $and: [{ email: authEmail }, { role: authRole }] }, { $set: { businessInfo, sellerInfo, inventoryInfo, isSeller: 'pending' } }, { new: true });
+        if (isUpdate) {
             return res
                 .status(200)
-                .send({ message: "Seller name exists ! try to another" });
-        }
-        else {
-            const result = yield db.collection("users").updateOne({ email: userEmail }, {
-                $set: body,
-            }, { upsert: true });
-            res.status(200).send({ result, message: "success" });
+                .send({ success: true, statusCode: 200, message: "Thanks for sending a seller request. We are working for your request" });
         }
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        res.status(400).send({ success: false, statusCode: 400, error: error === null || error === void 0 ? void 0 : error.message });
     }
 });
+// Permit the seller request
 module.exports.permitSellerRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _c, _d;
     try {
-        const db = yield dbConnection();
-        const userId = req.params.userId;
-        const result = yield db.collection("users").updateOne({ _id: ObjectId(userId) }, {
-            $set: { role: "seller", seller_request: "ok", isSeller: true },
-        }, { upsert: true });
+        const userId = (_c = req.headers.authorization) === null || _c === void 0 ? void 0 : _c.split(',')[0];
+        const userEmail = (_d = req.headers.authorization) === null || _d === void 0 ? void 0 : _d.split(',')[1];
+        const user = yield User.findOne({ $and: [{ email: userEmail }, { _id: userId }, { isSeller: 'pending' }] });
+        if (!user) {
+            return res.status(400).send({ success: false, statusCode: 400, error: 'Sorry! request user not found.' });
+        }
+        let result = yield User.updateOne({ email: userEmail }, {
+            $set: { role: "seller", isSeller: 'fulfilled', becomeSellerAt: new Date() },
+            $unset: { shoppingCartItems: 1, shippingAddress: 1 }
+        }, { new: true });
         (result === null || result === void 0 ? void 0 : result.acknowledged)
-            ? res.status(200).send({ message: "Request Success" })
-            : res.status(400).send({ message: "Bad Request" });
+            ? res.status(200).send({ success: true, statusCode: 200, message: "Request Success" })
+            : res.status(400).send({ success: false, statusCode: 400, error: "Bad Request" });
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
     }
 });
+/**
+ * controller --> fetch seller request in admin dashboard
+ * request method --> GET
+ * required --> NONE
+ */
 module.exports.checkSellerRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const db = yield dbConnection();
-        res
-            .status(200)
-            .send(yield db
-            .collection("users")
-            .find({ seller_request: "pending" })
-            .toArray());
+        let sellers = yield User.find({ isSeller: 'pending' });
+        sellers.forEach((user) => {
+            user === null || user === void 0 ? true : delete user.password;
+        });
+        return res.status(200).send({ success: true, statusCode: 200, data: sellers });
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
     }
 });

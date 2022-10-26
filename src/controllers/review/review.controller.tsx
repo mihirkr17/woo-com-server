@@ -72,7 +72,7 @@ module.exports.addProductRating = async (req: Request, res: Response) => {
       filters = {
         $set: {
           "rating.$[i].count": counter + 1,
-          rating_average: average,
+          ratingAverage: average,
         },
         $push: { reviews: body },
       };
@@ -81,7 +81,7 @@ module.exports.addProductRating = async (req: Request, res: Response) => {
       filters = {
         $set: {
           rating: newRatingArray,
-          rating_average: average,
+          ratingAverage: average,
         },
         $push: { reviews: body },
       };

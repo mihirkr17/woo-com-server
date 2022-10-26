@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const { updateProductStock } = require("../../utils/common");
-const { orderModel } = require("../../model/order");
+const { orderModel } = require("../../templates/order.template");
 
 module.exports.setOrderHandler = async (req: Request, res: Response) => {
   try {
@@ -60,7 +60,7 @@ module.exports.setOrderHandler = async (req: Request, res: Response) => {
 
       await db
         .collection("users")
-        .updateOne({ email: userEmail }, { $unset: { myCartProduct: [] } });
+        .updateOne({ email: userEmail }, { $unset: { shoppingCartItems: [] } });
       res.status(200).send(result && { message: "Order success" });
     }
   } catch (error: any) {

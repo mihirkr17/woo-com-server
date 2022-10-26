@@ -13,6 +13,29 @@ const mongoose_1 = require("mongoose");
 const bcrypt = require("bcrypt");
 const validator = require("validator");
 const saltRounds = 10;
+const BusinessInfoSchema = new mongoose_1.Schema({
+    sellCategory: [String],
+    taxID: String,
+    stateTaxID: String,
+    creditCard: String,
+}, { _id: false });
+const SellerInfoSchema = new mongoose_1.Schema({
+    dateOfBirth: String,
+    phone: Number,
+    address: {
+        street: String,
+        thana: String,
+        district: String,
+        state: String,
+        country: String,
+        pinCode: Number
+    }
+}, { _id: false });
+const InventoryInfoSchema = new mongoose_1.Schema({
+    earn: Number,
+    totalSell: Number,
+    totalProducts: Number,
+}, { _id: false });
 // user schema design
 var UserSchema = new mongoose_1.Schema({
     email: {
@@ -33,6 +56,7 @@ var UserSchema = new mongoose_1.Schema({
     },
     shippingAddress: [
         {
+            addressId: { type: Number },
             name: { type: String, default: "" },
             district: { type: String, default: "" },
             street: { type: String, default: "" },
@@ -43,19 +67,23 @@ var UserSchema = new mongoose_1.Schema({
             pinCode: { type: Number, default: 0 },
         }
     ],
-    status: { type: String, enum: ["offline", "online"], default: "offline" },
+    businessInfo: { type: BusinessInfoSchema, default: undefined },
+    sellerInfo: { type: SellerInfoSchema, default: undefined },
+    inventoryInfo: { type: InventoryInfoSchema, default: undefined },
+    isSeller: { type: String, enum: ['pending', 'fulfilled'], default: undefined },
     accountStatus: { type: String, enum: ["active", "inactive", "blocked"], default: "inactive", },
-    loginCredential: { type: String, enum: ['system', 'thirdParty'], default: 'system' },
-    myCartProduct: [],
+    authProvider: { type: String, enum: ['system', 'thirdParty'], default: 'system' },
+    shoppingCartItems: { type: Number, default: undefined },
     verifyToken: String,
     createdAt: { type: Date, default: Date.now },
+    becomeSellerAt: { type: Date, default: undefined }
 });
 // user password hashing before save into database
 UserSchema.pre("save", function (next) {
     return __awaiter(this, void 0, void 0, function* () {
         let password = this.password;
-        let loginCredential = this.loginCredential;
-        if (loginCredential === 'thirdParty') {
+        let authProvider = this.authProvider;
+        if (authProvider === 'thirdParty') {
             next();
         }
         // hashing password throw bcrypt

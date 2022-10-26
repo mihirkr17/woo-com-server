@@ -11,16 +11,41 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 var jwt = require("jsonwebtoken");
 const { dbConnection } = require("../utils/db");
-const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+const verifyAuthUserByJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     const token = req.cookies.token; // finding token in http only cookies.
     // if token not present in cookies then return 403 status code and terminate the request here....
     if (!token || typeof token === "undefined") {
-        return res.send({ success: false, statusCode: 403, error: "Token not found" });
+        res.clearCookie('is_logged');
+        return res.status(204).send();
     }
     jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
         // verifying the token with jwt verify method and if token broken then 401 status code will send and terminate the request
         if (err) {
             res.clearCookie("token");
+            res.clearCookie('is_logged');
+            return res.status(401).send({
+                success: false,
+                statusCode: 401,
+                error: err.message,
+            });
+        }
+        // if success then return email throw req.decoded
+        req.decoded = decoded;
+        next();
+    });
+});
+const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    const token = req.cookies.token; // finding token in http only cookies.
+    // if token not present in cookies then return 403 status code and terminate the request here....
+    if (!token || typeof token === "undefined") {
+        res.clearCookie('is_logged');
+        return res.status(401).send({ success: false, statusCode: 401, error: 'Token not found' });
+    }
+    jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
+        // verifying the token with jwt verify method and if token broken then 401 status code will send and terminate the request
+        if (err) {
+            res.clearCookie("token");
+            res.clearCookie('is_logged');
             return res.status(401).send({
                 success: false,
                 statusCode: 401,
@@ -39,29 +64,30 @@ const checkingOwnerOrAdmin = (req, res, next) => __awaiter(void 0, void 0, void 
     const findAuthInDB = yield db.collection("users").findOne({
         email: authEmail && authEmail,
     });
-    if (findAuthInDB.role !== "owner" || findAuthInDB.role !== "admin") {
-        return res.status(400).send({
+    if (findAuthInDB.role === "owner" || findAuthInDB.role === "admin") {
+        next();
+    }
+    else {
+        return res.status(503).send({
             success: false,
-            statusCode: 400,
+            statusCode: 503,
             error: "You are not a owner or admin, So you are not authorized for process this.",
         });
     }
-    next();
 });
 // verify seller
 const checkingSeller = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     const db = yield dbConnection();
     const authEmail = req.decoded.email;
-    const findAuthInDB = yield db.collection("users").findOne({
-        email: authEmail && authEmail,
-    });
-    if (findAuthInDB.role !== "seller") {
-        return res.status(400).send({
+    const user = yield db.collection('users').findOne({ $and: [{ email: authEmail }, { role: 'seller' }] });
+    if (!user) {
+        return res.status(503).send({
             success: false,
-            statusCode: 400,
+            statusCode: 503,
             error: "You are not a seller, So you are not authorized for process this.",
         });
     }
+    req.decoded = { _id: user._id, email: user.email, username: user.username, role: user.role };
     next();
 });
 // verify seller
@@ -85,4 +111,5 @@ module.exports = {
     checkingOwnerOrAdmin,
     checkingSeller,
     checkingUser,
+    verifyAuthUserByJWT
 };

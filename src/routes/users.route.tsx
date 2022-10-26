@@ -1,11 +1,9 @@
 import express, { Router } from "express";
-const { verifyJWT, checkingOwnerOrAdmin } = require("../middleware/auth");
+const { verifyJWT, checkingOwnerOrAdmin, verifyAuthUserByJWT } = require("../middleware/auth");
 const router: Router = express.Router();
 const {
   fetchAuthUser,
-  signUser,
   signOutUser,
-  switchRole,
   updateProfileData,
   makeAdmin,
   demoteToUser,
@@ -27,7 +25,7 @@ try {
    * @apiParams no params required.
    * @apiSuccess {one particular user object data}
    */
-  router.get("/fetch-auth-user", verifyJWT, fetchAuthUser);
+  router.get("/fau", verifyAuthUserByJWT, fetchAuthUser);
 
   /**
    * @api {put} /sign in the user
@@ -38,12 +36,10 @@ try {
    * @apiParams no params required.
    * @apiSuccess sending success message.
    */
-  router.post("/sign-user", signUser);
   router.post("/login-user", userLoginController);
   router.post("/register-user", userRegisterController);
   router.post("/verify-register-user", userRegisterVerify);
-  router.post("/sign-out", verifyJWT, signOutUser);
-  router.put("/switch-role/:role", verifyJWT, switchRole);
+  router.post("/sign-out", signOutUser);
   router.put("/update-profile-data/:email", verifyJWT, updateProfileData);
   router.put("/make-admin/:userId", verifyJWT, checkingOwnerOrAdmin, makeAdmin);
   router.put(
@@ -53,9 +49,9 @@ try {
     demoteToUser
   );
   router.get("/manage-user", manageUsers);
-  router.put("/make-seller-request/:userEmail", makeSellerRequest);
+  router.put("/make-seller-request", verifyJWT, makeSellerRequest);
   router.put(
-    "/permit-seller-request/:userId",
+    "/permit-seller-request",
     verifyJWT,
     checkingOwnerOrAdmin,
     permitSellerRequest

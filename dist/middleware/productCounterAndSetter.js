@@ -8,16 +8,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-require("dotenv").config();
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PWD}@cluster0.8bccj.mongodb.net/ecommerce-db?retryWrites=true&w=majority`;
-let dbh = new MongoClient(uri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-    serverApi: ServerApiVersion.v1,
+var conn = require("../utils/db");
+var mongodb = require("mongodb");
+module.exports.productCounterAndSetter = (user) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        let db = yield conn.dbConnection();
+        let tp = yield db.collection('products').countDocuments({ $and: [{ 'seller.name': user.username }, { 'seller.uuid': mongodb.ObjectId(user._id) }] });
+        return yield db.collection('users').updateOne({ $and: [{ email: user.email }, { role: 'seller' }] }, { $set: { 'inventoryInfo.totalProducts': tp } }, { upsert: true });
+    }
+    catch (error) {
+        return error.message;
+    }
 });
-const dbConnection = () => __awaiter(void 0, void 0, void 0, function* () {
-    yield dbh.connect();
-    return dbh.db("ecommerce-db");
-});
-module.exports = { dbConnection };
