@@ -32,8 +32,8 @@ module.exports.userLoginController = (req, res) => __awaiter(void 0, void 0, voi
         let userData;
         let credentials;
         const cookieObject = {
-            // sameSite: "none",
-            // secure: true,
+            sameSite: "none",
+            secure: true,
             maxAge: 57600000,
             httpOnly: true,
         };

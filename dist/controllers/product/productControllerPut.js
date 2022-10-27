@@ -11,8 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 var { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
-const { productUpdateModel, productIntroTemplate, productImagesModel, productRatingTemplate } = require("../../templates/product.template");
-const { productCounterAndSetter, productCounter, topSellingProducts, topRatedProducts } = require("../../model/product.model");
+const { productUpdateModel, productImagesModel, } = require("../../templates/product.template");
 module.exports.updateProductController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {

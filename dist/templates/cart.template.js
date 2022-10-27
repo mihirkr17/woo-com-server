@@ -1,24 +1,25 @@
 "use strict";
-module.exports.cartTemplate = (product, email, productId) => {
-    var _a, _b, _c, _d, _e, _f, _g;
+module.exports.cartTemplate = (product, email, productId, listingId, variationId) => {
     return {
         customerEmail: email,
-        productId: productId,
-        title: product === null || product === void 0 ? void 0 : product.title,
-        slug: product === null || product === void 0 ? void 0 : product.slug,
-        brand: product === null || product === void 0 ? void 0 : product.brand,
-        size: (_a = product === null || product === void 0 ? void 0 : product.attr) === null || _a === void 0 ? void 0 : _a.size,
-        image: product.images && product.images[0],
+        productId,
+        variationId,
+        listingId,
         quantity: 1,
-        price: parseFloat((_b = product === null || product === void 0 ? void 0 : product.pricing) === null || _b === void 0 ? void 0 : _b.sellingPrice),
-        totalAmount: parseFloat((_c = product === null || product === void 0 ? void 0 : product.pricing) === null || _c === void 0 ? void 0 : _c.sellingPrice) * 1,
-        discount: (_d = product === null || product === void 0 ? void 0 : product.pricing) === null || _d === void 0 ? void 0 : _d.discount,
-        seller: (_e = product === null || product === void 0 ? void 0 : product.seller) === null || _e === void 0 ? void 0 : _e.name,
-        sku: product === null || product === void 0 ? void 0 : product.sku,
-        paymentInfo: (product === null || product === void 0 ? void 0 : product.paymentInfo) && (product === null || product === void 0 ? void 0 : product.paymentInfo),
-        stock: (_f = product === null || product === void 0 ? void 0 : product.stockInfo) === null || _f === void 0 ? void 0 : _f.stock,
-        available: (_g = product === null || product === void 0 ? void 0 : product.stockInfo) === null || _g === void 0 ? void 0 : _g.available,
-        status: product === null || product === void 0 ? void 0 : product.status,
         addedAt: new Date()
+        // title: product?.variations?.title,
+        // slug: product?.variations?.slug,
+        // brand: product?.brand,
+        // size: product?.variations?.attributes?.size,
+        // image: product?.variations?.images && product?.variations?.images[0],
+        // price: parseFloat(product?.variations?.pricing?.sellingPrice),
+        // totalAmount: parseFloat(product?.variations?.pricing?.sellingPrice) * 1,
+        // discount: product?.variations?.pricing?.discount,
+        // seller: product?.seller?.name,
+        // sku: product?.variations?.sku,
+        // paymentInfo: product?.paymentInfo && product?.paymentInfo,
+        // stock: product?.variations?.stock,
+        // available: product?.variations?.available,
+        // status: product?.variations?.status,
     };
 };

@@ -3,19 +3,17 @@ const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const { cartTemplate } = require("../../templates/cart.template");
 
-const checkProductAvailability = async (productId: string) => {
+const checkProductAvailability = async (productId: string, variationId: String) => {
   const db = await dbConnection();
 
-  const result = await db.collection('products').aggregate([]).toArray();
+  let product = await db.collection('products').aggregate([
+    { $match: { _id: ObjectId(productId) } },
+    { $unwind: { path: "$variations" } },
+    { $match: { $and: [{ 'variations.vId': variationId }, { 'variations.available': { $gte: 1 } }, { 'variations.stock': 'in' }] } }
+  ]).toArray();
 
-  return await db.collection("products").findOne({
-    $and: [
-      { _id: ObjectId(productId) },
-      { 'stockInfo.available': { $gte: 1 } },
-      { 'stockInfo.stock': "in" },
-      { status: "active" }
-    ]
-  });
+  product = product[0];
+  return product;
 };
 
 const responseSender = (
@@ -49,8 +47,45 @@ module.exports.showMyCartItemsController = async (req: Request, res: Response) =
 
     const cartItems = await db.collection('shoppingCarts').find({ customerEmail: authEmail }).toArray();
 
+    const result = await db.collection('shoppingCarts').aggregate([
+      { $match: { customerEmail: authEmail } },
+      {
+        $lookup: {
+          from: 'products',
+          localField: 'listingId',
+          foreignField: "_lId",
+          as: "main_product"
+        }
+      },
+      {
+        $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } }
+      },
+      { $project: { main_product: 0 } },
+      { $unwind: { path: "$variations" } },
+      {
+        $match: {
+          $expr: {
+            $and: [
+              { $eq: ['$variations.vId', '$variationId'] }
+            ]
+          }
+        }
+      },
+      {
+        $project: {
+          listingId: 1,
+          productId: 1, variationId: 1, variations: 1, brand: 1, 
+          quantity: 1, 
+          totalAmount: { $multiply: ['$variations.pricing.sellingPrice', '$quantity'] },
+          seller: 1,
+          shippingCharge: "$deliveryDetails.zonalDeliveryCharge",
+          paymentInfo: 1
+        }
+      }
+    ]).toArray();
+
     if (cartItems) {
-      return res.status(200).send({ success: true, statusCode: 200, data: { items: cartItems.length, products: cartItems } });
+      return res.status(200).send({ success: true, statusCode: 200, data: { items: cartItems.length, products: result, result: result } });
     }
   } catch (error: any) {
     return res.status(500).send({ success: false, statusCode: 500, error: error?.message })
@@ -65,7 +100,7 @@ module.exports.updateProductQuantity = async (req: Request, res: Response) => {
     const userEmail: string = req.decoded.email;
     const cart_types: string = req.params.cartTypes;
     const productId = req.headers.authorization;
-    const { quantity } = req.body;
+    const { quantity, variationId } = req.body;
 
     // undefined variables
     let updateDocuments: any;
@@ -75,7 +110,7 @@ module.exports.updateProductQuantity = async (req: Request, res: Response) => {
       return responseSender(res, false, "Bad request! headers missing");
     }
 
-    const availableProduct = await checkProductAvailability(productId);
+    const availableProduct = await checkProductAvailability(productId, variationId);
 
     if (
       !availableProduct ||
@@ -147,6 +182,12 @@ module.exports.updateProductQuantity = async (req: Request, res: Response) => {
   }
 };
 
+
+/**
+ * @controller --> Delete cart items by product ID
+ * @request_method --> DELETE
+ * @required --> productId:req.headers.authorization & cartTypes:req.params
+ */
 module.exports.deleteCartItem = async (req: Request, res: Response) => {
   try {
     const productId = req.headers.authorization;
@@ -189,38 +230,44 @@ module.exports.deleteCartItem = async (req: Request, res: Response) => {
   }
 };
 
+
 // add to cart controller
+/**
+ * @controller --> add product to cart
+ * @required --> BODY [productId, variationId]
+ * @request_method --> POST
+ */
 module.exports.addToCartHandler = async (req: Request, res: Response) => {
   try {
     const db = await dbConnection();
 
-    const email: string = req.decoded.email;
+    const authEmail: string = req.decoded.email;
     const body = req.body;
 
-    const availableProduct = await checkProductAvailability(body?.productId);
+    const availableProduct = await checkProductAvailability(body?.productId, body?.variationId);
 
-    if (availableProduct?.stockInfo?.stock === "out" && availableProduct?.stockInfo?.available <= 0) {
-      return responseSender(res, false, "This product out of stock now!");
+    if (!availableProduct) {
+      return res.status(503).send({ success: false, statusCode: 503, error: "Sorry! This product is out of stock now!" });
     }
 
     const existsProduct = await db.collection("shoppingCarts").findOne(
-      { $and: [{ customerEmail: email }, { productId: body?.productId }] }
+      { $and: [{ customerEmail: authEmail }, { variationId: body?.variationId }] }
     );
 
     if (existsProduct) {
       return res.status(400).send({ success: false, statusCode: 400, error: "Product Has Already In Your Cart" });
     }
 
-    const cartTem = cartTemplate(availableProduct, email, body?.productId);
+    const cartTemp = cartTemplate(availableProduct, authEmail, body?.productId, body?.listingId, body?.variationId);
 
-    const result = await db.collection('shoppingCarts').insertOne(cartTem);
+    const result = await db.collection('shoppingCarts').insertOne(cartTemp);
 
     if (result) {
       return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart" });
     }
 
   } catch (error: any) {
-    res.status(500).send({ message: error?.message });
+    return res.status(500).send({ success: false, statusCode: 500, error: error?.message });
   }
 };
 
@@ -429,7 +476,7 @@ module.exports.updateCartProductQuantityController = async (req: Request, res: R
 
     const cartContext = upsertRequest?.cartContext;
 
-    const { productId, cartId, quantity } = cartContext;
+    const { productId, variationId, cartId, quantity } = cartContext;
 
     const cartProduct = await db.collection('shoppingCarts').findOne({ $and: [{ customerEmail: authEmail }, { productId }, { _id: ObjectId(cartId) }] });
 
@@ -437,20 +484,20 @@ module.exports.updateCartProductQuantityController = async (req: Request, res: R
       return res.status(404).send({ success: false, statusCode: 404, error: 'product not found !!!' });
     }
 
-    const availableProduct = await checkProductAvailability(productId);
+    const availableProduct = await checkProductAvailability(productId, variationId);
 
     if (!availableProduct || typeof availableProduct === "undefined" || availableProduct === null) {
       return res.status(400).send({ success: false, statusCode: 400, error: "Product not available" });
     }
 
-    if (parseInt(quantity) >= availableProduct?.stockInfo?.available) {
+    if (parseInt(quantity) >= availableProduct?.variations?.available) {
       return res.status(400).send({ success: false, statusCode: 400, error: "Sorry ! your selected quantity out of range." });
     }
 
 
-    let price = parseFloat(cartProduct?.price) || 0;
+    // let price = parseFloat(cartProduct?.price) || 0;
 
-    let amount = (price * quantity);
+    // let amount = (price * quantity);
 
     const result = await db.collection('shoppingCarts').updateOne(
       {
@@ -459,7 +506,7 @@ module.exports.updateCartProductQuantityController = async (req: Request, res: R
       {
         $set: {
           quantity,
-          totalAmount: amount
+          // totalAmount: amount
         }
       },
       {

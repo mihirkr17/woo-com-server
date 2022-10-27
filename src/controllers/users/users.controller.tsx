@@ -23,8 +23,8 @@ module.exports.userLoginController = async (req: Request, res: Response) => {
     let credentials;
 
     const cookieObject: any = {
-      // sameSite: "none",
-      // secure: true,
+      sameSite: "none",
+      secure: true,
       maxAge: 57600000, // 16hr [3600000 -> 1hr]ms
       httpOnly: true,
     };

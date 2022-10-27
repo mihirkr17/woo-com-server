@@ -65,9 +65,9 @@ const productIntroTemplate = (body: any) => {
     },
     deliveryDetails: {
       shippingProvider: body?.shippingProvider,
-      localDeliveryCharge: body?.localDeliveryCharge,
-      zonalDeliveryCharge: body?.zonalDeliveryCharge,
-      nationalDeliveryCharge: body?.nationalDeliveryCharge
+      localDeliveryCharge: parseInt(body?.localDeliveryCharge),
+      zonalDeliveryCharge: parseInt(body?.zonalDeliveryCharge),
+      nationalDeliveryCharge: parseInt(body?.nationalDeliveryCharge)
     },
     packageInfo: {
       dimension: {

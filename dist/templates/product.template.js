@@ -64,9 +64,9 @@ const productIntroTemplate = (body) => {
         },
         deliveryDetails: {
             shippingProvider: body === null || body === void 0 ? void 0 : body.shippingProvider,
-            localDeliveryCharge: body === null || body === void 0 ? void 0 : body.localDeliveryCharge,
-            zonalDeliveryCharge: body === null || body === void 0 ? void 0 : body.zonalDeliveryCharge,
-            nationalDeliveryCharge: body === null || body === void 0 ? void 0 : body.nationalDeliveryCharge
+            localDeliveryCharge: parseInt(body === null || body === void 0 ? void 0 : body.localDeliveryCharge),
+            zonalDeliveryCharge: parseInt(body === null || body === void 0 ? void 0 : body.zonalDeliveryCharge),
+            nationalDeliveryCharge: parseInt(body === null || body === void 0 ? void 0 : body.nationalDeliveryCharge)
         },
         packageInfo: {
             dimension: {

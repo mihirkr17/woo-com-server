@@ -12,17 +12,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const { cartTemplate } = require("../../templates/cart.template");
-const checkProductAvailability = (productId) => __awaiter(void 0, void 0, void 0, function* () {
+const checkProductAvailability = (productId, variationId) => __awaiter(void 0, void 0, void 0, function* () {
     const db = yield dbConnection();
-    const result = yield db.collection('products').aggregate([]).toArray();
-    return yield db.collection("products").findOne({
-        $and: [
-            { _id: ObjectId(productId) },
-            { 'stockInfo.available': { $gte: 1 } },
-            { 'stockInfo.stock': "in" },
-            { status: "active" }
-        ]
-    });
+    let product = yield db.collection('products').aggregate([
+        { $match: { _id: ObjectId(productId) } },
+        { $unwind: { path: "$variations" } },
+        { $match: { $and: [{ 'variations.vId': variationId }, { 'variations.available': { $gte: 1 } }, { 'variations.stock': 'in' }] } }
+    ]).toArray();
+    product = product[0];
+    return product;
 });
 const responseSender = (res, success, message, data = null) => {
     return success
@@ -45,8 +43,44 @@ module.exports.showMyCartItemsController = (req, res) => __awaiter(void 0, void 
         const db = yield dbConnection();
         const authEmail = req.decoded.email;
         const cartItems = yield db.collection('shoppingCarts').find({ customerEmail: authEmail }).toArray();
+        const result = yield db.collection('shoppingCarts').aggregate([
+            { $match: { customerEmail: authEmail } },
+            {
+                $lookup: {
+                    from: 'products',
+                    localField: 'listingId',
+                    foreignField: "_lId",
+                    as: "main_product"
+                }
+            },
+            {
+                $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } }
+            },
+            { $project: { main_product: 0 } },
+            { $unwind: { path: "$variations" } },
+            {
+                $match: {
+                    $expr: {
+                        $and: [
+                            { $eq: ['$variations.vId', '$variationId'] }
+                        ]
+                    }
+                }
+            },
+            {
+                $project: {
+                    listingId: 1,
+                    productId: 1, variationId: 1, variations: 1, brand: 1,
+                    quantity: 1,
+                    totalAmount: { $multiply: ['$variations.pricing.sellingPrice', '$quantity'] },
+                    seller: 1,
+                    shippingCharge: "$deliveryDetails.zonalDeliveryCharge",
+                    paymentInfo: 1
+                }
+            }
+        ]).toArray();
         if (cartItems) {
-            return res.status(200).send({ success: true, statusCode: 200, data: { items: cartItems.length, products: cartItems } });
+            return res.status(200).send({ success: true, statusCode: 200, data: { items: cartItems.length, products: result, result: result } });
         }
     }
     catch (error) {
@@ -61,14 +95,14 @@ module.exports.updateProductQuantity = (req, res) => __awaiter(void 0, void 0, v
         const userEmail = req.decoded.email;
         const cart_types = req.params.cartTypes;
         const productId = req.headers.authorization;
-        const { quantity } = req.body;
+        const { quantity, variationId } = req.body;
         // undefined variables
         let updateDocuments;
         let filters;
         if (!productId || typeof productId === "undefined" || productId === null) {
             return responseSender(res, false, "Bad request! headers missing");
         }
-        const availableProduct = yield checkProductAvailability(productId);
+        const availableProduct = yield checkProductAvailability(productId, variationId);
         if (!availableProduct ||
             typeof availableProduct === "undefined" ||
             availableProduct === null) {
@@ -123,6 +157,11 @@ module.exports.updateProductQuantity = (req, res) => __awaiter(void 0, void 0, v
         res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
     }
 });
+/**
+ * @controller --> Delete cart items by product ID
+ * @request_method --> DELETE
+ * @required --> productId:req.headers.authorization & cartTypes:req.params
+ */
 module.exports.deleteCartItem = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const productId = req.headers.authorization;
@@ -155,28 +194,32 @@ module.exports.deleteCartItem = (req, res) => __awaiter(void 0, void 0, void 0, 
     }
 });
 // add to cart controller
+/**
+ * @controller --> add product to cart
+ * @required --> BODY [productId, variationId]
+ * @request_method --> POST
+ */
 module.exports.addToCartHandler = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _b, _c;
     try {
         const db = yield dbConnection();
-        const email = req.decoded.email;
+        const authEmail = req.decoded.email;
         const body = req.body;
-        const availableProduct = yield checkProductAvailability(body === null || body === void 0 ? void 0 : body.productId);
-        if (((_b = availableProduct === null || availableProduct === void 0 ? void 0 : availableProduct.stockInfo) === null || _b === void 0 ? void 0 : _b.stock) === "out" && ((_c = availableProduct === null || availableProduct === void 0 ? void 0 : availableProduct.stockInfo) === null || _c === void 0 ? void 0 : _c.available) <= 0) {
-            return responseSender(res, false, "This product out of stock now!");
+        const availableProduct = yield checkProductAvailability(body === null || body === void 0 ? void 0 : body.productId, body === null || body === void 0 ? void 0 : body.variationId);
+        if (!availableProduct) {
+            return res.status(503).send({ success: false, statusCode: 503, error: "Sorry! This product is out of stock now!" });
         }
-        const existsProduct = yield db.collection("shoppingCarts").findOne({ $and: [{ customerEmail: email }, { productId: body === null || body === void 0 ? void 0 : body.productId }] });
+        const existsProduct = yield db.collection("shoppingCarts").findOne({ $and: [{ customerEmail: authEmail }, { variationId: body === null || body === void 0 ? void 0 : body.variationId }] });
         if (existsProduct) {
             return res.status(400).send({ success: false, statusCode: 400, error: "Product Has Already In Your Cart" });
         }
-        const cartTem = cartTemplate(availableProduct, email, body === null || body === void 0 ? void 0 : body.productId);
-        const result = yield db.collection('shoppingCarts').insertOne(cartTem);
+        const cartTemp = cartTemplate(availableProduct, authEmail, body === null || body === void 0 ? void 0 : body.productId, body === null || body === void 0 ? void 0 : body.listingId, body === null || body === void 0 ? void 0 : body.variationId);
+        const result = yield db.collection('shoppingCarts').insertOne(cartTemp);
         if (result) {
             return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart" });
         }
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        return res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
     }
 });
 module.exports.addToBuyHandler = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -326,33 +369,33 @@ module.exports.checkCartItemExpirationController = (req, res) => __awaiter(void 
     }
 });
 module.exports.updateCartProductQuantityController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _d;
+    var _b;
     try {
         const db = yield dbConnection();
         const authEmail = req.decoded.email || "";
         const body = req.body;
         const upsertRequest = body === null || body === void 0 ? void 0 : body.upsertRequest;
         const cartContext = upsertRequest === null || upsertRequest === void 0 ? void 0 : upsertRequest.cartContext;
-        const { productId, cartId, quantity } = cartContext;
+        const { productId, variationId, cartId, quantity } = cartContext;
         const cartProduct = yield db.collection('shoppingCarts').findOne({ $and: [{ customerEmail: authEmail }, { productId }, { _id: ObjectId(cartId) }] });
         if (!cartProduct) {
             return res.status(404).send({ success: false, statusCode: 404, error: 'product not found !!!' });
         }
-        const availableProduct = yield checkProductAvailability(productId);
+        const availableProduct = yield checkProductAvailability(productId, variationId);
         if (!availableProduct || typeof availableProduct === "undefined" || availableProduct === null) {
             return res.status(400).send({ success: false, statusCode: 400, error: "Product not available" });
         }
-        if (parseInt(quantity) >= ((_d = availableProduct === null || availableProduct === void 0 ? void 0 : availableProduct.stockInfo) === null || _d === void 0 ? void 0 : _d.available)) {
+        if (parseInt(quantity) >= ((_b = availableProduct === null || availableProduct === void 0 ? void 0 : availableProduct.variations) === null || _b === void 0 ? void 0 : _b.available)) {
             return res.status(400).send({ success: false, statusCode: 400, error: "Sorry ! your selected quantity out of range." });
         }
-        let price = parseFloat(cartProduct === null || cartProduct === void 0 ? void 0 : cartProduct.price) || 0;
-        let amount = (price * quantity);
+        // let price = parseFloat(cartProduct?.price) || 0;
+        // let amount = (price * quantity);
         const result = yield db.collection('shoppingCarts').updateOne({
             $and: [{ customerEmail: authEmail }, { productId }, { _id: ObjectId(cartId) }]
         }, {
             $set: {
                 quantity,
-                totalAmount: amount
+                // totalAmount: amount
             }
         }, {
             upsert: true,
