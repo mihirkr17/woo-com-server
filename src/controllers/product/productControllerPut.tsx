@@ -1,57 +1,6 @@
 import { Request, Response } from "express";
 var { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
-const {
-  productUpdateModel,
-  productImagesModel,
-} = require("../../templates/product.template");
-
-
-module.exports.updateProductController = async (
-  req: Request,
-  res: Response
-) => {
-  try {
-    const db = await dbConnection();
-
-    const productId: String = req.headers?.authorization || "";
-    const body = req.body;
-    let model;
-
-    if (body?.images) {
-      model = productImagesModel(body);
-    } else {
-      model = productUpdateModel(body);
-    }
-
-    const exists =
-      (await db
-        .collection("users")
-        .find({ "shoppingCartItems._id": productId })
-        .toArray()) || [];
-
-    if (exists && exists.length > 0) {
-      await db.collection("users").updateMany(
-        { "shoppingCartItems._id": productId },
-        {
-          $pull: { shoppingCartItems: { _id: productId } },
-        }
-      );
-    }
-
-    const result = await db
-      .collection("products")
-      .updateOne(
-        { _id: ObjectId(productId) },
-        { $set: model },
-        { upsert: true }
-      );
-
-    res.status(200).send(result && { message: "Product updated successfully" });
-  } catch (error: any) {
-    res.status(500).send({ message: error?.message });
-  }
-};
 
 // Update Product Stock Controller
 module.exports.updateStockController = async (req: Request, res: Response) => {
@@ -99,9 +48,10 @@ module.exports.updateStockController = async (req: Request, res: Response) => {
 
 
 // product variation controller
-module.exports.productVariationController = async (req: Request, res: Response) => {
+module.exports.productOperationController = async (req: Request, res: Response) => {
   try {
     const db = await dbConnection();
+
     const productId: String = req.headers?.authorization || "";
     const formTypes = req.query.formType || "";
     const vId = req.query.vId;
@@ -109,6 +59,25 @@ module.exports.productVariationController = async (req: Request, res: Response) 
     let result;
     let model = req.body;
 
+    // Update variation
+    if (formTypes === 'update-variation') {
+      model['_vId'] = vId;
+      if (vId && productAttr === 'ProductVariations') {
+        result = await db.collection('products').updateOne(
+          {
+            $and: [{ _id: ObjectId(productId) }, { 'variations._vId': vId }]
+          },
+          {
+            $set: {
+              'variations.$[i]': model,
+            }
+          },
+          { arrayFilters: [{ "i._vId": vId }] }
+        );
+      }
+    }
+
+    // create new variation
     if (formTypes === 'new-variation') {
       result = await db.collection('products').updateOne(
         {
@@ -124,52 +93,26 @@ module.exports.productVariationController = async (req: Request, res: Response) 
     // next condition
     else if (formTypes === 'update') {
 
-      if (vId) {
+      if (productAttr === 'ProductSpecs') {
 
-        if (productAttr === 'variationOne') {
-          result = await db.collection('products').updateOne(
-            {
-              $and: [{ _id: ObjectId(productId) }, { 'variations.vId': vId }]
-            },
-            {
-              $set: {
-                'variations.$[i].title': model.title,
-                'variations.$[i].slug': model.slug,
-                'variations.$[i].images': model.images,
-                'variations.$[i].sku': model.sku,
-                'variations.$[i].pricing': model.pricing,
-                'variations.$[i].stock': model.stock,
-                'variations.$[i].available': model.available,
-                'variations.$[i].status': model.status,
-              }
-            },
-            { arrayFilters: [{ "i.vId": vId }] }
-          );
-        }
+        result = await db.collection('products').updateOne(
+          { _id: ObjectId(productId) },
+          {
+            $set: { specification: model }
+          },
+          { upsert: true }
+        );
+      }
 
-        if (productAttr === 'variationTwo') {
+      if (productAttr === 'bodyInformation') {
 
-          result = await db.collection('products').updateOne(
-            {
-              $and: [{ _id: ObjectId(productId) }, { 'variations.vId': vId }]
-            },
-            {
-              $set: { 'variations.$[i].attributes': model }
-            },
-            { arrayFilters: [{ "i.vId": vId }] }
-          );
-        }
-
-        if (productAttr === 'variationThree') {
-
-          result = await db.collection('products').updateOne(
-            { _id: ObjectId(productId) },
-            {
-              $set: { bodyInfo: model }
-            },
-            { upsert: true }
-          );
-        }
+        result = await db.collection('products').updateOne(
+          { _id: ObjectId(productId) },
+          {
+            $set: { bodyInfo: model }
+          },
+          { upsert: true }
+        );
       }
     }
 
@@ -180,5 +123,42 @@ module.exports.productVariationController = async (req: Request, res: Response) 
 
   } catch (error: any) {
     return res.status(500).send({ success: false, statusCode: 500, error: error?.message });
+  }
+}
+
+
+module.exports.productControlController = async (req: Request, res: Response) => {
+  try {
+
+    const db = await dbConnection();
+
+    const body = req.body;
+    let product: any;
+
+    if (body?.market_place !== 'woo-kart') {
+      return res.status(403).send({ success: false, statusCode: 403, error: "Forbidden." });
+    }
+
+    if (body?.data?.vId) {
+
+      product = await db.collection('products').updateOne(
+        { $and: [{ _id: ObjectId(body?.data?.pId) }, { _lId: body?.data?.lId }] },
+        { $set: { 'variations.$[i].status': body?.data?.action } },
+        { arrayFilters: [{ "i._vId": body?.data?.vId }] });
+    } else {
+      product = await db.collection('products').updateOne(
+        { $and: [{ _id: ObjectId(body?.data?.pId) }, { _lId: body?.data?.lId }] },
+        { $set: { save_as: body?.data?.action } },
+        { upsert: true });
+    }
+
+
+    if (product) {
+      return res.status(200).send({ success: true, statusCode: 200, message: `Request ${body?.data?.action}` });
+    }
+
+
+  } catch (error: any) {
+    res.status(500).send({ success: false, statusCode: 500, error: error?.message });
   }
 }

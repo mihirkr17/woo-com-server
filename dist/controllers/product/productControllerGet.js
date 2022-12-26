@@ -11,7 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 var { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
-const { productCounter, topSellingProducts, topRatedProducts } = require("../../model/product.model");
+const { productCounter, topSellingProducts, topRatedProducts, allProducts } = require("../../model/product.model");
 /**
  * @controller      --> Fetch the single product information in product details page.
  * @required        --> [req.headers.authorization:email, req.query:productId, req.query:variationId, req.params:product slug]
@@ -27,32 +27,26 @@ module.exports.fetchSingleProductController = (req, res) => __awaiter(void 0, vo
         const variationId = req.query.vId;
         let inCart = false;
         let inWishlist = false;
+        let colors = req.query.colors;
+        let size = req.query.size;
         // Product Details
         let productDetail = yield db.collection('products').aggregate([
             { $match: { _id: ObjectId(productId) } },
             {
                 $project: {
+                    title: 1,
+                    slug: 1,
                     variations: '$variations', swatch: "$variations",
+                    specification: '$specification',
                     brand: 1, categories: 1,
                     seller: 1, rating: 1, ratingAverage: 1, save_as: 1, createdAt: 1, bodyInfo: 1, manufacturer: 1,
                     _lId: 1
                 }
             },
             { $unwind: { path: '$variations' } },
-            { $match: { 'variations.vId': variationId } }
+            { $match: { 'variations._vId': variationId } }
         ]).toArray();
         productDetail = productDetail[0];
-        let newProduct = productDetail === null || productDetail === void 0 ? void 0 : productDetail.swatch;
-        let swatches = [];
-        for (let i = 0; i < newProduct.length; i++) {
-            let e = newProduct[i];
-            swatches.push({
-                vId: e.vId,
-                slug: e.slug,
-                attr: e.attributes
-            });
-        }
-        productDetail.swatch = swatches;
         // Related products
         const relatedProducts = yield db.collection("products").aggregate([
             { $unwind: { path: '$variations' } },
@@ -60,7 +54,7 @@ module.exports.fetchSingleProductController = (req, res) => __awaiter(void 0, vo
                 $match: {
                     $and: [
                         { categories: { $in: productDetail.categories } },
-                        { 'variations.vId': { $ne: variationId } },
+                        { 'variations._vId': { $ne: variationId } },
                         { 'variations.status': "active" },
                     ],
                 },
@@ -71,7 +65,7 @@ module.exports.fetchSingleProductController = (req, res) => __awaiter(void 0, vo
                     ratingAverage: "$ratingAverage",
                     brand: "$brand",
                     variations: {
-                        vId: "$variations.vId",
+                        _vId: "$variations._vId",
                         pricing: "$variations.pricing",
                         title: "$variations.title",
                         slug: "$variations.slug",
@@ -87,7 +81,7 @@ module.exports.fetchSingleProductController = (req, res) => __awaiter(void 0, vo
         if (email) {
             const existProductInCart = yield db
                 .collection("shoppingCarts")
-                .findOne({ $and: [{ customerEmail: email }, { vId: variationId }] });
+                .findOne({ $and: [{ customerEmail: email }, { _vId: variationId }] });
             const existProductInWishlist = yield db
                 .collection("users")
                 .findOne({ $and: [{ email }, { "wishlist.slug": product_slug }] });
@@ -185,7 +179,7 @@ module.exports.fetchSingleProductByPidController = (req, res) => __awaiter(void 
                     $unwind: { path: "$variations" },
                 },
                 {
-                    $match: { 'variations.vId': variationId }
+                    $match: { 'variations._vId': variationId }
                 }
             ]).toArray();
             product = product[0];
@@ -274,25 +268,17 @@ module.exports.countProductsController = (req, res) => __awaiter(void 0, void 0,
  */
 module.exports.homeStoreController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const db = yield dbConnection();
         const totalLimits = parseInt(req.params.limits);
-        let allProducts = yield db.collection('products').aggregate([
-            { $unwind: { path: '$variations' } },
-            { $match: { 'variations.status': 'active' } },
-            { $sort: { 'variations.vId': -1 } },
-            { $limit: totalLimits }
-        ]).toArray();
+        const products = yield allProducts(totalLimits);
         const topSellingProduct = yield topSellingProducts();
         const topRatedProduct = yield topRatedProducts();
-        return allProducts
-            ? res.status(200).send({
-                success: true, statusCode: 200, data: {
-                    store: allProducts,
-                    topSellingProducts: topSellingProduct,
-                    topRatedProducts: topRatedProduct
-                }
-            })
-            : res.status(500).send({ success: false, statusCode: 500, error: "Something went wrong" });
+        return res.status(200).send({
+            success: true, statusCode: 200, data: {
+                store: products,
+                topSellingProducts: topSellingProduct,
+                topRatedProducts: topRatedProduct
+            }
+        });
     }
     catch (error) {
         return res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
@@ -369,16 +355,17 @@ module.exports.manageProductController = (req, res) => __awaiter(void 0, void 0,
         let cursor;
         let products;
         let draftProducts;
+        let inactiveProduct;
         let showFor;
         if (isSeller.role === "seller") {
             showFor = [
                 { "seller.name": isSeller === null || isSeller === void 0 ? void 0 : isSeller.username },
-                { status: "active" },
+                { 'variations.status': "active" },
                 { save_as: "fulfilled" },
             ];
         }
         else {
-            showFor = [{ status: "active" }, { save_as: "fulfilled" }];
+            showFor = [{ 'variations.status': "active" }, { save_as: "fulfilled" }];
         }
         const searchQuery = (sTxt) => {
             item = "";
@@ -397,27 +384,44 @@ module.exports.manageProductController = (req, res) => __awaiter(void 0, void 0,
             return {
                 $and: [
                     { categories: { $all: [category] } },
-                    { status: "active" },
+                    { 'variations.status': "active" },
                     { save_as: "fulfilled" },
                 ],
             };
         };
         page = parseInt(page) === 1 ? 0 : parseInt(page) - 1;
-        cursor =
-            searchText && searchText.length > 0
-                ? db.collection("products").find(searchQuery(searchText))
-                : filters && filters !== "all"
-                    ? db.collection("products").find(filterQuery(filters))
-                    : db.collection("products").find({ $and: showFor });
-        if (item || page) {
-            products = yield cursor
-                .skip(page * parseInt(item))
-                .limit(parseInt(item))
-                .toArray();
-        }
-        else {
-            products = yield cursor.toArray();
-        }
+        // cursor =
+        //    searchText && searchText.length > 0
+        //       ? db.collection("products").find(searchQuery(searchText))
+        //       : filters && filters !== "all"
+        //          ? db.collection("products").find(filterQuery(filters))
+        //          : db.collection("products").find({ $and: showFor });
+        // if (item || page) {
+        //    products = await cursor
+        //       .skip(page * parseInt(item))
+        //       .limit(parseInt(item))
+        //       .toArray();
+        // } else {
+        //    products = await cursor.toArray();
+        // }
+        products = yield db.collection("products").aggregate([
+            { $unwind: { path: '$variations' } },
+            {
+                $match: {
+                    $and: showFor,
+                    $or: [
+                        { title: { $regex: searchText, $options: "i" } },
+                        { "seller.name": { $regex: searchText, $options: "i" } },
+                        { categories: { $all: [filters] } }
+                    ]
+                }
+            },
+            {
+                $skip: page * parseInt(item)
+            }, {
+                $limit: (parseInt(item))
+            }
+        ]).toArray();
         if (isSeller) {
             // draftProducts = await db.collection('products').aggregate([
             //   {
@@ -433,11 +437,15 @@ module.exports.manageProductController = (req, res) => __awaiter(void 0, void 0,
                 $and: [{ "seller.name": isSeller === null || isSeller === void 0 ? void 0 : isSeller.username }, { save_as: "draft" }],
             })
                 .toArray();
+            inactiveProduct = yield db.collection("products").aggregate([
+                { $unwind: { path: "$variations" } },
+                { $match: { $and: [{ "seller.name": isSeller === null || isSeller === void 0 ? void 0 : isSeller.username }, { "variations.status": 'inactive' }] } }
+            ]).toArray();
         }
         return res.status(200).send({
             success: true,
             statusCode: 200,
-            data: { products: products, draftProducts },
+            data: { products, draftProducts, inactiveProduct },
         });
     }
     catch (error) {

@@ -106,10 +106,30 @@ const checkingUser = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
     }
     next();
 });
+// admin authorization
+const isAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const db = yield dbConnection();
+        const authEmail = req.decoded.email;
+        const authRole = req.decoded.role;
+        if (authRole !== 'admin') {
+            return res.status(503).send({ success: false, statusCode: 503, error: "Service is unavailable !" });
+        }
+        const findAdmin = yield db.collection('users').findOne({ $and: [{ email: authEmail }, { role: 'admin' }] });
+        if (!findAdmin) {
+            return res.status(503).send({ success: false, statusCode: 503, error: "Service is unavailable !" });
+        }
+        next();
+    }
+    catch (error) {
+        return res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+    }
+});
 module.exports = {
     verifyJWT,
     checkingOwnerOrAdmin,
     checkingSeller,
     checkingUser,
-    verifyAuthUserByJWT
+    verifyAuthUserByJWT,
+    isAdmin
 };

@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 var jwt = require("jsonwebtoken");
 const { dbConnection } = require("../utils/db");
 
-const verifyAuthUserByJWT = async (req:Request, res:Response, next:any) => {
+const verifyAuthUserByJWT = async (req: Request, res: Response, next: any) => {
   const token = req.cookies.token; // finding token in http only cookies.
 
   // if token not present in cookies then return 403 status code and terminate the request here....
@@ -40,7 +40,7 @@ const verifyJWT = async (req: Request, res: Response, next: any) => {
   // if token not present in cookies then return 403 status code and terminate the request here....
   if (!token || typeof token === "undefined") {
     res.clearCookie('is_logged');
-    return res.status(401).send({success: false, statusCode: 401, error: 'Token not found'});
+    return res.status(401).send({ success: false, statusCode: 401, error: 'Token not found' });
   }
 
 
@@ -131,10 +131,37 @@ const checkingUser = async (req: Request, res: Response, next: any) => {
   next();
 };
 
+
+
+// admin authorization
+const isAdmin = async (req: Request, res: Response, next: any) => {
+  try {
+
+    const db = await dbConnection();
+    const authEmail: String = req.decoded.email;
+    const authRole: String = req.decoded.role;
+
+    if (authRole !== 'admin') {
+      return res.status(503).send({ success: false, statusCode: 503, error: "Service is unavailable !" });
+    }
+
+    const findAdmin = await db.collection('users').findOne({ $and: [{ email: authEmail }, { role: 'admin' }] });
+
+    if (!findAdmin) {
+      return res.status(503).send({ success: false, statusCode: 503, error: "Service is unavailable !" });
+    }
+    
+    next();
+  } catch (error: any) {
+    return res.status(500).send({ success: false, statusCode: 500, error: error?.message });
+  }
+}
+
 module.exports = {
   verifyJWT,
   checkingOwnerOrAdmin,
   checkingSeller,
   checkingUser,
-  verifyAuthUserByJWT
+  verifyAuthUserByJWT,
+  isAdmin
 };

@@ -20,7 +20,6 @@ try {
     router.delete("/delete-product", verifyJWT, checkingSeller, deleteController.deleteProductController);
     router.put("/update-stock", verifyJWT, checkingSeller, putController.updateStockController);
     router.post("/set-product-intro/:formTypes", verifyJWT, postController.setProductIntroController);
-    router.put("/set-product-details", verifyJWT, putController.updateProductController);
     router.get("/fetch-single-product/:product_slug", getController.fetchSingleProductController);
     router.get("/store/:limits", getController.homeStoreController);
     /**
@@ -39,7 +38,8 @@ try {
     router.get("/fetch-top-selling-product", getController.fetchTopSellingProduct);
     router.get("/manage-product", verifyJWT, getController.manageProductController);
     router.get("/dashboard-overview", verifyJWT, getController.dashboardOverviewController);
-    router.put("/set-product-variation", verifyJWT, variationOne, putController.productVariationController);
+    router.put("/set-product-variation", verifyJWT, variationOne, putController.productOperationController);
+    router.put("/product-control", verifyJWT, checkingSeller, putController.productControlController);
     router.delete("/delete-product-variation/:productId/:vId", verifyJWT, deleteController.deleteProductVariationController);
 }
 catch (error) {

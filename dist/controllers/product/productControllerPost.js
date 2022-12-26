@@ -17,6 +17,7 @@ const { productCounterAndSetter } = require("../../model/product.model");
  * Adding Product Title and slug first
  */
 module.exports.setProductIntroController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const db = yield dbConnection();
         const authEmail = req.decoded.email;
@@ -54,6 +55,7 @@ module.exports.setProductIntroController = (req, res) => __awaiter(void 0, void 
             model["seller"] = {};
             model.seller.uuid = user === null || user === void 0 ? void 0 : user._id;
             model.seller.name = user === null || user === void 0 ? void 0 : user.username;
+            model.seller.storeTitle = (_a = user === null || user === void 0 ? void 0 : user.store) === null || _a === void 0 ? void 0 : _a.title;
             model['createdAt'] = new Date(Date.now());
             model["rating"] = [
                 { weight: 5, count: 0 },

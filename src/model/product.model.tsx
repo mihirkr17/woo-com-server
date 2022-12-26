@@ -96,8 +96,21 @@ module.exports.topRatedProducts = async () => {
       const db = await conn.dbConnection();
 
       return await db.collection("products").aggregate([
-         { $unwind: { path: "$variations" } },
-         { $match: { 'variations.status': "active" } },
+         { $addFields: { variations: { $first: "$variations" } } },
+         { $match: { 'variations.status': 'active' } },
+         {
+            $project: {
+               title: 1,
+               slug: 1,
+               variations: 1,
+               brand: 1,
+               packageInfo: 1,
+               rating: 1,
+               ratingAverage: 1,
+               _lId: 1,
+               reviews: 1
+            }
+         },
          { $sort: { ratingAverage: -1 } },
          { $limit: 6 }
       ]).toArray();
@@ -106,3 +119,34 @@ module.exports.topRatedProducts = async () => {
       return error?.message;
    }
 };
+
+// Fetch all products
+module.exports.allProducts = async (limits: any) => {
+   try {
+
+      const db = await conn.dbConnection();
+
+      return await db.collection('products').aggregate([
+         { $addFields: { variations: { $first: "$variations" } } },
+         { $match: { 'variations.status': 'active' } },
+         {
+            $project: {
+               title: 1,
+               slug: 1,
+               variations: 1,
+               brand: 1,
+               packageInfo: 1,
+               rating: 1,
+               ratingAverage: 1,
+               _lId: 1,
+               reviews: 1
+            }
+         },
+         { $sort: { 'variations._vId': -1 } },
+         { $limit: limits }
+      ]).toArray();
+
+   } catch (error: any) {
+      return error?.message;
+   }
+}

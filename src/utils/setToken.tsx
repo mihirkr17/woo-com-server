@@ -1,5 +1,6 @@
 var jwt = require("jsonwebtoken");
 
+
 module.exports = function setToken (userInfo:any) {
 
    const payload = {

@@ -60,6 +60,7 @@ module.exports.setProductIntroController = async (
          model["seller"] = {};
          model.seller.uuid = user?._id;
          model.seller.name = user?.username;
+         model.seller.storeTitle = user?.store?.title;
          model['createdAt'] = new Date(Date.now());
 
          model["rating"] = [

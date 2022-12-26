@@ -1,60 +1,7 @@
-const productUpdateModel = (body: any) => {
-  let stock: String;
-  let available = parseInt(body?.available) || 0;
-
-  if (available && available >= 1) {
-    stock = "in";
-  } else {
-    stock = "out";
-  }
-
-  return {
-    attr: {
-      size: body?.size || [],
-      color: body?.color || [],
-      material: body?.material || []
-    },
-    brand: body?.brand || '',
-    bodyInfo: {
-      description: body?.description || "",
-      metaDescription: body?.metaDescription || "",
-      specification: body?.specification || [],
-    },
-    pricing: {
-      price: parseFloat(body?.price),
-      sellingPrice: parseFloat(body.sellingPrice),
-      discount: parseInt(body?.discount),
-      currency: "BDT"
-    },
-    stockInfo: {
-      stock,
-      available
-    },
-    categories: [body?.category, body?.subCategory, body?.postCategory] || [],
-    packageInfo: {
-      inTheBox: body?.inTheBox || "",
-      dimension: {
-        weight: parseFloat(body?.packageWeight || 0),
-        length: parseFloat(body?.packageLength || 0),
-        width: parseFloat(body?.packageWidth || 0),
-        height: parseFloat(body?.packageHeight || 0),
-      },
-      unit: 'cm'
-    },
-    variations: body?.variations,
-    warranty: {
-      wType: body?.warrantyType,
-      wTime: body?.warrantyTime,
-    },
-    paymentInfo: body?.paymentInfo || [],
-    sku: body?.sku || "",
-    status: body?.status || "",
-    modifiedAt: new Date(Date.now()),
-  };
-};
-
 const productIntroTemplate = (body: any) => {
   return {
+    title: body?.title,
+    slug: body?.slug,
     save_as: 'draft',
     categories: [body?.category, body?.subCategory, body?.postCategory] || [],
     brand: body?.brand,
@@ -94,27 +41,8 @@ const productIntroTemplate = (body: any) => {
   }
 }
 
-const productRatingTemplate = () => {
-  return {
-    rating: [
-      { weight: 5, count: 0 },
-      { weight: 4, count: 0 },
-      { weight: 3, count: 0 },
-      { weight: 2, count: 0 },
-      { weight: 1, count: 0 },
-    ],
-    ratingAverage: 0,
-  }
-}
 
-const productImagesModel = (body: any) => {
-  return {
-    images: body?.images || [],
-  }
-}
-
-
-const variationOneTemplate = (body: any) => {
+const productVariation = (body: any) => {
   let available = parseInt(body?.available);
   let stock;
 
@@ -125,8 +53,6 @@ const variationOneTemplate = (body: any) => {
   }
 
   return {
-    title: body?.title,
-    slug: body?.slug,
     images: body?.images,
     sku: body?.sku,
     pricing: {
@@ -135,6 +61,7 @@ const variationOneTemplate = (body: any) => {
       discount: body?.discount,
       currency: 'BDT'
     },
+    variant: body?.variant || {},
     stock,
     available: parseInt(body?.available),
     status: body?.status,
@@ -142,4 +69,4 @@ const variationOneTemplate = (body: any) => {
   }
 }
 
-module.exports = { productUpdateModel, productIntroTemplate, productImagesModel, variationOneTemplate, productRatingTemplate };
+module.exports = { productIntroTemplate, productVariation };

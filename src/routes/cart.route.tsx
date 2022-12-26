@@ -1,45 +1,33 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
 const { verifyJWT } = require("../middleware/auth");
-const {
-  showMyCartItemsController,
-  updateProductQuantity,
-  deleteCartItem,
-  addToCartHandler,
-  addToBuyHandler,
-  addCartAddress,
-  updateCartAddress,
-  selectCartAddress,
-  deleteCartAddress,
-  checkCartItemExpirationController,
-  updateCartProductQuantityController
-} = require("../controllers/cart/cart.controller");
+const cartGetController = require("../controllers/cart/cartControllerGet");
+const cartPostController = require("../controllers/cart/cartControllerPost");
+const cartPutController = require("../controllers/cart/cartControllerPut");
+const cartDeleteController = require("../controllers/cart/cartControllerDelete");
 
 try {
-  router.get("/show-my-cart-items", verifyJWT, showMyCartItemsController)
-  router.post("/add-to-cart", verifyJWT, addToCartHandler);
-  router.put("/add-buy-product", verifyJWT, addToBuyHandler);
-  router.put(
-    "/update-product-quantity/:cartTypes",
-    verifyJWT,
-    updateProductQuantity
-  );
+  router.get("/show-my-cart-items", verifyJWT, cartGetController.showMyCartItemsController);
 
-  router.put('/update-cart-product-quantity', verifyJWT, updateCartProductQuantityController);
+  router.post("/add-to-cart", verifyJWT, cartPostController.addToCartHandler);
 
-  router.post("/add-cart-address", verifyJWT, addCartAddress);
-  router.put("/update-cart-address", verifyJWT, updateCartAddress);
-  router.put("/select-address", verifyJWT, selectCartAddress);
+  router.put("/add-buy-product", verifyJWT, cartPutController.addToBuyHandler);
+
+
+  router.put('/update-cart-product-quantity', verifyJWT, cartPutController.updateCartProductQuantityController);
+
+  router.post("/add-cart-address", verifyJWT, cartPostController.addCartAddress);
+  router.put("/update-cart-address", verifyJWT, cartPutController.updateCartAddress);
+  router.put("/select-address", verifyJWT, cartPutController.selectCartAddress);
 
   router.delete(
     "/delete-cart-address/:addressId",
     verifyJWT,
-    deleteCartAddress
+    cartDeleteController.deleteCartAddress
   );
 
-  router.delete("/delete-cart-item/:cartTypes", verifyJWT, deleteCartItem);
+  router.delete("/delete-cart-item/:cartTypes", verifyJWT, cartDeleteController.deleteCartItem);
 
-  router.delete("/check-cart-item-expiration/:productId", verifyJWT, checkCartItemExpirationController)
 } catch (error: any) {
   console.log(error?.message);
 }
