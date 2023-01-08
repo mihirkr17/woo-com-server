@@ -4,13 +4,13 @@ const emailValidator = require("../helpers/emailValidator");
 
 module.exports = async function userRegisterMiddleware(req: Request, res: Response, next: any) {
    try {
-      const { username, email, password } = req.body;
+      const { phone, email, password } = req.body;
 
       if (!req.body) {
          return res.status(400).send({ success: false, statusCode: 400, error: "Information not found !!!" });
       }
 
-      if (username.length <= 3 && username.length >= 9) {
+      if (phone.length <= 3 && phone.length >= 9) {
          return res.status(400).send({ success: false, statusCode: 400, error: 'Username length must between 4 to 8 characters !!!' });
       }
 

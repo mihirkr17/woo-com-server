@@ -16,16 +16,6 @@ try {
 
   router.put('/update-cart-product-quantity', verifyJWT, cartPutController.updateCartProductQuantityController);
 
-  router.post("/add-cart-address", verifyJWT, cartPostController.addCartAddress);
-  router.put("/update-cart-address", verifyJWT, cartPutController.updateCartAddress);
-  router.put("/select-address", verifyJWT, cartPutController.selectCartAddress);
-
-  router.delete(
-    "/delete-cart-address/:addressId",
-    verifyJWT,
-    cartDeleteController.deleteCartAddress
-  );
-
   router.delete("/delete-cart-item/:cartTypes", verifyJWT, cartDeleteController.deleteCartItem);
 
 } catch (error: any) {

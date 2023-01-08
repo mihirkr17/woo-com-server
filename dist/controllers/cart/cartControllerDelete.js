@@ -30,6 +30,8 @@ module.exports.deleteCartItem = (req, res) => __awaiter(void 0, void 0, void 0, 
             updateDocuments = yield db.collection('shoppingCarts').deleteOne({ $and: [{ customerEmail: authEmail }, { productId }] });
         }
         if (updateDocuments) {
+            const countCartItems = yield db.collection("shoppingCarts").countDocuments({ customerEmail: authEmail });
+            res.cookie("cart_p", countCartItems, { httpOnly: false, maxAge: 57600000 });
             return res.status(200).send({ success: true, statusCode: 200, message: "Item removed successfully from your cart." });
         }
         return res.status(500).send({ success: false, statusCode: 500, message: "Sorry! failed to remove!!!" });

@@ -6,38 +6,36 @@ const productIntroTemplate = (body) => {
         save_as: 'draft',
         categories: [body === null || body === void 0 ? void 0 : body.category, body === null || body === void 0 ? void 0 : body.subCategory, body === null || body === void 0 ? void 0 : body.postCategory] || [],
         brand: body === null || body === void 0 ? void 0 : body.brand,
-        inventoryDetails: {
-            fulfillmentBy: body === null || body === void 0 ? void 0 : body.fulfillmentBy,
+        shipping: {
+            fulfilledBy: body === null || body === void 0 ? void 0 : body.fulfilledBy,
             procurementType: body === null || body === void 0 ? void 0 : body.procurementType,
-            procurementSLA: body === null || body === void 0 ? void 0 : body.procurementSLA
-        },
-        deliveryDetails: {
-            shippingProvider: body === null || body === void 0 ? void 0 : body.shippingProvider,
-            localDeliveryCharge: parseInt(body === null || body === void 0 ? void 0 : body.localDeliveryCharge),
-            zonalDeliveryCharge: parseInt(body === null || body === void 0 ? void 0 : body.zonalDeliveryCharge),
-            nationalDeliveryCharge: parseInt(body === null || body === void 0 ? void 0 : body.nationalDeliveryCharge)
-        },
-        packageInfo: {
-            dimension: {
-                height: body === null || body === void 0 ? void 0 : body.packageHeight,
-                length: body === null || body === void 0 ? void 0 : body.packageLength,
-                width: body === null || body === void 0 ? void 0 : body.packageWidth
+            procurementSLA: body === null || body === void 0 ? void 0 : body.procurementSLA,
+            provider: body === null || body === void 0 ? void 0 : body.shippingProvider,
+            delivery: {
+                localCharge: parseInt(body === null || body === void 0 ? void 0 : body.localCharge),
+                zonalCharge: parseInt(body === null || body === void 0 ? void 0 : body.zonalCharge),
             },
-            weight: body === null || body === void 0 ? void 0 : body.packageWeight,
-            weightUnit: 'kg',
-            dimensionUnit: 'cm',
-            inTheBox: body === null || body === void 0 ? void 0 : body.inTheBox
+            package: {
+                dimension: {
+                    height: body === null || body === void 0 ? void 0 : body.packageHeight,
+                    length: body === null || body === void 0 ? void 0 : body.packageLength,
+                    width: body === null || body === void 0 ? void 0 : body.packageWidth
+                },
+                weight: body === null || body === void 0 ? void 0 : body.packageWeight,
+                weightUnit: 'kg',
+                dimensionUnit: 'cm',
+                inTheBox: body === null || body === void 0 ? void 0 : body.inTheBox
+            }
         },
-        taxDetails: {
-            hsn: body === null || body === void 0 ? void 0 : body.hsn,
-            taxCode: body === null || body === void 0 ? void 0 : body.taxCode
+        tax: {
+            hsn: body === null || body === void 0 ? void 0 : body.taxHsn,
+            code: body === null || body === void 0 ? void 0 : body.taxCode
         },
         manufacturer: {
-            countryOfOrigin: body === null || body === void 0 ? void 0 : body.countryOfOrigin,
-            manufacturerDetails: body === null || body === void 0 ? void 0 : body.manufacturerDetails,
-            packerDetails: body === null || body === void 0 ? void 0 : body.packerDetails
+            origin: body === null || body === void 0 ? void 0 : body.manufacturerOrigin,
+            details: body === null || body === void 0 ? void 0 : body.manufacturerDetails,
         },
-        paymentInfo: body === null || body === void 0 ? void 0 : body.paymentInfo,
+        paymentInfo: body === null || body === void 0 ? void 0 : body.paymentInformation,
         warranty: body === null || body === void 0 ? void 0 : body.warranty
     };
 };
@@ -62,8 +60,7 @@ const productVariation = (body) => {
         variant: (body === null || body === void 0 ? void 0 : body.variant) || {},
         stock,
         available: parseInt(body === null || body === void 0 ? void 0 : body.available),
-        status: body === null || body === void 0 ? void 0 : body.status,
-        modifiedAt: new Date(Date.now())
+        status: body === null || body === void 0 ? void 0 : body.status
     };
 };
 module.exports = { productIntroTemplate, productVariation };

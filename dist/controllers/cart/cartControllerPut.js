@@ -19,7 +19,7 @@ const checkProductAvailability = (productId, variationId) => __awaiter(void 0, v
         {
             $match: {
                 $and: [
-                    { 'variations.vId': variationId },
+                    { 'variations._vId': variationId },
                     { 'variations.available': { $gte: 1 } },
                     { 'variations.stock': 'in' }
                 ]
@@ -74,14 +74,11 @@ module.exports.updateCartProductQuantityController = (req, res) => __awaiter(voi
         if (parseInt(quantity) >= ((_a = availableProduct === null || availableProduct === void 0 ? void 0 : availableProduct.variations) === null || _a === void 0 ? void 0 : _a.available)) {
             return res.status(400).send({ success: false, statusCode: 400, error: "Sorry ! your selected quantity out of range." });
         }
-        // let price = parseFloat(cartProduct?.price) || 0;
-        // let amount = (price * quantity);
         const result = yield db.collection('shoppingCarts').updateOne({
             $and: [{ customerEmail: authEmail }, { productId }, { _id: ObjectId(cartId) }]
         }, {
             $set: {
                 quantity,
-                // totalAmount: amount
             }
         }, {
             upsert: true,
@@ -121,43 +118,5 @@ module.exports.updateCartAddress = (req, res) => __awaiter(void 0, void 0, void 
     }
     catch (error) {
         res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
-    }
-});
-module.exports.selectCartAddress = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const db = yield dbConnection();
-        const userEmail = req.decoded.email;
-        const { addressId, select_address } = req.body;
-        const user = yield db.collection("users").findOne({ email: userEmail });
-        if (!user) {
-            return res.status(404).send({ success: false, statusCode: 404, error: 'User not found !!!' });
-        }
-        const shippingAddress = (user === null || user === void 0 ? void 0 : user.shippingAddress) || [];
-        if (shippingAddress && shippingAddress.length > 0) {
-            yield db.collection("users").updateOne({ email: userEmail }, {
-                $set: {
-                    "shippingAddress.$[j].select_address": false,
-                },
-            }, {
-                arrayFilters: [{ "j.addressId": { $ne: addressId } }],
-                multi: true,
-            });
-            const result = yield db.collection("users").updateOne({ email: userEmail }, {
-                $set: {
-                    "shippingAddress.$[i].select_address": select_address,
-                },
-            }, { arrayFilters: [{ "i.addressId": addressId }] });
-            if (!result) {
-                return res.status(400).send({
-                    success: false,
-                    statusCode: 400,
-                    error: "Failed to select the address",
-                });
-            }
-            return res.status(200).send({ success: true, statusCode: 200, message: "Shipping address Saved." });
-        }
-    }
-    catch (error) {
-        res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
     }
 });

@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
-const setToken = require("../../utils/setToken");
-const User = require("../../model/user.model");
-const { comparePassword } = require("../../utils/comparePassword");
-const generateVerifyToken = require("../../utils/generateVerifyToken");
+const setToken = require("../../../utils/setToken");
+const User = require("../../../model/user.model");
+const { comparePassword } = require("../../../utils/comparePassword");
+const generateVerifyToken = require("../../../utils/generateVerifyToken");
 
 
 /**
@@ -13,7 +13,7 @@ const generateVerifyToken = require("../../utils/generateVerifyToken");
 module.exports.userLoginController = async (req: Request, res: Response) => {
    try {
       const verify_token = req.headers.authorization?.split(' ')[1] || undefined;
-      const { username, password, authProvider } = req.body;
+      const { email, password, authProvider } = req.body;
       let token: String;
       let userData;
       let provider: String;
@@ -33,8 +33,9 @@ module.exports.userLoginController = async (req: Request, res: Response) => {
 
       const existUser = await User.findOne({
          $and: [
-            { $or: [{ username }, { email: username }] },
-            { authProvider: provider }
+            { email },
+            { authProvider: provider },
+            { accountStatus: 'active' }
          ]
       });
 
@@ -42,7 +43,9 @@ module.exports.userLoginController = async (req: Request, res: Response) => {
       if (authProvider === 'thirdParty') {
 
          if (!existUser || typeof existUser === 'undefined') {
-            const user = new User({ email: username, username, authProvider, accountStatus: 'active' });
+            const UUID = Math.random().toString(36).toUpperCase().slice(2, 18);
+
+            const user = new User({ _UUID: UUID, email, authProvider, accountStatus: 'active' });
             userData = await user.save();
 
          } else {
@@ -78,7 +81,7 @@ module.exports.userLoginController = async (req: Request, res: Response) => {
                return res.status(400).send({ success: false, statusCode: 400, error: 'Required valid token !!!' });
             }
 
-            await User.updateOne({ $or: [{ username }, { email: username }] }, { $unset: { verifyToken: 1 }, $set: { accountStatus: 'active' } });
+            await User.updateOne({ email }, { $unset: { verifyToken: 1 }, $set: { accountStatus: 'active' } });
             res.clearCookie('verifyToken');
          }
 
@@ -106,13 +109,15 @@ module.exports.userRegisterController = async (req: Request, res: Response, next
 
       let body = req.body;
 
-      let existUser = await User.findOne({ $or: [{ username: body?.username }, { email: body.email }] });
+      let existUser = await User.findOne({ $or: [{ phone: body?.phone }, { email: body.email }] });
 
       if (existUser) {
          return res.status(400).send({ success: false, statusCode: 400, error: "User already exists ! Please try another username or email address." });
       }
 
+      body['_UUID'] = Math.random().toString(36).toUpperCase().slice(2, 18);
       body['verifyToken'] = generateVerifyToken();
+      body['idFor'] = 'buy';
 
       let user = new User(body);
 
@@ -189,5 +194,43 @@ module.exports.signOutUser = async (req: Request, res: Response) => {
       res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
    } catch (error: any) {
       res.status(500).send({ success: false, statusCode: 500, error: error?.message });
+   }
+};
+
+
+module.exports.sellerRegisterController = async (req: Request, res: Response, next: any) => {
+   try {
+
+      let body = req.body;
+
+      let existUser = await User.findOne({ email: body.email });
+
+      if (existUser) {
+         return res.status(400).send({ success: false, statusCode: 400, error: "User already exists ! Please try another username or email address." });
+      }
+
+      body['_UUID'] = Math.random().toString(36).toUpperCase().slice(2, 18);
+      body['authProvider'] = 'system';
+      body['isSeller'] = 'pending';
+      body['idFor'] = 'sell';
+
+      let user = new User(body);
+
+      const result = await user.save();
+
+      if (!result) {
+         return res.status(500).send({ success: false, statusCode: 500, error: "Internal error!" });
+      }
+
+      res.cookie("verifyToken", result?.verifyToken, { maxAge: 3600000, httpOnly: false });
+
+      return res.status(200).send({
+         success: true,
+         statusCode: 200,
+         message: "Registration success. Please verify your account.",
+         data: { username: result?.username, verifyToken: result?.verifyToken, email: result?.email }
+      });
+   } catch (error: any) {
+      return res.status(500).send({ success: false, statusCode: 500, error: error.message });
    }
 };

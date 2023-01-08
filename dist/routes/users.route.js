@@ -5,9 +5,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const router = express_1.default.Router();
-const userGetController = require("../controllers/users/usersControllerGet");
-const userPostController = require("../controllers/users/usersControllerPost");
-const userPutController = require("../controllers/users/usersControllerPut");
+const userGetController = require("../controllers/auth/users/usersControllerGet");
+const userPostController = require("../controllers/auth/users/usersControllerPost");
+const userPutController = require("../controllers/auth/users/usersControllerPut");
+const shippingAddressController = require("../controllers/shippingAddressController");
 // Middleware
 const userRegisterMiddleware = require("../middleware/userRegisterMiddleware");
 const { verifyJWT, checkingOwnerOrAdmin, verifyAuthUserByJWT } = require("../middleware/auth");
@@ -34,13 +35,19 @@ try {
     router.post("/register-user", userRegisterMiddleware, userPostController.userRegisterController);
     router.post("/verify-register-user", userPostController.userRegisterVerify);
     router.post("/sign-out", userPostController.signOutUser);
-    router.put("/update-profile-data/:email", verifyJWT, userPutController.updateProfileData);
+    router.put("/update-profile-data", verifyJWT, userPutController.updateProfileData);
     router.put("/make-admin/:userId", verifyJWT, checkingOwnerOrAdmin, userPutController.makeAdmin);
     router.put("/demote-to-user/:userId", verifyJWT, checkingOwnerOrAdmin, userPutController.demoteToUser);
     router.get("/manage-user", userGetController.manageUsers);
     router.put("/make-seller-request", verifyJWT, userPutController.makeSellerRequest);
     router.put("/permit-seller-request", verifyJWT, checkingOwnerOrAdmin, userPutController.permitSellerRequest);
     router.get("/check-seller-request", userGetController.checkSellerRequest);
+    // Shipping address route
+    router.post("/shipping-address", verifyJWT, shippingAddressController.createShippingAddress);
+    router.put("/shipping-address", verifyJWT, shippingAddressController.updateShippingAddress);
+    router.post("/shipping-address-select", verifyJWT, shippingAddressController.selectShippingAddress);
+    router.delete("/shipping-address-delete/:_SA_UID", verifyJWT, shippingAddressController.deleteShippingAddress);
+    router.post("/register-new-seller", userPostController.sellerRegisterController);
 }
 catch (error) {
     console.log(error === null || error === void 0 ? void 0 : error.message);

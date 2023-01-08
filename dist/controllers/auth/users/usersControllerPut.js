@@ -9,31 +9,33 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
-const User = require("../../model/user.model");
+const User = require("../../../model/user.model");
 module.exports.updateProfileData = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const email = req.decoded.email;
+        const clientEmail = req.headers.authorization || "";
+        if (clientEmail !== email) {
+            return res.status(403).send({ success: false, statusCode: 403, error: "Forbidden!" });
+        }
         const result = yield User.updateOne({ email: email }, { $set: req.body }, { new: true });
-        result && res.status(200).send({ success: true, statusCode: 200, message: "Profile updated." });
+        if ((result === null || result === void 0 ? void 0 : result.matchedCount) === 1) {
+            return res.status(200).send({ success: true, statusCode: 200, message: "Profile updated." });
+        }
     }
     catch (error) {
-        res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+        return res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
     }
 });
 module.exports.makeAdmin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const db = yield dbConnection();
         const userId = req.params.userId;
         if (!ObjectId.isValid(userId)) {
             return res
                 .status(400)
                 .send({ success: false, error: "User ID not valid" });
         }
-        const result = yield db
-            .collection("users")
-            .updateOne({ _id: ObjectId(userId) }, { $set: { role: 'ADMIN' } }, { upsert: true });
+        const result = yield User.updateOne({ _id: ObjectId(userId) }, { $set: { role: "ADMIN" } }, { new: true });
         return result
             ? res.status(200).send({ success: true, message: "Permission granted" })
             : res.status(500).send({ success: false, error: "Failed" });
@@ -44,16 +46,13 @@ module.exports.makeAdmin = (req, res) => __awaiter(void 0, void 0, void 0, funct
 });
 module.exports.demoteToUser = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const db = yield dbConnection();
         const userId = req.params.userId;
         if (!ObjectId.isValid(userId)) {
             return res.status(400).send({ error: "User Id is not valid" });
         }
         res
             .status(200)
-            .send(yield db
-            .collection("users")
-            .updateOne({ _id: ObjectId(userId) }, { $set: { role: 'BUYER' } }, { upsert: true }));
+            .send(yield User.updateOne({ _id: ObjectId(userId) }, { $set: { role: "BUYER" } }, { new: true }));
     }
     catch (error) {
         next(error);
@@ -122,17 +121,20 @@ module.exports.makeSellerRequest = (req, res) => __awaiter(void 0, void 0, void 
 });
 // Permit the seller request
 module.exports.permitSellerRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+    var _a, _b, _c;
     try {
         const userId = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(',')[0];
-        const userEmail = (_b = req.headers.authorization) === null || _b === void 0 ? void 0 : _b.split(',')[1];
-        const user = yield User.findOne({ $and: [{ email: userEmail }, { _id: userId }, { isSeller: 'pending' }] });
+        const UUID = (_b = req.headers.authorization) === null || _b === void 0 ? void 0 : _b.split(',')[1];
+        const userEmail = (_c = req.headers.authorization) === null || _c === void 0 ? void 0 : _c.split(',')[2];
+        const user = yield User.findOne({ $and: [{ email: userEmail }, { _id: userId }, { _UUID: UUID }, { isSeller: 'pending' }] });
+        // console.log(user);
         if (!user) {
             return res.status(400).send({ success: false, statusCode: 400, error: 'Sorry! request user not found.' });
         }
-        let result = yield User.updateOne({ email: userEmail }, {
-            $set: { role: 'SELLER', isSeller: 'fulfilled', becomeSellerAt: new Date() },
-            $unset: { shoppingCartItems: 1, shippingAddress: 1 }
+        let result = yield User.updateOne({
+            $and: [{ email: userEmail }, { _UUID: UUID }, { isSeller: 'pending' }]
+        }, {
+            $set: { isSeller: 'fulfilled', accountStatus: 'active', becomeSellerAt: new Date() }
         }, { new: true });
         (result === null || result === void 0 ? void 0 : result.acknowledged)
             ? res.status(200).send({ success: true, statusCode: 200, message: "Request Success" })

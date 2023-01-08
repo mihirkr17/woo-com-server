@@ -11,7 +11,7 @@ const checkProductAvailability = async (productId: string, variationId: String) 
       {
          $match: {
             $and: [
-               { 'variations.vId': variationId },
+               { 'variations._vId': variationId },
                { 'variations.available': { $gte: 1 } },
                { 'variations.stock': 'in' }]
          }
@@ -87,11 +87,6 @@ module.exports.updateCartProductQuantityController = async (req: Request, res: R
          return res.status(400).send({ success: false, statusCode: 400, error: "Sorry ! your selected quantity out of range." });
       }
 
-
-      // let price = parseFloat(cartProduct?.price) || 0;
-
-      // let amount = (price * quantity);
-
       const result = await db.collection('shoppingCarts').updateOne(
          {
             $and: [{ customerEmail: authEmail }, { productId }, { _id: ObjectId(cartId) }]
@@ -99,7 +94,6 @@ module.exports.updateCartProductQuantityController = async (req: Request, res: R
          {
             $set: {
                quantity,
-               // totalAmount: amount
             }
          },
          {
@@ -150,60 +144,5 @@ module.exports.updateCartAddress = async (req: Request, res: Response) => {
       }
    } catch (error: any) {
       res.status(500).send({ message: error?.message });
-   }
-};
-
-
-module.exports.selectCartAddress = async (req: Request, res: Response) => {
-   try {
-      const db = await dbConnection();
-      const userEmail = req.decoded.email;
-      const { addressId, select_address } = req.body;
-
-      const user = await db.collection("users").findOne({ email: userEmail });
-
-      if (!user) {
-         return res.status(404).send({ success: false, statusCode: 404, error: 'User not found !!!' });
-      }
-
-      const shippingAddress = user?.shippingAddress || [];
-
-      if (shippingAddress && shippingAddress.length > 0) {
-
-         await db.collection("users").updateOne(
-            { email: userEmail },
-            {
-               $set: {
-                  "shippingAddress.$[j].select_address": false,
-               },
-            },
-            {
-               arrayFilters: [{ "j.addressId": { $ne: addressId } }],
-               multi: true,
-            }
-         );
-
-         const result = await db.collection("users").updateOne(
-            { email: userEmail },
-            {
-               $set: {
-                  "shippingAddress.$[i].select_address": select_address,
-               },
-            },
-            { arrayFilters: [{ "i.addressId": addressId }] }
-         );
-
-         if (!result) {
-            return res.status(400).send({
-               success: false,
-               statusCode: 400,
-               error: "Failed to select the address",
-            });
-         }
-
-         return res.status(200).send({ success: true, statusCode: 200, message: "Shipping address Saved." });
-      }
-   } catch (error: any) {
-      res.status(500).send({ success: false, statusCode: 500, error: error?.message });
    }
 };

@@ -1,20 +1,26 @@
 import { Request, Response } from "express";
-const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
-const User = require("../../model/user.model");
+const User = require("../../../model/user.model");
 
 
 
 module.exports.updateProfileData = async (req: Request, res: Response) => {
    try {
-      const db = await dbConnection();
       const email: string = req.decoded.email;
-      const result = await db
-         .collection("users")
-         .updateOne({ email: email }, { $set: req.body }, { upsert: true });
-      res.status(200).send(result);
+      const clientEmail = req.headers.authorization || "";
+
+      if (clientEmail !== email) {
+         return res.status(403).send({ success: false, statusCode: 403, error: "Forbidden!" });
+      }
+
+      const result = await User.updateOne({ email: email }, { $set: req.body }, { new: true });
+
+      if (result?.matchedCount === 1) {
+         return res.status(200).send({ success: true, statusCode: 200, message: "Profile updated." });
+      }
+
    } catch (error: any) {
-      res.status(500).send({ error: error?.message });
+      return res.status(500).send({ success: false, statusCode: 500, error: error?.message });
    }
 };
 
@@ -22,7 +28,6 @@ module.exports.updateProfileData = async (req: Request, res: Response) => {
 
 module.exports.makeAdmin = async (req: Request, res: Response) => {
    try {
-      const db = await dbConnection();
 
       const userId: string = req.params.userId;
 
@@ -32,13 +37,11 @@ module.exports.makeAdmin = async (req: Request, res: Response) => {
             .send({ success: false, error: "User ID not valid" });
       }
 
-      const result = await db
-         .collection("users")
-         .updateOne(
-            { _id: ObjectId(userId) },
-            { $set: { role: "admin" } },
-            { upsert: true }
-         );
+      const result = await User.updateOne(
+         { _id: ObjectId(userId) },
+         { $set: { role: "ADMIN" } },
+         { new: true }
+      );
 
       return result
          ? res.status(200).send({ success: true, message: "Permission granted" })
@@ -55,7 +58,6 @@ module.exports.demoteToUser = async (
    next: any
 ) => {
    try {
-      const db = await dbConnection();
 
       const userId: string = req.params.userId;
 
@@ -66,13 +68,11 @@ module.exports.demoteToUser = async (
       res
          .status(200)
          .send(
-            await db
-               .collection("users")
-               .updateOne(
-                  { _id: ObjectId(userId) },
-                  { $set: { role: "user" } },
-                  { upsert: true }
-               )
+            await User.updateOne(
+               { _id: ObjectId(userId) },
+               { $set: { role: "BUYER" } },
+               { new: true }
+            )
          );
    } catch (error: any) {
       next(error);
@@ -89,7 +89,7 @@ module.exports.makeSellerRequest = async (req: Request, res: Response) => {
       const authEmail = req.decoded.email;
       const authRole = req.decoded.role;
 
-      let user = await User.findOne({ $and: [{ email: authEmail }, { role: 'user' }] });
+      let user = await User.findOne({ $and: [{ email: authEmail }, { role: 'BUYER' }] });
 
       if (!user) {
          return res.status(404).send({ success: false, statusCode: 404, error: 'User not found' });
@@ -165,19 +165,24 @@ module.exports.makeSellerRequest = async (req: Request, res: Response) => {
 module.exports.permitSellerRequest = async (req: Request, res: Response) => {
    try {
       const userId = req.headers.authorization?.split(',')[0];
-      const userEmail = req.headers.authorization?.split(',')[1];
+      const UUID = req.headers.authorization?.split(',')[1];
+      const userEmail = req.headers.authorization?.split(',')[2];
 
-      const user = await User.findOne({ $and: [{ email: userEmail }, { _id: userId }, { isSeller: 'pending' }] });
+      const user = await User.findOne({ $and: [{ email: userEmail }, { _id: userId }, { _UUID: UUID }, { isSeller: 'pending' }] });
+
+      // console.log(user);
 
       if (!user) {
          return res.status(400).send({ success: false, statusCode: 400, error: 'Sorry! request user not found.' });
       }
 
       let result = await User.updateOne(
-         { email: userEmail },
          {
-            $set: { role: "seller", isSeller: 'fulfilled', becomeSellerAt: new Date() },
-            $unset: { shoppingCartItems: 1, shippingAddress: 1 }
+            $and: [{ email: userEmail }, { _UUID: UUID }, { isSeller: 'pending' }]
+         }
+         ,
+         {
+            $set: { isSeller: 'fulfilled', accountStatus: 'active', becomeSellerAt: new Date() }
          },
          { new: true }
       );

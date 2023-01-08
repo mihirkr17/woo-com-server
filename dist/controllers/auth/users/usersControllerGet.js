@@ -9,8 +9,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const User = require("../../model/user.model");
-const { dbConnection } = require("../../utils/db");
+const User = require("../../../model/user.model");
+const { dbConnection } = require("../../../utils/db");
 /**
  * controller --> fetch authenticate user information
  * request method --> GET

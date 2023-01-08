@@ -3,104 +3,138 @@ const bcrypt = require("bcrypt");
 const validator = require("validator");
 const saltRounds = 10;
 
+const buyerType = new Schema({
+  taxId: { type: String },
+  shippingAddress: [
+    {
+      _id: false,
+      _SA_UID: { type: Number },
+      name: { type: String, default: "" },
+      division: { type: String, default: "" },
+      city: { type: String, default: "" },
+      area: { type: String, default: "" },
+      area_type: { type: String, default: "" },
+      landmark: { type: String, default: "" },
+      phone_number: { type: Number, default: 0 },
+      postal_code: { type: Number, default: 0 },
+      default_shipping_address: { type: Boolean }
+    }
+  ],
+}, { _id: false });
+
+const sellerType = new Schema({
+  taxId: { type: String },
+  address: {
+    country: { type: String },
+    division: { type: String },
+    city: { type: String },
+    area: { type: String },
+    landmark: { type: String, default: "" },
+    postal_code: { type: String }
+  },
+  storeInfos: {
+    storeName: { type: String },
+    storeLicense: { type: String },
+    numOfProducts: { type: Number }
+  }
+
+}, { _id: false });
+
 // Interface of user
 interface IUser {
+  UUID: String;
+  fullName: String;
+  phone: String;
+  phonePrefixCode: String;
   email: String;
-  username?: String;
+  contactEmail: String;
   password: String;
+  hasPassword: Boolean;
   role: String;
-  shippingAddress?: any[];
-  businessInfo?: any;
-  sellerInfo?: any;
-  inventoryInfo?: any;
+  gender: String;
+  dob: String;
   isSeller?: String;
+  idFor: String;
   accountStatus: String;
   authProvider: String;
-  shoppingCartItems?: Number,
   verifyToken: String;
   createdAt: Date;
   becomeSellerAt?: Date;
+  seller: any;
+  buyer: any;
 }
-
-const BusinessInfoSchema = new Schema({
-  sellCategory: [String],
-  taxID: String,
-  stateTaxID: String,
-  creditCard: String,
-}, { _id: false });
-
-const SellerInfoSchema = new Schema({
-  dateOfBirth: String,
-  phone: Number,
-  address: {
-    street: String,
-    thana: String,
-    district: String,
-    state: String,
-    country: String,
-    pinCode: Number
-  }
-}, { _id: false });
-
-const InventoryInfoSchema = new Schema({
-  earn: Number,
-  totalSell: Number,
-  totalProducts: Number,
-}, { _id: false });
 
 // user schema design
 var UserSchema = new Schema<IUser>({
+  UUID: { type: String },
+  fullName: { type: String, default: null },
+
   email: {
     type: String,
     required: [true, "Email address required !!!"],
     unique: true,
     validate: [validator.isEmail, "Provide a valid email address !!!"],
   },
-  username: { type: String, required: true, unique: true },
+
+  phone: { type: String },
+  phonePrefixCode: { type: String, enum: ["880"], default: "880" },
+
+  contactEmail: { type: String },
+
   password: {
     type: String,
     minLength: [5, "Password must be greater than or equal to 5 characters !!!",],
   },
-  role: {
-    type: String,
-    enum: ["user", "seller", "admin", "owner"],
-    default: "user",
+
+  hasPassword: {
+    type: Boolean,
+    default: false
   },
 
-  shippingAddress: [
-    {
-      addressId: {type: Number},
-      name: { type: String, default: "" },
-      district: { type: String, default: "" },
-      street: { type: String, default: "" },
-      state: { type: String, default: "" },
-      country: { type: String, default: "" },
-      phoneNumber: { type: Number, default: 0 },
-      altPhoneNumber: { type: Number, default: 0 },
-      pinCode: { type: Number, default: 0 },
-    }
-  ],
+  role: {
+    type: String,
+    enum: ["BUYER", "SELLER", "ADMIN", "OWNER"],
+    default: "BUYER",
+  },
 
-  businessInfo: { type: BusinessInfoSchema, default: undefined },
+  gender: {
+    type: String, default: null
+  },
 
-  sellerInfo: { type: SellerInfoSchema, default: undefined },
+  dob: { type: String, default: "" },
 
-  inventoryInfo: { type: InventoryInfoSchema, default: undefined },
+  seller: { type: sellerType, default: undefined },
+
+  buyer: { type: buyerType, default: undefined },
 
   isSeller: { type: String, enum: ['pending', 'fulfilled'], default: undefined },
 
+  idFor: { type: String, enum: ['sell', 'buy'], default: undefined },
+
   accountStatus: { type: String, enum: ["active", "inactive", "blocked"], default: "inactive", },
+
   authProvider: { type: String, enum: ['system', 'thirdParty'], default: 'system' },
-  shoppingCartItems: {type: Number, default: undefined},
-  verifyToken: String,
+
+  verifyToken: { type: String, default: undefined },
+
   createdAt: { type: Date, default: Date.now },
+
   becomeSellerAt: { type: Date, default: undefined }
 });
 
 // user password hashing before save into database
 UserSchema.pre("save", async function (next: any) {
   let password = this.password;
-  let authProvider = this.authProvider
+  let authProvider = this.authProvider;
+  let emailAddr = this.email;
+
+  if (this.idFor === 'sell') {
+    this.role = 'SELLER'
+  }
+
+  if (this.idFor === 'buy') {
+    this.role = 'BUYER'
+  }
 
   if (authProvider === 'thirdParty') {
     next();
@@ -109,7 +143,9 @@ UserSchema.pre("save", async function (next: any) {
   // hashing password throw bcrypt
   let hashedPwd = await bcrypt.hash(password, saltRounds);
 
+  this.contactEmail = emailAddr;
   this.password = hashedPwd;
+  this.hasPassword = true;
 
   next();
 });

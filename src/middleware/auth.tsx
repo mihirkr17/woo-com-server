@@ -75,7 +75,7 @@ const checkingOwnerOrAdmin = async (req: Request, res: Response, next: any) => {
     email: authEmail && authEmail,
   });
 
-  if (findAuthInDB.role === "owner" || findAuthInDB.role === "admin") {
+  if (findAuthInDB.role === "OWNER" || findAuthInDB.role === "ADMIN") {
     next();
   }
 
@@ -95,7 +95,7 @@ const checkingSeller = async (req: Request, res: Response, next: any) => {
 
   const authEmail = req.decoded.email;
 
-  const user = await db.collection('users').findOne({ $and: [{ email: authEmail }, { role: 'seller' }] });
+  const user = await db.collection('users').findOne({ $and: [{ email: authEmail }, { role: 'SELLER' }] });
 
   if (!user) {
     return res.status(503).send({
@@ -120,7 +120,7 @@ const checkingUser = async (req: Request, res: Response, next: any) => {
     email: authEmail && authEmail,
   });
 
-  if (findAuthInDB.role !== "user") {
+  if (findAuthInDB.role !== "BUYER") {
     return res.status(400).send({
       success: false,
       statusCode: 400,
@@ -141,11 +141,11 @@ const isAdmin = async (req: Request, res: Response, next: any) => {
     const authEmail: String = req.decoded.email;
     const authRole: String = req.decoded.role;
 
-    if (authRole !== 'admin') {
+    if (authRole !== 'ADMIN') {
       return res.status(503).send({ success: false, statusCode: 503, error: "Service is unavailable !" });
     }
 
-    const findAdmin = await db.collection('users').findOne({ $and: [{ email: authEmail }, { role: 'admin' }] });
+    const findAdmin = await db.collection('users').findOne({ $and: [{ email: authEmail }, { role: 'ADMIN' }] });
 
     if (!findAdmin) {
       return res.status(503).send({ success: false, statusCode: 503, error: "Service is unavailable !" });

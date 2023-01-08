@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-const User = require("../../model/user.model");
-const { dbConnection } = require("../../utils/db");
+const User = require("../../../model/user.model");
+const { dbConnection } = require("../../../utils/db");
 
 /**
  * controller --> fetch authenticate user information
@@ -15,19 +15,20 @@ module.exports.fetchAuthUser = async (
    try {
       const authEmail = req.decoded.email;
       const role = req.decoded.role;
-      let result: any;
 
-      const db = await dbConnection();
-
-      result = await User.findOne({ $and: [{ email: authEmail }, { role: role }, { accountStatus: 'active' }] });
+      const result = await User.findOne(
+         {
+            $and: [{ email: authEmail }, { role: role }, { accountStatus: 'active' }]
+         },
+         {
+            password: 0, createdAt: 0
+         }
+      );
+      
 
       if (!result || typeof result !== "object") {
          return res.status(404).send({ success: false, statusCode: 404, error: "User not found!" });
       }
-
-      result.password = undefined;
-      result.authProvider = undefined;
-      result.createdAt = undefined;
 
       return res.status(200).send({ success: true, statusCode: 200, message: 'Welcome ' + result?.username, data: result });
 
@@ -35,10 +36,6 @@ module.exports.fetchAuthUser = async (
       next(error);
    }
 };
-
-
-
-
 
 
 module.exports.manageUsers = async (req: Request, res: Response, next: any) => {

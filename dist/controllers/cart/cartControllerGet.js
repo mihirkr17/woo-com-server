@@ -35,25 +35,43 @@ module.exports.showMyCartItemsController = (req, res) => __awaiter(void 0, void 
                 $match: {
                     $expr: {
                         $and: [
-                            { $eq: ['$variations.vId', '$variationId'] }
+                            { $eq: ['$variations._vId', '$variationId'] },
+                            { $eq: ["$variations.stock", "in"] },
+                            { $eq: ["$save_as", "fulfilled"] }
                         ]
                     }
                 }
             },
             {
                 $project: {
+                    title: 1,
+                    slug: 1,
                     listingId: 1,
                     productId: 1, variationId: 1, variations: 1, brand: 1,
                     quantity: 1,
                     totalAmount: { $multiply: ['$variations.pricing.sellingPrice', '$quantity'] },
                     seller: 1,
-                    shippingCharge: "$deliveryDetails.zonalDeliveryCharge",
+                    shippingCharge: "$shipping.delivery.zonalCharge",
                     paymentInfo: 1
                 }
             }
         ]).toArray();
-        if (cartItems) {
-            return res.status(200).send({ success: true, statusCode: 200, data: { items: cartItems.length, products: result, result: result } });
+        if (Array.isArray(result) && typeof result === "object") {
+            const totalAmounts = result && result.map((tAmount) => (parseFloat(tAmount === null || tAmount === void 0 ? void 0 : tAmount.totalAmount))).reduce((p, c) => p + c, 0).toFixed(2);
+            const totalQuantities = result && result.map((tQuant) => (parseFloat(tQuant === null || tQuant === void 0 ? void 0 : tQuant.quantity))).reduce((p, c) => p + c, 0).toFixed(0);
+            const shippingFees = result && result.map((p) => parseFloat(p === null || p === void 0 ? void 0 : p.shippingCharge)).reduce((p, c) => p + c, 0).toFixed(2);
+            const finalAmounts = result && result.map((fAmount) => (parseFloat(fAmount === null || fAmount === void 0 ? void 0 : fAmount.totalAmount) + (fAmount === null || fAmount === void 0 ? void 0 : fAmount.shippingCharge))).reduce((p, c) => p + c, 0).toFixed(2);
+            const data = {
+                products: result,
+                container_p: {
+                    totalAmounts,
+                    totalQuantities,
+                    finalAmounts,
+                    shippingFees,
+                },
+                numberOfProducts: result.length || 0
+            };
+            return res.status(200).send({ success: true, statusCode: 200, data });
         }
     }
     catch (error) {

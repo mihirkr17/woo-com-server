@@ -27,8 +27,17 @@ module.exports.fetchSingleProductController = (req, res) => __awaiter(void 0, vo
         const variationId = req.query.vId;
         let inCart = false;
         let inWishlist = false;
-        let colors = req.query.colors;
-        let size = req.query.size;
+        let existProductInCart = null;
+        let existProductInWishlist;
+        // If user email address exists
+        if (email) {
+            existProductInCart = yield db
+                .collection("shoppingCarts")
+                .findOne({ $and: [{ customerEmail: email }, { variationId: variationId }] });
+            existProductInWishlist = yield db
+                .collection("users")
+                .findOne({ $and: [{ email }, { "wishlist.slug": product_slug }] });
+        }
         // Product Details
         let productDetail = yield db.collection('products').aggregate([
             { $match: { _id: ObjectId(productId) } },
@@ -36,11 +45,26 @@ module.exports.fetchSingleProductController = (req, res) => __awaiter(void 0, vo
                 $project: {
                     title: 1,
                     slug: 1,
-                    variations: '$variations', swatch: "$variations",
+                    variations: 1,
+                    swatch: {
+                        $map: {
+                            input: "$variations",
+                            as: "variation",
+                            in: { variant: "$$variation.variant", _vId: "$$variation._vId" }
+                        }
+                    },
+                    fulfilledBy: "$shipping.fulfilledBy",
+                    deliveryCharge: "$shipping.delivery",
+                    deliveryDetails: 1,
                     specification: '$specification',
                     brand: 1, categories: 1,
                     seller: 1, rating: 1, ratingAverage: 1, save_as: 1, createdAt: 1, bodyInfo: 1, manufacturer: 1,
-                    _lId: 1
+                    _lId: 1,
+                    inCart: {
+                        $cond: {
+                            if: { $eq: [existProductInCart, null] }, then: false, else: true
+                        }
+                    }
                 }
             },
             { $unwind: { path: '$variations' } },
@@ -77,23 +101,6 @@ module.exports.fetchSingleProductController = (req, res) => __awaiter(void 0, vo
             },
             { $limit: 5 },
         ]).toArray();
-        // If user email address exists
-        if (email) {
-            const existProductInCart = yield db
-                .collection("shoppingCarts")
-                .findOne({ $and: [{ customerEmail: email }, { _vId: variationId }] });
-            const existProductInWishlist = yield db
-                .collection("users")
-                .findOne({ $and: [{ email }, { "wishlist.slug": product_slug }] });
-            if (existProductInWishlist) {
-                inWishlist = true;
-            }
-            if (existProductInCart && typeof existProductInCart === "object") {
-                inCart = true;
-            }
-            productDetail["inCart"] = inCart;
-            productDetail["inWishlist"] = inWishlist;
-        }
         return res.status(200).send({
             success: true,
             statusCode: 200,
@@ -168,7 +175,7 @@ module.exports.fetchSingleProductByPidController = (req, res) => __awaiter(void 
         const db = yield dbConnection();
         const productId = req.query.pid;
         const variationId = req.query.vId;
-        const seller = req.query.seller;
+        const storeName = req.query.storeName;
         let product;
         if (variationId) {
             product = yield db.collection('products').aggregate([
@@ -186,7 +193,7 @@ module.exports.fetchSingleProductByPidController = (req, res) => __awaiter(void 
         }
         else {
             product = yield db.collection("products").findOne({
-                $and: [{ _id: ObjectId(productId) }, { "seller.name": seller }],
+                $and: [{ _id: ObjectId(productId) }, { "sellerData.storeName": storeName }],
             });
         }
         return product
@@ -294,12 +301,12 @@ module.exports.dashboardOverviewController = (req, res) => __awaiter(void 0, voi
         let topSoldProducts;
         let matches;
         const user = yield db.collection("users").findOne({ $and: [{ email: authEmail }, { role }] });
-        if ((user === null || user === void 0 ? void 0 : user.role) === 'seller') {
+        if ((user === null || user === void 0 ? void 0 : user.role) === 'SELLER') {
             matches = { $match: { $and: [{ 'seller.name': user === null || user === void 0 ? void 0 : user.username }, { 'stockInfo.sold': { $exists: true } }] } };
         }
-        if ((user === null || user === void 0 ? void 0 : user.role) === "admin") {
+        if ((user === null || user === void 0 ? void 0 : user.role) === 'ADMIN') {
             topSellers = yield db.collection('users').aggregate([
-                { $match: { role: "seller" } },
+                { $match: { role: 'SELLER' } },
                 {
                     $project: {
                         totalSell: '$inventoryInfo.totalSell',
@@ -357,7 +364,7 @@ module.exports.manageProductController = (req, res) => __awaiter(void 0, void 0,
         let draftProducts;
         let inactiveProduct;
         let showFor;
-        if (isSeller.role === "seller") {
+        if (isSeller.role === 'SELLER') {
             showFor = [
                 { "seller.name": isSeller === null || isSeller === void 0 ? void 0 : isSeller.username },
                 { 'variations.status': "active" },
@@ -462,7 +469,7 @@ module.exports.fetchTopSellingProduct = (req, res) => __awaiter(void 0, void 0, 
             status: "active",
         };
         if (seller) {
-            filterQuery["seller"] = seller;
+            filterQuery['SELLER'] = seller;
         }
         const result = yield db
             .collection("products")

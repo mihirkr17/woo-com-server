@@ -9,7 +9,7 @@ const checkProductAvailability = async (productId: string, variationId: String) 
    let product = await db.collection('products').aggregate([
       { $match: { _id: ObjectId(productId) } },
       { $unwind: { path: "$variations" } },
-      { $match: { $and: [{ 'variations.vId': variationId }, { 'variations.available': { $gte: 1 } }, { 'variations.stock': 'in' }] } }
+      { $match: { $and: [{ 'variations._vId': variationId }, { 'variations.available': { $gte: 1 } }, { 'variations.stock': 'in' }] } }
    ]).toArray();
 
    product = product[0];
@@ -66,7 +66,9 @@ module.exports.addCartAddress = async (req: Request, res: Response) => {
 
       const userEmail = req.decoded.email;
 
-      const body = req.body;
+      let body = req.body;
+      body['_SA_UID'] = Math.floor(Math.random() * 100000000);
+      body['select_address'] = false;
 
       const result = await db
          .collection("users")

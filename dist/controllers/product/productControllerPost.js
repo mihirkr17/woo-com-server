@@ -17,26 +17,28 @@ const { productCounterAndSetter } = require("../../model/product.model");
  * Adding Product Title and slug first
  */
 module.exports.setProductIntroController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+    var _a, _b, _c;
     try {
         const db = yield dbConnection();
         const authEmail = req.decoded.email;
         const formTypes = req.params.formTypes;
         const body = req.body;
+        const productId = ((_a = req.headers) === null || _a === void 0 ? void 0 : _a.authorization) || null;
         let model;
         const user = yield db
             .collection("users")
-            .findOne({ $and: [{ email: authEmail }, { role: "seller" }] });
+            .findOne({ $and: [{ email: authEmail }, { role: 'SELLER' }] });
         if (!user) {
             return res
                 .status(401)
                 .send({ success: false, statusCode: 401, error: "Unauthorized" });
         }
-        if (formTypes === "update" && (body === null || body === void 0 ? void 0 : body.productId)) {
+        if (formTypes === "update" && productId) {
             model = productIntroTemplate(body);
+            model['modifiedAt'] = new Date(Date.now());
             let result = yield db
                 .collection("products")
-                .updateOne({ $and: [{ _id: ObjectId(body === null || body === void 0 ? void 0 : body.productId) }, { save_as: "draft" }] }, { $set: model }, { upsert: true });
+                .updateOne({ $and: [{ _id: ObjectId(productId) }, { save_as: "draft" }] }, { $set: model }, { upsert: true });
             return (result === null || result === void 0 ? void 0 : result.acknowledged)
                 ? res.status(200).send({
                     success: true,
@@ -52,10 +54,10 @@ module.exports.setProductIntroController = (req, res) => __awaiter(void 0, void 
         if (formTypes === 'create') {
             model = productIntroTemplate(body);
             model['_lId'] = "LID" + Math.random().toString(36).toUpperCase().slice(2, 18);
-            model["seller"] = {};
-            model.seller.uuid = user === null || user === void 0 ? void 0 : user._id;
-            model.seller.name = user === null || user === void 0 ? void 0 : user.username;
-            model.seller.storeTitle = (_a = user === null || user === void 0 ? void 0 : user.store) === null || _a === void 0 ? void 0 : _a.title;
+            model['sellerData'] = {};
+            model.sellerData.sellerId = user === null || user === void 0 ? void 0 : user._UUID;
+            model.sellerData.sellerName = user === null || user === void 0 ? void 0 : user.fullName;
+            model.sellerData.storeName = (_c = (_b = user === null || user === void 0 ? void 0 : user.seller) === null || _b === void 0 ? void 0 : _b.storeInfos) === null || _c === void 0 ? void 0 : _c.storeName;
             model['createdAt'] = new Date(Date.now());
             model["rating"] = [
                 { weight: 5, count: 0 },

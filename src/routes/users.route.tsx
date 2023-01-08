@@ -1,8 +1,9 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
-const userGetController = require("../controllers/users/usersControllerGet");
-const userPostController = require("../controllers/users/usersControllerPost");
-const userPutController = require("../controllers/users/usersControllerPut");
+const userGetController = require("../controllers/auth/users/usersControllerGet");
+const userPostController = require("../controllers/auth/users/usersControllerPost");
+const userPutController = require("../controllers/auth/users/usersControllerPut");
+const shippingAddressController = require("../controllers/shippingAddressController");
 
 // Middleware
 const userRegisterMiddleware = require("../middleware/userRegisterMiddleware");
@@ -36,7 +37,7 @@ try {
 
   router.post("/sign-out", userPostController.signOutUser);
 
-  router.put("/update-profile-data/:email", verifyJWT, userPutController.updateProfileData);
+  router.put("/update-profile-data", verifyJWT, userPutController.updateProfileData);
 
   router.put("/make-admin/:userId", verifyJWT, checkingOwnerOrAdmin, userPutController.makeAdmin);
 
@@ -58,6 +59,15 @@ try {
   );
 
   router.get("/check-seller-request", userGetController.checkSellerRequest);
+
+
+  // Shipping address route
+  router.post("/shipping-address", verifyJWT, shippingAddressController.createShippingAddress);
+  router.put("/shipping-address", verifyJWT, shippingAddressController.updateShippingAddress);
+  router.post("/shipping-address-select", verifyJWT, shippingAddressController.selectShippingAddress);
+  router.delete("/shipping-address-delete/:_SA_UID", verifyJWT, shippingAddressController.deleteShippingAddress);
+
+  router.post("/register-new-seller", userPostController.sellerRegisterController);
   
 } catch (error: any) {
   console.log(error?.message);

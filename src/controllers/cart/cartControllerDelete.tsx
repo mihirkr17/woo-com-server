@@ -26,9 +26,13 @@ module.exports.deleteCartItem = async (req: Request, res: Response) => {
       }
 
       if (updateDocuments) {
+         const countCartItems = await db.collection("shoppingCarts").countDocuments({ customerEmail: authEmail });
+         res.cookie("cart_p", countCartItems, { httpOnly: false, maxAge: 57600000 });
          return res.status(200).send({ success: true, statusCode: 200, message: "Item removed successfully from your cart." });
       }
       return res.status(500).send({ success: false, statusCode: 500, message: "Sorry! failed to remove!!!" });
+
+
 
    } catch (error: any) {
       res.status(500).send({ message: error?.message });

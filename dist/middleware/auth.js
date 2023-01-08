@@ -64,7 +64,7 @@ const checkingOwnerOrAdmin = (req, res, next) => __awaiter(void 0, void 0, void 
     const findAuthInDB = yield db.collection("users").findOne({
         email: authEmail && authEmail,
     });
-    if (findAuthInDB.role === "owner" || findAuthInDB.role === "admin") {
+    if (findAuthInDB.role === "OWNER" || findAuthInDB.role === "ADMIN") {
         next();
     }
     else {
@@ -79,7 +79,7 @@ const checkingOwnerOrAdmin = (req, res, next) => __awaiter(void 0, void 0, void 
 const checkingSeller = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     const db = yield dbConnection();
     const authEmail = req.decoded.email;
-    const user = yield db.collection('users').findOne({ $and: [{ email: authEmail }, { role: 'seller' }] });
+    const user = yield db.collection('users').findOne({ $and: [{ email: authEmail }, { role: 'SELLER' }] });
     if (!user) {
         return res.status(503).send({
             success: false,
@@ -97,7 +97,7 @@ const checkingUser = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
     const findAuthInDB = yield db.collection("users").findOne({
         email: authEmail && authEmail,
     });
-    if (findAuthInDB.role !== "user") {
+    if (findAuthInDB.role !== "BUYER") {
         return res.status(400).send({
             success: false,
             statusCode: 400,
@@ -112,10 +112,10 @@ const isAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0, function* 
         const db = yield dbConnection();
         const authEmail = req.decoded.email;
         const authRole = req.decoded.role;
-        if (authRole !== 'admin') {
+        if (authRole !== 'ADMIN') {
             return res.status(503).send({ success: false, statusCode: 503, error: "Service is unavailable !" });
         }
-        const findAdmin = yield db.collection('users').findOne({ $and: [{ email: authEmail }, { role: 'admin' }] });
+        const findAdmin = yield db.collection('users').findOne({ $and: [{ email: authEmail }, { role: 'ADMIN' }] });
         if (!findAdmin) {
             return res.status(503).send({ success: false, statusCode: 503, error: "Service is unavailable !" });
         }

@@ -18,11 +18,12 @@ module.exports.setProductIntroController = async (
       const authEmail = req.decoded.email;
       const formTypes = req.params.formTypes;
       const body = req.body;
+      const productId = req.headers?.authorization || null;
       let model;
 
       const user = await db
          .collection("users")
-         .findOne({ $and: [{ email: authEmail }, { role: "seller" }] });
+         .findOne({ $and: [{ email: authEmail }, { role: 'SELLER' }] });
 
       if (!user) {
          return res
@@ -30,13 +31,14 @@ module.exports.setProductIntroController = async (
             .send({ success: false, statusCode: 401, error: "Unauthorized" });
       }
 
-      if (formTypes === "update" && body?.productId) {
+      if (formTypes === "update" && productId) {
          model = productIntroTemplate(body);
+         model['modifiedAt'] = new Date(Date.now());
 
          let result = await db
             .collection("products")
             .updateOne(
-               { $and: [{ _id: ObjectId(body?.productId) }, { save_as: "draft" }] },
+               { $and: [{ _id: ObjectId(productId) }, { save_as: "draft" }] },
                { $set: model },
                { upsert: true }
             );
@@ -57,10 +59,10 @@ module.exports.setProductIntroController = async (
       if (formTypes === 'create') {
          model = productIntroTemplate(body);
          model['_lId'] = "LID" + Math.random().toString(36).toUpperCase().slice(2, 18);
-         model["seller"] = {};
-         model.seller.uuid = user?._id;
-         model.seller.name = user?.username;
-         model.seller.storeTitle = user?.store?.title;
+         model['sellerData'] = {};
+         model.sellerData.sellerId = user?._UUID;
+         model.sellerData.sellerName = user?.fullName;
+         model.sellerData.storeName = user?.seller?.storeInfos?.storeName;
          model['createdAt'] = new Date(Date.now());
 
          model["rating"] = [

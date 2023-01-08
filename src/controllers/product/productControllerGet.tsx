@@ -23,9 +23,19 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
       const variationId = req.query.vId;
       let inCart: boolean = false;
       let inWishlist: boolean = false;
+      let existProductInCart: any = null;
+      let existProductInWishlist: any;
 
-      let colors = req.query.colors;
-      let size = req.query.size;
+      // If user email address exists
+      if (email) {
+         existProductInCart = await db
+            .collection("shoppingCarts")
+            .findOne({ $and: [{ customerEmail: email }, { variationId: variationId }] });
+
+         existProductInWishlist = await db
+            .collection("users")
+            .findOne({ $and: [{ email }, { "wishlist.slug": product_slug }] });
+      }
 
       // Product Details
       let productDetail = await db.collection('products').aggregate([
@@ -34,11 +44,26 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
             $project: {
                title: 1,
                slug: 1,
-               variations: '$variations', swatch: "$variations",
+               variations: 1,
+               swatch: {
+                  $map: {
+                     input: "$variations",
+                     as: "variation",
+                     in: { variant: "$$variation.variant", _vId: "$$variation._vId" }
+                  }
+               },
+               fulfilledBy: "$shipping.fulfilledBy",
+               deliveryCharge: "$shipping.delivery",
+               deliveryDetails: 1,
                specification: '$specification',
                brand: 1, categories: 1,
                seller: 1, rating: 1, ratingAverage: 1, save_as: 1, createdAt: 1, bodyInfo: 1, manufacturer: 1,
-               _lId: 1
+               _lId: 1,
+               inCart: {
+                  $cond: {
+                     if: { $eq: [existProductInCart, null] }, then: false, else: true
+                  }
+               }
             }
          },
          { $unwind: { path: '$variations' } },
@@ -79,28 +104,7 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
          { $limit: 5 },
       ]).toArray();
 
-      // If user email address exists
-      if (email) {
-         const existProductInCart = await db
-            .collection("shoppingCarts")
-            .findOne({ $and: [{ customerEmail: email }, { _vId: variationId }] });
 
-         const existProductInWishlist = await db
-            .collection("users")
-            .findOne({ $and: [{ email }, { "wishlist.slug": product_slug }] });
-
-         if (existProductInWishlist) {
-            inWishlist = true;
-         }
-
-         if (existProductInCart && typeof existProductInCart === "object") {
-            inCart = true;
-         }
-
-         productDetail["inCart"] = inCart;
-
-         productDetail["inWishlist"] = inWishlist;
-      }
 
       return res.status(200).send({
          success: true,
@@ -191,7 +195,7 @@ module.exports.fetchSingleProductByPidController = async (req: Request, res: Res
 
       const productId = req.query.pid;
       const variationId = req.query.vId;
-      const seller = req.query.seller;
+      const storeName = req.query.storeName;
 
       let product;
 
@@ -210,7 +214,7 @@ module.exports.fetchSingleProductByPidController = async (req: Request, res: Res
          product = product[0];
       } else {
          product = await db.collection("products").findOne({
-            $and: [{ _id: ObjectId(productId) }, { "seller.name": seller }],
+            $and: [{ _id: ObjectId(productId) }, { "sellerData.storeName": storeName }],
          });
       }
 
@@ -353,14 +357,14 @@ module.exports.dashboardOverviewController = async (req: Request, res: Response)
 
       const user = await db.collection("users").findOne({ $and: [{ email: authEmail }, { role }] });
 
-      if (user?.role === 'seller') {
+      if (user?.role === 'SELLER') {
          matches = { $match: { $and: [{ 'seller.name': user?.username }, { 'stockInfo.sold': { $exists: true } }] } }
       }
 
-      if (user?.role === "admin") {
+      if (user?.role === 'ADMIN') {
 
          topSellers = await db.collection('users').aggregate([
-            { $match: { role: "seller" } },
+            { $match: { role: 'SELLER' } },
             {
                $project: {
                   totalSell: '$inventoryInfo.totalSell',
@@ -434,7 +438,7 @@ module.exports.manageProductController = async (
 
       let showFor: any[];
 
-      if (isSeller.role === "seller") {
+      if (isSeller.role === 'SELLER') {
          showFor = [
             { "seller.name": isSeller?.username },
             { 'variations.status': "active" },
@@ -555,7 +559,7 @@ module.exports.fetchTopSellingProduct = async (req: Request, res: Response) => {
          status: "active",
       };
       if (seller) {
-         filterQuery["seller"] = seller;
+         filterQuery['SELLER'] = seller;
       }
 
       const result = await db

@@ -17,7 +17,7 @@ const checkProductAvailability = (productId, variationId) => __awaiter(void 0, v
     let product = yield db.collection('products').aggregate([
         { $match: { _id: ObjectId(productId) } },
         { $unwind: { path: "$variations" } },
-        { $match: { $and: [{ 'variations.vId': variationId }, { 'variations.available': { $gte: 1 } }, { 'variations.stock': 'in' }] } }
+        { $match: { $and: [{ 'variations._vId': variationId }, { 'variations.available': { $gte: 1 } }, { 'variations.stock': 'in' }] } }
     ]).toArray();
     product = product[0];
     return product;
@@ -57,7 +57,9 @@ module.exports.addCartAddress = (req, res) => __awaiter(void 0, void 0, void 0, 
     try {
         const db = yield dbConnection();
         const userEmail = req.decoded.email;
-        const body = req.body;
+        let body = req.body;
+        body['_SA_UID'] = Math.floor(Math.random() * 100000000);
+        body['select_address'] = false;
         const result = yield db
             .collection("users")
             .updateOne({ email: userEmail }, { $push: { shippingAddress: body } }, { upsert: true });

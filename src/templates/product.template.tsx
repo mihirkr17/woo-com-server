@@ -5,38 +5,36 @@ const productIntroTemplate = (body: any) => {
     save_as: 'draft',
     categories: [body?.category, body?.subCategory, body?.postCategory] || [],
     brand: body?.brand,
-    inventoryDetails: {
-      fulfillmentBy: body?.fulfillmentBy,
+    shipping: {
+      fulfilledBy: body?.fulfilledBy,
       procurementType: body?.procurementType,
-      procurementSLA: body?.procurementSLA
-    },
-    deliveryDetails: {
-      shippingProvider: body?.shippingProvider,
-      localDeliveryCharge: parseInt(body?.localDeliveryCharge),
-      zonalDeliveryCharge: parseInt(body?.zonalDeliveryCharge),
-      nationalDeliveryCharge: parseInt(body?.nationalDeliveryCharge)
-    },
-    packageInfo: {
-      dimension: {
-        height: body?.packageHeight,
-        length: body?.packageLength,
-        width: body?.packageWidth
+      procurementSLA: body?.procurementSLA,
+      provider: body?.shippingProvider,
+      delivery: {
+        localCharge: parseInt(body?.localCharge),
+        zonalCharge: parseInt(body?.zonalCharge),
       },
-      weight: body?.packageWeight,
-      weightUnit: 'kg',
-      dimensionUnit: 'cm',
-      inTheBox: body?.inTheBox
+      package: {
+        dimension: {
+          height: body?.packageHeight,
+          length: body?.packageLength,
+          width: body?.packageWidth
+        },
+        weight: body?.packageWeight,
+        weightUnit: 'kg',
+        dimensionUnit: 'cm',
+        inTheBox: body?.inTheBox
+      }
     },
-    taxDetails: {
-      hsn: body?.hsn,
-      taxCode: body?.taxCode
+    tax: {
+      hsn: body?.taxHsn,
+      code: body?.taxCode
     },
     manufacturer: {
-      countryOfOrigin: body?.countryOfOrigin,
-      manufacturerDetails: body?.manufacturerDetails,
-      packerDetails: body?.packerDetails
+      origin: body?.manufacturerOrigin,
+      details: body?.manufacturerDetails,
     },
-    paymentInfo: body?.paymentInfo,
+    paymentInfo: body?.paymentInformation,
     warranty: body?.warranty
   }
 }
@@ -64,8 +62,7 @@ const productVariation = (body: any) => {
     variant: body?.variant || {},
     stock,
     available: parseInt(body?.available),
-    status: body?.status,
-    modifiedAt: new Date(Date.now())
+    status: body?.status
   }
 }
 
