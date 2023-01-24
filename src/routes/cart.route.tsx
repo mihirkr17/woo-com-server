@@ -1,6 +1,6 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
-const { verifyJWT } = require("../middleware/auth");
+const { verifyJWT } = require("../middleware/Auth.middleware");
 const cartGetController = require("../controllers/cart/cartControllerGet");
 const cartPostController = require("../controllers/cart/cartControllerPost");
 const cartPutController = require("../controllers/cart/cartControllerPut");

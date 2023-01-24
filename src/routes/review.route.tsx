@@ -1,10 +1,10 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
-const { checkingUser } = require("../middleware/auth");
+const { verifyJWT, isRoleBuyer } = require("../middleware/Auth.middleware");
 const { addProductRating } = require("../controllers/review/review.controller");
 
 try {
-  router.put("/add-product-rating/:productId", checkingUser, addProductRating);
+  router.put("/add-product-rating/:productId", verifyJWT, isRoleBuyer, addProductRating);
 } catch (error: any) {
   console.log(error?.message);
 }

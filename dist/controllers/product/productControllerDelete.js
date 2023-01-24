@@ -11,7 +11,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 var { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
-const { productCounterAndSetter } = require("../../model/product.model");
 // Delete product by inventory management
 module.exports.deleteProductController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -28,7 +27,6 @@ module.exports.deleteProductController = (req, res) => __awaiter(void 0, void 0,
                 error: "Service unavailable",
             });
         }
-        yield productCounterAndSetter(user);
         yield db
             .collection("users")
             .updateMany({ "shoppingCartItems._id": productId }, { $pull: { shoppingCartItems: { _id: productId } } });
@@ -53,6 +51,9 @@ module.exports.deleteProductVariationController = (req, res) => __awaiter(void 0
         const product = yield db.collection('products').findOne({ _id: ObjectId(productId) });
         if (!product) {
             return res.status(404).send({ success: false, statusCode: 404, error: 'Sorry! Product not found!!!' });
+        }
+        if (product && Array.isArray(product === null || product === void 0 ? void 0 : product.variations) && (product === null || product === void 0 ? void 0 : product.variations.length) <= 1) {
+            return res.status(200).send({ success: false, statusCode: 200, message: "Please create another variation before delete this variation !" });
         }
         const result = yield db.collection('products').updateOne({ $and: [{ _id: ObjectId(productId) }, { 'variations.vId': vId }] }, { $pull: { variations: { vId: vId } } });
         if (result) {

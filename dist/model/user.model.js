@@ -44,13 +44,15 @@ const sellerType = new mongoose_1.Schema({
     storeInfos: {
         storeName: { type: String },
         storeLicense: { type: String },
-        numOfProducts: { type: Number }
+        numOfProducts: { type: Number },
+        productInFulfilled: { type: Number },
+        productInDraft: { type: Number }
     }
 }, { _id: false });
 // user schema design
 var UserSchema = new mongoose_1.Schema({
-    UUID: { type: String },
-    fullName: { type: String, default: null },
+    _UUID: { type: String },
+    fullName: { type: String, required: true },
     email: {
         type: String,
         required: [true, "Email address required !!!"],
@@ -74,9 +76,9 @@ var UserSchema = new mongoose_1.Schema({
         default: "BUYER",
     },
     gender: {
-        type: String, default: null
+        type: String, required: true, enum: ["Male", "Female", "Others"]
     },
-    dob: { type: String, default: "" },
+    dob: { type: String, required: true },
     seller: { type: sellerType, default: undefined },
     buyer: { type: buyerType, default: undefined },
     isSeller: { type: String, enum: ['pending', 'fulfilled'], default: undefined },

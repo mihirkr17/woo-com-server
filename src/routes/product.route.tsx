@@ -1,7 +1,7 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
-const { verifyJWT, checkingSeller } = require("../middleware/auth");
-const { variationOne } = require("../middleware/product.middleware");
+const { verifyJWT, isRoleSeller, isPermitForDashboard } = require("../middleware/Auth.middleware");
+const { variationOne } = require("../middleware/Product.middleware");
 const deleteController = require("../controllers/product/productControllerDelete");
 const getController = require("../controllers/product/productControllerGet");
 const postController = require("../controllers/product/productControllerPost");
@@ -12,10 +12,9 @@ try {
    * @apiRoutes /api/product
    */
   router.get("/search-products/:q", getController.searchProducts);
-  router.get("/product-count", getController.countProductsController);
-  router.delete("/delete-product", verifyJWT, checkingSeller, deleteController.deleteProductController);
-  router.put("/update-stock", verifyJWT, checkingSeller, putController.updateStockController);
-  router.post("/set-product-intro/:formTypes", verifyJWT, postController.setProductIntroController);
+  router.delete("/delete-product", verifyJWT, isRoleSeller, deleteController.deleteProductController);
+  router.put("/update-stock", verifyJWT, isRoleSeller, putController.updateStockController);
+  router.post("/set-product-intro/:formTypes", verifyJWT, isRoleSeller, postController.setProductIntroController);
 
   router.get("/fetch-single-product/:product_slug", getController.fetchSingleProductController);
 
@@ -27,7 +26,7 @@ try {
    * @desc --> Fetch Single Product By Product ID
    * @required [pid -> query, ]
    */
-  router.get("/fetch-single-product-by-pid", getController.fetchSingleProductByPidController);
+  router.get("/get-one-product-in-seller-dsb", verifyJWT, isRoleSeller, getController.getProductForSellerDSBController);
 
   /**
     * @requestMethod GET
@@ -38,14 +37,12 @@ try {
 
 
   router.get("/fetch-top-selling-product", getController.fetchTopSellingProduct);
-  router.get("/manage-product", verifyJWT, getController.manageProductController);
-
-  router.get("/dashboard-overview", verifyJWT, getController.dashboardOverviewController);
+  router.get("/manage-product", verifyJWT, isPermitForDashboard, getController.manageProductController);
 
 
   router.put("/set-product-variation", verifyJWT, variationOne, putController.productOperationController);
 
-  router.put("/product-control", verifyJWT, checkingSeller, putController.productControlController);
+  router.put("/product-control", verifyJWT, isRoleSeller, putController.productControlController);
 
   router.delete("/delete-product-variation/:productId/:vId", verifyJWT, deleteController.deleteProductVariationController);
 

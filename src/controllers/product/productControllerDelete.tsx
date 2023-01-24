@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 var { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
-const { productCounterAndSetter } = require("../../model/product.model");
 
 
 // Delete product by inventory management
@@ -26,8 +25,6 @@ module.exports.deleteProductController = async (
             error: "Service unavailable",
          });
       }
-
-      await productCounterAndSetter(user);
 
       await db
          .collection("users")
@@ -63,6 +60,10 @@ module.exports.deleteProductVariationController = async (req: Request, res: Resp
 
       if (!product) {
          return res.status(404).send({ success: false, statusCode: 404, error: 'Sorry! Product not found!!!' });
+      }
+
+      if (product && Array.isArray(product?.variations) && product?.variations.length <= 1) {
+         return res.status(200).send({success: false, statusCode: 200, message: "Please create another variation before delete this variation !"});
       }
 
       const result = await db.collection('products').updateOne(

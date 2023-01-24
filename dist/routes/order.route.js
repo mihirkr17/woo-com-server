@@ -5,15 +5,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const router = express_1.default.Router();
-const orderValidator = require("../middleware/orderValidator");
-const { verifyJWT, checkingSeller, checkingUser, } = require("../middleware/auth");
+const orderValidator = require("../middleware/OrderValidator.middleware");
+const { verifyJWT, isRoleSeller, isRoleBuyer, } = require("../middleware/auth");
 const { setOrderHandler, myOrder, removeOrder, cancelMyOrder, dispatchOrderRequest, manageOrders, } = require("../controllers/order/order.controller");
 try {
-    router.post("/set-order", verifyJWT, checkingUser, orderValidator, setOrderHandler);
+    router.post("/set-order", verifyJWT, isRoleBuyer, orderValidator, setOrderHandler);
     router.get("/my-order/:email", myOrder);
     router.delete("/remove-order/:email/:orderId", verifyJWT, removeOrder);
     router.put("/cancel-my-order/:userEmail/:orderId", verifyJWT, cancelMyOrder);
-    router.put("/dispatch-order-request/:orderId/:trackingId", verifyJWT, checkingSeller, dispatchOrderRequest);
+    router.put("/dispatch-order-request/:orderId/:trackingId", verifyJWT, isRoleSeller, dispatchOrderRequest);
     router.get("/manage-orders", manageOrders);
 }
 catch (error) {

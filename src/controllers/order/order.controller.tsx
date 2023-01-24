@@ -4,7 +4,7 @@ const { ObjectId } = require("mongodb");
 const { updateProductStock } = require("../../utils/common");
 const { orderModel } = require("../../templates/order.template");
 
-module.exports.setOrderHandler = async (req: Request, res: Response) => {
+module.exports.setOrderHandler = async (req: Request, res: Response, next: any) => {
   try {
     const db = await dbConnection();
 
@@ -64,21 +64,21 @@ module.exports.setOrderHandler = async (req: Request, res: Response) => {
       res.status(200).send(result && { message: "Order success" });
     }
   } catch (error: any) {
-    res.status(500).send({ message: error?.message });
+    next(error);
   }
 };
 
-module.exports.myOrder = async (req: Request, res: Response) => {
+module.exports.myOrder = async (req: Request, res: Response, next: any) => {
   try {
     const db = await dbConnection();
     const email = req.params.email;
     res.send(await db.collection("orders").findOne({ user_email: email }));
   } catch (error: any) {
-    res.status(500).send({ message: error?.message });
+    next(error);
   }
 };
 
-module.exports.removeOrder = async (req: Request, res: Response) => {
+module.exports.removeOrder = async (req: Request, res: Response, next: any) => {
   try {
     const db = await dbConnection();
 
@@ -93,7 +93,7 @@ module.exports.removeOrder = async (req: Request, res: Response) => {
 
     res.status(200).send({ result, message: "Order Removed successfully" });
   } catch (error: any) {
-    res.status(500).send({ message: error?.message });
+    next(error);
   }
 };
 
@@ -135,6 +135,7 @@ module.exports.dispatchOrderRequest = async (req: Request, res: Response) => {
     const orderId: number = parseInt(req.params.orderId);
     const trackingId = req.params.trackingId;
     const userEmail: string = req.headers.authorization || "";
+    
     res.status(200).send(
       (await db.collection("orders").updateOne(
         { user_email: userEmail },
@@ -156,17 +157,17 @@ module.exports.dispatchOrderRequest = async (req: Request, res: Response) => {
 module.exports.manageOrders = async (req: Request, res: Response) => {
   try {
     const db = await dbConnection();
-    const seller = req.query.seller;
+    const storeName = req.query.storeName;
     let result: any;
 
-    if (seller) {
+    if (storeName) {
       result = await db
         .collection("orders")
         .aggregate([
           { $unwind: "$orders" },
           {
             $match: {
-              $and: [{ "orders.seller": seller }],
+              $and: [{ "orders.seller": storeName }],
             },
           },
         ])

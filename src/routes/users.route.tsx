@@ -1,13 +1,10 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
-const userGetController = require("../controllers/auth/users/usersControllerGet");
-const userPostController = require("../controllers/auth/users/usersControllerPost");
-const userPutController = require("../controllers/auth/users/usersControllerPut");
-const shippingAddressController = require("../controllers/shippingAddressController");
+const shippingAddressController = require("../controllers/users/ShippingAddress.controller");
+const userCTRL = require("../controllers/users/users");
 
 // Middleware
-const userRegisterMiddleware = require("../middleware/userRegisterMiddleware");
-const { verifyJWT, checkingOwnerOrAdmin, verifyAuthUserByJWT } = require("../middleware/auth");
+const { verifyJWT, isRoleOwnerOrAdmin } = require("../middleware/auth");
 
 try {
   /**
@@ -18,7 +15,7 @@ try {
    * @apiParams no params required.
    * @apiSuccess {one particular user object data}
    */
-  router.get("/fau", verifyAuthUserByJWT, userGetController.fetchAuthUser);
+  router.get("/fau", verifyJWT, userCTRL.fetchAuthUserController);
 
   /**
    * @api {put} /sign in the user
@@ -29,36 +26,29 @@ try {
    * @apiParams no params required.
    * @apiSuccess sending success message.
    */
-  router.post("/login-user", userPostController.userLoginController);
 
-  router.post("/register-user", userRegisterMiddleware, userPostController.userRegisterController);
+  router.put("/update-profile-data", verifyJWT, userCTRL.updateProfileDataController);
 
-  router.post("/verify-register-user", userPostController.userRegisterVerify);
-
-  router.post("/sign-out", userPostController.signOutUser);
-
-  router.put("/update-profile-data", verifyJWT, userPutController.updateProfileData);
-
-  router.put("/make-admin/:userId", verifyJWT, checkingOwnerOrAdmin, userPutController.makeAdmin);
+  router.put("/make-admin/:userId", verifyJWT, isRoleOwnerOrAdmin, userCTRL.makeAdminController);
 
   router.put(
     "/demote-to-user/:userId",
     verifyJWT,
-    checkingOwnerOrAdmin,
-    userPutController.demoteToUser
+    isRoleOwnerOrAdmin,
+    userCTRL.demoteToUser
   );
-  router.get("/manage-user", userGetController.manageUsers);
+  router.get("/manage-user", userCTRL.manageUsersController);
 
-  router.put("/make-seller-request", verifyJWT, userPutController.makeSellerRequest);
+  router.put("/make-seller-request", verifyJWT, userCTRL.makeSellerRequest);
 
   router.put(
     "/permit-seller-request",
     verifyJWT,
-    checkingOwnerOrAdmin,
-    userPutController.permitSellerRequest
+    isRoleOwnerOrAdmin,
+    userCTRL.permitSellerRequest
   );
 
-  router.get("/check-seller-request", userGetController.checkSellerRequest);
+  router.get("/check-seller-request", userCTRL.checkSellerRequestController);
 
 
   // Shipping address route
@@ -67,8 +57,6 @@ try {
   router.post("/shipping-address-select", verifyJWT, shippingAddressController.selectShippingAddress);
   router.delete("/shipping-address-delete/:_SA_UID", verifyJWT, shippingAddressController.deleteShippingAddress);
 
-  router.post("/register-new-seller", userPostController.sellerRegisterController);
-  
 } catch (error: any) {
   console.log(error?.message);
 }

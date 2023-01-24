@@ -2,7 +2,6 @@ const productIntroTemplate = (body: any) => {
   return {
     title: body?.title,
     slug: body?.slug,
-    save_as: 'draft',
     categories: [body?.category, body?.subCategory, body?.postCategory] || [],
     brand: body?.brand,
     shipping: {

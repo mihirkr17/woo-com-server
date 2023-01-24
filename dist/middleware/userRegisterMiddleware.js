@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const emailValidator = require("../helpers/emailValidator");
-module.exports = function userRegisterMiddleware(req, res, next) {
+module.exports = function validateRegisterInputs(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const { phone, email, password } = req.body;

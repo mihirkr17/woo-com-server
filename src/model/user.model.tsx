@@ -35,14 +35,16 @@ const sellerType = new Schema({
   storeInfos: {
     storeName: { type: String },
     storeLicense: { type: String },
-    numOfProducts: { type: Number }
+    numOfProducts: { type: Number },
+    productInFulfilled: { type: Number },
+    productInDraft: { type: Number }
   }
 
 }, { _id: false });
 
 // Interface of user
 interface IUser {
-  UUID: String;
+  _UUID: String;
   fullName: String;
   phone: String;
   phonePrefixCode: String;
@@ -66,8 +68,8 @@ interface IUser {
 
 // user schema design
 var UserSchema = new Schema<IUser>({
-  UUID: { type: String },
-  fullName: { type: String, default: null },
+  _UUID: { type: String },
+  fullName: { type: String, required: true },
 
   email: {
     type: String,
@@ -98,10 +100,10 @@ var UserSchema = new Schema<IUser>({
   },
 
   gender: {
-    type: String, default: null
+    type: String, required: true, enum: ["Male", "Female", "Others"]
   },
 
-  dob: { type: String, default: "" },
+  dob: { type: String, required: true },
 
   seller: { type: sellerType, default: undefined },
 

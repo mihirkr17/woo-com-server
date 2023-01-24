@@ -142,14 +142,14 @@ module.exports.productControlController = async (req: Request, res: Response) =>
     if (body?.data?.vId) {
 
       product = await db.collection('products').updateOne(
-        { $and: [{ _id: ObjectId(body?.data?.pId) }, { _lId: body?.data?.lId }] },
+        { $and: [{ _id: ObjectId(body?.data?.pId) }, { _lId: body?.data?.lId }, { save_as: 'fulfilled' }] },
         { $set: { 'variations.$[i].status': body?.data?.action } },
         { arrayFilters: [{ "i._vId": body?.data?.vId }] });
     } else {
       product = await db.collection('products').updateOne(
         { $and: [{ _id: ObjectId(body?.data?.pId) }, { _lId: body?.data?.lId }] },
-        { $set: { save_as: body?.data?.action } },
-        { upsert: true });
+        { $set: { save_as: body?.data?.action, "variations.$[].status": "inactive" } },
+        { upsert: true, multi: true });
     }
 
 

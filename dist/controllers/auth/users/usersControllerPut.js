@@ -11,12 +11,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const { ObjectId } = require("mongodb");
 const User = require("../../../model/user.model");
-module.exports.updateProfileData = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const response = require("../../../errors/apiResponse");
+module.exports.updateProfileData = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const email = req.decoded.email;
         const clientEmail = req.headers.authorization || "";
         if (clientEmail !== email) {
-            return res.status(403).send({ success: false, statusCode: 403, error: "Forbidden!" });
+            throw new response.Api403Error("AuthError", "Invalid email address !");
         }
         const result = yield User.updateOne({ email: email }, { $set: req.body }, { new: true });
         if ((result === null || result === void 0 ? void 0 : result.matchedCount) === 1) {
@@ -24,10 +25,10 @@ module.exports.updateProfileData = (req, res) => __awaiter(void 0, void 0, void 
         }
     }
     catch (error) {
-        return res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });
-module.exports.makeAdmin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.makeAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const userId = req.params.userId;
         if (!ObjectId.isValid(userId)) {
@@ -41,7 +42,7 @@ module.exports.makeAdmin = (req, res) => __awaiter(void 0, void 0, void 0, funct
             : res.status(500).send({ success: false, error: "Failed" });
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });
 module.exports.demoteToUser = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
@@ -58,7 +59,7 @@ module.exports.demoteToUser = (req, res, next) => __awaiter(void 0, void 0, void
         next(error);
     }
 });
-module.exports.makeSellerRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.makeSellerRequest = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const authEmail = req.decoded.email;
         const authRole = req.decoded.role;
@@ -116,11 +117,11 @@ module.exports.makeSellerRequest = (req, res) => __awaiter(void 0, void 0, void 
         }
     }
     catch (error) {
-        res.status(400).send({ success: false, statusCode: 400, error: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });
 // Permit the seller request
-module.exports.permitSellerRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.permitSellerRequest = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c;
     try {
         const userId = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(',')[0];
@@ -141,6 +142,6 @@ module.exports.permitSellerRequest = (req, res) => __awaiter(void 0, void 0, voi
             : res.status(400).send({ success: false, statusCode: 400, error: "Bad Request" });
     }
     catch (error) {
-        res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });

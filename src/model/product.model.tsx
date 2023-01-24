@@ -1,50 +1,47 @@
 var conn = require("../utils/db");
 var mongodb = require("mongodb");
 
-module.exports.productCounter = async (seller: any = '') => {
-   try {
-      let db = await conn.dbConnection();
-      let filter: any;
-
-      if (seller) {
-         filter = { $and: [{ status: "active" }, { 'seller.name': seller }, { save_as: 'fulfilled' }] };
-      } else {
-         filter = { $and: [{ status: 'active' }, { save_as: 'fulfilled' }] };
-      }
-
-      const totalProducts = await db.collection('products').countDocuments(filter);
-
-      if (!totalProducts && typeof totalProducts !== 'number') {
-         return false;
-      }
-
-      return totalProducts;
-
-   } catch (error: any) {
-      return error.message
-   }
-}
-
-module.exports.productCounterAndSetter = async (user: any) => {
+module.exports.productCounter = async (sellerInfo: any) => {
    try {
       let db = await conn.dbConnection();
 
-      let totalProducts: Number = await db.collection('products').countDocuments({ $and: [{ 'seller.name': user.username }, { 'seller.uuid': mongodb.ObjectId(user._id) }] });
+      const productCollection = await db.collection('products');
 
-      if (!totalProducts && typeof totalProducts !== 'number') {
-         return false;
+      async function cps(saveAs: String = "") {
+         let f;
+         let isSaveAs;
+
+         if (saveAs) {
+            isSaveAs = { 'save_as': saveAs };
+         } else {
+            isSaveAs = {};
+         }
+
+         if (sellerInfo) {
+            f = {
+               $and: [
+                  isSaveAs,
+                  { 'sellerData.storeName': sellerInfo?.storeName },
+                  { 'sellerData.sellerId': sellerInfo?._UUID }
+               ]
+            }
+         } else {
+            f = isSaveAs;
+
+         }
+         return productCollection.countDocuments(f);
       }
 
-      const updateSellerInventor = await db.collection('users').updateOne(
-         { $and: [{ email: user.email }, { role: user.role }] },
-         { $set: { 'inventoryInfo.totalProducts': (totalProducts || 0) } },
-         { upsert: true }
-      );
+      let totalProducts: Number = await cps();
 
-      return updateSellerInventor ? true : false;
+      let productInFulfilled: Number = await cps("fulfilled");
+
+      let productInDraft: Number = await cps("draft");
+
+      return { totalProducts, productInFulfilled, productInDraft };
 
    } catch (error: any) {
-      return error.message
+      return error;
    }
 }
 

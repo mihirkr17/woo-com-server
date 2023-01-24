@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
-const dbc = require("../utils/db");
-const User = require("../model/user.model");
+const User = require("../../model/user.model");
 
 module.exports.createShippingAddress = async (req: Request, res: Response) => {
    try {

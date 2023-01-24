@@ -4,7 +4,6 @@ var { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 
 const { productIntroTemplate } = require("../../templates/product.template");
-const { productCounterAndSetter } = require("../../model/product.model");
 
 /**
  * Adding Product Title and slug first
@@ -18,7 +17,7 @@ module.exports.setProductIntroController = async (
       const authEmail = req.decoded.email;
       const formTypes = req.params.formTypes;
       const body = req.body;
-      const productId = req.headers?.authorization || null;
+      const lId = req.headers?.authorization || null;
       let model;
 
       const user = await db
@@ -31,29 +30,32 @@ module.exports.setProductIntroController = async (
             .send({ success: false, statusCode: 401, error: "Unauthorized" });
       }
 
-      if (formTypes === "update" && productId) {
+      if (formTypes === "update" && lId) {
          model = productIntroTemplate(body);
          model['modifiedAt'] = new Date(Date.now());
 
          let result = await db
             .collection("products")
             .updateOne(
-               { $and: [{ _id: ObjectId(productId) }, { save_as: "draft" }] },
+               { _lId: lId },
                { $set: model },
                { upsert: true }
             );
 
-         return result?.acknowledged
-            ? res.status(200).send({
+         if (result) {
+
+            return res.status(200).send({
                success: true,
                statusCode: 200,
                message: "Product updated successfully.",
             })
-            : res.status(400).send({
+         } else {
+            return res.status(400).send({
                success: false,
                statusCode: 400,
                error: "Operation failed!!!",
             });
+         }
       }
 
       if (formTypes === 'create') {
@@ -74,11 +76,10 @@ module.exports.setProductIntroController = async (
          ];
          model["ratingAverage"] = 0;
          model['reviews'] = [];
+         model['save_as'] = 'draft';
 
-         let result = await db.collection('products').insertOne(model);
+         let result = await db.collection('product').insertOne(model);
          if (result) {
-            await productCounterAndSetter(user);
-
             return res.status(200).send({
                success: true,
                statusCode: 200,

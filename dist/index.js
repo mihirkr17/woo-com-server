@@ -7,6 +7,7 @@ const express_1 = __importDefault(require("express"));
 var mongoose = require("mongoose");
 require("dotenv").config();
 const cookieParser = require("cookie-parser");
+const authRoutes = require("./routes/authentication.route");
 const userRoutes = require("./routes/users.route");
 const productRoutes = require("./routes/product.route");
 const cartRoutes = require("./routes/cart.route");
@@ -14,7 +15,8 @@ const orderRoutes = require("./routes/order.route");
 const reviewRoutes = require("./routes/review.route");
 const policyRoutes = require("./routes/policy.route");
 const wishlistRoutes = require("./routes/wishlist.route");
-const errorHandlers = require("./errors/errors");
+const dashboardRoutes = require("./routes/dashboard.route");
+const returnErrors = require("./errors/errors");
 const port = process.env.PORT || 5000;
 // Server setup
 const cors = require("cors");
@@ -39,14 +41,16 @@ app.get("/", (req, res) => {
     res.status(200).send("Woo-Com Server is running");
 });
 // all the routes
-app.use("/api/user", userRoutes);
-app.use("/api/product", productRoutes);
-app.use("/api/cart", cartRoutes);
-app.use("/api/order", orderRoutes);
-app.use("/api/review", reviewRoutes);
-app.use("/api/policy", policyRoutes);
-app.use("/api/wishlist", wishlistRoutes);
-app.use(errorHandlers);
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/user", userRoutes);
+app.use("/api/v1/product", productRoutes);
+app.use("/api/v1/dashboard", dashboardRoutes);
+app.use("/api/v1/cart", cartRoutes);
+app.use("/api/v1/order", orderRoutes);
+app.use("/api/v1/review", reviewRoutes);
+app.use("/api/v1/policy", policyRoutes);
+app.use("/api/v1/wishlist", wishlistRoutes);
+app.use(returnErrors);
 const server = app.listen(port, () => {
     console.log(`Running port is ${port}`);
 });

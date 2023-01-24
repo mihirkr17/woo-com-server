@@ -1,16 +1,21 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 const { ObjectId } = require("mongodb");
-const User = require("../../../model/user.model");
+const User = require("../../model/user.model");
+const response = require("../../errors/apiResponse");
+const { productCounter } = require("../../model/product.model");
 
-
-
-module.exports.updateProfileData = async (req: Request, res: Response) => {
+/**
+ * @apiController --> Update Profile Data Controller
+ * @apiMethod --> PUT
+ * @apiRequired --> client email in header 
+ */
+module.exports.updateProfileDataController = async (req: Request, res: Response, next: any) => {
    try {
       const email: string = req.decoded.email;
       const clientEmail = req.headers.authorization || "";
 
       if (clientEmail !== email) {
-         return res.status(403).send({ success: false, statusCode: 403, error: "Forbidden!" });
+         throw new response.Api403Error("AuthError", "Invalid email address !");
       }
 
       const result = await User.updateOne({ email: email }, { $set: req.body }, { new: true });
@@ -20,13 +25,17 @@ module.exports.updateProfileData = async (req: Request, res: Response) => {
       }
 
    } catch (error: any) {
-      return res.status(500).send({ success: false, statusCode: 500, error: error?.message });
+      next(error);
    }
 };
 
 
-
-module.exports.makeAdmin = async (req: Request, res: Response) => {
+/**
+ * @apiController --> Make Admin Controller
+ * @apiMethod --> PUT
+ * @apiRequired --> userId in params
+ */
+module.exports.makeAdminController = async (req: Request, res: Response, next: any) => {
    try {
 
       const userId: string = req.params.userId;
@@ -47,11 +56,15 @@ module.exports.makeAdmin = async (req: Request, res: Response) => {
          ? res.status(200).send({ success: true, message: "Permission granted" })
          : res.status(500).send({ success: false, error: "Failed" });
    } catch (error: any) {
-      res.status(500).send({ message: error?.message });
+      next(error);
    }
 };
 
-
+/**
+ * @apiController --> Demote admin to user Controller
+ * @apiMethod --> PUT
+ * @apiRequired --> userId in params
+ */
 module.exports.demoteToUser = async (
    req: Request,
    res: Response,
@@ -80,11 +93,7 @@ module.exports.demoteToUser = async (
 };
 
 
-
-
-
-
-module.exports.makeSellerRequest = async (req: Request, res: Response) => {
+module.exports.makeSellerRequest = async (req: Request, res: Response, next: any) => {
    try {
       const authEmail = req.decoded.email;
       const authRole = req.decoded.role;
@@ -155,14 +164,14 @@ module.exports.makeSellerRequest = async (req: Request, res: Response) => {
       }
 
    } catch (error: any) {
-      res.status(400).send({ success: false, statusCode: 400, error: error?.message });
+      next(error);
    }
 };
 
 
 
 // Permit the seller request
-module.exports.permitSellerRequest = async (req: Request, res: Response) => {
+module.exports.permitSellerRequest = async (req: Request, res: Response, next: any) => {
    try {
       const userId = req.headers.authorization?.split(',')[0];
       const UUID = req.headers.authorization?.split(',')[1];
@@ -192,6 +201,91 @@ module.exports.permitSellerRequest = async (req: Request, res: Response) => {
          : res.status(400).send({ success: false, statusCode: 400, error: "Bad Request" });
 
    } catch (error: any) {
-      res.status(500).send({ success: false, statusCode: 500, error: error?.message });
+      next(error);
    }
 };
+
+
+
+
+/**
+ * controller --> fetch authenticate user information
+ * request method --> GET
+ * required --> NONE
+ */
+module.exports.fetchAuthUserController = async (
+   req: Request,
+   res: Response,
+   next: NextFunction
+) => {
+   try {
+      const authEmail = req.decoded.email;
+      const role = req.decoded.role;
+
+      const result = await User.findOne(
+         {
+            $and: [{ email: authEmail }, { role: role }, { accountStatus: 'active' }]
+         },
+         {
+            password: 0, createdAt: 0,
+            phonePrefixCode: 0,
+            becomeSellerAt: 0
+         }
+      );
+
+      if (result && result?.role === 'SELLER') {
+
+         const cpbs = await productCounter({ storeName: result.seller.storeInfos?.storeName, _UUID: result?._UUID });
+
+         if (cpbs && typeof cpbs === 'object') {
+            result.seller.storeInfos.numOfProducts = cpbs?.totalProducts;
+            result.seller.storeInfos.productInFulfilled = cpbs?.productInFulfilled;
+            result.seller.storeInfos.productInDraft = cpbs?.productInDraft;
+         }
+      }
+
+      if (!result || typeof result !== "object") {
+         throw new response.Api404Error("AuthError", "User not found !");
+      }
+
+      return res.status(200).send({ success: true, statusCode: 200, message: 'Welcome ' + result?.fullName, data: result });
+
+   } catch (error: any) {
+      next(error);
+   }
+};
+
+
+module.exports.manageUsersController = async (req: Request, res: Response, next: NextFunction) => {
+   try {
+      const uType = req.query.uTyp;
+
+      res.status(200).send(await User.find({ role: uType }).toArray());
+
+   } catch (error: any) {
+      next(error);
+   }
+};
+
+
+
+
+/**
+* controller --> fetch seller request in admin dashboard
+* request method --> GET
+* required --> NONE
+*/
+module.exports.checkSellerRequestController = async (req: Request, res: Response, next: NextFunction) => {
+   try {
+      let sellers = await User.find({ isSeller: 'pending' });
+
+      sellers.forEach((user: any) => {
+         delete user?.password;
+      });
+
+      return res.status(200).send({ success: true, statusCode: 200, data: sellers });
+   } catch (error: any) {
+      next(error);
+   }
+};
+

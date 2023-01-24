@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 var bcrypt = require("bcrypt");
-module.exports.comparePassword = function (password, hash) {
+module.exports = function comparePassword(password, hash) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             return yield bcrypt.compare(password, hash);

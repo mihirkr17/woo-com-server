@@ -12,7 +12,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const { productIntroTemplate } = require("../../templates/product.template");
-const { productCounterAndSetter } = require("../../model/product.model");
 /**
  * Adding Product Title and slug first
  */
@@ -23,7 +22,7 @@ module.exports.setProductIntroController = (req, res) => __awaiter(void 0, void 
         const authEmail = req.decoded.email;
         const formTypes = req.params.formTypes;
         const body = req.body;
-        const productId = ((_a = req.headers) === null || _a === void 0 ? void 0 : _a.authorization) || null;
+        const lId = ((_a = req.headers) === null || _a === void 0 ? void 0 : _a.authorization) || null;
         let model;
         const user = yield db
             .collection("users")
@@ -33,23 +32,26 @@ module.exports.setProductIntroController = (req, res) => __awaiter(void 0, void 
                 .status(401)
                 .send({ success: false, statusCode: 401, error: "Unauthorized" });
         }
-        if (formTypes === "update" && productId) {
+        if (formTypes === "update" && lId) {
             model = productIntroTemplate(body);
             model['modifiedAt'] = new Date(Date.now());
             let result = yield db
                 .collection("products")
-                .updateOne({ $and: [{ _id: ObjectId(productId) }, { save_as: "draft" }] }, { $set: model }, { upsert: true });
-            return (result === null || result === void 0 ? void 0 : result.acknowledged)
-                ? res.status(200).send({
+                .updateOne({ _lId: lId }, { $set: model }, { upsert: true });
+            if (result) {
+                return res.status(200).send({
                     success: true,
                     statusCode: 200,
                     message: "Product updated successfully.",
-                })
-                : res.status(400).send({
+                });
+            }
+            else {
+                return res.status(400).send({
                     success: false,
                     statusCode: 400,
                     error: "Operation failed!!!",
                 });
+            }
         }
         if (formTypes === 'create') {
             model = productIntroTemplate(body);
@@ -68,9 +70,9 @@ module.exports.setProductIntroController = (req, res) => __awaiter(void 0, void 
             ];
             model["ratingAverage"] = 0;
             model['reviews'] = [];
-            let result = yield db.collection('products').insertOne(model);
+            model['save_as'] = 'draft';
+            let result = yield db.collection('product').insertOne(model);
             if (result) {
-                yield productCounterAndSetter(user);
                 return res.status(200).send({
                     success: true,
                     statusCode: 200,

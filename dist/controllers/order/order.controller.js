@@ -13,7 +13,7 @@ const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const { updateProductStock } = require("../../utils/common");
 const { orderModel } = require("../../templates/order.template");
-module.exports.setOrderHandler = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.setOrderHandler = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const db = yield dbConnection();
         const userEmail = req.headers.authorization || "";
@@ -59,20 +59,20 @@ module.exports.setOrderHandler = (req, res) => __awaiter(void 0, void 0, void 0,
         }
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });
-module.exports.myOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.myOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const db = yield dbConnection();
         const email = req.params.email;
         res.send(yield db.collection("orders").findOne({ user_email: email }));
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });
-module.exports.removeOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.removeOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const db = yield dbConnection();
         const orderUserEmail = req.params.email;
@@ -83,7 +83,7 @@ module.exports.removeOrder = (req, res) => __awaiter(void 0, void 0, void 0, fun
         res.status(200).send({ result, message: "Order Removed successfully" });
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });
 module.exports.cancelMyOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -129,16 +129,16 @@ module.exports.dispatchOrderRequest = (req, res) => __awaiter(void 0, void 0, vo
 module.exports.manageOrders = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const db = yield dbConnection();
-        const seller = req.query.seller;
+        const storeName = req.query.storeName;
         let result;
-        if (seller) {
+        if (storeName) {
             result = yield db
                 .collection("orders")
                 .aggregate([
                 { $unwind: "$orders" },
                 {
                     $match: {
-                        $and: [{ "orders.seller": seller }],
+                        $and: [{ "orders.seller": storeName }],
                     },
                 },
             ])

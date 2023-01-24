@@ -3,7 +3,6 @@ const productIntroTemplate = (body) => {
     return {
         title: body === null || body === void 0 ? void 0 : body.title,
         slug: body === null || body === void 0 ? void 0 : body.slug,
-        save_as: 'draft',
         categories: [body === null || body === void 0 ? void 0 : body.category, body === null || body === void 0 ? void 0 : body.subCategory, body === null || body === void 0 ? void 0 : body.postCategory] || [],
         brand: body === null || body === void 0 ? void 0 : body.brand,
         shipping: {

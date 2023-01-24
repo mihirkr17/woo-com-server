@@ -13,16 +13,17 @@ const setToken = require("../../../utils/setToken");
 const User = require("../../../model/user.model");
 const { comparePassword } = require("../../../utils/comparePassword");
 const generateVerifyToken = require("../../../utils/generateVerifyToken");
+const apiResponse = require("../../../errors/apiResponse");
 /**
  * controller --> user login controller
  * request method --> POST
  * required --> BODY
  */
-module.exports.userLoginController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.userLoginController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
         const verify_token = ((_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(' ')[1]) || undefined;
-        const { email, password, authProvider } = req.body;
+        const { emailOrPhone, password, authProvider } = req.body;
         let token;
         let userData;
         let provider;
@@ -40,7 +41,7 @@ module.exports.userLoginController = (req, res) => __awaiter(void 0, void 0, voi
         }
         const existUser = yield User.findOne({
             $and: [
-                { email },
+                { $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] },
                 { authProvider: provider },
                 { accountStatus: 'active' }
             ]
@@ -49,7 +50,7 @@ module.exports.userLoginController = (req, res) => __awaiter(void 0, void 0, voi
         if (authProvider === 'thirdParty') {
             if (!existUser || typeof existUser === 'undefined') {
                 const UUID = Math.random().toString(36).toUpperCase().slice(2, 18);
-                const user = new User({ _UUID: UUID, email, authProvider, accountStatus: 'active' });
+                const user = new User({ _UUID: UUID, email: emailOrPhone, authProvider, accountStatus: 'active' });
                 userData = yield user.save();
             }
             else {
@@ -60,11 +61,11 @@ module.exports.userLoginController = (req, res) => __awaiter(void 0, void 0, voi
         // system login
         else {
             if (!existUser) {
-                return res.status(400).send({ success: false, statusCode: 400, error: 'User not found !!!' });
+                throw new apiResponse.Api400Error("LoginError", `User with ${emailOrPhone} not found!`);
             }
             let comparedPassword = yield comparePassword(password, existUser === null || existUser === void 0 ? void 0 : existUser.password);
             if (!comparedPassword) {
-                return res.status(400).send({ success: false, statusCode: 400, error: "Password didn't match !!!" });
+                throw new apiResponse.Api400Error("LoginError", "Password didn't match !");
             }
             if (existUser.verifyToken && !verify_token) {
                 res.cookie("verifyToken", existUser.verifyToken, { maxAge: 3600000, httpOnly: false });
@@ -73,9 +74,9 @@ module.exports.userLoginController = (req, res) => __awaiter(void 0, void 0, voi
             // next condition
             if (existUser.verifyToken && (verify_token && typeof verify_token !== 'undefined')) {
                 if ((existUser === null || existUser === void 0 ? void 0 : existUser.verifyToken) !== verify_token) {
-                    return res.status(400).send({ success: false, statusCode: 400, error: 'Required valid token !!!' });
+                    throw new apiResponse.Api400Error("TokenError", 'Required valid token !');
                 }
-                yield User.updateOne({ email }, { $unset: { verifyToken: 1 }, $set: { accountStatus: 'active' } });
+                yield User.updateOne({ email: emailOrPhone }, { $unset: { verifyToken: 1 }, $set: { accountStatus: 'active' } });
                 res.clearCookie('verifyToken');
             }
             token = setToken(existUser);
@@ -83,11 +84,11 @@ module.exports.userLoginController = (req, res) => __awaiter(void 0, void 0, voi
         if (token) {
             res.cookie("token", token, cookieObject);
             res.cookie("is_logged", existUser === null || existUser === void 0 ? void 0 : existUser._id, { httpOnly: false, maxAge: 57600000 });
-            return res.status(200).send({ message: "isLogin", statusCode: 200, success: true });
+            return res.status(200).send({ name: "isLogin", message: "LoginSuccess" });
         }
     }
     catch (error) {
-        return res.status(400).send({ success: false, statusCode: 400, error: error.message });
+        return next(error);
     }
 });
 /**
@@ -100,7 +101,7 @@ module.exports.userRegisterController = (req, res, next) => __awaiter(void 0, vo
         let body = req.body;
         let existUser = yield User.findOne({ $or: [{ phone: body === null || body === void 0 ? void 0 : body.phone }, { email: body.email }] });
         if (existUser) {
-            return res.status(400).send({ success: false, statusCode: 400, error: "User already exists ! Please try another username or email address." });
+            throw new apiResponse.Api400Error("RegistrationError", "User already exists, Please try another phone number or email address !");
         }
         body['_UUID'] = Math.random().toString(36).toUpperCase().slice(2, 18);
         body['verifyToken'] = generateVerifyToken();
@@ -108,18 +109,18 @@ module.exports.userRegisterController = (req, res, next) => __awaiter(void 0, vo
         let user = new User(body);
         const result = yield user.save();
         if (!result) {
-            return res.status(500).send({ success: false, statusCode: 500, error: "Internal error!" });
+            throw new apiResponse.Api500Error("ServerError", "Something went wrong !");
         }
         res.cookie("verifyToken", result === null || result === void 0 ? void 0 : result.verifyToken, { maxAge: 3600000, httpOnly: false });
         return res.status(200).send({
             success: true,
             statusCode: 200,
             message: "Registration success. Please verify your account.",
-            data: { username: result === null || result === void 0 ? void 0 : result.username, verifyToken: result === null || result === void 0 ? void 0 : result.verifyToken, email: result === null || result === void 0 ? void 0 : result.email }
+            data: { phone: result === null || result === void 0 ? void 0 : result.phone, verifyToken: result === null || result === void 0 ? void 0 : result.verifyToken, email: result === null || result === void 0 ? void 0 : result.email }
         });
     }
     catch (error) {
-        return res.status(500).send({ success: false, statusCode: 500, error: error.message });
+        return next(error);
     }
 });
 /**
@@ -131,7 +132,7 @@ module.exports.userRegisterVerify = (req, res, next) => __awaiter(void 0, void 0
         const verify_token = ((_b = req.headers.authorization) === null || _b === void 0 ? void 0 : _b.split(' ')[1]) || undefined;
         const existUser = yield User.findOne({ verifyToken: verify_token });
         if (!existUser) {
-            return res.status(400).send({ success: false, statusCode: 400, error: 'User not found !!!' });
+            throw new apiResponse.Api400Error("VerifyTokenError", "Sorry, User not found !");
         }
         if (existUser.verifyToken && !verify_token) {
             res.cookie("verifyToken", existUser.verifyToken, { maxAge: 3600000, httpOnly: false });
@@ -151,24 +152,25 @@ module.exports.userRegisterVerify = (req, res, next) => __awaiter(void 0, void 0
         }
     }
     catch (error) {
+        next(error);
     }
 });
-module.exports.signOutUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.signOutUser = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         res.clearCookie("token");
         res.clearCookie('is_logged');
         res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
     }
     catch (error) {
-        res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });
 module.exports.sellerRegisterController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         let body = req.body;
-        let existUser = yield User.findOne({ email: body.email });
+        let existUser = yield User.findOne({ $or: [{ email: body.email }, { phone: body.phone }] });
         if (existUser) {
-            return res.status(400).send({ success: false, statusCode: 400, error: "User already exists ! Please try another username or email address." });
+            throw new apiResponse.Api400Error("RegistrationError", "User already exists, Please try another phone number or email address !");
         }
         body['_UUID'] = Math.random().toString(36).toUpperCase().slice(2, 18);
         body['authProvider'] = 'system';
@@ -177,7 +179,7 @@ module.exports.sellerRegisterController = (req, res, next) => __awaiter(void 0, 
         let user = new User(body);
         const result = yield user.save();
         if (!result) {
-            return res.status(500).send({ success: false, statusCode: 500, error: "Internal error!" });
+            throw new apiResponse.Api500Error("ServerError", "Something went wrong !");
         }
         res.cookie("verifyToken", result === null || result === void 0 ? void 0 : result.verifyToken, { maxAge: 3600000, httpOnly: false });
         return res.status(200).send({
@@ -188,6 +190,6 @@ module.exports.sellerRegisterController = (req, res, next) => __awaiter(void 0, 
         });
     }
     catch (error) {
-        return res.status(500).send({ success: false, statusCode: 500, error: error.message });
+        next(error);
     }
 });

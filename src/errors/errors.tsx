@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 
-const errorHandlers = (err: any, req: Request, res: Response, next: any) => {
-  res.status(500).send({ error: err?.message });
+const returnErrors = (err: any, req: Request, res: Response, next: any) => {
+  res.status(err?.statusCode || 500).send({ message: err?.message, name: err?.name, statusCode: err?.statusCode, success: err?.success });
 };
 
-module.exports = errorHandlers;
+module.exports = returnErrors;

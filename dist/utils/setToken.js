@@ -2,6 +2,7 @@
 var jwt = require("jsonwebtoken");
 module.exports = function setToken(userInfo) {
     const payload = {
+        _UUID: userInfo === null || userInfo === void 0 ? void 0 : userInfo._UUID,
         email: userInfo === null || userInfo === void 0 ? void 0 : userInfo.email,
         role: userInfo === null || userInfo === void 0 ? void 0 : userInfo.role,
         status: 'online'

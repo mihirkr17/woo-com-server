@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const User = require("../../../model/user.model");
-const { dbConnection } = require("../../../utils/db");
+const response = require("../../../errors/apiResponse");
 /**
  * controller --> fetch authenticate user information
  * request method --> GET
@@ -26,7 +26,7 @@ module.exports.fetchAuthUser = (req, res, next) => __awaiter(void 0, void 0, voi
             password: 0, createdAt: 0
         });
         if (!result || typeof result !== "object") {
-            return res.status(404).send({ success: false, statusCode: 404, error: "User not found!" });
+            throw new response.Api404Error("AuthError", "User not found !");
         }
         return res.status(200).send({ success: true, statusCode: 200, message: 'Welcome ' + (result === null || result === void 0 ? void 0 : result.username), data: result });
     }
@@ -36,11 +36,8 @@ module.exports.fetchAuthUser = (req, res, next) => __awaiter(void 0, void 0, voi
 });
 module.exports.manageUsers = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const db = yield dbConnection();
         const uType = req.query.uTyp;
-        res
-            .status(200)
-            .send(yield db.collection("users").find({ role: uType }).toArray());
+        res.status(200).send(yield User.find({ role: uType }).toArray());
     }
     catch (error) {
         next(error);
@@ -51,7 +48,7 @@ module.exports.manageUsers = (req, res, next) => __awaiter(void 0, void 0, void 
 * request method --> GET
 * required --> NONE
 */
-module.exports.checkSellerRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.checkSellerRequest = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         let sellers = yield User.find({ isSeller: 'pending' });
         sellers.forEach((user) => {
@@ -60,6 +57,6 @@ module.exports.checkSellerRequest = (req, res) => __awaiter(void 0, void 0, void
         return res.status(200).send({ success: true, statusCode: 200, data: sellers });
     }
     catch (error) {
-        res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });

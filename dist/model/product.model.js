@@ -10,38 +10,42 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 var conn = require("../utils/db");
 var mongodb = require("mongodb");
-module.exports.productCounter = (seller = '') => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.productCounter = (sellerInfo) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         let db = yield conn.dbConnection();
-        let filter;
-        if (seller) {
-            filter = { $and: [{ status: "active" }, { 'seller.name': seller }, { save_as: 'fulfilled' }] };
+        const productCollection = yield db.collection('products');
+        function cps(saveAs = "") {
+            return __awaiter(this, void 0, void 0, function* () {
+                let f;
+                let isSaveAs;
+                if (saveAs) {
+                    isSaveAs = { 'save_as': saveAs };
+                }
+                else {
+                    isSaveAs = {};
+                }
+                if (sellerInfo) {
+                    f = {
+                        $and: [
+                            isSaveAs,
+                            { 'sellerData.storeName': sellerInfo === null || sellerInfo === void 0 ? void 0 : sellerInfo.storeName },
+                            { 'sellerData.sellerId': sellerInfo === null || sellerInfo === void 0 ? void 0 : sellerInfo._UUID }
+                        ]
+                    };
+                }
+                else {
+                    f = isSaveAs;
+                }
+                return productCollection.countDocuments(f);
+            });
         }
-        else {
-            filter = { $and: [{ status: 'active' }, { save_as: 'fulfilled' }] };
-        }
-        const totalProducts = yield db.collection('products').countDocuments(filter);
-        if (!totalProducts && typeof totalProducts !== 'number') {
-            return false;
-        }
-        return totalProducts;
+        let totalProducts = yield cps();
+        let productInFulfilled = yield cps("fulfilled");
+        let productInDraft = yield cps("draft");
+        return { totalProducts, productInFulfilled, productInDraft };
     }
     catch (error) {
-        return error.message;
-    }
-});
-module.exports.productCounterAndSetter = (user) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        let db = yield conn.dbConnection();
-        let totalProducts = yield db.collection('products').countDocuments({ $and: [{ 'seller.name': user.username }, { 'seller.uuid': mongodb.ObjectId(user._id) }] });
-        if (!totalProducts && typeof totalProducts !== 'number') {
-            return false;
-        }
-        const updateSellerInventor = yield db.collection('users').updateOne({ $and: [{ email: user.email }, { role: user.role }] }, { $set: { 'inventoryInfo.totalProducts': (totalProducts || 0) } }, { upsert: true });
-        return updateSellerInventor ? true : false;
-    }
-    catch (error) {
-        return error.message;
+        return error;
     }
 });
 module.exports.productByCategories = (product, limit = 1000) => __awaiter(void 0, void 0, void 0, function* () {

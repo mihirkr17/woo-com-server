@@ -2,12 +2,24 @@ import { Request, Response } from "express";
 const emailValidator = require("../helpers/emailValidator");
 
 
-module.exports = async function userRegisterMiddleware(req: Request, res: Response, next: any) {
+module.exports.validateBuyerRegistrationInputs = async (req: Request, res: Response, next: any) => {
    try {
-      const { phone, email, password } = req.body;
+      const { phone, email, password, fullName, gender, dob } = req.body;
 
       if (!req.body) {
          return res.status(400).send({ success: false, statusCode: 400, error: "Information not found !!!" });
+      }
+
+      if (!fullName && fullName.length <= 0) {
+         return res.status(400).send({ success: false, statusCode: 400, error: 'Full name required !' });
+      }
+
+      if (!dob && dob.length <= 0) {
+         return res.status(400).send({ success: false, statusCode: 400, error: 'Date of birthday required !' });
+      }
+
+      if (!gender && gender.length <= 0) {
+         return res.status(400).send({ success: false, statusCode: 400, error: 'Gender required !' });
       }
 
       if (phone.length <= 3 && phone.length >= 9) {

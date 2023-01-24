@@ -5,13 +5,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const router = express_1.default.Router();
-const userGetController = require("../controllers/auth/users/usersControllerGet");
-const userPostController = require("../controllers/auth/users/usersControllerPost");
-const userPutController = require("../controllers/auth/users/usersControllerPut");
-const shippingAddressController = require("../controllers/shippingAddressController");
+const shippingAddressController = require("../controllers/users/ShippingAddress.controller");
+const userCTRL = require("../controllers/users/users");
 // Middleware
-const userRegisterMiddleware = require("../middleware/userRegisterMiddleware");
-const { verifyJWT, checkingOwnerOrAdmin, verifyAuthUserByJWT } = require("../middleware/auth");
+const { verifyJWT, isRoleOwnerOrAdmin } = require("../middleware/auth");
 try {
     /**
      * @api {get} /fetch the authorize user data
@@ -21,7 +18,7 @@ try {
      * @apiParams no params required.
      * @apiSuccess {one particular user object data}
      */
-    router.get("/fau", verifyAuthUserByJWT, userGetController.fetchAuthUser);
+    router.get("/fau", verifyJWT, userCTRL.fetchAuthUserController);
     /**
      * @api {put} /sign in the user
      * @apiDescription this endpoint will save the currently login or sign up user data to the database with role
@@ -31,23 +28,18 @@ try {
      * @apiParams no params required.
      * @apiSuccess sending success message.
      */
-    router.post("/login-user", userPostController.userLoginController);
-    router.post("/register-user", userRegisterMiddleware, userPostController.userRegisterController);
-    router.post("/verify-register-user", userPostController.userRegisterVerify);
-    router.post("/sign-out", userPostController.signOutUser);
-    router.put("/update-profile-data", verifyJWT, userPutController.updateProfileData);
-    router.put("/make-admin/:userId", verifyJWT, checkingOwnerOrAdmin, userPutController.makeAdmin);
-    router.put("/demote-to-user/:userId", verifyJWT, checkingOwnerOrAdmin, userPutController.demoteToUser);
-    router.get("/manage-user", userGetController.manageUsers);
-    router.put("/make-seller-request", verifyJWT, userPutController.makeSellerRequest);
-    router.put("/permit-seller-request", verifyJWT, checkingOwnerOrAdmin, userPutController.permitSellerRequest);
-    router.get("/check-seller-request", userGetController.checkSellerRequest);
+    router.put("/update-profile-data", verifyJWT, userCTRL.updateProfileDataController);
+    router.put("/make-admin/:userId", verifyJWT, isRoleOwnerOrAdmin, userCTRL.makeAdminController);
+    router.put("/demote-to-user/:userId", verifyJWT, isRoleOwnerOrAdmin, userCTRL.demoteToUser);
+    router.get("/manage-user", userCTRL.manageUsersController);
+    router.put("/make-seller-request", verifyJWT, userCTRL.makeSellerRequest);
+    router.put("/permit-seller-request", verifyJWT, isRoleOwnerOrAdmin, userCTRL.permitSellerRequest);
+    router.get("/check-seller-request", userCTRL.checkSellerRequestController);
     // Shipping address route
     router.post("/shipping-address", verifyJWT, shippingAddressController.createShippingAddress);
     router.put("/shipping-address", verifyJWT, shippingAddressController.updateShippingAddress);
     router.post("/shipping-address-select", verifyJWT, shippingAddressController.selectShippingAddress);
     router.delete("/shipping-address-delete/:_SA_UID", verifyJWT, shippingAddressController.deleteShippingAddress);
-    router.post("/register-new-seller", userPostController.sellerRegisterController);
 }
 catch (error) {
     console.log(error === null || error === void 0 ? void 0 : error.message);
