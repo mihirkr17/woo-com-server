@@ -85,13 +85,13 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
          {
             $project: {
                _lId: 1,
+               title: 1,
+               slug: 1,
                ratingAverage: "$ratingAverage",
                brand: "$brand",
                variations: {
                   _vId: "$variations._vId",
                   pricing: "$variations.pricing",
-                  title: "$variations.title",
-                  slug: "$variations.slug",
                   attributes: "$variations.attributes",
                   images: "$variations.images"
                },
@@ -174,60 +174,8 @@ module.exports.productsByCategoryController = async (req: Request, res: Response
 
 
 
-/**
-* @controller      --> Fetch the single product in product edit page.
-* @required        --> [req.query:seller, req.query:productId, req.query:variationId]
-* @request_method  --> GET
-*/
-module.exports.getProductForSellerDSBController = async (req: Request, res: Response, next: any) => {
-   try {
-      const db = await dbConnection();
 
-      const productId = req.query.pid;
-      const variationId = req.query.vId;
-      const storeName = req.query.storeName;
-
-      let product;
-
-      if (!storeName && typeof storeName === 'undefined' && !productId) return res.status(204).send();
-
-      if (variationId && typeof variationId === 'string') {
-         product = await db.collection('products').aggregate([
-            {
-               $match: { _id: ObjectId(productId) }
-            },
-            {
-               $unwind: { path: "$variations" },
-            },
-            {
-               $match: { 'variations._vId': variationId }
-            }
-         ]).toArray();
-         product = product[0];
-
-      } else {
-         product = await db.collection("products").findOne({
-            $and: [{ _id: ObjectId(productId) }, { "sellerData.storeName": storeName }],
-         });
-      }
-
-      return product
-         ? res.status(200).send(product)
-         : res.status(404).send({
-            success: false,
-            statusCode: 404,
-            error: "Product not found!!!",
-         });
-   } catch (error: any) {
-      next(error);
-   }
-};
-
-
-
-
-
-module.exports.searchProducts = async (req: Request, res: Response, next:NextFunction) => {
+module.exports.searchProducts = async (req: Request, res: Response, next: NextFunction) => {
    try {
       const db = await dbConnection();
 
@@ -296,90 +244,6 @@ module.exports.homeStoreController = async (req: Request, res: Response) => {
       return res.status(500).send({ success: false, statusCode: 500, error: error?.message });
    }
 }
-
-
-module.exports.manageProductController = async (
-   req: Request,
-   res: Response
-) => {
-   try {
-      const db = await dbConnection();
-
-      const authEmail = req.decoded.email;
-      const role = req.decoded.role;
-
-      const user = await db.collection("users").findOne({ $and: [{ email: authEmail }, { role }] });
-
-      let item: any;
-      let page: any;
-      item = req.query.items;
-      page = req.query.page;
-      let searchText: any = req.query.search;
-      let filters: any = req.query.category;
-      let products: any;
-      let draftProducts: any;
-      let inactiveProduct: any;
-
-      let showFor: any[];
-
-      if (user.role === 'SELLER') {
-         showFor = [
-            { "sellerData.storeName": user?.seller?.storeInfos?.storeName },
-            { save_as: "fulfilled" },
-         ];
-      } else {
-         showFor = [{ 'variations.status': "active" }, { save_as: "fulfilled" }];
-      }
-
-      page = parseInt(page) === 1 ? 0 : parseInt(page) - 1;
-
-      products = await db.collection("products").aggregate([
-         {
-            $match: {
-               $and: showFor,
-               $or: [
-                  { title: { $regex: searchText, $options: "i" } },
-                  { "sellerData.storeName": { $regex: searchText, $options: "i" } },
-                  { categories: { $all: [filters] } }
-               ]
-            }
-         },
-         {
-            $skip: page * parseInt(item)
-         }, {
-            $limit: (parseInt(item))
-         }
-      ]).toArray();
-
-      draftProducts = await db.collection("products").find({
-         $and: [user?.role === 'SELLER' && { "sellerData.storeName": user?.seller?.storeInfos?.storeName }, { save_as: "draft" }],
-      }).toArray();
-
-      inactiveProduct = await db.collection("products").aggregate([
-         { $unwind: { path: "$variations" } },
-         {
-            $match: {
-               $and: [
-                  { save_as: 'fulfilled' },
-                  user?.role === 'SELLER' && { "sellerData.storeName": user?.seller?.storeInfos?.storeName },
-                  { "variations.status": 'inactive' }
-               ]
-            }
-         }
-      ]).toArray();
-
-
-      return res.status(200).send({
-         success: true,
-         statusCode: 200,
-         data: { products, draftProducts, inactiveProduct },
-      });
-   } catch (error: any) {
-      return res
-         .status(500)
-         .send({ success: false, statusCode: 500, error: error?.message });
-   }
-};
 
 
 

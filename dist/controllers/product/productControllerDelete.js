@@ -12,14 +12,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 // Delete product by inventory management
-module.exports.deleteProductController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.deleteProductController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d;
     try {
         const db = yield dbConnection();
-        const user = req.decoded;
-        const productId = req.headers.authorization || "";
-        const deletedProduct = yield db
-            .collection("products")
-            .deleteOne({ _id: ObjectId(productId) }); //return --> "acknowledged" : true, "deletedCount" : 1
+        const productId = ((_b = (_a = req.headers) === null || _a === void 0 ? void 0 : _a.authorization) === null || _b === void 0 ? void 0 : _b.split(',')[0]) || "";
+        const _lId = ((_d = (_c = req.headers) === null || _c === void 0 ? void 0 : _c.authorization) === null || _d === void 0 ? void 0 : _d.split(',')[1]) || "";
+        //return --> "acknowledged" : true, "deletedCount" : 1
+        const deletedProduct = yield db.collection("products").deleteOne({ $and: [{ _id: ObjectId(productId) }, { _lId }] });
         if (!deletedProduct.deletedCount) {
             return res.status(503).send({
                 success: false,
@@ -27,9 +27,6 @@ module.exports.deleteProductController = (req, res) => __awaiter(void 0, void 0,
                 error: "Service unavailable",
             });
         }
-        yield db
-            .collection("users")
-            .updateMany({ "shoppingCartItems._id": productId }, { $pull: { shoppingCartItems: { _id: productId } } });
         return res.status(200).send({
             success: true,
             statusCode: 200,
@@ -37,17 +34,15 @@ module.exports.deleteProductController = (req, res) => __awaiter(void 0, void 0,
         });
     }
     catch (error) {
-        return res
-            .status(500)
-            .send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });
 // delete product variation controller
-module.exports.deleteProductVariationController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.deleteProductVariationController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const db = yield dbConnection();
         const productId = req.params.productId;
-        const vId = req.params.vId;
+        const _vId = req.params.vId;
         const product = yield db.collection('products').findOne({ _id: ObjectId(productId) });
         if (!product) {
             return res.status(404).send({ success: false, statusCode: 404, error: 'Sorry! Product not found!!!' });
@@ -55,13 +50,13 @@ module.exports.deleteProductVariationController = (req, res) => __awaiter(void 0
         if (product && Array.isArray(product === null || product === void 0 ? void 0 : product.variations) && (product === null || product === void 0 ? void 0 : product.variations.length) <= 1) {
             return res.status(200).send({ success: false, statusCode: 200, message: "Please create another variation before delete this variation !" });
         }
-        const result = yield db.collection('products').updateOne({ $and: [{ _id: ObjectId(productId) }, { 'variations.vId': vId }] }, { $pull: { variations: { vId: vId } } });
+        const result = yield db.collection('products').updateOne({ _id: ObjectId(productId) }, { $pull: { variations: { _vId } } });
         if (result) {
             return res.status(200).send({ success: true, statusCode: 200, message: 'Variation deleted successfully.' });
         }
         return res.status(500).send({ success: false, statusCode: 500, message: 'Failed to delete!!!' });
     }
     catch (error) {
-        return res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });

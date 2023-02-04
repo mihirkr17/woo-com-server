@@ -181,7 +181,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
         }
         if (token) {
             res.cookie("token", token, cookieObject);
-            res.cookie("is_logged", existUser === null || existUser === void 0 ? void 0 : existUser._id, { httpOnly: false, maxAge: 57600000 });
+            res.cookie("loggedUUID", existUser === null || existUser === void 0 ? void 0 : existUser._UUID, { httpOnly: false, maxAge: 57600000 });
             return res.status(200).send({ name: "isLogin", message: "LoginSuccess" });
         }
     }
@@ -197,7 +197,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
 module.exports.signOutController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         res.clearCookie("token");
-        res.clearCookie('is_logged');
+        res.clearCookie('loggedUUID');
         res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
     }
     catch (error) {

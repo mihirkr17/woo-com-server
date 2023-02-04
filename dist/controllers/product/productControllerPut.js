@@ -13,17 +13,20 @@ var { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 // Update Product Stock Controller
 module.exports.updateStockController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c;
     try {
         const db = yield dbConnection();
         const productId = req.headers.authorization || "";
         const body = req.body;
         if (productId && body) {
-            let stock = (body === null || body === void 0 ? void 0 : body.available) <= 1 ? "out" : "in";
+            let stock = ((_a = body === null || body === void 0 ? void 0 : body.variations) === null || _a === void 0 ? void 0 : _a.available) <= 1 ? "out" : "in";
             const result = yield db.collection("products").updateOne({ _id: ObjectId(productId) }, {
                 $set: {
-                    "stockInfo.available": body === null || body === void 0 ? void 0 : body.available,
-                    "stockInfo.stock": stock,
+                    "variations.$[i].available": (_b = body === null || body === void 0 ? void 0 : body.variations) === null || _b === void 0 ? void 0 : _b.available,
+                    "variations.$[i].stock": stock,
                 },
+            }, {
+                arrayFilters: [{ 'i._vId': (_c = body === null || body === void 0 ? void 0 : body.variations) === null || _c === void 0 ? void 0 : _c._vId }]
             }, { upsert: true });
             if (!result) {
                 return res.status(503).send({
@@ -47,10 +50,10 @@ module.exports.updateStockController = (req, res) => __awaiter(void 0, void 0, v
 });
 // product variation controller
 module.exports.productOperationController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+    var _d;
     try {
         const db = yield dbConnection();
-        const productId = ((_a = req.headers) === null || _a === void 0 ? void 0 : _a.authorization) || "";
+        const productId = ((_d = req.headers) === null || _d === void 0 ? void 0 : _d.authorization) || "";
         const formTypes = req.query.formType || "";
         const vId = req.query.vId;
         const productAttr = req.query.attr;
@@ -99,26 +102,26 @@ module.exports.productOperationController = (req, res) => __awaiter(void 0, void
         return res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
     }
 });
-module.exports.productControlController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _b, _c, _d, _e, _f, _g, _h, _j, _k;
+module.exports.productControlController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _e, _f, _g, _h, _j, _k, _l, _m, _o;
     try {
         const db = yield dbConnection();
         const body = req.body;
-        let product;
+        let result;
         if ((body === null || body === void 0 ? void 0 : body.market_place) !== 'woo-kart') {
             return res.status(403).send({ success: false, statusCode: 403, error: "Forbidden." });
         }
-        if ((_b = body === null || body === void 0 ? void 0 : body.data) === null || _b === void 0 ? void 0 : _b.vId) {
-            product = yield db.collection('products').updateOne({ $and: [{ _id: ObjectId((_c = body === null || body === void 0 ? void 0 : body.data) === null || _c === void 0 ? void 0 : _c.pId) }, { _lId: (_d = body === null || body === void 0 ? void 0 : body.data) === null || _d === void 0 ? void 0 : _d.lId }, { save_as: 'fulfilled' }] }, { $set: { 'variations.$[i].status': (_e = body === null || body === void 0 ? void 0 : body.data) === null || _e === void 0 ? void 0 : _e.action } }, { arrayFilters: [{ "i._vId": (_f = body === null || body === void 0 ? void 0 : body.data) === null || _f === void 0 ? void 0 : _f.vId }] });
+        if ((_e = body === null || body === void 0 ? void 0 : body.data) === null || _e === void 0 ? void 0 : _e.vId) {
+            result = yield db.collection('products').updateOne({ $and: [{ _id: ObjectId((_f = body === null || body === void 0 ? void 0 : body.data) === null || _f === void 0 ? void 0 : _f.pId) }, { _lId: (_g = body === null || body === void 0 ? void 0 : body.data) === null || _g === void 0 ? void 0 : _g.lId }, { save_as: 'fulfilled' }] }, { $set: { 'variations.$[i].status': (_h = body === null || body === void 0 ? void 0 : body.data) === null || _h === void 0 ? void 0 : _h.action } }, { arrayFilters: [{ "i._vId": (_j = body === null || body === void 0 ? void 0 : body.data) === null || _j === void 0 ? void 0 : _j.vId }] });
         }
         else {
-            product = yield db.collection('products').updateOne({ $and: [{ _id: ObjectId((_g = body === null || body === void 0 ? void 0 : body.data) === null || _g === void 0 ? void 0 : _g.pId) }, { _lId: (_h = body === null || body === void 0 ? void 0 : body.data) === null || _h === void 0 ? void 0 : _h.lId }] }, { $set: { save_as: (_j = body === null || body === void 0 ? void 0 : body.data) === null || _j === void 0 ? void 0 : _j.action, "variations.$[].status": "inactive" } }, { upsert: true, multi: true });
+            result = yield db.collection('products').updateOne({ $and: [{ _id: ObjectId((_k = body === null || body === void 0 ? void 0 : body.data) === null || _k === void 0 ? void 0 : _k.pId) }, { _lId: (_l = body === null || body === void 0 ? void 0 : body.data) === null || _l === void 0 ? void 0 : _l.lId }] }, { $set: { save_as: (_m = body === null || body === void 0 ? void 0 : body.data) === null || _m === void 0 ? void 0 : _m.action, "variations.$[].status": "inactive" } }, { upsert: true, multi: true });
         }
-        if (product) {
-            return res.status(200).send({ success: true, statusCode: 200, message: `Request ${(_k = body === null || body === void 0 ? void 0 : body.data) === null || _k === void 0 ? void 0 : _k.action}` });
+        if (result) {
+            return res.status(200).send({ success: true, statusCode: 200, message: `Request ${(_o = body === null || body === void 0 ? void 0 : body.data) === null || _o === void 0 ? void 0 : _o.action} successful.` });
         }
     }
     catch (error) {
-        res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });

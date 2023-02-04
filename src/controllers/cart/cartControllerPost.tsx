@@ -1,20 +1,7 @@
-import { Request, Response } from "express";
-const { dbConnection } = require("../../utils/db");
-const { ObjectId } = require("mongodb");
+import { NextFunction, Request, Response } from "express";
 const { cartTemplate } = require("../../templates/cart.template");
-
-const checkProductAvailability = async (productId: string, variationId: String) => {
-   const db = await dbConnection();
-
-   let product = await db.collection('products').aggregate([
-      { $match: { _id: ObjectId(productId) } },
-      { $unwind: { path: "$variations" } },
-      { $match: { $and: [{ 'variations._vId': variationId }, { 'variations.available': { $gte: 1 } }, { 'variations.stock': 'in' }] } }
-   ]).toArray();
-
-   product = product[0];
-   return product;
-};
+const { checkProductAvailability } = require("../../model/common.model");
+const ShoppingCart = require("../../model/shoppingCart.model");
 
 // add to cart controller
 /**
@@ -22,12 +9,12 @@ const checkProductAvailability = async (productId: string, variationId: String) 
  * @required --> BODY [productId, variationId]
  * @request_method --> POST
  */
-module.exports.addToCartHandler = async (req: Request, res: Response) => {
+module.exports.addToCartHandler = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const db = await dbConnection();
 
       const authEmail: string = req.decoded.email;
       const body = req.body;
+      let countCartItems: number = 0;
 
       const availableProduct = await checkProductAvailability(body?.productId, body?.variationId);
 
@@ -35,7 +22,7 @@ module.exports.addToCartHandler = async (req: Request, res: Response) => {
          return res.status(503).send({ success: false, statusCode: 503, error: "Sorry! This product is out of stock now!" });
       }
 
-      const existsProduct = await db.collection("shoppingCarts").findOne(
+      const existsProduct = await ShoppingCart.findOne(
          { $and: [{ customerEmail: authEmail }, { variationId: body?.variationId }] }
       );
 
@@ -43,55 +30,23 @@ module.exports.addToCartHandler = async (req: Request, res: Response) => {
          return res.status(400).send({ success: false, statusCode: 400, error: "Product Has Already In Your Cart!" });
       }
 
-      const cartTemp = cartTemplate(availableProduct, authEmail, body?.productId, body?.listingId, body?.variationId);
+      const cartTemp = cartTemplate(authEmail, body?.productId, body?.listingId, body?.variationId);
 
-      const result = await db.collection('shoppingCarts').insertOne(cartTemp);
+      let cart = new ShoppingCart(cartTemp);
+      let result = await cart.save();
 
-      const countCartItems = await db.collection("shoppingCarts").countDocuments({customerEmail: authEmail});
+      if (result?._id) {
 
-      if (result) {
+         // counting items in shopping cart
+         countCartItems = await ShoppingCart.countDocuments({ customerEmail: authEmail });
+
+         // after counting set this on cookie as a cart product
          res.cookie("cart_p", countCartItems, { httpOnly: false, maxAge: 57600000 });
+
+         // and then send the success response to the clients.
          return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart." });
       }
-
    } catch (error: any) {
-      return res.status(500).send({ success: false, statusCode: 500, error: error?.message });
-   }
-};
-
-
-module.exports.addCartAddress = async (req: Request, res: Response) => {
-   try {
-      const db = await dbConnection();
-
-      const userEmail = req.decoded.email;
-
-      let body = req.body;
-      body['_SA_UID'] = Math.floor(Math.random() * 100000000);
-      body['select_address'] = false;
-
-      const result = await db
-         .collection("users")
-         .updateOne(
-            { email: userEmail },
-            { $push: { shippingAddress: body } },
-            { upsert: true }
-         );
-
-      if (!result) {
-         return res.status(400).send({
-            success: false,
-            statusCode: 400,
-            error: "Failed to add address in this cart",
-         });
-      }
-
-      return res.status(200).send({
-         success: true,
-         statusCode: 200,
-         message: "Successfully shipping address added in your cart.",
-      });
-   } catch (error: any) {
-      res.status(500).send({ message: error?.message });
+      next(error);
    }
 };

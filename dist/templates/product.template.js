@@ -34,8 +34,10 @@ const productIntroTemplate = (body) => {
             origin: body === null || body === void 0 ? void 0 : body.manufacturerOrigin,
             details: body === null || body === void 0 ? void 0 : body.manufacturerDetails,
         },
-        paymentInfo: body === null || body === void 0 ? void 0 : body.paymentInformation,
-        warranty: body === null || body === void 0 ? void 0 : body.warranty
+        paymentInfo: (body === null || body === void 0 ? void 0 : body.paymentInformation) || [],
+        warranty: body === null || body === void 0 ? void 0 : body.warranty,
+        bodyInfo: (body === null || body === void 0 ? void 0 : body.bodyInfo) || {},
+        specification: (body === null || body === void 0 ? void 0 : body.specification) || {}
     };
 };
 const productVariation = (body) => {

@@ -71,7 +71,7 @@ module.exports.setProductIntroController = (req, res) => __awaiter(void 0, void 
             model["ratingAverage"] = 0;
             model['reviews'] = [];
             model['save_as'] = 'draft';
-            let result = yield db.collection('product').insertOne(model);
+            let result = yield db.collection('products').insertOne(model);
             if (result) {
                 return res.status(200).send({
                     success: true,

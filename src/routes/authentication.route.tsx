@@ -10,7 +10,7 @@ try {
 
    router.post("/login", authCTRL.loginController);
 
-   router.post("/sign-out", authCTRL.signOutUser);
+   router.post("/sign-out", authCTRL.signOutController);
 
    router.post("/register-new-seller", authCTRL.sellerRegistrationController);
 

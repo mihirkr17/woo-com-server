@@ -10,7 +10,7 @@ const formInputValidator = require("../middleware/FormInputValidator.middleware"
 try {
     router.post("/register-new-user", formInputValidator.validateBuyerRegistrationInputs, authCTRL.buyerRegistrationController);
     router.post("/login", authCTRL.loginController);
-    router.post("/sign-out", authCTRL.signOutUser);
+    router.post("/sign-out", authCTRL.signOutController);
     router.post("/register-new-seller", authCTRL.sellerRegistrationController);
     router.post("/verify-register-user", authCTRL.userVerifyTokenController);
 }

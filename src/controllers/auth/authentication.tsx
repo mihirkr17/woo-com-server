@@ -1,6 +1,6 @@
 // authentication.tsx
 
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 const User = require("../../model/user.model");
 const generateVerifyToken = require("../../utils/generateVerifyToken");
 const apiResponse = require("../../errors/apiResponse");
@@ -12,7 +12,7 @@ const comparePassword = require("../../utils/comparePassword");
  * @apiMethod --> POST
  * @apiRequired --> BODY
  */
-module.exports.buyerRegistrationController = async (req: Request, res: Response, next: any) => {
+module.exports.buyerRegistrationController = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
       let body = req.body;
@@ -57,7 +57,7 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
  * @apiMethod --> POST
  * @apiRequired --> BODY
  */
-module.exports.sellerRegistrationController = async (req: Request, res: Response, next: any) => {
+module.exports.sellerRegistrationController = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
       let body = req.body;
@@ -101,7 +101,7 @@ module.exports.sellerRegistrationController = async (req: Request, res: Response
 /**
  * @controller --> registration verify
  */
-module.exports.userVerifyTokenController = async (req: Request, res: Response, next: any) => {
+module.exports.userVerifyTokenController = async (req: Request, res: Response, next: NextFunction) => {
    try {
       const verify_token = req.headers.authorization?.split(' ')[1] || undefined;
 
@@ -147,7 +147,7 @@ module.exports.userVerifyTokenController = async (req: Request, res: Response, n
  * @apiMethod --> POST
  * @apiRequired --> BODY
  */
-module.exports.loginController = async (req: Request, res: Response, next: any) => {
+module.exports.loginController = async (req: Request, res: Response, next: NextFunction) => {
    try {
       const verify_token = req.headers.authorization?.split(' ')[1] || undefined;
       const { emailOrPhone, password, authProvider } = req.body;
@@ -227,7 +227,7 @@ module.exports.loginController = async (req: Request, res: Response, next: any) 
 
       if (token) {
          res.cookie("token", token, cookieObject);
-         res.cookie("is_logged", existUser?._id, { httpOnly: false, maxAge: 57600000 });
+         res.cookie("loggedUUID", existUser?._UUID, { httpOnly: false, maxAge: 57600000 });
 
          return res.status(200).send({ name: "isLogin", message: "LoginSuccess" });
       }
@@ -242,10 +242,10 @@ module.exports.loginController = async (req: Request, res: Response, next: any) 
  * @apiMethod --> POST
  * @apiRequired --> BODY
  */
-module.exports.signOutController = async (req: Request, res: Response, next: any) => {
+module.exports.signOutController = async (req: Request, res: Response, next: NextFunction) => {
    try {
       res.clearCookie("token");
-      res.clearCookie('is_logged');
+      res.clearCookie('loggedUUID');
 
       res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
    } catch (error: any) {

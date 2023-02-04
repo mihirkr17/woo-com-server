@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 var jwt = require("jsonwebtoken");
 
 
@@ -11,7 +11,7 @@ var jwt = require("jsonwebtoken");
  * @middleware Verifying valid json web token
  */
 
-const verifyJWT = async (req: Request, res: Response, next: any) => {
+const verifyJWT = async (req: Request, res: Response, next: NextFunction) => {
   const token = req.cookies.token; // finding token in http only cookies.
 
   // if token not present in cookies then return 403 status code and terminate the request here....
@@ -45,7 +45,7 @@ const verifyJWT = async (req: Request, res: Response, next: any) => {
 };
 
 // // verify owner
-const isRoleOwnerOrAdmin = async (req: Request, res: Response, next: any) => {
+const isRoleOwnerOrAdmin = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authRole = req.decoded.role;
 
@@ -55,12 +55,12 @@ const isRoleOwnerOrAdmin = async (req: Request, res: Response, next: any) => {
       return res.status(401).send({ success: false, statusCode: 401, error: "Unauthorized access!" });
     }
   } catch (error: any) {
-    return res.status(500).send({ success: false, statusCode: 500, error: error?.message });
+    next(error);
   }
 };
 
 // verify seller
-const isRoleSeller = async (req: Request, res: Response, next: any) => {
+const isRoleSeller = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authRole = req.decoded.role;
 
@@ -70,12 +70,12 @@ const isRoleSeller = async (req: Request, res: Response, next: any) => {
       return res.status(401).send({ success: false, statusCode: 401, error: "Unauthorized access!" });
     }
   } catch (error: any) {
-    return res.status(500).send({ success: false, statusCode: 500, error: error?.message });
+    next(error);
   }
 };
 
 // verify seller
-const isRoleBuyer = async (req: Request, res: Response, next: any) => {
+const isRoleBuyer = async (req: Request, res: Response, next: NextFunction) => {
 
   try {
     const authRole = req.decoded.role;
@@ -90,14 +90,14 @@ const isRoleBuyer = async (req: Request, res: Response, next: any) => {
       });
     }
   } catch (error: any) {
-    return res.status(500).send({ success: false, statusCode: 500, error: error?.message });
+    next(error);
   }
 };
 
 
 
 // admin authorization
-const isRoleAdmin = async (req: Request, res: Response, next: any) => {
+const isRoleAdmin = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authRole: String = req.decoded.role;
 
@@ -108,11 +108,11 @@ const isRoleAdmin = async (req: Request, res: Response, next: any) => {
     }
 
   } catch (error: any) {
-    return res.status(500).send({ success: false, statusCode: 500, error: error?.message });
+    next(error);
   }
 }
 
-const isPermitForDashboard = async (req: Request, res: Response, next: any) => {
+const isPermitForDashboard = async (req: Request, res: Response, next: NextFunction) => {
   try {
 
     const authRole = req.decoded.role;
@@ -124,7 +124,7 @@ const isPermitForDashboard = async (req: Request, res: Response, next: any) => {
     }
 
   } catch (error: any) {
-    return res.status(500).send();
+    next(error);
   }
 }
 

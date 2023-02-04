@@ -1,4 +1,5 @@
 const productIntroTemplate = (body: any) => {
+
   return {
     title: body?.title,
     slug: body?.slug,
@@ -33,8 +34,10 @@ const productIntroTemplate = (body: any) => {
       origin: body?.manufacturerOrigin,
       details: body?.manufacturerDetails,
     },
-    paymentInfo: body?.paymentInformation,
-    warranty: body?.warranty
+    paymentInfo: body?.paymentInformation || [],
+    warranty: body?.warranty,
+    bodyInfo: body?.bodyInfo || {},
+    specification: body?.specification || {}
   }
 }
 

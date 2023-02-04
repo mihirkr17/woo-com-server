@@ -1,8 +1,9 @@
 import { NextFunction, Request, Response } from "express";
 const { ObjectId } = require("mongodb");
 const User = require("../../model/user.model");
+const ShoppingCart = require("../../model/shoppingCart.model");
 const response = require("../../errors/apiResponse");
-const { productCounter } = require("../../model/product.model");
+const { productCounter } = require("../../model/common.model");
 
 /**
  * @apiController --> Update Profile Data Controller
@@ -221,8 +222,10 @@ module.exports.fetchAuthUserController = async (
    try {
       const authEmail = req.decoded.email;
       const role = req.decoded.role;
+      let result: any;
+      let shoppingCartData: any;
 
-      const result = await User.findOne(
+      result = await User.findOne(
          {
             $and: [{ email: authEmail }, { role: role }, { accountStatus: 'active' }]
          },
@@ -233,15 +236,75 @@ module.exports.fetchAuthUserController = async (
          }
       );
 
-      if (result && result?.role === 'SELLER') {
 
-         const cpbs = await productCounter({ storeName: result.seller.storeInfos?.storeName, _UUID: result?._UUID });
+      if (result && result?.role === 'SELLER' && result?.idFor === 'sell') {
 
-         if (cpbs && typeof cpbs === 'object') {
-            result.seller.storeInfos.numOfProducts = cpbs?.totalProducts;
-            result.seller.storeInfos.productInFulfilled = cpbs?.productInFulfilled;
-            result.seller.storeInfos.productInDraft = cpbs?.productInDraft;
+         await productCounter({ storeName: result.seller.storeInfos?.storeName, _UUID: result?._UUID });
+      }
+
+      if (result && result?.role === 'BUYER' && result?.idFor === 'buy') {
+
+         const spC = await ShoppingCart.aggregate([
+            { $match: { customerEmail: authEmail } },
+            {
+               $lookup: {
+                  from: 'products',
+                  localField: 'listingId',
+                  foreignField: "_lId",
+                  as: "main_product"
+               }
+            },
+            {
+               $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } }
+            },
+            { $project: { main_product: 0 } },
+            { $unwind: { path: "$variations" } },
+            {
+               $match: {
+                  $expr: {
+                     $and: [
+                        { $eq: ['$variations._vId', '$variationId'] },
+                        { $eq: ["$variations.stock", "in"] },
+                        { $eq: ["$save_as", "fulfilled"] }
+                     ]
+                  }
+               }
+            },
+            {
+               $project: {
+                  title: 1,
+                  slug: 1,
+                  listingId: 1,
+                  productId: 1, variationId: 1, variations: 1, brand: 1,
+                  quantity: 1,
+                  totalAmount: { $multiply: ['$variations.pricing.sellingPrice', '$quantity'] },
+                  seller: 1,
+                  shippingCharge: "$shipping.delivery.zonalCharge",
+                  paymentInfo: 1
+               }
+            }
+         ]);
+
+         if (typeof spC === "object") {
+
+            const totalAmounts = spC && spC.map((tAmount: any) => (parseFloat(tAmount?.totalAmount))).reduce((p: any, c: any) => p + c, 0).toFixed(2);
+            const totalQuantities = spC && spC.map((tQuant: any) => (parseFloat(tQuant?.quantity))).reduce((p: any, c: any) => p + c, 0).toFixed(0);
+            const shippingFees = spC && spC.map((p: any) => parseFloat(p?.shippingCharge)).reduce((p: any, c: any) => p + c, 0).toFixed(2);
+            const finalAmounts = spC && spC.map((fAmount: any) => (parseFloat(fAmount?.totalAmount) + fAmount?.shippingCharge)).reduce((p: any, c: any) => p + c, 0).toFixed(2);
+
+            shoppingCartData = {
+               products: spC,
+               container_p: {
+                  totalAmounts,
+                  totalQuantities,
+                  finalAmounts,
+                  shippingFees,
+               },
+               numberOfProducts: spC.length || 0
+            }
          }
+
+         result.buyer['shoppingCart'] = shoppingCartData;
       }
 
       if (!result || typeof result !== "object") {

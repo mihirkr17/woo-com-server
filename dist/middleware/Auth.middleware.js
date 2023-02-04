@@ -54,7 +54,7 @@ const isRoleOwnerOrAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0,
         }
     }
     catch (error) {
-        return res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });
 // verify seller
@@ -69,7 +69,7 @@ const isRoleSeller = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
         }
     }
     catch (error) {
-        return res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });
 // verify seller
@@ -88,7 +88,7 @@ const isRoleBuyer = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         }
     }
     catch (error) {
-        return res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });
 // admin authorization
@@ -103,7 +103,7 @@ const isRoleAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         }
     }
     catch (error) {
-        return res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });
 const isPermitForDashboard = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
@@ -117,7 +117,7 @@ const isPermitForDashboard = (req, res, next) => __awaiter(void 0, void 0, void 
         }
     }
     catch (error) {
-        return res.status(500).send();
+        next(error);
     }
 });
 module.exports = {

@@ -15,6 +15,7 @@ const validator = require("validator");
 const saltRounds = 10;
 const buyerType = new mongoose_1.Schema({
     taxId: { type: String },
+    shoppingCart: { type: Object },
     shippingAddress: [
         {
             _id: false,
