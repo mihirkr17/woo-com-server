@@ -16,17 +16,17 @@ module.exports.updateStockController = (req, res) => __awaiter(void 0, void 0, v
     var _a, _b, _c;
     try {
         const db = yield dbConnection();
-        const productId = req.headers.authorization || "";
+        const productID = req.headers.authorization || "";
         const body = req.body;
-        if (productId && body) {
+        if (productID && body) {
             let stock = ((_a = body === null || body === void 0 ? void 0 : body.variations) === null || _a === void 0 ? void 0 : _a.available) <= 1 ? "out" : "in";
-            const result = yield db.collection("products").updateOne({ _id: ObjectId(productId) }, {
+            const result = yield db.collection("products").updateOne({ _id: ObjectId(productID) }, {
                 $set: {
                     "variations.$[i].available": (_b = body === null || body === void 0 ? void 0 : body.variations) === null || _b === void 0 ? void 0 : _b.available,
                     "variations.$[i].stock": stock,
                 },
             }, {
-                arrayFilters: [{ 'i._vId': (_c = body === null || body === void 0 ? void 0 : body.variations) === null || _c === void 0 ? void 0 : _c._vId }]
+                arrayFilters: [{ 'i._VID': (_c = body === null || body === void 0 ? void 0 : body.variations) === null || _c === void 0 ? void 0 : _c._VID }]
             }, { upsert: true });
             if (!result) {
                 return res.status(503).send({
@@ -53,7 +53,7 @@ module.exports.productOperationController = (req, res) => __awaiter(void 0, void
     var _d;
     try {
         const db = yield dbConnection();
-        const productId = ((_d = req.headers) === null || _d === void 0 ? void 0 : _d.authorization) || "";
+        const productID = ((_d = req.headers) === null || _d === void 0 ? void 0 : _d.authorization) || "";
         const formTypes = req.query.formType || "";
         const vId = req.query.vId;
         const productAttr = req.query.attr;
@@ -61,21 +61,21 @@ module.exports.productOperationController = (req, res) => __awaiter(void 0, void
         let model = req.body;
         // Update variation
         if (formTypes === 'update-variation') {
-            model['_vId'] = vId;
+            model['_VID'] = vId;
             if (vId && productAttr === 'ProductVariations') {
                 result = yield db.collection('products').updateOne({
-                    $and: [{ _id: ObjectId(productId) }, { 'variations._vId': vId }]
+                    $and: [{ _id: ObjectId(productID) }, { 'variations._VID': vId }]
                 }, {
                     $set: {
                         'variations.$[i]': model,
                     }
-                }, { arrayFilters: [{ "i._vId": vId }] });
+                }, { arrayFilters: [{ "i._VID": vId }] });
             }
         }
         // create new variation
         if (formTypes === 'new-variation') {
             result = yield db.collection('products').updateOne({
-                _id: ObjectId(productId)
+                _id: ObjectId(productID)
             }, {
                 $push: { variations: model }
             }, { upsert: true });
@@ -83,12 +83,12 @@ module.exports.productOperationController = (req, res) => __awaiter(void 0, void
         // next condition
         else if (formTypes === 'update') {
             if (productAttr === 'ProductSpecs') {
-                result = yield db.collection('products').updateOne({ _id: ObjectId(productId) }, {
+                result = yield db.collection('products').updateOne({ _id: ObjectId(productID) }, {
                     $set: { specification: model }
                 }, { upsert: true });
             }
             if (productAttr === 'bodyInformation') {
-                result = yield db.collection('products').updateOne({ _id: ObjectId(productId) }, {
+                result = yield db.collection('products').updateOne({ _id: ObjectId(productID) }, {
                     $set: { bodyInfo: model }
                 }, { upsert: true });
             }
@@ -112,10 +112,10 @@ module.exports.productControlController = (req, res, next) => __awaiter(void 0, 
             return res.status(403).send({ success: false, statusCode: 403, error: "Forbidden." });
         }
         if ((_e = body === null || body === void 0 ? void 0 : body.data) === null || _e === void 0 ? void 0 : _e.vId) {
-            result = yield db.collection('products').updateOne({ $and: [{ _id: ObjectId((_f = body === null || body === void 0 ? void 0 : body.data) === null || _f === void 0 ? void 0 : _f.pId) }, { _lId: (_g = body === null || body === void 0 ? void 0 : body.data) === null || _g === void 0 ? void 0 : _g.lId }, { save_as: 'fulfilled' }] }, { $set: { 'variations.$[i].status': (_h = body === null || body === void 0 ? void 0 : body.data) === null || _h === void 0 ? void 0 : _h.action } }, { arrayFilters: [{ "i._vId": (_j = body === null || body === void 0 ? void 0 : body.data) === null || _j === void 0 ? void 0 : _j.vId }] });
+            result = yield db.collection('products').updateOne({ $and: [{ _id: ObjectId((_f = body === null || body === void 0 ? void 0 : body.data) === null || _f === void 0 ? void 0 : _f.pId) }, { _LID: (_g = body === null || body === void 0 ? void 0 : body.data) === null || _g === void 0 ? void 0 : _g.lId }, { save_as: 'fulfilled' }] }, { $set: { 'variations.$[i].status': (_h = body === null || body === void 0 ? void 0 : body.data) === null || _h === void 0 ? void 0 : _h.action } }, { arrayFilters: [{ "i._VID": (_j = body === null || body === void 0 ? void 0 : body.data) === null || _j === void 0 ? void 0 : _j.vId }] });
         }
         else {
-            result = yield db.collection('products').updateOne({ $and: [{ _id: ObjectId((_k = body === null || body === void 0 ? void 0 : body.data) === null || _k === void 0 ? void 0 : _k.pId) }, { _lId: (_l = body === null || body === void 0 ? void 0 : body.data) === null || _l === void 0 ? void 0 : _l.lId }] }, { $set: { save_as: (_m = body === null || body === void 0 ? void 0 : body.data) === null || _m === void 0 ? void 0 : _m.action, "variations.$[].status": "inactive" } }, { upsert: true, multi: true });
+            result = yield db.collection('products').updateOne({ $and: [{ _id: ObjectId((_k = body === null || body === void 0 ? void 0 : body.data) === null || _k === void 0 ? void 0 : _k.pId) }, { _LID: (_l = body === null || body === void 0 ? void 0 : body.data) === null || _l === void 0 ? void 0 : _l.lId }] }, { $set: { save_as: (_m = body === null || body === void 0 ? void 0 : body.data) === null || _m === void 0 ? void 0 : _m.action, "variations.$[].status": "inactive" } }, { upsert: true, multi: true });
         }
         if (result) {
             return res.status(200).send({ success: true, statusCode: 200, message: `Request ${(_o = body === null || body === void 0 ? void 0 : body.data) === null || _o === void 0 ? void 0 : _o.action} successful.` });

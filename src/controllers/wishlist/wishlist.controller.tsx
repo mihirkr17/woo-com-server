@@ -50,13 +50,13 @@ module.exports.removeFromWishlistHandler = async (
   try {
     const db = await dbConnection();
 
-    const productId = req.params.productId;
+    const productID = req.params.productID;
     const userEmail = req.decoded.email;
     const result = await db
       .collection("users")
       .updateOne(
         { email: userEmail },
-        { $pull: { wishlist: { _id: productId } } }
+        { $pull: { wishlist: { _id: productID } } }
       );
 
     if (result) {

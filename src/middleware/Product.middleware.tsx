@@ -1,9 +1,9 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 const productTemplates = require("../templates/product.template");
 
-module.exports.variationOne = async (req: Request, res: Response, next: any) => {
+module.exports.variationOne = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const productId: String = req.headers?.authorization || "";
+      const productID: String = req.headers?.authorization || "";
       const formTypes = req.query.formType || "";
       const vId = req.query.vId;
       const attrs = req.query.attr;
@@ -21,9 +21,9 @@ module.exports.variationOne = async (req: Request, res: Response, next: any) => 
 
       // for new variation 
       if (formTypes === 'new-variation' && attrs === 'ProductVariations') {
-         let variationId = Math.random().toString(36).toUpperCase().slice(2, 18);
+         let variationID = Math.random().toString(36).toUpperCase().slice(2, 18);
          model = productTemplates.productVariation(variation);
-         model['_vId'] = variationId
+         model['_VID'] = variationID
          req.body = model;
          next();
          return;

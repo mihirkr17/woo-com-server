@@ -50,11 +50,11 @@ module.exports.addToWishlistHandler = (req, res) => __awaiter(void 0, void 0, vo
 module.exports.removeFromWishlistHandler = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const db = yield dbConnection();
-        const productId = req.params.productId;
+        const productID = req.params.productID;
         const userEmail = req.decoded.email;
         const result = yield db
             .collection("users")
-            .updateOne({ email: userEmail }, { $pull: { wishlist: { _id: productId } } });
+            .updateOne({ email: userEmail }, { $pull: { wishlist: { _id: productID } } });
         if (result) {
             return res
                 .status(200)

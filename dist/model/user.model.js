@@ -15,7 +15,8 @@ const validator = require("validator");
 const saltRounds = 10;
 const buyerType = new mongoose_1.Schema({
     taxId: { type: String },
-    shoppingCart: { type: Object },
+    defaultShippingAddress: { type: Object },
+    shoppingCartItems: { type: Number },
     shippingAddress: [
         {
             _id: false,
@@ -113,13 +114,5 @@ UserSchema.pre("save", function (next) {
         next();
     });
 });
-// check or compare user password from hash password
-// UserSchema.methods.comparePassword = async function (password: any, hash: any) {
-//   try {
-//     return await bcrypt.compare(password, hash);
-//   } catch (error: any) {
-//     throw new Error(error);
-//   }
-// };
 var User = (0, mongoose_1.model)("User", UserSchema, "users");
 module.exports = User;

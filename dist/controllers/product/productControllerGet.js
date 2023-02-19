@@ -14,7 +14,7 @@ const { ObjectId } = require("mongodb");
 const { topSellingProducts, topRatedProducts, allProducts } = require("../../model/product.model");
 /**
  * @controller      --> Fetch the single product information in product details page.
- * @required        --> [req.headers.authorization:email, req.query:productId, req.query:variationId, req.params:product slug]
+ * @required        --> [req.headers.authorization:email, req.query:productID, req.query:variationID, req.params:product slug]
  * @request_method  --> GET
  */
 module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
@@ -23,22 +23,22 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
         const db = yield dbConnection();
         const email = req.headers.authorization || '';
         const product_slug = req.params.product_slug;
-        const productId = (_a = req.query) === null || _a === void 0 ? void 0 : _a.pId;
-        const variationId = req.query.vId;
+        const productID = (_a = req.query) === null || _a === void 0 ? void 0 : _a.pId;
+        const variationID = req.query.vId;
         let existProductInCart = null;
         let existProductInWishlist;
         // If user email address exists
         if (email && typeof email === 'string') {
             existProductInCart = yield db
                 .collection("shoppingCarts")
-                .findOne({ $and: [{ customerEmail: email }, { variationId: variationId }] });
+                .findOne({ $and: [{ customerEmail: email }, { variationID: variationID }] });
             existProductInWishlist = yield db
                 .collection("users")
                 .findOne({ $and: [{ email }, { "wishlist.slug": product_slug }] });
         }
         // Product Details
         let productDetail = yield db.collection('products').aggregate([
-            { $match: { _id: ObjectId(productId) } },
+            { $match: { _id: ObjectId(productID) } },
             {
                 $project: {
                     title: 1,
@@ -46,9 +46,17 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
                     variations: 1,
                     swatch: {
                         $map: {
-                            input: "$variations",
+                            input: {
+                                $filter: {
+                                    input: "$variations",
+                                    cond: {
+                                        $eq: ["$$v.status", "active"]
+                                    },
+                                    as: "v"
+                                }
+                            },
                             as: "variation",
-                            in: { variant: "$$variation.variant", _vId: "$$variation._vId" }
+                            in: { variant: "$$variation.variant", _VID: "$$variation._VID" }
                         }
                     },
                     fulfilledBy: "$shipping.fulfilledBy",
@@ -57,7 +65,7 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
                     specification: '$specification',
                     brand: 1, categories: 1,
                     sellerData: 1, rating: 1, ratingAverage: 1, save_as: 1, createdAt: 1, bodyInfo: 1, manufacturer: 1,
-                    _lId: 1,
+                    _LID: 1,
                     inCart: {
                         $cond: {
                             if: { $eq: [existProductInCart, null] }, then: false, else: true
@@ -66,7 +74,7 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
                 }
             },
             { $unwind: { path: '$variations' } },
-            { $match: { 'variations._vId': variationId } }
+            { $match: { 'variations._VID': variationID } }
         ]).toArray();
         productDetail = productDetail[0];
         // Related products
@@ -76,23 +84,22 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
                 $match: {
                     $and: [
                         { categories: { $in: productDetail.categories } },
-                        { 'variations._vId': { $ne: variationId } },
+                        { 'variations._VID': { $ne: variationID } },
                         { 'variations.status': "active" },
                     ],
                 },
             },
             {
                 $project: {
-                    _lId: 1,
+                    _LID: 1,
                     title: 1,
                     slug: 1,
                     ratingAverage: "$ratingAverage",
                     brand: "$brand",
                     variations: {
-                        _vId: "$variations._vId",
+                        _VID: "$variations._VID",
                         pricing: "$variations.pricing",
-                        attributes: "$variations.attributes",
-                        images: "$variations.images"
+                        variant: "$variations.variant"
                     },
                     reviews: 1,
                 },
@@ -140,7 +147,7 @@ module.exports.productsByCategoryController = (req, res, next) => __awaiter(void
             },
             {
                 $project: {
-                    title: 1, slug: 1, variations: 1, rating: 1, brand: 1, _lId: 1, _id: 1,
+                    title: 1, slug: 1, variations: 1, rating: 1, brand: 1, _LID: 1, _id: 1,
                     ratingAverage: 1
                 }
             },
@@ -199,7 +206,7 @@ module.exports.searchProducts = (req, res, next) => __awaiter(void 0, void 0, vo
  * @required        --> []
  * @request_method  --> GET
  */
-module.exports.homeStoreController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.homeStoreController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const totalLimits = parseInt(req.params.limits);
         const products = yield allProducts(totalLimits);
@@ -214,7 +221,7 @@ module.exports.homeStoreController = (req, res) => __awaiter(void 0, void 0, voi
         });
     }
     catch (error) {
-        return res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });
 module.exports.fetchTopSellingProduct = (req, res) => __awaiter(void 0, void 0, void 0, function* () {

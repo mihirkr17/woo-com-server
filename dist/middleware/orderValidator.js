@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const orderValidator = (req, res, next) => {
-    const { orderId, trackingId, user_email, ownerProfit, productId, title, slug, brand, image, sku, price, totalAmount, quantity, seller, payment_mode, shipping_address, package_dimension, delivery_service, } = req.body;
+    const { orderId, trackingId, user_email, ownerProfit, productID, title, slug, brand, image, sku, price, totalAmount, quantity, seller, payment_mode, shipping_address, package_dimension, delivery_service, } = req.body;
     const errorMessage = (msg) => {
         return res.status(400).send({ success: false, error: `${msg}` });
     };

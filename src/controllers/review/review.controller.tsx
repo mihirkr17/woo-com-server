@@ -6,7 +6,7 @@ module.exports.addProductRating = async (req: Request, res: Response) => {
   try {
     const db = await dbConnection();
 
-    const productId = req.params.productId;
+    const productID = req.params.productID;
     const email = req.decoded.email;
     const body = req.body;
     const orderId = parseInt(body?.orderId);
@@ -22,7 +22,7 @@ module.exports.addProductRating = async (req: Request, res: Response) => {
     );
 
     const products = await db.collection("products").findOne({
-      _id: ObjectId(productId),
+      _id: ObjectId(productID),
       status: "active",
     });
 
@@ -89,7 +89,7 @@ module.exports.addProductRating = async (req: Request, res: Response) => {
     }
 
     const result = await db.collection("products").updateOne(
-      { _id: ObjectId(productId) },
+      { _id: ObjectId(productID) },
       filters,
       options
     );

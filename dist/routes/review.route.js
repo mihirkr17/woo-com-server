@@ -8,7 +8,7 @@ const router = express_1.default.Router();
 const { verifyJWT, isRoleBuyer } = require("../middleware/Auth.middleware");
 const { addProductRating } = require("../controllers/review/review.controller");
 try {
-    router.put("/add-product-rating/:productId", verifyJWT, isRoleBuyer, addProductRating);
+    router.put("/add-product-rating/:productID", verifyJWT, isRoleBuyer, addProductRating);
 }
 catch (error) {
     console.log(error === null || error === void 0 ? void 0 : error.message);

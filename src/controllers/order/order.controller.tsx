@@ -1,78 +1,30 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const { updateProductStock } = require("../../utils/common");
 const { orderModel } = require("../../templates/order.template");
+const Product = require("../../model/product.model");
+const User = require("../../model/user.model");
+const Order = require("../../model/order.model");
 
-module.exports.setOrderHandler = async (req: Request, res: Response, next: any) => {
-  try {
-    const db = await dbConnection();
 
-    const userEmail: string = req.headers.authorization || "";
-    const verifiedEmail: string = req.decoded.email;
-    const body: any = req.body;
-
-    if (userEmail !== verifiedEmail) {
-      return res.status(401).send({ error: "Unauthorized access" });
-    }
-
-    if (!body || typeof body === "undefined") {
-      return res.status(400).send({
-        success: false,
-        statusCode: 400,
-        error: "Something went wrong !",
-      });
-    }
-
-    const products = await db.collection("products").findOne({
-      _id: ObjectId(body?.productId),
-    });
-
-    if (!products || typeof products === "undefined") {
-      return res.status(400).send({
-        success: false,
-        statuscode: 400,
-        error: "Sorry! Can't place this order",
-      });
-    }
-
-    if (products?.available < body?.quantity && products.stock !== "in") {
-      return res.status(400).send({
-        success: false,
-        statuscode: 400,
-        error:
-          "Sorry! Order not taken because this product not available rights now!",
-      });
-    }
-
-    let model = orderModel(body);
-
-    const result = await db
-      .collection("orders")
-      .updateOne(
-        { user_email: userEmail },
-        { $push: { orders: model } },
-        { upsert: true }
-      );
-
-    if (result) {
-      await updateProductStock(body?.productId, body?.quantity, "dec");
-
-      await db
-        .collection("users")
-        .updateOne({ email: userEmail }, { $unset: { shoppingCartItems: [] } });
-      res.status(200).send(result && { message: "Order success" });
-    }
-  } catch (error: any) {
-    next(error);
-  }
-};
-
-module.exports.myOrder = async (req: Request, res: Response, next: any) => {
+module.exports.myOrder = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const db = await dbConnection();
     const email = req.params.email;
-    res.send(await db.collection("orders").findOne({ user_email: email }));
+    const authEmail = req.decoded.email;
+
+    if (email !== authEmail) {
+      return res.status(401).send();
+    }
+
+    let result = await Order.aggregate([
+      { $match: { $and: [{ user_email: email }] } },
+      { $unwind: { path: "$orders" } },
+      { $replaceRoot: { newRoot: "$orders" } }
+    ]);
+
+    res.status(200).send({ success: true, statusCode: 200, data: { module: { orders: result } } });
   } catch (error: any) {
     next(error);
   }
@@ -97,85 +49,79 @@ module.exports.removeOrder = async (req: Request, res: Response, next: any) => {
   }
 };
 
-module.exports.cancelMyOrder = async (req: Request, res: Response) => {
+module.exports.cancelMyOrder = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const db = await dbConnection();
-
     const userEmail = req.params.userEmail;
-    const orderId = parseInt(req.params.orderId);
-    const { status, cancel_reason, time_canceled, quantity, productId } =
-      req.body;
+    const { cancel_reason, orderID } = req.body;
 
-    const result = await db.collection("orders").updateOne(
+    const timestamp = Date.now();
+
+    let cancelTime = {
+      iso: new Date(timestamp),
+      time: new Date(timestamp).toLocaleTimeString(),
+      date: new Date(timestamp).toDateString(),
+      timestamp: timestamp
+    }
+
+    const result = await Order.findOneAndUpdate(
       { user_email: userEmail },
       {
         $set: {
-          "orders.$[i].status": status,
-          "orders.$[i].cancel_reason": cancel_reason,
-          "orders.$[i].time_canceled": time_canceled,
+          "orders.$[i].orderStatus": "canceled",
+          "orders.$[i].cancelReason": cancel_reason,
+          "orders.$[i].orderCanceledAT": cancelTime,
         },
       },
-      { arrayFilters: [{ "i.orderId": orderId }] }
+      { arrayFilters: [{ "i.orderID": orderID }], upsert: true }
     );
 
     if (result) {
-      await updateProductStock(productId, quantity, "inc");
-    }
-
-    res.send({ result, message: "Order canceled successfully" });
-  } catch (error: any) {
-    res.status(500).send({ message: error?.message });
-  }
-};
-
-module.exports.dispatchOrderRequest = async (req: Request, res: Response) => {
-  try {
-    const db = await dbConnection();
-
-    const orderId: number = parseInt(req.params.orderId);
-    const trackingId = req.params.trackingId;
-    const userEmail: string = req.headers.authorization || "";
-    
-    res.status(200).send(
-      (await db.collection("orders").updateOne(
-        { user_email: userEmail },
+      let existOrder = await Order.aggregate([
+        { $match: { user_email: userEmail } },
+        { $unwind: { path: "$orders" } },
         {
-          $set: {
-            "orders.$[i].status": "dispatch",
-          },
+          $replaceRoot: { newRoot: "$orders" }
         },
         {
-          arrayFilters: [{ "i.orderId": orderId, "i.trackingId": trackingId }],
+          $match: { $and: [{ orderID: orderID }] }
         }
-      )) && { message: "Successfully order dispatched" }
-    );
-  } catch (error: any) {
-    res.status(500).send({ message: error?.message });
-  }
-};
+      ]);
 
-module.exports.manageOrders = async (req: Request, res: Response) => {
-  try {
-    const db = await dbConnection();
-    const storeName = req.query.storeName;
-    let result: any;
+      existOrder = existOrder[0];
 
-    if (storeName) {
-      result = await db
-        .collection("orders")
-        .aggregate([
-          { $unwind: "$orders" },
-          {
-            $match: {
-              $and: [{ "orders.seller": storeName }],
-            },
-          },
-        ])
-        .toArray();
+      let products = await Product.aggregate([
+        { $match: { $and: [{ _LID: existOrder?.listingID }] } },
+        { $unwind: { path: "$variations" } },
+        {
+          $project: {
+            variations: 1
+          }
+        },
+        { $match: { $and: [{ "variations._VID": existOrder?.variationID }] } },
+      ]);
+      products = products[0];
+
+
+      let availableProduct = products?.variations?.available;
+      let restAvailable = availableProduct + existOrder?.quantity;
+      let stock = restAvailable <= 1 ? "out" : "in";
+
+      await Product.findOneAndUpdate(
+        { _id: ObjectId(existOrder?.productID) },
+        {
+          $set: {
+            "variations.$[i].available": restAvailable,
+            "variations.$[i].stock": stock
+          }
+        },
+        { arrayFilters: [{ "i._VID": existOrder?.variationID }] }
+      );
     }
 
-    res.status(200).send(result);
+    res.send({ success: true, statusCode: 200, message: "Order canceled successfully" });
   } catch (error: any) {
-    res.status(500).send({ message: error?.message });
+    next(error);
   }
 };
+
+

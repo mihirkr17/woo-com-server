@@ -6,15 +6,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const router = express_1.default.Router();
 const orderValidator = require("../middleware/OrderValidator.middleware");
-const { verifyJWT, isRoleSeller, isRoleBuyer, } = require("../middleware/auth");
-const { setOrderHandler, myOrder, removeOrder, cancelMyOrder, dispatchOrderRequest, manageOrders, } = require("../controllers/order/order.controller");
+const { verifyJWT, isRoleBuyer, } = require("../middleware/auth");
+const { myOrder, removeOrder, cancelMyOrder, } = require("../controllers/order/order.controller");
+const SetOrder = require("../controllers/order/SetOrder");
 try {
-    router.post("/set-order", verifyJWT, isRoleBuyer, orderValidator, setOrderHandler);
-    router.get("/my-order/:email", myOrder);
+    router.post("/set-order", verifyJWT, isRoleBuyer, SetOrder);
+    router.get("/my-order/:email", verifyJWT, myOrder);
     router.delete("/remove-order/:email/:orderId", verifyJWT, removeOrder);
-    router.put("/cancel-my-order/:userEmail/:orderId", verifyJWT, cancelMyOrder);
-    router.put("/dispatch-order-request/:orderId/:trackingId", verifyJWT, isRoleSeller, dispatchOrderRequest);
-    router.get("/manage-orders", manageOrders);
+    router.put("/cancel-my-order/:userEmail", verifyJWT, cancelMyOrder);
 }
 catch (error) {
     console.log(error === null || error === void 0 ? void 0 : error.message);

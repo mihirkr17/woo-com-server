@@ -2,6 +2,7 @@ import express, { Router } from "express";
 const router: Router = express.Router();
 const shippingAddressController = require("../controllers/users/ShippingAddress.controller");
 const userCTRL = require("../controllers/users/users");
+const FetchAuthUser = require("../controllers/users/FetchAuthUser");
 
 // Middleware
 const { verifyJWT, isRoleOwnerOrAdmin } = require("../middleware/auth");
@@ -15,7 +16,7 @@ try {
    * @apiParams no params required.
    * @apiSuccess {one particular user object data}
    */
-  router.get("/fau", verifyJWT, userCTRL.fetchAuthUserController);
+  router.get("/fau", verifyJWT, FetchAuthUser);
 
   /**
    * @api {put} /sign in the user

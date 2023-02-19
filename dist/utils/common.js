@@ -10,20 +10,18 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const { ObjectId } = require("mongodb");
-const { dbConnection } = require("./db");
-module.exports.updateProductStock = (productId, quantity, action) => __awaiter(void 0, void 0, void 0, function* () {
-    const db = yield dbConnection();
-    const products = yield db.collection("products").findOne({
-        _id: ObjectId(productId),
-    });
-    let availableProduct = products === null || products === void 0 ? void 0 : products.available;
-    let restAvailable;
-    if (action === "inc") {
-        restAvailable = availableProduct + quantity;
+const Product = require("../model/product.model");
+module.exports.updateProductStock = (productID, variationID, restAvailable) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        let stock = restAvailable <= 1 ? "out" : "in";
+        return yield Product.findOneAndUpdate({ _id: ObjectId(productID) }, {
+            $set: {
+                "variations.$[i].available": restAvailable,
+                "variations.$[i].stock": stock
+            }
+        }, { arrayFilters: [{ "i._VID": variationID }] });
     }
-    if (action === "dec") {
-        restAvailable = availableProduct - quantity;
+    catch (error) {
+        return error;
     }
-    let stock = restAvailable <= 1 ? "out" : "in";
-    yield db.collection("products").updateOne({ _id: ObjectId(productId) }, { $set: { available: restAvailable, stock } }, { upsert: true });
 });

@@ -5,11 +5,14 @@ const {
    topSellingProducts,
    topRatedProducts,
    allProducts
-} = require("../../model/product.model");
+} = require("../../model/common.model");
+const User = require("../../model/user.model");
+const Product = require("../../model/product.model");
+const ShoppingCart = require("../../model/shoppingCart.model");
 
 /**
  * @controller      --> Fetch the single product information in product details page.
- * @required        --> [req.headers.authorization:email, req.query:productId, req.query:variationId, req.params:product slug]
+ * @required        --> [req.headers.authorization:email, req.query:productID, req.query:variationID, req.params:product slug]
  * @request_method  --> GET
  */
 module.exports.fetchSingleProductController = async (req: Request, res: Response, next: any) => {
@@ -18,25 +21,32 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
 
       const email: String = req.headers.authorization || '';
       const product_slug: String = req.params.product_slug;
-      const productId = req.query?.pId;
-      const variationId = req.query.vId;
+      const productID = req.query?.pId;
+      const variationID = req.query.vId;
       let existProductInCart: any = null;
-      let existProductInWishlist: any;
+      let areaType: any = "";
+
 
       // If user email address exists
       if (email && typeof email === 'string') {
-         existProductInCart = await db
-            .collection("shoppingCarts")
-            .findOne({ $and: [{ customerEmail: email }, { variationId: variationId }] });
+         existProductInCart = await ShoppingCart.findOne({ $and: [{ customerEmail: email }, { variationID: variationID }] });
 
-         existProductInWishlist = await db
-            .collection("users")
-            .findOne({ $and: [{ email }, { "wishlist.slug": product_slug }] });
+         let defaultShippingAddress = await User.aggregate([
+            { $match: { email } },
+            { $unwind: { path: "$buyer.shippingAddress" } },
+            { $replaceRoot: { newRoot: "$buyer.shippingAddress" } },
+            {
+               $match: { default_shipping_address: true }
+            }
+         ]);
+         defaultShippingAddress = defaultShippingAddress[0];
+         areaType = defaultShippingAddress?.area_type;
+
       }
 
       // Product Details
       let productDetail = await db.collection('products').aggregate([
-         { $match: { _id: ObjectId(productId) } },
+         { $match: { _id: ObjectId(productID) } },
          {
             $project: {
                title: 1,
@@ -44,18 +54,29 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
                variations: 1,
                swatch: {
                   $map: {
-                     input: "$variations",
+                     input: {
+                        $filter: {
+                           input: "$variations",
+                           cond: {
+                              $eq: ["$$v.status", "active"]
+                           },
+                           as: "v"
+                        }
+                     },
                      as: "variation",
-                     in: { variant: "$$variation.variant", _vId: "$$variation._vId" }
+                     in: { variant: "$$variation.variant", _VID: "$$variation._VID" }
                   }
                },
                fulfilledBy: "$shipping.fulfilledBy",
-               deliveryCharge: "$shipping.delivery",
+               deliveryCharge: {
+                  $cond: { if: { $eq: [areaType, "local"] }, then: "$shipping.delivery.localCharge", else: "$shipping.delivery.zonalCharge" }
+               },
                deliveryDetails: 1,
                specification: '$specification',
                brand: 1, categories: 1,
                sellerData: 1, rating: 1, ratingAverage: 1, save_as: 1, createdAt: 1, bodyInfo: 1, manufacturer: 1,
-               _lId: 1,
+               _LID: 1,
+               paymentInfo: 1,
                inCart: {
                   $cond: {
                      if: { $eq: [existProductInCart, null] }, then: false, else: true
@@ -64,7 +85,7 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
             }
          },
          { $unwind: { path: '$variations' } },
-         { $match: { 'variations._vId': variationId } }
+         { $match: { 'variations._VID': variationID } }
       ]).toArray();
 
 
@@ -77,23 +98,22 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
             $match: {
                $and: [
                   { categories: { $in: productDetail.categories } },
-                  { 'variations._vId': { $ne: variationId } },
+                  { 'variations._VID': { $ne: variationID } },
                   { 'variations.status': "active" },
                ],
             },
          },
          {
             $project: {
-               _lId: 1,
+               _LID: 1,
                title: 1,
                slug: 1,
                ratingAverage: "$ratingAverage",
                brand: "$brand",
                variations: {
-                  _vId: "$variations._vId",
+                  _VID: "$variations._VID",
                   pricing: "$variations.pricing",
-                  attributes: "$variations.attributes",
-                  images: "$variations.images"
+                  variant: "$variations.variant"
                },
                reviews: 1,
             },
@@ -153,7 +173,7 @@ module.exports.productsByCategoryController = async (req: Request, res: Response
          },
          {
             $project: {
-               title: 1, slug: 1, variations: 1, rating: 1, brand: 1, _lId: 1, _id: 1,
+               title: 1, slug: 1, variations: 1, rating: 1, brand: 1, _LID: 1, _id: 1,
                ratingAverage: 1
             }
          },
@@ -221,7 +241,7 @@ module.exports.searchProducts = async (req: Request, res: Response, next: NextFu
  * @required        --> []
  * @request_method  --> GET
  */
-module.exports.homeStoreController = async (req: Request, res: Response) => {
+module.exports.homeStoreController = async (req: Request, res: Response, next: NextFunction) => {
    try {
       const totalLimits = parseInt(req.params.limits);
 
@@ -241,7 +261,7 @@ module.exports.homeStoreController = async (req: Request, res: Response) => {
 
 
    } catch (error: any) {
-      return res.status(500).send({ success: false, statusCode: 500, error: error?.message });
+      next(error);
    }
 }
 
@@ -270,3 +290,103 @@ module.exports.fetchTopSellingProduct = async (req: Request, res: Response) => {
       return res.status(500).send({ message: error?.message });
    }
 };
+
+
+
+
+module.exports.purchaseProductController = async (req: Request, res: Response, next: NextFunction) => {
+   try {
+
+      const authEmail = req.decoded.email;
+      const role = req.decoded.role;
+      const body = req.body;
+
+      let result = await User.findOne(
+         {
+            $and: [{ email: authEmail }, { role: role }, { accountStatus: 'active' }]
+         },
+         {
+            password: 0, createdAt: 0,
+            phonePrefixCode: 0,
+            becomeSellerAt: 0
+         }
+      );
+
+      let areaType = (Array.isArray(result?.buyer?.shippingAddress) &&
+         result?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
+      areaType = areaType?.area_type;
+
+      let buyProduct = await Product.aggregate([
+         { $match: { _LID: body?.listingID } },
+         { $unwind: { path: "$variations" } },
+         { $match: { $and: [{ 'variations._VID': body?.variationID }] } },
+         {
+            $project: {
+               _id: 0,
+               title: 1,
+               slug: 1,
+               variations: 1,
+               brand: 1,
+               image: { $first: "$variations.images" },
+               sku: "$variations.sku",
+               sellerData: 1,
+               shippingCharge: {
+                  $switch: {
+                     branches: [
+                        { case: { $eq: [areaType, "zonal"] }, then: "$shipping.delivery.zonalCharge" },
+                        { case: { $eq: [areaType, "local"] }, then: "$shipping.delivery.localCharge" }
+                     ],
+                     default: "$shipping.delivery.zonalCharge"
+                  }
+               },
+               totalAmount: {
+                  $add: [{ $multiply: ['$variations.pricing.sellingPrice', body?.quantity] }, {
+                     $switch: {
+                        branches: [
+                           { case: { $eq: [areaType, "zonal"] }, then: "$shipping.delivery.zonalCharge" },
+                           { case: { $eq: [areaType, "local"] }, then: "$shipping.delivery.localCharge" }
+                        ],
+                        default: "$shipping.delivery.zonalCharge"
+                     }
+                  }]
+               },
+               paymentInfo: 1,
+               sellingPrice: "$variations.pricing.sellingPrice",
+               variant: "$variations.variant",
+               stock: "$variations.stock"
+            }
+         }, {
+            $unset: ["variations"]
+         }
+      ]);
+
+      if (buyProduct && typeof buyProduct !== 'undefined') {
+         buyProduct = buyProduct[0];
+         buyProduct["quantity"] = body?.quantity;
+         buyProduct["productID"] = body.productID;
+         buyProduct["listingID"] = body?.listingID;
+         buyProduct["variationID"] = body?.variationID;
+         buyProduct["customerEmail"] = body?.customerEmail;
+
+         const totalAmounts = buyProduct?.totalAmount && parseFloat(buyProduct?.totalAmount).toFixed(2);
+         const totalQuantities = buyProduct?.quantity && parseInt(buyProduct?.quantity);
+         const shippingFees = buyProduct?.shippingCharge && parseFloat(buyProduct?.shippingCharge).toFixed(2);
+         const finalAmounts = buyProduct && (parseFloat(buyProduct?.totalAmount) + parseFloat(buyProduct?.shippingCharge)).toFixed(2);
+
+         let buyingCartData = {
+            product: buyProduct,
+            container_p: {
+               totalAmounts,
+               totalQuantities,
+               finalAmounts,
+               shippingFees,
+            },
+            numberOfProducts: buyProduct.length || 0
+         }
+
+         return res.status(200).send({ success: true, statusCode: 200, data: { module: buyingCartData } });
+      }
+   } catch (error: any) {
+      next(error)
+   }
+}

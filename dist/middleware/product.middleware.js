@@ -13,7 +13,7 @@ const productTemplates = require("../templates/product.template");
 module.exports.variationOne = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     try {
-        const productId = ((_a = req.headers) === null || _a === void 0 ? void 0 : _a.authorization) || "";
+        const productID = ((_a = req.headers) === null || _a === void 0 ? void 0 : _a.authorization) || "";
         const formTypes = req.query.formType || "";
         const vId = req.query.vId;
         const attrs = req.query.attr;
@@ -27,9 +27,9 @@ module.exports.variationOne = (req, res, next) => __awaiter(void 0, void 0, void
         }
         // for new variation 
         if (formTypes === 'new-variation' && attrs === 'ProductVariations') {
-            let variationId = Math.random().toString(36).toUpperCase().slice(2, 18);
+            let variationID = Math.random().toString(36).toUpperCase().slice(2, 18);
             model = productTemplates.productVariation(variation);
-            model['_vId'] = variationId;
+            model['_VID'] = variationID;
             req.body = model;
             next();
             return;

@@ -1,149 +1,68 @@
-var conn = require("../utils/db");
-var mongodb = require("mongodb");
+import { Schema, model } from "mongoose";
 
-module.exports.productCounter = async (sellerInfo: any) => {
-   try {
-      let db = await conn.dbConnection();
+const sellerDataType = new Schema({
+   storeName: { type: String, required: true },
+   sellerID: { type: String, required: true },
+   sellerName: { type: String, required: true }
+}, { _id: false });
 
-      const productCollection = await db.collection('products');
+const taxType = new Schema({
+   hsn: { type: String, required: true },
+   code: { type: String, required: true }
+}, { _id: false });
 
-      async function cps(saveAs: String = "") {
-         let f;
-         let isSaveAs;
-
-         if (saveAs) {
-            isSaveAs = { 'save_as': saveAs };
-         } else {
-            isSaveAs = {};
-         }
-
-         if (sellerInfo) {
-            f = {
-               $and: [
-                  isSaveAs,
-                  { 'sellerData.storeName': sellerInfo?.storeName },
-                  { 'sellerData.sellerId': sellerInfo?._UUID }
-               ]
-            }
-         } else {
-            f = isSaveAs;
-
-         }
-         return productCollection.countDocuments(f);
-      }
-
-      let totalProducts: Number = await cps();
-
-      let productInFulfilled: Number = await cps("fulfilled");
-
-      let productInDraft: Number = await cps("draft");
-
-      return { totalProducts, productInFulfilled, productInDraft };
-
-   } catch (error: any) {
-      return error;
+const shippingType = new Schema({
+   fulfilledBy: { type: String, required: true },
+   procurementType: { type: String, required: true },
+   procurementSLA: { type: String, required: true },
+   provider: { type: String, required: true },
+   delivery: {
+      localCharge: { type: Number, required: true },
+      zonalCharge: { type: Number, required: true }
    }
-}
+}, { _id: false });
 
-module.exports.productByCategories = async (product: any, limit: Number = 1000) => {
+const manufacturerType = new Schema({
+   origin: { type: String, required: true },
+   details: { type: String, required: true }
+}, { _id: false });
 
-   try {
 
-      let db = await conn.dbConnection();
-      let relatedProducts = await db.collection('products').aggregate([
-         {
-            $match: {
-               $and: [
-                  { categories: { $in: product.categories } },
-                  { slug: { $ne: product.slug } },
-                  { status: "active" },
-                  { save_as: 'fulfilled' }
-               ]
-            }
-         },
-         { $project: { slug: "$slug", title: "$title", pricing: "$pricing", ratingAverage: "$ratingAverage", brand: "$brand" } },
-         { $limit: limit }
-      ]).toArray();
+const bodyInfoType = new Schema({
+   keyFeatures: { type: Array, required: true },
+   searchKeywords: { type: Array, required: true },
+   metaDescription: { type: String, required: true },
+   description: { type: String, required: true }
+}, { _id: false });
 
-   } catch (error: any) {
-
+var ProductSchema = new Schema({
+   _LID: { type: String, required: true },
+   title: { type: String, required: true },
+   slug: { type: String, required: true },
+   categories: { type: Array, required: true },
+   brand: { type: String, required: true },
+   manufacturer: { type: manufacturerType, required: true },
+   shipping: { type: shippingType, required: true },
+   paymentInfo: { type: Array, required: true },
+   rating: { type: Array, required: true },
+   reviews: { type: Array, required: true },
+   ratingAverage: { type: Number, required: true, default: 0 },
+   bodyInfo: { type: bodyInfoType, required: true },
+   specification: { type: Object, required: true },
+   variations: { type: Array, required: true },
+   tax: { type: taxType, required: true },
+   sellerData: { type: sellerDataType, required: true },
+   save_as: { type: String, required: true, enum: ["fulfilled", "draft"] },
+   createdAt: { type: Date, required: true },
+   modifiedAt: { type: Date, required: false },
+   isVerified: { type: Boolean, required: true },
+   verifyStatus: {
+      verifiedBy: { type: String, required: true },
+      email: { type: String, required: true },
+      verifiedAt: { type: Date, required: true }
    }
-}
+});
 
-// top selling products
-module.exports.topSellingProducts = async () => {
-   try {
-      let db = await conn.dbConnection();
+const Product = model('Product', ProductSchema, 'products');
 
-      return await db.collection("products").aggregate([
-         { $unwind: { path: '$variations' } },
-         { $match: { 'variations.status': "active" } },
-         { $sort: { 'variations.totalSold': -1 } },
-         { $limit: 6 }
-      ]).toArray();
-
-   } catch (error: any) {
-      return error?.message;
-   }
-}
-
-// top rated products
-module.exports.topRatedProducts = async () => {
-   try {
-      const db = await conn.dbConnection();
-
-      return await db.collection("products").aggregate([
-         { $addFields: { variations: { $first: "$variations" } } },
-         { $match: { 'variations.status': 'active' } },
-         {
-            $project: {
-               title: 1,
-               slug: 1,
-               variations: 1,
-               brand: 1,
-               packageInfo: 1,
-               rating: 1,
-               ratingAverage: 1,
-               _lId: 1,
-               reviews: 1
-            }
-         },
-         { $sort: { ratingAverage: -1 } },
-         { $limit: 6 }
-      ]).toArray();
-
-   } catch (error: any) {
-      return error?.message;
-   }
-};
-
-// Fetch all products
-module.exports.allProducts = async (limits: any) => {
-   try {
-
-      const db = await conn.dbConnection();
-
-      return await db.collection('products').aggregate([
-         { $addFields: { variations: { $first: "$variations" } } },
-         { $match: { 'variations.status': 'active' } },
-         {
-            $project: {
-               title: 1,
-               slug: 1,
-               variations: 1,
-               brand: 1,
-               packageInfo: 1,
-               rating: 1,
-               ratingAverage: 1,
-               _lId: 1,
-               reviews: 1
-            }
-         },
-         { $sort: { 'variations._vId': -1 } },
-         { $limit: limits }
-      ]).toArray();
-
-   } catch (error: any) {
-      return error?.message;
-   }
-}
+module.exports = Product;

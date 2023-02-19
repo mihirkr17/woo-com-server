@@ -2,11 +2,10 @@ import { NextFunction, Request, Response } from "express";
 const { cartTemplate } = require("../../templates/cart.template");
 const { checkProductAvailability } = require("../../model/common.model");
 const ShoppingCart = require("../../model/shoppingCart.model");
-
 // add to cart controller
 /**
  * @controller --> add product to cart
- * @required --> BODY [productId, variationId]
+ * @required --> BODY [productID, variationID]
  * @request_method --> POST
  */
 module.exports.addToCartHandler = async (req: Request, res: Response, next: NextFunction) => {
@@ -14,38 +13,34 @@ module.exports.addToCartHandler = async (req: Request, res: Response, next: Next
 
       const authEmail: string = req.decoded.email;
       const body = req.body;
-      let countCartItems: number = 0;
+      let cart: any;
 
-      const availableProduct = await checkProductAvailability(body?.productId, body?.variationId);
+      const availableProduct = await checkProductAvailability(body?.productID, body?.variationID);
 
       if (!availableProduct) {
          return res.status(503).send({ success: false, statusCode: 503, error: "Sorry! This product is out of stock now!" });
       }
 
-      const existsProduct = await ShoppingCart.findOne(
-         { $and: [{ customerEmail: authEmail }, { variationId: body?.variationId }] }
-      );
+      const cartTemp = cartTemplate(authEmail, body?.productID, body?.listingID, body?.variationID);
 
-      if (existsProduct) {
-         return res.status(400).send({ success: false, statusCode: 400, error: "Product Has Already In Your Cart!" });
+      if (body?.action === "toCart") {
+         
+         const existsProduct = await ShoppingCart.findOne(
+            { $and: [{ customerEmail: authEmail }, { variationID: body?.variationID }] }
+         );
+   
+         if (existsProduct) {
+            return res.status(400).send({ success: false, statusCode: 400, error: "Product Has Already In Your Cart!" });
+         }
+         
+         cart = new ShoppingCart(cartTemp);
+         let result = await cart.save();
+
+         if (result?._id) {
+            return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart." });
+         }
       }
 
-      const cartTemp = cartTemplate(authEmail, body?.productId, body?.listingId, body?.variationId);
-
-      let cart = new ShoppingCart(cartTemp);
-      let result = await cart.save();
-
-      if (result?._id) {
-
-         // counting items in shopping cart
-         countCartItems = await ShoppingCart.countDocuments({ customerEmail: authEmail });
-
-         // after counting set this on cookie as a cart product
-         res.cookie("cart_p", countCartItems, { httpOnly: false, maxAge: 57600000 });
-
-         // and then send the success response to the clients.
-         return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart." });
-      }
    } catch (error: any) {
       next(error);
    }

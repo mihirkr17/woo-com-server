@@ -1,8 +1,8 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 var { dbConnection } = require("../../utils/db");
 const User = require("../../model/user.model");
 
-module.exports.dashboardOverview = async (req: Request, res: Response) => {
+module.exports.dashboardOverview = async (req: Request, res: Response, next:NextFunction) => {
    try {
       const db = await dbConnection();
 
@@ -34,7 +34,7 @@ module.exports.dashboardOverview = async (req: Request, res: Response) => {
             },
             { $sort: { totalSold: -1 } },
             { $limit: 10 }
-         ]).toArray();
+         ]);
 
          matches = { $match: { 'seller.storeInfos.totalSold': { $exists: true } } }
       }
@@ -63,9 +63,7 @@ module.exports.dashboardOverview = async (req: Request, res: Response) => {
       return res.status(200).send({ success: true, statusCode: 200, data: { topSellers, topSoldProducts } });
 
    } catch (error: any) {
-      return res
-         .status(500)
-         .send({ success: false, statusCode: 500, error: error?.message });
+      next(error);
    }
 };
 

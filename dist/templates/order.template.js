@@ -9,7 +9,7 @@ const orderModel = (body) => {
         trackingId: body === null || body === void 0 ? void 0 : body.trackingId,
         user_email: body === null || body === void 0 ? void 0 : body.user_email,
         ownerProfit,
-        productId: body === null || body === void 0 ? void 0 : body.productId,
+        productID: body === null || body === void 0 ? void 0 : body.productID,
         title: body === null || body === void 0 ? void 0 : body.title,
         slug: body === null || body === void 0 ? void 0 : body.slug,
         brand: body === null || body === void 0 ? void 0 : body.brand,

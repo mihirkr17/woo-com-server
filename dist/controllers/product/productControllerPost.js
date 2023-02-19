@@ -11,7 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 var { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
-const { productIntroTemplate } = require("../../templates/product.template");
+const { product_listing_template_engine } = require("../../templates/product.template");
 /**
  * Adding Product Title and slug first
  */
@@ -33,11 +33,11 @@ module.exports.setProductIntroController = (req, res) => __awaiter(void 0, void 
                 .send({ success: false, statusCode: 401, error: "Unauthorized" });
         }
         if (formTypes === "update" && lId) {
-            model = productIntroTemplate(body);
+            model = product_listing_template_engine(body);
             model['modifiedAt'] = new Date(Date.now());
             let result = yield db
                 .collection("products")
-                .updateOne({ _lId: lId }, { $set: model }, { upsert: true });
+                .updateOne({ _LID: lId }, { $set: model }, { upsert: true });
             if (result) {
                 return res.status(200).send({
                     success: true,
@@ -54,8 +54,8 @@ module.exports.setProductIntroController = (req, res) => __awaiter(void 0, void 
             }
         }
         if (formTypes === 'create') {
-            model = productIntroTemplate(body);
-            model['_lId'] = "LID" + Math.random().toString(36).toUpperCase().slice(2, 18);
+            model = product_listing_template_engine(body);
+            model['_LID'] = "LID" + Math.random().toString(36).toUpperCase().slice(2, 18);
             model['sellerData'] = {};
             model.sellerData.sellerId = user === null || user === void 0 ? void 0 : user._UUID;
             model.sellerData.sellerName = user === null || user === void 0 ? void 0 : user.fullName;

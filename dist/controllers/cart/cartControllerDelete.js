@@ -14,20 +14,20 @@ const { ObjectId } = require("mongodb");
 /**
  * @controller --> Delete cart items by product ID
  * @request_method --> DELETE
- * @required --> productId:req.headers.authorization & cartTypes:req.params
+ * @required --> productID:req.headers.authorization & cartTypes:req.params
  */
 module.exports.deleteCartItem = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const productId = req.headers.authorization;
+        const productID = req.headers.authorization;
         const authEmail = req.decoded.email;
         const cart_types = req.params.cartTypes;
         let updateDocuments;
         const db = yield dbConnection();
-        if (!ObjectId.isValid(productId) || !productId) {
+        if (!ObjectId.isValid(productID) || !productID) {
             return res.status(500).send({ success: false, statusCode: 500, message: "headers missing!!!" });
         }
         if (cart_types === "toCart") {
-            updateDocuments = yield db.collection('shoppingCarts').deleteOne({ $and: [{ customerEmail: authEmail }, { productId }] });
+            updateDocuments = yield db.collection('shoppingCarts').deleteOne({ $and: [{ customerEmail: authEmail }, { productID }] });
         }
         if (updateDocuments) {
             const countCartItems = yield db.collection("shoppingCarts").countDocuments({ customerEmail: authEmail });

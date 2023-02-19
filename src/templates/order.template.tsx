@@ -9,7 +9,7 @@ const orderModel = (body: any) => {
     trackingId: body?.trackingId,
     user_email: body?.user_email,
     ownerProfit,
-    productId: body?.productId,
+    productID: body?.productID,
     title: body?.title,
     slug: body?.slug,
     brand: body?.brand,

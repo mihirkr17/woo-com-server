@@ -1,10 +1,14 @@
-const productIntroTemplate = (body: any) => {
-
+const product_listing_template_engine = (body: any) => {
   return {
     title: body?.title,
     slug: body?.slug,
     categories: [body?.category, body?.subCategory, body?.postCategory] || [],
     brand: body?.brand,
+    sellerData: {
+      sellerID: body?.sellerData?.sellerID || "",
+      sellerName: body?.sellerData?.sellerName || "",
+      storeName: body?.sellerData?.storeName || ""
+    },
     shipping: {
       fulfilledBy: body?.fulfilledBy,
       procurementType: body?.procurementType,
@@ -68,4 +72,4 @@ const productVariation = (body: any) => {
   }
 }
 
-module.exports = { productIntroTemplate, productVariation };
+module.exports = { product_listing_template_engine, productVariation };

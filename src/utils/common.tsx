@@ -1,33 +1,28 @@
 import express from "express";
 const { ObjectId } = require("mongodb");
-const { dbConnection } = require("./db");
+const Product = require("../model/product.model");
 
 module.exports.updateProductStock = async (
-  productId: string,
-  quantity: number,
-  action: string
+  productID: string,
+  variationID: string,
+  restAvailable: number
 ) => {
-  const db = await dbConnection();
+  try {
 
-  const products = await db.collection("products").findOne({
-    _id: ObjectId(productId),
-  });
+    let stock = restAvailable <= 1 ? "out" : "in";
 
-  let availableProduct = products?.available;
-  let restAvailable;
+    return await Product.findOneAndUpdate(
+      { _id: ObjectId(productID) },
+      {
+        $set: {
+          "variations.$[i].available": restAvailable,
+          "variations.$[i].stock": stock
+        }
+      },
+      { arrayFilters: [{ "i._VID": variationID }] }
+    );
 
-  if (action === "inc") {
-    restAvailable = availableProduct + quantity;
+  } catch (error: any) {
+    return error;
   }
-  if (action === "dec") {
-    restAvailable = availableProduct - quantity;
-  }
-
-  let stock = restAvailable <= 1 ? "out" : "in";
-
-  await db.collection("products").updateOne(
-    { _id: ObjectId(productId) },
-    { $set: { available: restAvailable, stock } },
-    { upsert: true }
-  );
 };

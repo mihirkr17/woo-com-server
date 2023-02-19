@@ -6,7 +6,7 @@ const orderValidator = (req: Request, res: Response, next: any) => {
     trackingId,
     user_email,
     ownerProfit,
-    productId,
+    productID,
     title,
     slug,
     brand,

@@ -1,10 +1,16 @@
 "use strict";
-const productIntroTemplate = (body) => {
+const product_listing_template_engine = (body) => {
+    var _a, _b, _c;
     return {
         title: body === null || body === void 0 ? void 0 : body.title,
         slug: body === null || body === void 0 ? void 0 : body.slug,
         categories: [body === null || body === void 0 ? void 0 : body.category, body === null || body === void 0 ? void 0 : body.subCategory, body === null || body === void 0 ? void 0 : body.postCategory] || [],
         brand: body === null || body === void 0 ? void 0 : body.brand,
+        sellerData: {
+            sellerID: ((_a = body === null || body === void 0 ? void 0 : body.sellerData) === null || _a === void 0 ? void 0 : _a.sellerID) || "",
+            sellerName: ((_b = body === null || body === void 0 ? void 0 : body.sellerData) === null || _b === void 0 ? void 0 : _b.sellerName) || "",
+            storeName: ((_c = body === null || body === void 0 ? void 0 : body.sellerData) === null || _c === void 0 ? void 0 : _c.storeName) || ""
+        },
         shipping: {
             fulfilledBy: body === null || body === void 0 ? void 0 : body.fulfilledBy,
             procurementType: body === null || body === void 0 ? void 0 : body.procurementType,
@@ -64,4 +70,4 @@ const productVariation = (body) => {
         status: body === null || body === void 0 ? void 0 : body.status
     };
 };
-module.exports = { productIntroTemplate, productVariation };
+module.exports = { product_listing_template_engine, productVariation };

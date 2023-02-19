@@ -13,60 +13,23 @@ const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const { updateProductStock } = require("../../utils/common");
 const { orderModel } = require("../../templates/order.template");
-module.exports.setOrderHandler = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const db = yield dbConnection();
-        const userEmail = req.headers.authorization || "";
-        const verifiedEmail = req.decoded.email;
-        const body = req.body;
-        if (userEmail !== verifiedEmail) {
-            return res.status(401).send({ error: "Unauthorized access" });
-        }
-        if (!body || typeof body === "undefined") {
-            return res.status(400).send({
-                success: false,
-                statusCode: 400,
-                error: "Something went wrong !",
-            });
-        }
-        const products = yield db.collection("products").findOne({
-            _id: ObjectId(body === null || body === void 0 ? void 0 : body.productId),
-        });
-        if (!products || typeof products === "undefined") {
-            return res.status(400).send({
-                success: false,
-                statuscode: 400,
-                error: "Sorry! Can't place this order",
-            });
-        }
-        if ((products === null || products === void 0 ? void 0 : products.available) < (body === null || body === void 0 ? void 0 : body.quantity) && products.stock !== "in") {
-            return res.status(400).send({
-                success: false,
-                statuscode: 400,
-                error: "Sorry! Order not taken because this product not available rights now!",
-            });
-        }
-        let model = orderModel(body);
-        const result = yield db
-            .collection("orders")
-            .updateOne({ user_email: userEmail }, { $push: { orders: model } }, { upsert: true });
-        if (result) {
-            yield updateProductStock(body === null || body === void 0 ? void 0 : body.productId, body === null || body === void 0 ? void 0 : body.quantity, "dec");
-            yield db
-                .collection("users")
-                .updateOne({ email: userEmail }, { $unset: { shoppingCartItems: [] } });
-            res.status(200).send(result && { message: "Order success" });
-        }
-    }
-    catch (error) {
-        next(error);
-    }
-});
+const Product = require("../../model/product.model");
+const User = require("../../model/user.model");
+const Order = require("../../model/order.model");
 module.exports.myOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const db = yield dbConnection();
         const email = req.params.email;
-        res.send(yield db.collection("orders").findOne({ user_email: email }));
+        const authEmail = req.decoded.email;
+        if (email !== authEmail) {
+            return res.status(401).send();
+        }
+        let result = yield Order.aggregate([
+            { $match: { $and: [{ user_email: email }] } },
+            { $unwind: { path: "$orders" } },
+            { $replaceRoot: { newRoot: "$orders" } }
+        ]);
+        res.status(200).send({ success: true, statusCode: 200, data: { module: { orders: result } } });
     }
     catch (error) {
         next(error);
@@ -86,67 +49,61 @@ module.exports.removeOrder = (req, res, next) => __awaiter(void 0, void 0, void 
         next(error);
     }
 });
-module.exports.cancelMyOrder = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.cancelMyOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
-        const db = yield dbConnection();
         const userEmail = req.params.userEmail;
-        const orderId = parseInt(req.params.orderId);
-        const { status, cancel_reason, time_canceled, quantity, productId } = req.body;
-        const result = yield db.collection("orders").updateOne({ user_email: userEmail }, {
+        const { cancel_reason, orderID } = req.body;
+        const timestamp = Date.now();
+        let cancelTime = {
+            iso: new Date(timestamp),
+            time: new Date(timestamp).toLocaleTimeString(),
+            date: new Date(timestamp).toDateString(),
+            timestamp: timestamp
+        };
+        const result = yield Order.findOneAndUpdate({ user_email: userEmail }, {
             $set: {
-                "orders.$[i].status": status,
-                "orders.$[i].cancel_reason": cancel_reason,
-                "orders.$[i].time_canceled": time_canceled,
+                "orders.$[i].orderStatus": "canceled",
+                "orders.$[i].cancelReason": cancel_reason,
+                "orders.$[i].orderCanceledAT": cancelTime,
             },
-        }, { arrayFilters: [{ "i.orderId": orderId }] });
+        }, { arrayFilters: [{ "i.orderID": orderID }], upsert: true });
         if (result) {
-            yield updateProductStock(productId, quantity, "inc");
-        }
-        res.send({ result, message: "Order canceled successfully" });
-    }
-    catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
-    }
-});
-module.exports.dispatchOrderRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const db = yield dbConnection();
-        const orderId = parseInt(req.params.orderId);
-        const trackingId = req.params.trackingId;
-        const userEmail = req.headers.authorization || "";
-        res.status(200).send((yield db.collection("orders").updateOne({ user_email: userEmail }, {
-            $set: {
-                "orders.$[i].status": "dispatch",
-            },
-        }, {
-            arrayFilters: [{ "i.orderId": orderId, "i.trackingId": trackingId }],
-        })) && { message: "Successfully order dispatched" });
-    }
-    catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
-    }
-});
-module.exports.manageOrders = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const db = yield dbConnection();
-        const storeName = req.query.storeName;
-        let result;
-        if (storeName) {
-            result = yield db
-                .collection("orders")
-                .aggregate([
-                { $unwind: "$orders" },
+            let existOrder = yield Order.aggregate([
+                { $match: { user_email: userEmail } },
+                { $unwind: { path: "$orders" } },
                 {
-                    $match: {
-                        $and: [{ "orders.seller": storeName }],
-                    },
+                    $replaceRoot: { newRoot: "$orders" }
                 },
-            ])
-                .toArray();
+                {
+                    $match: { $and: [{ orderID: orderID }] }
+                }
+            ]);
+            existOrder = existOrder[0];
+            let products = yield Product.aggregate([
+                { $match: { $and: [{ _LID: existOrder === null || existOrder === void 0 ? void 0 : existOrder.listingID }] } },
+                { $unwind: { path: "$variations" } },
+                {
+                    $project: {
+                        variations: 1
+                    }
+                },
+                { $match: { $and: [{ "variations._VID": existOrder === null || existOrder === void 0 ? void 0 : existOrder.variationID }] } },
+            ]);
+            products = products[0];
+            let availableProduct = (_a = products === null || products === void 0 ? void 0 : products.variations) === null || _a === void 0 ? void 0 : _a.available;
+            let restAvailable = availableProduct + (existOrder === null || existOrder === void 0 ? void 0 : existOrder.quantity);
+            let stock = restAvailable <= 1 ? "out" : "in";
+            yield Product.findOneAndUpdate({ _id: ObjectId(existOrder === null || existOrder === void 0 ? void 0 : existOrder.productID) }, {
+                $set: {
+                    "variations.$[i].available": restAvailable,
+                    "variations.$[i].stock": stock
+                }
+            }, { arrayFilters: [{ "i._VID": existOrder === null || existOrder === void 0 ? void 0 : existOrder.variationID }] });
         }
-        res.status(200).send(result);
+        res.send({ success: true, statusCode: 200, message: "Order canceled successfully" });
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });

@@ -8,7 +8,7 @@ const {
 
 try {
   router.put("/add-to-wishlist/:email", verifyJWT, addToWishlistHandler);
-  router.delete("/remove-from-wishlist/:productId", verifyJWT, removeFromWishlistHandler);
+  router.delete("/remove-from-wishlist/:productID", verifyJWT, removeFromWishlistHandler);
 } catch (error) {}
 
 module.exports = router;

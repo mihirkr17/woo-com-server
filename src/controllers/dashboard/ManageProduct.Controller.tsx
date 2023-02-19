@@ -1,21 +1,31 @@
-import { NextFunction, Request, Response } from "express";
-var { dbConnection } = require("../../utils/db");
-const { ObjectId } = require("mongodb");
-const { productIntroTemplate } = require("../../templates/product.template");
+// ManageProduct.Controller.tsx
 
+import { NextFunction, Request, Response } from "express";
+const { ObjectId } = require("mongodb");
+const { product_listing_template_engine } = require("../../templates/product.template");
+const User = require("../../model/user.model");
+const QueueProduct = require("../../model/queueProduct.model");
+const Product = require("../../model/product.model");
+
+
+
+// Controllers
 module.exports.updateStockController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const db = await dbConnection();
 
-      const productId: String = req.headers.authorization || "";
+      const productID: String = req.headers.authorization || "";
       const body = req.body;
       const storeName = req.params.storeName;
 
-      if (productId && body && storeName) {
+      if (!body?.variations?._VID || !body?.variations?.available) {
+         throw new Error("Variation ID and unit required !");
+      }
+
+      if (productID && body && storeName) {
          let stock = body?.variations?.available <= 1 ? "out" : "in";
 
-         const result = await db.collection("products").updateOne(
-            { $and: [{ _id: ObjectId(productId) }, { 'sellerData.storeName': storeName }] },
+         const result = await Product.findOneAndUpdate(
+            { $and: [{ _id: ObjectId(productID) }, { 'sellerData.storeName': storeName }] },
             {
                $set: {
                   "variations.$[i].available": body?.variations?.available,
@@ -23,16 +33,17 @@ module.exports.updateStockController = async (req: Request, res: Response, next:
                },
             },
             {
-               arrayFilters: [{ 'i._vId': body?.variations?._vId }]
-            },
-            { upsert: true }
+               arrayFilters: [{ "i._VID": body?.variations?._VID }]
+            }
          );
 
+
          if (!result) {
-            return res.status(503).send({
+            return res.status(500).send({
                success: false,
-               statusCode: 503,
-               error: "Failed to update stock quantity !!!",
+               statusCode: 500,
+               name: "Server Error",
+               message: "Failed to update stock quantity !!!",
             });
          }
 
@@ -50,9 +61,8 @@ module.exports.updateStockController = async (req: Request, res: Response, next:
 // product variation controller
 module.exports.productOperationController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const db = await dbConnection();
 
-      const productId: String = req.headers?.authorization || "";
+      const productID: String = req.headers?.authorization || "";
       const formTypes = req.query.formType || "";
       const vId = req.query.vId;
       const productAttr = req.query.attr;
@@ -61,27 +71,27 @@ module.exports.productOperationController = async (req: Request, res: Response, 
 
       // Update variation
       if (formTypes === 'update-variation') {
-         model['_vId'] = vId;
+         model['_VID'] = vId;
          if (vId && productAttr === 'ProductVariations') {
-            result = await db.collection('products').updateOne(
+            result = await Product.findOneAndUpdate(
                {
-                  $and: [{ _id: ObjectId(productId) }, { 'variations._vId': vId }]
+                  $and: [{ _id: ObjectId(productID) }, { 'variations._VID': vId }]
                },
                {
                   $set: {
                      'variations.$[i]': model,
                   }
                },
-               { arrayFilters: [{ "i._vId": vId }] }
+               { arrayFilters: [{ "i._VID": vId }] }
             );
          }
       }
 
       // create new variation
       if (formTypes === 'new-variation') {
-         result = await db.collection('products').updateOne(
+         result = await Product.updateOne(
             {
-               _id: ObjectId(productId)
+               _id: ObjectId(productID)
             },
             {
                $push: { variations: model }
@@ -95,8 +105,8 @@ module.exports.productOperationController = async (req: Request, res: Response, 
 
          if (productAttr === 'ProductSpecs') {
 
-            result = await db.collection('products').updateOne(
-               { _id: ObjectId(productId) },
+            result = await Product.updateOne(
+               { _id: ObjectId(productID) },
                {
                   $set: { specification: model }
                },
@@ -106,8 +116,8 @@ module.exports.productOperationController = async (req: Request, res: Response, 
 
          if (productAttr === 'bodyInformation') {
 
-            result = await db.collection('products').updateOne(
-               { _id: ObjectId(productId) },
+            result = await Product.updateOne(
+               { _id: ObjectId(productID) },
                {
                   $set: { bodyInfo: model }
                },
@@ -129,9 +139,6 @@ module.exports.productOperationController = async (req: Request, res: Response, 
 
 module.exports.productControlController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-
-      const db = await dbConnection();
-
       const body = req.body;
       let result: any;
 
@@ -141,14 +148,26 @@ module.exports.productControlController = async (req: Request, res: Response, ne
 
       if (body?.data?.vId) {
 
-         result = await db.collection('products').updateOne(
-            { $and: [{ _id: ObjectId(body?.data?.pId) }, { _lId: body?.data?.lId }, { save_as: 'fulfilled' }] },
+         result = await Product.findOneAndUpdate(
+            {
+               $and: [
+                  { _id: ObjectId(body?.data?.pId) },
+                  { _LID: body?.data?.lId },
+                  { save_as: 'fulfilled' }
+               ]
+            },
             { $set: { 'variations.$[i].status': body?.data?.action } },
-            { arrayFilters: [{ "i._vId": body?.data?.vId }] });
+            { arrayFilters: [{ "i._VID": body?.data?.vId }] }
+         );
 
       } else {
-         result = await db.collection('products').updateOne(
-            { $and: [{ _id: ObjectId(body?.data?.pId) }, { _lId: body?.data?.lId }] },
+         result = await Product.findOneAndUpdate(
+            {
+               $and: [
+                  { _id: ObjectId(body?.data?.pId) },
+                  { _LID: body?.data?.lId }
+               ]
+            },
             { $set: { save_as: body?.data?.action, "variations.$[].status": "inactive" } },
             { upsert: true, multi: true });
       }
@@ -170,14 +189,12 @@ module.exports.viewAllProductsInDashboard = async (
    next: NextFunction
 ) => {
    try {
-      const db = await dbConnection();
-
-      // await db.collection("products").createIndex({ _lId: 1, slug: 1, save_as: 1, categories: 1, brand: 1, "sellerData.storeName": 1, "sellerData.sellerName": 1, "sellerData.sellerId": 1 });
+      // await db.collection("products").createIndex({ _LID: 1, slug: 1, save_as: 1, categories: 1, brand: 1, "sellerData.storeName": 1, "sellerData.sellerName": 1, "sellerData.sellerID": 1 });
 
       const authEmail = req.decoded.email;
       const role = req.decoded.role;
 
-      const user = await db.collection("users").findOne({ $and: [{ email: authEmail }, { role }] });
+      const user = await User.findOne({ $and: [{ email: authEmail }, { role }] });
 
       let item: any;
       let page: any;
@@ -196,6 +213,7 @@ module.exports.viewAllProductsInDashboard = async (
          showFor = [
             { "sellerData.storeName": user?.seller?.storeInfos?.storeName },
             { save_as: "fulfilled" },
+            { isVerified: true }
          ];
       } else {
          showFor = [{ 'variations.status': "active" }, { save_as: "fulfilled" }];
@@ -211,16 +229,12 @@ module.exports.viewAllProductsInDashboard = async (
          ]
       } else if (filters) {
          searchText = '';
-
-         if (filters === 'all') {
-            src = [{}];
-         } else {
-            src = [{ categories: {$in: [filters]} }];
-         }
-
+         src = [{ categories: { $in: [filters] } }];
+      } else {
+         src = [{}];
       }
 
-      products = await db.collection("products").aggregate([
+      products = await Product.aggregate([
          {
             $match: {
                $and: showFor,
@@ -232,13 +246,22 @@ module.exports.viewAllProductsInDashboard = async (
          }, {
             $limit: (parseInt(item))
          }
-      ]).toArray();
+      ]);
 
-      draftProducts = await db.collection("products").find({
+   //  products = await Product.aggregate([
+   //       { $match: { $and: showFor, $or: src } },
+   //       { $unwind: { path: "$variations" } },
+   //       { $replaceRoot: { newRoot: { $mergeObjects: ["$variations", "$$ROOT"] } } },
+   //       { $unset: ["variations"] },
+   //       { $skip: page * parseInt(item) },
+   //       { $limit: (parseInt(item)) }
+   //    ]);
+
+      draftProducts = await Product.find({
          $and: [user?.role === 'SELLER' && { "sellerData.storeName": user?.seller?.storeInfos?.storeName }, { save_as: "draft" }],
-      }).toArray();
+      });
 
-      inactiveProduct = await db.collection("products").aggregate([
+      inactiveProduct = await Product.aggregate([
          { $unwind: { path: "$variations" } },
          {
             $match: {
@@ -249,7 +272,7 @@ module.exports.viewAllProductsInDashboard = async (
                ]
             }
          }
-      ]).toArray();
+      ]);
 
 
       return res.status(200).send({
@@ -265,38 +288,37 @@ module.exports.viewAllProductsInDashboard = async (
 
 /**
 * @controller      --> Fetch the single product in product edit page.
-* @required        --> [req.query:seller, req.query:productId, req.query:variationId]
+* @required        --> [req.query:seller, req.query:productID, req.query:variationID]
 * @request_method  --> GET
 */
 module.exports.getProductForSellerDSBController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const db = await dbConnection();
 
-      const productId = req.query.pid;
-      const variationId = req.query.vId;
+      const productID = req.query.pid;
+      const variationID = req.query.vId;
       const storeName = req.query.storeName;
 
       let product;
 
-      if (!storeName && typeof storeName === 'undefined' && !productId) return res.status(204).send();
+      if (!storeName && typeof storeName === 'undefined' && !productID) return res.status(204).send();
 
-      if (variationId && typeof variationId === 'string') {
-         product = await db.collection('products').aggregate([
+      if (variationID && typeof variationID === 'string') {
+         product = await Product.aggregate([
             {
-               $match: { _id: ObjectId(productId) }
+               $match: { _id: ObjectId(productID) }
             },
             {
                $unwind: { path: "$variations" },
             },
             {
-               $match: { 'variations._vId': variationId }
+               $match: { 'variations._VID': variationID }
             }
-         ]).toArray();
+         ]);
          product = product[0];
 
       } else {
-         product = await db.collection("products").findOne({
-            $and: [{ _id: ObjectId(productId) }, { "sellerData.storeName": storeName }],
+         product = await Product.findOne({
+            $and: [{ _id: ObjectId(productID) }, { "sellerData.storeName": storeName }],
          });
       }
 
@@ -317,22 +339,19 @@ module.exports.getProductForSellerDSBController = async (req: Request, res: Resp
 /**
  * Adding Product Title and slug first
  */
-module.exports.setProductIntroController = async (
+module.exports.productListingController = async (
    req: Request,
    res: Response,
    next: NextFunction
 ) => {
    try {
-      const db = await dbConnection();
       const authEmail = req.decoded.email;
       const formTypes = req.params.formTypes;
       const body = req.body;
       const lId = req.headers?.authorization || null;
       let model;
 
-      const user = await db
-         .collection("users")
-         .findOne({ $and: [{ email: authEmail }, { role: 'SELLER' }] });
+      const user = await User.findOne({ $and: [{ email: authEmail }, { role: 'SELLER' }] });
 
       if (!user) {
          return res
@@ -341,16 +360,17 @@ module.exports.setProductIntroController = async (
       }
 
       if (formTypes === "update" && lId) {
-         model = productIntroTemplate(body);
+         model = product_listing_template_engine(body);
          model['modifiedAt'] = new Date(Date.now());
+         model.sellerData.sellerID = user?._UUID;
+         model.sellerData.sellerName = user?.fullName;
+         model.sellerData.storeName = user?.seller?.storeInfos?.storeName;
 
-         let result = await db
-            .collection("products")
-            .updateOne(
-               { _lId: lId },
-               { $set: model },
-               { upsert: true }
-            );
+         let result = await Product.updateOne(
+            { _LID: lId, save_as: { $and: ['draft', 'fulfilled'] } },
+            { $set: model },
+            { upsert: true }
+         );
 
          if (result) {
             return res.status(200).send({
@@ -368,13 +388,10 @@ module.exports.setProductIntroController = async (
       }
 
       if (formTypes === 'create') {
-         model = productIntroTemplate(body);
-         model['_lId'] = "LID" + Math.random().toString(36).toUpperCase().slice(2, 18);
-         model['sellerData'] = {};
-         model.sellerData.sellerId = user?._UUID;
+         model = product_listing_template_engine(body);
+         model.sellerData.sellerID = user?._UUID;
          model.sellerData.sellerName = user?.fullName;
          model.sellerData.storeName = user?.seller?.storeInfos?.storeName;
-         model['createdAt'] = new Date(Date.now());
 
          model["rating"] = [
             { weight: 5, count: 0 },
@@ -385,11 +402,12 @@ module.exports.setProductIntroController = async (
          ];
          model["ratingAverage"] = 0;
          model['reviews'] = [];
-         model['save_as'] = 'draft';
+         model['save_as'] = 'queue';
 
-         let result = await db.collection('products').insertOne(model);
+         let queueProduct = new QueueProduct(model);
+         let results = await queueProduct.save();
 
-         if (result) {
+         if (results) {
             return res.status(200).send({
                success: true,
                statusCode: 200,
@@ -406,13 +424,12 @@ module.exports.setProductIntroController = async (
 // delete product variation controller
 module.exports.deleteProductVariationController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const db = await dbConnection();
 
-      const productId = req.params.productId;
-      const _vId = req.params.vId;
+      const productID = req.params.productID;
+      const _VID = req.params.vId;
       const storeName = req.params.storeName;
 
-      const product = await db.collection('products').findOne({ $and: [{ _id: ObjectId(productId) }, { "sellerData.storeName": storeName }] });
+      const product = await Product.findOne({ $and: [{ _id: ObjectId(productID) }, { "sellerData.storeName": storeName }] });
 
       if (!product) {
          return res.status(404).send({ success: false, statusCode: 404, error: 'Sorry! Product not found!!!' });
@@ -422,9 +439,9 @@ module.exports.deleteProductVariationController = async (req: Request, res: Resp
          return res.status(200).send({ success: false, statusCode: 200, message: "Please create another variation before delete this variation !" });
       }
 
-      const result = await db.collection('products').updateOne(
-         { $and: [{ _id: ObjectId(productId) }, { "sellerData.storeName": storeName }] },
-         { $pull: { variations: { _vId } } }
+      const result = await Product.updateOne(
+         { $and: [{ _id: ObjectId(productID) }, { "sellerData.storeName": storeName }] },
+         { $pull: { variations: { _VID } } }
       );
 
       if (result) {
@@ -442,17 +459,16 @@ module.exports.deleteProductVariationController = async (req: Request, res: Resp
 
 module.exports.deleteProductController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const db = await dbConnection();
 
-      const productId: string = req.headers?.authorization?.split(',')[0] || "";
-      const _lId: string = req.headers?.authorization?.split(',')[1] || "";
+      const productID: string = req.headers?.authorization?.split(',')[0] || "";
+      const _LID: string = req.headers?.authorization?.split(',')[1] || "";
       const storeName = req.params.storeName;
 
       //return --> "acknowledged" : true, "deletedCount" : 1
-      const deletedProduct = await db.collection("products").deleteOne({
+      const deletedProduct = await Product.deleteOne({
          $and: [
-            { _id: ObjectId(productId) },
-            { _lId },
+            { _id: ObjectId(productID) },
+            { _LID },
             { 'sellerData.storeName': storeName }
          ]
       });
@@ -474,3 +490,61 @@ module.exports.deleteProductController = async (req: Request, res: Response, nex
       next(error);
    }
 };
+
+
+
+
+module.exports.productFlashSaleController = async (req: Request, res: Response, next: NextFunction) => {
+   try {
+      const storeName = req.params.storeName;
+
+      const body = req.body;
+
+      const productID = body?.data?.productID;
+
+      const listingID = body?.data?.listingID;
+
+      const fSale = body?.data?.fSale;
+
+      const product = await Product.findOne({ $and: [{ _id: ObjectId(productID) }, { _LID: listingID }, { "sellerData.storeName": storeName }] });
+
+
+      if (!product) {
+         return res.status(200).send({ success: false, statusCode: 200, message: "Product Not found !" });
+      }
+
+      const result = await Product.updateOne(
+         {
+            $and:
+               [
+                  { _id: ObjectId(productID) }, { _LID: listingID }, { "sellerData.storeName": storeName }
+               ]
+         },
+
+         {
+            $set: {
+               isFlashSale: true,
+               flashSale: fSale
+            }
+         },
+
+         {
+            upsert: true
+         }
+      );
+
+
+      if (result) {
+         return res.status(200).send({ success: true, statusCode: 200, message: "Flash Sale Starting...." })
+      }
+
+
+   } catch (error: any) {
+      next(error);
+   }
+}
+
+
+
+
+

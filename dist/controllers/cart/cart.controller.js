@@ -12,12 +12,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const { cartTemplate } = require("../../templates/cart.template");
-const checkProductAvailability = (productId, variationId) => __awaiter(void 0, void 0, void 0, function* () {
+const checkProductAvailability = (productID, variationID) => __awaiter(void 0, void 0, void 0, function* () {
     const db = yield dbConnection();
     let product = yield db.collection('products').aggregate([
-        { $match: { _id: ObjectId(productId) } },
+        { $match: { _id: ObjectId(productID) } },
         { $unwind: { path: "$variations" } },
-        { $match: { $and: [{ 'variations.vId': variationId }, { 'variations.available': { $gte: 1 } }, { 'variations.stock': 'in' }] } }
+        { $match: { $and: [{ 'variations.vId': variationID }, { 'variations.available': { $gte: 1 } }, { 'variations.stock': 'in' }] } }
     ]).toArray();
     product = product[0];
     return product;

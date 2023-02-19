@@ -11,7 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 var { dbConnection } = require("../../utils/db");
 const User = require("../../model/user.model");
-module.exports.dashboardOverview = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.dashboardOverview = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     try {
         const db = yield dbConnection();
@@ -37,7 +37,7 @@ module.exports.dashboardOverview = (req, res) => __awaiter(void 0, void 0, void 
                 },
                 { $sort: { totalSold: -1 } },
                 { $limit: 10 }
-            ]).toArray();
+            ]);
             matches = { $match: { 'seller.storeInfos.totalSold': { $exists: true } } };
         }
         topSoldProducts = yield db.collection('products').aggregate([
@@ -61,8 +61,6 @@ module.exports.dashboardOverview = (req, res) => __awaiter(void 0, void 0, void 
         return res.status(200).send({ success: true, statusCode: 200, data: { topSellers, topSoldProducts } });
     }
     catch (error) {
-        return res
-            .status(500)
-            .send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });

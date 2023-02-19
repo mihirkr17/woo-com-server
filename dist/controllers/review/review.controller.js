@@ -14,7 +14,7 @@ const { ObjectId } = require("mongodb");
 module.exports.addProductRating = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const db = yield dbConnection();
-        const productId = req.params.productId;
+        const productID = req.params.productID;
         const email = req.decoded.email;
         const body = req.body;
         const orderId = parseInt(body === null || body === void 0 ? void 0 : body.orderId);
@@ -24,7 +24,7 @@ module.exports.addProductRating = (req, res) => __awaiter(void 0, void 0, void 0
             },
         }, { upsert: true, arrayFilters: [{ "i.orderId": orderId }] });
         const products = yield db.collection("products").findOne({
-            _id: ObjectId(productId),
+            _id: ObjectId(productID),
             status: "active",
         });
         const point = parseInt(body === null || body === void 0 ? void 0 : body.rating_point);
@@ -81,7 +81,7 @@ module.exports.addProductRating = (req, res) => __awaiter(void 0, void 0, void 0
             };
             options = { upsert: true };
         }
-        const result = yield db.collection("products").updateOne({ _id: ObjectId(productId) }, filters, options);
+        const result = yield db.collection("products").updateOne({ _id: ObjectId(productID) }, filters, options);
         if (result) {
             return res.status(200).send({ message: "Thanks for your review !" });
         }

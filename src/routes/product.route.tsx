@@ -1,7 +1,7 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
 const { verifyJWT, isRoleSeller, isPermitForDashboard } = require("../middleware/Auth.middleware");
-const getController = require("../controllers/product/productControllerGet");
+const getController = require("../controllers/product/product.controller");
 
 try {
   /**
@@ -12,6 +12,8 @@ try {
   router.get("/fetch-single-product/:product_slug", getController.fetchSingleProductController);
 
   router.get("/store/:limits", getController.homeStoreController);
+
+  router.post("/purchase", verifyJWT, getController?.purchaseProductController);
 
   /**
     * @requestMethod GET
