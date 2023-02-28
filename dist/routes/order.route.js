@@ -5,12 +5,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const router = express_1.default.Router();
-const orderValidator = require("../middleware/OrderValidator.middleware");
 const { verifyJWT, isRoleBuyer, } = require("../middleware/auth");
-const { myOrder, removeOrder, cancelMyOrder, } = require("../controllers/order/order.controller");
+const { myOrder, removeOrder, cancelMyOrder } = require("../controllers/order/order.controller");
+// set order controller
 const SetOrder = require("../controllers/order/SetOrder");
+const ConfirmOrder = require("../controllers/order/ConfirmOrder");
+// single order controller
+const SinglePurchaseOrder = require("../controllers/order/SinglePurchaseOrder");
 try {
     router.post("/set-order", verifyJWT, isRoleBuyer, SetOrder);
+    router.post("/confirm-order", verifyJWT, isRoleBuyer, ConfirmOrder);
+    router.post("/single-purchase", verifyJWT, isRoleBuyer, SinglePurchaseOrder);
     router.get("/my-order/:email", verifyJWT, myOrder);
     router.delete("/remove-order/:email/:orderId", verifyJWT, removeOrder);
     router.put("/cancel-my-order/:userEmail", verifyJWT, cancelMyOrder);

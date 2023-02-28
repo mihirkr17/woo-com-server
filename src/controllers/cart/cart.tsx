@@ -1,31 +1,23 @@
 import { NextFunction, Request, Response } from "express";
 const ShoppingCart = require("../../model/shoppingCart.model");
-const User = require("../../model/user.model");
+const { findUserByEmail } = require("../../services/common.services");
 
 module.exports.getCartContext = async (req: Request, res: Response, next: NextFunction) => {
    try {
-
       const authEmail = req.decoded.email;
-      const role = req.decoded.role;
 
-      let result = await User.findOne(
-         {
-            $and: [{ email: authEmail }, { role: role }, { accountStatus: 'active' }]
-         },
-         {
-            password: 0, createdAt: 0,
-            phonePrefixCode: 0,
-            becomeSellerAt: 0
-         }
-      );
-      let defaultShippingAddress;
+      let user = await findUserByEmail(authEmail);
 
-      let areaType = (Array.isArray(result?.buyer?.shippingAddress) &&
-         result?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
-      defaultShippingAddress = areaType;
-      areaType = areaType?.area_type;
+      if (!user) {
+         return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
+      }
 
-      const spC = await ShoppingCart.aggregate([
+      let defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
+         user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
+
+      let areaType = defaultShippingAddress?.area_type || "";
+
+      const cart = await ShoppingCart.aggregate([
          { $match: { customerEmail: authEmail } },
          {
             $lookup: {
@@ -45,7 +37,8 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
                $expr: {
                   $and: [
                      { $eq: ['$variations._VID', '$variationID'] },
-                     { $eq: ["$variations.stock", "in"] },
+                     // { $eq: ["$variations.stock", "in"] },
+                     { $eq: ["$variations.status", "active"] },
                      { $eq: ["$save_as", "fulfilled"] }
                   ]
                }
@@ -76,6 +69,8 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
                      default: "$shipping.delivery.zonalCharge"
                   }
                },
+               savingAmount: { $multiply: [{ $subtract: ["$variations.pricing.price", "$variations.pricing.sellingPrice"] }, '$quantity'] },
+               baseAmount: { $multiply: ['$variations.pricing.sellingPrice', '$quantity'] },
                totalAmount: {
                   $add: [
                      { $multiply: ['$variations.pricing.sellingPrice', '$quantity'] },
@@ -102,22 +97,24 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
 
 
 
-      if (typeof spC === "object") {
+      if (typeof cart === "object") {
 
-         const totalAmounts = spC && spC.map((tAmount: any) => (parseFloat(tAmount?.totalAmount))).reduce((p: any, c: any) => p + c, 0).toFixed(2);
-         const totalQuantities = spC && spC.map((tQuant: any) => (parseFloat(tQuant?.quantity))).reduce((p: any, c: any) => p + c, 0).toFixed(0);
-         const shippingFees = spC && spC.map((p: any) => parseFloat(p?.shippingCharge)).reduce((p: any, c: any) => p + c, 0).toFixed(2);
-         const finalAmounts = spC && spC.map((fAmount: any) => (parseFloat(fAmount?.totalAmount) + fAmount?.shippingCharge)).reduce((p: any, c: any) => p + c, 0).toFixed(2);
+         const baseAmounts = cart && cart.map((tAmount: any) => (parseInt(tAmount?.baseAmount))).reduce((p: any, c: any) => p + c, 0);
+         const totalQuantities = cart && cart.map((tQuant: any) => (parseInt(tQuant?.quantity))).reduce((p: any, c: any) => p + c, 0);
+         const shippingFees = cart && cart.map((p: any) => parseInt(p?.shippingCharge)).reduce((p: any, c: any) => p + c, 0);
+         const finalAmounts = cart && cart.map((fAmount: any) => (parseInt(fAmount?.totalAmount))).reduce((p: any, c: any) => p + c, 0);
+         const savingAmounts = cart && cart.map((fAmount: any) => (parseInt(fAmount?.savingAmount))).reduce((p: any, c: any) => p + c, 0);
 
          let shoppingCartData = {
-            products: spC,
+            products: cart,
             container_p: {
-               totalAmounts,
+               baseAmounts,
                totalQuantities,
                finalAmounts,
                shippingFees,
+               savingAmounts
             },
-            numberOfProducts: spC.length || 0,
+            numberOfProducts: cart.length || 0,
             defaultShippingAddress
          }
 

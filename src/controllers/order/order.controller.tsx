@@ -104,7 +104,7 @@ module.exports.cancelMyOrder = async (req: Request, res: Response, next: NextFun
 
       let availableProduct = products?.variations?.available;
       let restAvailable = availableProduct + existOrder?.quantity;
-      let stock = restAvailable <= 1 ? "out" : "in";
+      let stock = restAvailable <= 0 ? "out" : "in";
 
       await Product.findOneAndUpdate(
         { _id: ObjectId(existOrder?.productID) },

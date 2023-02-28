@@ -4,6 +4,7 @@ const mongoose_1 = require("mongoose");
 ;
 var orderSchemaList = new mongoose_1.Schema({
     orderID: String,
+    orderPaymentID: String,
     listingID: String,
     variationID: String,
     productID: String,
@@ -13,9 +14,10 @@ var orderSchemaList = new mongoose_1.Schema({
     slug: String,
     image: String,
     brand: String,
-    totalAmount: Number,
+    baseAmount: Number,
     quantity: Number,
     paymentMode: String,
+    sku: String,
     shippingAddress: Object,
     shippingCharge: Number,
     sellerData: Object,
@@ -26,11 +28,19 @@ var orderSchemaList = new mongoose_1.Schema({
     orderAT: Object,
     orderPlacedAT: { type: Date, required: false },
     orderShippedAT: { type: Date, required: false },
-    orderStatus: { type: String, enum: ["pending", "placed", "shipped", "canceled", "dispatch"], default: "pending" },
+    isShipped: Boolean,
+    orderStatus: { type: String, enum: ["pending", "placed", "shipped", "canceled", "dispatch", "refunded", "completed"], default: "pending" },
     cancelReason: String,
     orderCanceledAT: Object,
+    isCanceled: Boolean,
     orderDispatchAT: Object,
-    isDispatch: { type: Boolean, required: false }
+    isDispatch: { type: Boolean, required: false },
+    orderCompletedAT: { type: Date, required: false },
+    isCompleted: Boolean,
+    paymentIntentID: { type: String, required: false },
+    paymentMethodID: { type: String, required: false },
+    paymentStatus: { type: String, required: false, enum: ["success", "failed", "pending"] },
+    refund: { type: Object, required: false }
 }, { _id: false });
 let orderSchema = new mongoose_1.Schema({
     user_email: { type: String },

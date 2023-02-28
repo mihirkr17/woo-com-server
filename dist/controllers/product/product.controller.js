@@ -1,4 +1,5 @@
 "use strict";
+// product.controller.tsx
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -9,43 +10,33 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-var { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
-const { topSellingProducts, topRatedProducts, allProducts } = require("../../model/common.model");
-const User = require("../../model/user.model");
 const Product = require("../../model/product.model");
 const ShoppingCart = require("../../model/shoppingCart.model");
+const { findUserByEmail } = require("../../services/common.services");
 /**
  * @controller      --> Fetch the single product information in product details page.
  * @required        --> [req.headers.authorization:email, req.query:productID, req.query:variationID, req.params:product slug]
  * @request_method  --> GET
  */
 module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+    var _a, _b, _c;
     try {
-        const db = yield dbConnection();
         const email = req.headers.authorization || '';
-        const product_slug = req.params.product_slug;
         const productID = (_a = req.query) === null || _a === void 0 ? void 0 : _a.pId;
         const variationID = req.query.vId;
         let existProductInCart = null;
-        let areaType = "";
+        let areaType;
         // If user email address exists
         if (email && typeof email === 'string') {
             existProductInCart = yield ShoppingCart.findOne({ $and: [{ customerEmail: email }, { variationID: variationID }] });
-            let defaultShippingAddress = yield User.aggregate([
-                { $match: { email } },
-                { $unwind: { path: "$buyer.shippingAddress" } },
-                { $replaceRoot: { newRoot: "$buyer.shippingAddress" } },
-                {
-                    $match: { default_shipping_address: true }
-                }
-            ]);
-            defaultShippingAddress = defaultShippingAddress[0];
+            let user = yield findUserByEmail(email);
+            let defaultShippingAddress = (Array.isArray((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress) &&
+                ((_c = user === null || user === void 0 ? void 0 : user.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
             areaType = defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type;
         }
         // Product Details
-        let productDetail = yield db.collection('products').aggregate([
+        let productDetail = yield Product.aggregate([
             { $match: { _id: ObjectId(productID) } },
             {
                 $project: {
@@ -85,11 +76,16 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
                 }
             },
             { $unwind: { path: '$variations' } },
+            {
+                $set: {
+                    title: { $concat: ["$title", " ", " (", { $ifNull: ["$variations.variant.ram", ""] }, ", ", "$variations.variant.rom", ")"] }
+                }
+            },
             { $match: { 'variations._VID': variationID } }
-        ]).toArray();
+        ]);
         productDetail = productDetail[0];
         // Related products
-        const relatedProducts = yield db.collection("products").aggregate([
+        const relatedProducts = yield Product.aggregate([
             { $unwind: { path: '$variations' } },
             {
                 $match: {
@@ -116,7 +112,7 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
                 },
             },
             { $limit: 5 },
-        ]).toArray();
+        ]);
         return res.status(200).send({
             success: true,
             statusCode: 200,
@@ -133,7 +129,6 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
  */
 module.exports.productsByCategoryController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const db = yield dbConnection();
         const { categories, filters } = req.query;
         let category = (categories && categories.toString().split(",")) || [];
         let sorting = {};
@@ -146,7 +141,7 @@ module.exports.productsByCategoryController = (req, res, next) => __awaiter(void
         else {
             sorting = { $sort: { "variations.modifiedAt": 1 } };
         }
-        const products = yield db.collection("products").aggregate([
+        const products = yield Product.aggregate([
             { $unwind: { path: '$variations' } },
             {
                 $match: {
@@ -163,7 +158,7 @@ module.exports.productsByCategoryController = (req, res, next) => __awaiter(void
                 }
             },
             sorting
-        ]).toArray();
+        ]);
         return products
             ? res.status(200).send(products)
             : res.status(404).send({
@@ -178,11 +173,8 @@ module.exports.productsByCategoryController = (req, res, next) => __awaiter(void
 });
 module.exports.searchProducts = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const db = yield dbConnection();
         const q = req.params.q;
-        const result = (yield db
-            .collection("products")
-            .aggregate([
+        const result = (yield Product.aggregate([
             { $unwind: { path: "$variations" } },
             {
                 $match: {
@@ -220,9 +212,59 @@ module.exports.searchProducts = (req, res, next) => __awaiter(void 0, void 0, vo
 module.exports.homeStoreController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const totalLimits = parseInt(req.params.limits);
-        const products = yield allProducts(totalLimits);
-        const topSellingProduct = yield topSellingProducts();
-        const topRatedProduct = yield topRatedProducts();
+        const products = yield Product.aggregate([
+            { $match: { save_as: 'fulfilled' } },
+            {
+                $project: {
+                    title: 1,
+                    slug: 1,
+                    variations: {
+                        $slice: [{
+                                $filter: {
+                                    input: "$variations",
+                                    cond: { $and: [{ $eq: ["$$v.status", 'active'] }, { $eq: ["$$v.stock", "in"] }] },
+                                    as: "v"
+                                }
+                            }, 1]
+                    },
+                    brand: 1,
+                    packageInfo: 1,
+                    rating: 1,
+                    ratingAverage: 1,
+                    _LID: 1,
+                    reviews: 1
+                }
+            },
+            { $unwind: { path: "$variations" } },
+            { $sort: { 'variations._VID': -1 } },
+            { $limit: totalLimits }
+        ]);
+        ;
+        const topSellingProduct = yield Product.aggregate([
+            { $unwind: { path: '$variations' } },
+            { $match: { 'variations.status': "active" } },
+            { $sort: { 'variations.totalSold': -1 } },
+            { $limit: 6 }
+        ]);
+        const topRatedProduct = yield Product.aggregate([
+            { $addFields: { variations: { $first: "$variations" } } },
+            { $match: { 'variations.status': 'active' } },
+            {
+                $project: {
+                    title: 1,
+                    slug: 1,
+                    variations: 1,
+                    brand: 1,
+                    packageInfo: 1,
+                    rating: 1,
+                    ratingAverage: 1,
+                    _LID: 1,
+                    reviews: 1
+                }
+            },
+            { $sort: { ratingAverage: -1 } },
+            { $limit: 6 }
+        ]);
         return res.status(200).send({
             success: true, statusCode: 200, data: {
                 store: products,
@@ -235,9 +277,8 @@ module.exports.homeStoreController = (req, res, next) => __awaiter(void 0, void 
         next(error);
     }
 });
-module.exports.fetchTopSellingProduct = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.fetchTopSellingProduct = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const db = yield dbConnection();
         const seller = req.query.seller;
         let filterQuery = {
             status: "active",
@@ -245,34 +286,22 @@ module.exports.fetchTopSellingProduct = (req, res) => __awaiter(void 0, void 0, 
         if (seller) {
             filterQuery['SELLER'] = seller;
         }
-        const result = yield db
-            .collection("products")
-            .find(filterQuery)
-            .sort({ "stockInfo.sold": -1 })
-            .limit(6)
-            .toArray();
-        res.status(200).send(result);
+        const result = yield Product.find(filterQuery).sort({ "stockInfo.sold": -1 }).limit(6).toArray();
+        return res.status(200).send(result);
     }
     catch (error) {
-        return res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });
 module.exports.purchaseProductController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _b, _c;
+    var _d, _e;
     try {
         const authEmail = req.decoded.email;
-        const role = req.decoded.role;
         const body = req.body;
-        let result = yield User.findOne({
-            $and: [{ email: authEmail }, { role: role }, { accountStatus: 'active' }]
-        }, {
-            password: 0, createdAt: 0,
-            phonePrefixCode: 0,
-            becomeSellerAt: 0
-        });
-        let areaType = (Array.isArray((_b = result === null || result === void 0 ? void 0 : result.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress) &&
-            ((_c = result === null || result === void 0 ? void 0 : result.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
-        areaType = areaType === null || areaType === void 0 ? void 0 : areaType.area_type;
+        let user = yield findUserByEmail(authEmail);
+        let defaultShippingAddress = (Array.isArray((_d = user === null || user === void 0 ? void 0 : user.buyer) === null || _d === void 0 ? void 0 : _d.shippingAddress) &&
+            ((_e = user === null || user === void 0 ? void 0 : user.buyer) === null || _e === void 0 ? void 0 : _e.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
+        let areaType = defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type;
         let buyProduct = yield Product.aggregate([
             { $match: { _LID: body === null || body === void 0 ? void 0 : body.listingID } },
             { $unwind: { path: "$variations" } },
@@ -296,6 +325,8 @@ module.exports.purchaseProductController = (req, res, next) => __awaiter(void 0,
                             default: "$shipping.delivery.zonalCharge"
                         }
                     },
+                    savingAmount: { $multiply: [{ $subtract: ["$variations.pricing.price", "$variations.pricing.sellingPrice"] }, parseInt(body === null || body === void 0 ? void 0 : body.quantity)] },
+                    baseAmount: { $multiply: ['$variations.pricing.sellingPrice', body === null || body === void 0 ? void 0 : body.quantity] },
                     totalAmount: {
                         $add: [{ $multiply: ['$variations.pricing.sellingPrice', body === null || body === void 0 ? void 0 : body.quantity] }, {
                                 $switch: {
@@ -323,17 +354,19 @@ module.exports.purchaseProductController = (req, res, next) => __awaiter(void 0,
             buyProduct["listingID"] = body === null || body === void 0 ? void 0 : body.listingID;
             buyProduct["variationID"] = body === null || body === void 0 ? void 0 : body.variationID;
             buyProduct["customerEmail"] = body === null || body === void 0 ? void 0 : body.customerEmail;
-            const totalAmounts = (buyProduct === null || buyProduct === void 0 ? void 0 : buyProduct.totalAmount) && parseFloat(buyProduct === null || buyProduct === void 0 ? void 0 : buyProduct.totalAmount).toFixed(2);
+            const baseAmounts = (buyProduct === null || buyProduct === void 0 ? void 0 : buyProduct.totalAmount) && parseInt(buyProduct === null || buyProduct === void 0 ? void 0 : buyProduct.baseAmount);
             const totalQuantities = (buyProduct === null || buyProduct === void 0 ? void 0 : buyProduct.quantity) && parseInt(buyProduct === null || buyProduct === void 0 ? void 0 : buyProduct.quantity);
-            const shippingFees = (buyProduct === null || buyProduct === void 0 ? void 0 : buyProduct.shippingCharge) && parseFloat(buyProduct === null || buyProduct === void 0 ? void 0 : buyProduct.shippingCharge).toFixed(2);
-            const finalAmounts = buyProduct && (parseFloat(buyProduct === null || buyProduct === void 0 ? void 0 : buyProduct.totalAmount) + parseFloat(buyProduct === null || buyProduct === void 0 ? void 0 : buyProduct.shippingCharge)).toFixed(2);
+            const shippingFees = (buyProduct === null || buyProduct === void 0 ? void 0 : buyProduct.shippingCharge) && parseInt(buyProduct === null || buyProduct === void 0 ? void 0 : buyProduct.shippingCharge);
+            const finalAmounts = buyProduct && (parseInt(buyProduct === null || buyProduct === void 0 ? void 0 : buyProduct.totalAmount));
+            const savingAmounts = buyProduct && (parseInt(buyProduct === null || buyProduct === void 0 ? void 0 : buyProduct.savingAmount));
             let buyingCartData = {
                 product: buyProduct,
                 container_p: {
-                    totalAmounts,
+                    baseAmounts,
                     totalQuantities,
                     finalAmounts,
                     shippingFees,
+                    savingAmounts
                 },
                 numberOfProducts: buyProduct.length || 0
             };

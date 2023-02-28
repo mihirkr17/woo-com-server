@@ -10,25 +10,19 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const ShoppingCart = require("../../model/shoppingCart.model");
-const User = require("../../model/user.model");
+const { findUserByEmail } = require("../../services/common.services");
 module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     try {
         const authEmail = req.decoded.email;
-        const role = req.decoded.role;
-        let result = yield User.findOne({
-            $and: [{ email: authEmail }, { role: role }, { accountStatus: 'active' }]
-        }, {
-            password: 0, createdAt: 0,
-            phonePrefixCode: 0,
-            becomeSellerAt: 0
-        });
-        let defaultShippingAddress;
-        let areaType = (Array.isArray((_a = result === null || result === void 0 ? void 0 : result.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
-            ((_b = result === null || result === void 0 ? void 0 : result.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
-        defaultShippingAddress = areaType;
-        areaType = areaType === null || areaType === void 0 ? void 0 : areaType.area_type;
-        const spC = yield ShoppingCart.aggregate([
+        let user = yield findUserByEmail(authEmail);
+        if (!user) {
+            return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
+        }
+        let defaultShippingAddress = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
+            ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
+        let areaType = (defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type) || "";
+        const cart = yield ShoppingCart.aggregate([
             { $match: { customerEmail: authEmail } },
             {
                 $lookup: {
@@ -48,7 +42,8 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
                     $expr: {
                         $and: [
                             { $eq: ['$variations._VID', '$variationID'] },
-                            { $eq: ["$variations.stock", "in"] },
+                            // { $eq: ["$variations.stock", "in"] },
+                            { $eq: ["$variations.status", "active"] },
                             { $eq: ["$save_as", "fulfilled"] }
                         ]
                     }
@@ -79,6 +74,8 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
                             default: "$shipping.delivery.zonalCharge"
                         }
                     },
+                    savingAmount: { $multiply: [{ $subtract: ["$variations.pricing.price", "$variations.pricing.sellingPrice"] }, '$quantity'] },
+                    baseAmount: { $multiply: ['$variations.pricing.sellingPrice', '$quantity'] },
                     totalAmount: {
                         $add: [
                             { $multiply: ['$variations.pricing.sellingPrice', '$quantity'] },
@@ -102,20 +99,22 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
                 $unset: ["variations"]
             }
         ]);
-        if (typeof spC === "object") {
-            const totalAmounts = spC && spC.map((tAmount) => (parseFloat(tAmount === null || tAmount === void 0 ? void 0 : tAmount.totalAmount))).reduce((p, c) => p + c, 0).toFixed(2);
-            const totalQuantities = spC && spC.map((tQuant) => (parseFloat(tQuant === null || tQuant === void 0 ? void 0 : tQuant.quantity))).reduce((p, c) => p + c, 0).toFixed(0);
-            const shippingFees = spC && spC.map((p) => parseFloat(p === null || p === void 0 ? void 0 : p.shippingCharge)).reduce((p, c) => p + c, 0).toFixed(2);
-            const finalAmounts = spC && spC.map((fAmount) => (parseFloat(fAmount === null || fAmount === void 0 ? void 0 : fAmount.totalAmount) + (fAmount === null || fAmount === void 0 ? void 0 : fAmount.shippingCharge))).reduce((p, c) => p + c, 0).toFixed(2);
+        if (typeof cart === "object") {
+            const baseAmounts = cart && cart.map((tAmount) => (parseInt(tAmount === null || tAmount === void 0 ? void 0 : tAmount.baseAmount))).reduce((p, c) => p + c, 0);
+            const totalQuantities = cart && cart.map((tQuant) => (parseInt(tQuant === null || tQuant === void 0 ? void 0 : tQuant.quantity))).reduce((p, c) => p + c, 0);
+            const shippingFees = cart && cart.map((p) => parseInt(p === null || p === void 0 ? void 0 : p.shippingCharge)).reduce((p, c) => p + c, 0);
+            const finalAmounts = cart && cart.map((fAmount) => (parseInt(fAmount === null || fAmount === void 0 ? void 0 : fAmount.totalAmount))).reduce((p, c) => p + c, 0);
+            const savingAmounts = cart && cart.map((fAmount) => (parseInt(fAmount === null || fAmount === void 0 ? void 0 : fAmount.savingAmount))).reduce((p, c) => p + c, 0);
             let shoppingCartData = {
-                products: spC,
+                products: cart,
                 container_p: {
-                    totalAmounts,
+                    baseAmounts,
                     totalQuantities,
                     finalAmounts,
                     shippingFees,
+                    savingAmounts
                 },
-                numberOfProducts: spC.length || 0,
+                numberOfProducts: cart.length || 0,
                 defaultShippingAddress
             };
             return res.status(200).send({ success: true, statusCode: 200, data: { module: shoppingCartData } });

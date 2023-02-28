@@ -12,6 +12,7 @@ var conn = require("../utils/db");
 var mongodb = require("mongodb");
 const mng = require("mongodb");
 const User = require("./user.model");
+const ProductTable = require("./product.model");
 module.exports.productCounter = (sellerInfo) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         let db = yield conn.dbConnection();
@@ -82,106 +83,4 @@ module.exports.checkProductAvailability = (productID, variationID) => __awaiter(
     ]).toArray();
     product = product[0];
     return product;
-});
-module.exports.productByCategories = (product, limit = 1000) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        let db = yield conn.dbConnection();
-        let relatedProducts = yield db.collection('products').aggregate([
-            {
-                $match: {
-                    $and: [
-                        { categories: { $in: product.categories } },
-                        { slug: { $ne: product.slug } },
-                        { status: "active" },
-                        { save_as: 'fulfilled' }
-                    ]
-                }
-            },
-            { $project: { slug: "$slug", title: "$title", pricing: "$pricing", ratingAverage: "$ratingAverage", brand: "$brand" } },
-            { $limit: limit }
-        ]).toArray();
-    }
-    catch (error) {
-    }
-});
-// top selling products
-module.exports.topSellingProducts = () => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        let db = yield conn.dbConnection();
-        return yield db.collection("products").aggregate([
-            { $unwind: { path: '$variations' } },
-            { $match: { 'variations.status': "active" } },
-            { $sort: { 'variations.totalSold': -1 } },
-            { $limit: 6 }
-        ]).toArray();
-    }
-    catch (error) {
-        return error === null || error === void 0 ? void 0 : error.message;
-    }
-});
-// top rated products
-module.exports.topRatedProducts = () => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const db = yield conn.dbConnection();
-        return yield db.collection("products").aggregate([
-            { $addFields: { variations: { $first: "$variations" } } },
-            { $match: { 'variations.status': 'active' } },
-            {
-                $project: {
-                    title: 1,
-                    slug: 1,
-                    variations: 1,
-                    brand: 1,
-                    packageInfo: 1,
-                    rating: 1,
-                    ratingAverage: 1,
-                    _LID: 1,
-                    reviews: 1
-                }
-            },
-            { $sort: { ratingAverage: -1 } },
-            { $limit: 6 }
-        ]).toArray();
-    }
-    catch (error) {
-        return error === null || error === void 0 ? void 0 : error.message;
-    }
-});
-// Fetch all products
-module.exports.allProducts = (limits) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const db = yield conn.dbConnection();
-        return yield db.collection('products').aggregate([
-            { $match: { save_as: 'fulfilled' } },
-            {
-                $project: {
-                    title: 1,
-                    slug: 1,
-                    variations: {
-                        $slice: [{
-                                $filter: {
-                                    input: "$variations",
-                                    cond: {
-                                        $eq: ["$$v.status", 'active']
-                                    },
-                                    as: "v"
-                                }
-                            }, 1]
-                    },
-                    brand: 1,
-                    packageInfo: 1,
-                    rating: 1,
-                    ratingAverage: 1,
-                    _LID: 1,
-                    reviews: 1
-                }
-            },
-            { $unwind: { path: "$variations" } },
-            { $sort: { 'variations._VID': -1 } },
-            { $limit: limits }
-        ]).toArray();
-    }
-    catch (error) {
-        return error;
-    }
 });

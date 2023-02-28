@@ -1,29 +1,29 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
-const { verifyJWT, isRoleSeller, isPermitForDashboard } = require("../middleware/Auth.middleware");
-const getController = require("../controllers/product/product.controller");
+const { verifyJWT, isRoleBuyer } = require("../middleware/Auth.middleware");
+const productCTRL = require("../controllers/product/product.controller");
 
 try {
   /**
    * @apiRoutes /api/product
    */
-  router.get("/search-products/:q", getController.searchProducts);
+  router.get("/search-products/:q", productCTRL.searchProducts);
 
-  router.get("/fetch-single-product/:product_slug", getController.fetchSingleProductController);
+  router.get("/fetch-single-product/:product_slug", productCTRL.fetchSingleProductController);
 
-  router.get("/store/:limits", getController.homeStoreController);
+  router.get("/store/:limits", productCTRL.homeStoreController);
 
-  router.post("/purchase", verifyJWT, getController?.purchaseProductController);
+  router.post("/purchase", verifyJWT, isRoleBuyer, productCTRL?.purchaseProductController);
 
   /**
     * @requestMethod GET
     * @controller productsByCategoryController
     * @required categories [Optional -> filters query]
     */
-  router.get("/product-by-category", getController.productsByCategoryController);
+  router.get("/product-by-category", productCTRL.productsByCategoryController);
 
 
-  router.get("/fetch-top-selling-product", getController.fetchTopSellingProduct);
+  router.get("/fetch-top-selling-product", productCTRL.fetchTopSellingProduct);
 } catch (error: any) {
   console.log(error?.message);
 }

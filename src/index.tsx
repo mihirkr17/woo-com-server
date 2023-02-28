@@ -11,6 +11,7 @@ const reviewRoutes = require("./routes/review.route");
 const policyRoutes = require("./routes/policy.route");
 const wishlistRoutes = require("./routes/wishlist.route");
 const dashboardRoutes = require("./routes/dashboard.route");
+const paymentRoutes = require("./routes/payment.route");
 const returnErrors = require("./errors/errors");
 const port = process.env.PORT || 5000;
 
@@ -54,6 +55,7 @@ app.use("/api/v1/order", orderRoutes);
 app.use("/api/v1/review", reviewRoutes);
 app.use("/api/v1/policy", policyRoutes);
 app.use("/api/v1/wishlist", wishlistRoutes);
+app.use("/api/v1/payment", paymentRoutes);
 app.use(returnErrors);
 
 const server = app.listen(port, () => {

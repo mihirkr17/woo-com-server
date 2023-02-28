@@ -93,7 +93,7 @@ module.exports.cancelMyOrder = (req, res, next) => __awaiter(void 0, void 0, voi
             products = products[0];
             let availableProduct = (_a = products === null || products === void 0 ? void 0 : products.variations) === null || _a === void 0 ? void 0 : _a.available;
             let restAvailable = availableProduct + (existOrder === null || existOrder === void 0 ? void 0 : existOrder.quantity);
-            let stock = restAvailable <= 1 ? "out" : "in";
+            let stock = restAvailable <= 0 ? "out" : "in";
             yield Product.findOneAndUpdate({ _id: ObjectId(existOrder === null || existOrder === void 0 ? void 0 : existOrder.productID) }, {
                 $set: {
                     "variations.$[i].available": restAvailable,

@@ -11,6 +11,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 // common.services.tsx
 const mdb = require("mongodb");
 const Product = require("../model/product.model");
+const UserModel = require("../model/user.model");
+const OrderModel = require("../model/order.model");
 // Services
 module.exports.updateProductVariationAvailability = (productID, variationID, quantity, action) => __awaiter(void 0, void 0, void 0, function* () {
     const product = yield Product.findOne({
@@ -35,5 +37,74 @@ module.exports.updateProductVariationAvailability = (productID, variationID, qua
         }, {
             arrayFilters: [{ 'i._VID': variationID }]
         });
+    }
+});
+module.exports.findUserByEmail = (email) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        return (yield UserModel.findOne({ $and: [{ email: email }, { accountStatus: 'active' }] }, {
+            password: 0,
+            createdAt: 0,
+            phonePrefixCode: 0,
+            becomeSellerAt: 0
+        })) || null;
+    }
+    catch (error) {
+        return error;
+    }
+});
+module.exports.order_status_updater = (obj) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { customerEmail, type, orderID, trackingID, cancelReason } = obj;
+        let setQuery;
+        const timestamp = Date.now();
+        let timePlan = {
+            iso: new Date(timestamp),
+            time: new Date(timestamp).toLocaleTimeString(),
+            date: new Date(timestamp).toDateString(),
+            timestamp: timestamp
+        };
+        if (type === "dispatch") {
+            setQuery = {
+                $set: {
+                    "orders.$[i].orderStatus": "dispatch",
+                    "orders.$[i].orderDispatchAT": timePlan,
+                    "orders.$[i].isDispatch": true
+                }
+            };
+        }
+        else if (type === "shipped") {
+            setQuery = {
+                $set: {
+                    "orders.$[i].orderStatus": "shipped",
+                    "orders.$[i].orderShippedAT": timePlan,
+                    "orders.$[i].isShipped": true
+                }
+            };
+        }
+        else if (type === "completed") {
+            setQuery = {
+                $set: {
+                    "orders.$[i].orderStatus": "completed",
+                    "orders.$[i].orderCompletedAT": timePlan,
+                    "orders.$[i].isCompleted": true
+                }
+            };
+        }
+        else if (type === "canceled" && cancelReason) {
+            setQuery = {
+                $set: {
+                    "orders.$[i].orderStatus": "canceled",
+                    "orders.$[i].cancelReason": cancelReason,
+                    "orders.$[i].orderCanceledAT": timePlan,
+                    "orders.$[i].isCanceled": true
+                }
+            };
+        }
+        return (yield OrderModel.findOneAndUpdate({ user_email: customerEmail }, setQuery, {
+            arrayFilters: [{ "i.orderID": orderID, "i.trackingID": trackingID }],
+        })) ? { success: true } : { success: false };
+    }
+    catch (error) {
+        return error === null || error === void 0 ? void 0 : error.message;
     }
 });

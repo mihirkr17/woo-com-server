@@ -23,6 +23,8 @@ try {
 
   router.put("/store/:storeName/order/dispatch-order", verifyJWT, isRoleSeller, ManageOrderCTRL?.dispatchOrder);
 
+  router.post("/order-status-management", verifyJWT, isRoleSeller, ManageOrderCTRL.orderStatusManagement);
+
 
 
   // get controllers

@@ -1,135 +1,136 @@
 import { NextFunction, Request, Response } from "express";
-const Order = require("../../model/order.model");
-const Product = require("../../model/product.model");
-const { ObjectId } = require("mongodb");
+const response = require("../../errors/apiResponse");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const ShoppingCart = require("../../model/shoppingCart.model");
+const { findUserByEmail } = require("../../services/common.services");
 
 
-module.exports = async function setOrderHandler(req: Request, res: Response, next: NextFunction) {
+module.exports = async function SetOrder(req: Request, res: Response, next: NextFunction) {
    try {
-
       const userEmail: string = req.headers.authorization || "";
-      const verifiedEmail: string = req.decoded.email;
-      const customerUUID: string = req.decoded._UUID;
+      const authEmail: string = req.decoded.email;
       const body: any = req.body;
 
-      if (userEmail !== verifiedEmail) {
-         return res.status(401).send({ success: false, statusCode: 401, message: "Unauthorized access" });
+      if (userEmail !== authEmail) {
+         throw new response.Api401Error("AuthError", "Unauthorized access !");
       }
 
       if (!body || typeof body === "undefined") {
-         return res.status(400).send({
-            success: false,
-            statusCode: 400,
-            error: "Something went wrong !",
-         });
+         throw new response.Api400Error("ClientError", "Required body !");
       }
 
-      async function setOrder(item: any) {
-         let productInventor;
-         productInventor = await Product.aggregate([
-            { $match: { $and: [{ _LID: item?.listingID }, { _id: ObjectId(item?.productID) }] } },
-            { $unwind: { path: "$variations" } },
-            { $replaceRoot: { newRoot: { $mergeObjects: ["$variations", "$$ROOT"] } } },
-            { $unset: ["variations"] },
-            { $match: { $and: [{ _VID: item?.variationID }] } },
-            {
-               $project: {
-                  vr: {
-                     $cond: {
-                        if: { $gte: ["$available", item?.quantity] }, then: "yes", else: "no"
-                     },
+      let user = await findUserByEmail(authEmail);
 
-                  },
-                  available: 1,
-                  sellingPrice: "$pricing.sellingPrice",
-                  totalAmount: {
-                     $add: [
-                        { $multiply: ['$pricing.sellingPrice', parseInt(item?.quantity)] },
-                        {
-                           $switch: {
-                              branches: [
-                                 { case: { $eq: [item.shippingAddress.area_type, "zonal"] }, then: "$shipping.delivery.zonalCharge" },
-                                 { case: { $eq: [item.shippingAddress.area_type, "local"] }, then: "$shipping.delivery.localCharge" }
-                              ],
-                              default: "$shipping.delivery.zonalCharge"
-                           }
-                        }
-                     ]
-                  },
-                  sellerData: 1,
-                  shippingCharge: {
-                     $switch: {
-                        branches: [
-                           { case: { $eq: [item.shippingAddress.area_type, "zonal"] }, then: "$shipping.delivery.zonalCharge" },
-                           { case: { $eq: [item.shippingAddress.area_type, "local"] }, then: "$shipping.delivery.localCharge" }
-                        ],
-                        default: "$shipping.delivery.zonalCharge"
-                     }
-                  },
+      let defaultAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
+         user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
+
+      if (!defaultAddress) {
+         throw new response.Api400Error("ClientError", "Required shipping address !");
+      }
+
+      let areaType = defaultAddress?.area_type;
+
+      const orderItems = await ShoppingCart.aggregate([
+         { $match: { customerEmail: authEmail } },
+         {
+            $lookup: {
+               from: 'products',
+               localField: 'listingID',
+               foreignField: "_LID",
+               as: "main_product"
+            }
+         },
+         { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } } },
+         { $unset: ["main_product"] },
+         { $unwind: { path: "$variations" } },
+         {
+            $match: {
+               $expr: {
+                  $and: [
+                     { $eq: ['$variations._VID', '$variationID'] },
+                     { $eq: ["$variations.stock", "in"] },
+                     { $eq: ["$variations.status", "active"] },
+                     { $gt: ["$variations.available", "$quantity"] }
+                  ]
+
                }
             }
-         ]);
-
-         productInventor = productInventor[0];
-
-         if (productInventor && productInventor?.vr === "yes") {
-
-            item["shippingCharge"] = productInventor?.shippingCharge;
-            item["totalAmount"] = productInventor?.totalAmount;
-            item["sellerData"] = productInventor?.sellerData;
-            item["sellingPrice"] = productInventor?.sellingPrice;
-            item["orderID"] = "#" + (Math.round(Math.random() * 999999999) + productInventor?.available).toString();
-            item["trackingID"] = "TRC" + (Math.round(Math.random() * 9999999)).toString();
-            
-            const timestamp = Date.now();
-
-            item["orderAT"] = {
-               iso: new Date(timestamp),
-               time: new Date(timestamp).toLocaleTimeString(),
-               date: new Date(timestamp).toDateString(),
-               timestamp: timestamp
-            }
-            item["customerID"] = customerUUID;
-            item["orderStatus"] = "pending";
-
-            let result = await Order.findOneAndUpdate(
-               { user_email: userEmail },
-               { $push: { orders: item } },
-               { upsert: true }
-            );
-
-            if (result) {
-               let availableProduct = productInventor?.available;
-               let restAvailable = availableProduct - item?.quantity;
-               let stock = restAvailable <= 1 ? "out" : "in";
-
-               await Product.findOneAndUpdate(
-                  { _id: ObjectId(item?.productID) },
-                  {
-                     $set: {
-                        "variations.$[i].available": restAvailable,
-                        "variations.$[i].stock": stock
+         },
+         {
+            $project: {
+               _id: 0,
+               variations: 1,
+               quantity: 1,
+               productID: 1,
+               listingID: 1,
+               variationID: 1,
+               baseAmount: {
+                  $add: [
+                     { $multiply: ['$variations.pricing.sellingPrice', '$quantity'] },
+                     {
+                        $switch: {
+                           branches: [
+                              { case: { $eq: [areaType, "zonal"] }, then: "$shipping.delivery.zonalCharge" },
+                              { case: { $eq: [areaType, "local"] }, then: "$shipping.delivery.localCharge" }
+                           ],
+                           default: "$shipping.delivery.zonalCharge"
+                        }
                      }
-                  },
-                  { arrayFilters: [{ "i._VID": item?.variationID }] }
-               );
-
-               return { orderSuccess: true, message: "Order success for " + item?.title };
+                  ]
+               }
             }
+         },
+         {
+            $set: {
+               shippingAddress: defaultAddress,
+               areaType: areaType,
+               state: body?.state
+            }
+         },
+         { $unset: ["variations"] }
+      ]);
 
-         } else {
-            return { orderSuccess: false, message: "Sorry, Order failed for " + item?.title + " due to quantity greater than total units !" };
-         }
+      if (!orderItems || orderItems.length <= 0) {
+         throw new response.Api400Error("ClientError", "Nothing for purchase ! Please add product in your cart.");
       }
 
-      const promises: any = Array.isArray(body) && body.map(async (b: any) => {
-         return await setOrder(b);
+
+      let totalAmount = Array.isArray(orderItems) &&
+         orderItems.map((item: any) => parseFloat(item?.baseAmount)).reduce((p: any, n: any) => p + n, 0).toFixed(2);
+
+      totalAmount = parseFloat(totalAmount);
+
+      if (!totalAmount) {
+         return res.status(402).send();
+      }
+
+      // Creating payment intent after getting total amount of order items. 
+      const paymentIntent = await stripe.paymentIntents.create({
+         amount: (totalAmount * 100),
+         currency: 'bdt',
+         payment_method_types: ['card'],
+         metadata: {
+            order_id: "OP-" + (Math.round(Math.random() * 99999999) + parseInt(totalAmount)).toString()
+         }
       });
 
-      let finalResult: any = await Promise.all(promises);
+      if (!paymentIntent?.client_secret) {
+         throw new response.Api400Error("ClientError", "Payment failed.");
+      }
 
-      return res.status(200).send({ success: true, statusCode: 200, data: finalResult });
+
+      return res.status(200).send({
+         success: true,
+         statusCode: 200,
+         orderItems,
+         totalAmount: totalAmount,
+         clientSecret: paymentIntent?.client_secret,
+         orderPaymentID: paymentIntent?.metadata?.order_id
+      });
+
    } catch (error: any) {
       next(error);
    }
 };
+
+

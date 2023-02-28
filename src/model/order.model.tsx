@@ -2,17 +2,18 @@ import { Schema, model } from "mongoose";
 
 
 interface IOrder {
-   orderID: string,
-   listingID: string,
-   variationID: string,
-   productID: string,
+   orderID: string;
+   orderPaymentID: string;
+   listingID: string;
+   variationID: string;
+   productID: string;
    customerEmail: string,
    customerID: string,
    title: string,
    slug: string,
    image: string,
    brand: string,
-   totalAmount: number,
+   baseAmount: number,
    quantity: number,
    paymentMode: string,
    shippingAddress: object,
@@ -21,19 +22,29 @@ interface IOrder {
    variant: object,
    sellingPrice: number,
    state: string,
+   sku: string,
    trackingID: string,
    orderAT: object,
    orderStatus: string,
    orderPlacedAT: Date,
    orderShippedAT: Date,
+   isShipped: boolean,
    cancelReason: string,
    orderCanceledAT: object,
+   isCanceled: boolean,
    orderDispatchAT: object,
-   isDispatch: boolean
+   isDispatch: boolean,
+   orderCompletedAT: object,
+   isCompleted: boolean,
+   paymentIntentID?: string,
+   paymentMethodID?: string,
+   paymentStatus?: string,
+   refund?: object
 };
 
 var orderSchemaList = new Schema<IOrder>({
    orderID: String,
+   orderPaymentID: String,
    listingID: String,
    variationID: String,
    productID: String,
@@ -43,9 +54,10 @@ var orderSchemaList = new Schema<IOrder>({
    slug: String,
    image: String,
    brand: String,
-   totalAmount: Number,
+   baseAmount: Number,
    quantity: Number,
    paymentMode: String,
+   sku: String,
    shippingAddress: Object,
    shippingCharge: Number,
    sellerData: Object,
@@ -56,11 +68,19 @@ var orderSchemaList = new Schema<IOrder>({
    orderAT: Object,
    orderPlacedAT: { type: Date, required: false },
    orderShippedAT: { type: Date, required: false },
-   orderStatus: { type: String, enum: ["pending", "placed", "shipped", "canceled", "dispatch"], default: "pending" },
+   isShipped: Boolean,
+   orderStatus: { type: String, enum: ["pending", "placed", "shipped", "canceled", "dispatch", "refunded", "completed"], default: "pending" },
    cancelReason: String,
    orderCanceledAT: Object,
+   isCanceled: Boolean,
    orderDispatchAT: Object,
-   isDispatch: { type: Boolean, required: false }
+   isDispatch: { type: Boolean, required: false },
+   orderCompletedAT: { type: Date, required: false },
+   isCompleted: Boolean,
+   paymentIntentID: { type: String, required: false },
+   paymentMethodID: { type: String, required: false },
+   paymentStatus: { type: String, required: false, enum: ["success", "failed", "pending"] },
+   refund: { type: Object, required: false }
 }, { _id: false });
 
 let orderSchema = new Schema({

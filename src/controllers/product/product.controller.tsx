@@ -1,14 +1,11 @@
+
+// product.controller.tsx
+
 import { NextFunction, Request, Response } from "express";
-var { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
-const {
-   topSellingProducts,
-   topRatedProducts,
-   allProducts
-} = require("../../model/common.model");
-const User = require("../../model/user.model");
 const Product = require("../../model/product.model");
 const ShoppingCart = require("../../model/shoppingCart.model");
+const { findUserByEmail } = require("../../services/common.services");
 
 /**
  * @controller      --> Fetch the single product information in product details page.
@@ -17,35 +14,28 @@ const ShoppingCart = require("../../model/shoppingCart.model");
  */
 module.exports.fetchSingleProductController = async (req: Request, res: Response, next: any) => {
    try {
-      const db = await dbConnection();
 
       const email: String = req.headers.authorization || '';
-      const product_slug: String = req.params.product_slug;
       const productID = req.query?.pId;
       const variationID = req.query.vId;
       let existProductInCart: any = null;
-      let areaType: any = "";
+      let areaType: any;
 
 
       // If user email address exists
       if (email && typeof email === 'string') {
          existProductInCart = await ShoppingCart.findOne({ $and: [{ customerEmail: email }, { variationID: variationID }] });
 
-         let defaultShippingAddress = await User.aggregate([
-            { $match: { email } },
-            { $unwind: { path: "$buyer.shippingAddress" } },
-            { $replaceRoot: { newRoot: "$buyer.shippingAddress" } },
-            {
-               $match: { default_shipping_address: true }
-            }
-         ]);
-         defaultShippingAddress = defaultShippingAddress[0];
-         areaType = defaultShippingAddress?.area_type;
+         let user = await findUserByEmail(email);
 
+         let defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
+            user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
+
+         areaType = defaultShippingAddress?.area_type;
       }
 
       // Product Details
-      let productDetail = await db.collection('products').aggregate([
+      let productDetail = await Product.aggregate([
          { $match: { _id: ObjectId(productID) } },
          {
             $project: {
@@ -85,14 +75,19 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
             }
          },
          { $unwind: { path: '$variations' } },
+         {
+            $set: {
+               title: { $concat: ["$title", " ", " (", { $ifNull: ["$variations.variant.ram", ""] }, ", ", "$variations.variant.rom", ")"] }
+            }
+         },
          { $match: { 'variations._VID': variationID } }
-      ]).toArray();
+      ]);
 
 
       productDetail = productDetail[0];
 
       // Related products
-      const relatedProducts = await db.collection("products").aggregate([
+      const relatedProducts = await Product.aggregate([
          { $unwind: { path: '$variations' } },
          {
             $match: {
@@ -119,9 +114,7 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
             },
          },
          { $limit: 5 },
-      ]).toArray();
-
-
+      ]);
 
       return res.status(200).send({
          success: true,
@@ -143,7 +136,6 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
  */
 module.exports.productsByCategoryController = async (req: Request, res: Response, next: any) => {
    try {
-      const db = await dbConnection();
 
       const { categories, filters } = req.query;
 
@@ -161,7 +153,7 @@ module.exports.productsByCategoryController = async (req: Request, res: Response
       }
 
 
-      const products = await db.collection("products").aggregate([
+      const products = await Product.aggregate([
          { $unwind: { path: '$variations' } },
          {
             $match: {
@@ -178,7 +170,7 @@ module.exports.productsByCategoryController = async (req: Request, res: Response
             }
          },
          sorting
-      ]).toArray();
+      ]);
 
       return products
          ? res.status(200).send(products)
@@ -197,34 +189,31 @@ module.exports.productsByCategoryController = async (req: Request, res: Response
 
 module.exports.searchProducts = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const db = await dbConnection();
 
       const q = req.params.q;
 
       const result =
-         (await db
-            .collection("products")
-            .aggregate([
-               { $unwind: { path: "$variations" } },
-               {
-                  $match: {
-                     $and: [{ 'variations.status': "active" }, { save_as: "fulfilled" }],
-                     $or: [
-                        { title: { $regex: q, $options: "i" } },
-                        { "sellerData.sellerName": { $regex: q, $options: "i" } },
-                        { brand: { $regex: q, $options: "i" } },
-                        { categories: { $in: [q] } },
-                     ],
-                  },
+         (await Product.aggregate([
+            { $unwind: { path: "$variations" } },
+            {
+               $match: {
+                  $and: [{ 'variations.status': "active" }, { save_as: "fulfilled" }],
+                  $or: [
+                     { title: { $regex: q, $options: "i" } },
+                     { "sellerData.sellerName": { $regex: q, $options: "i" } },
+                     { brand: { $regex: q, $options: "i" } },
+                     { categories: { $in: [q] } },
+                  ],
                },
-               {
-                  $project: {
-                     title: "$title",
-                     categories: "$categories",
-                     images: "$variations.images",
-                  },
+            },
+            {
+               $project: {
+                  title: "$title",
+                  categories: "$categories",
+                  images: "$variations.images",
                },
-            ])
+            },
+         ])
             .toArray()) || [];
 
       return result.length > 0
@@ -245,11 +234,60 @@ module.exports.homeStoreController = async (req: Request, res: Response, next: N
    try {
       const totalLimits = parseInt(req.params.limits);
 
-      const products = await allProducts(totalLimits);
+      const products = await Product.aggregate([
+         { $match: { save_as: 'fulfilled' } },
+         {
+            $project: {
+               title: 1,
+               slug: 1,
+               variations: {
+                  $slice: [{
+                     $filter: {
+                        input: "$variations",
+                        cond: { $and: [{ $eq: ["$$v.status", 'active'] }, { $eq: ["$$v.stock", "in"] }] },
+                        as: "v"
+                     }
+                  }, 1]
+               },
+               brand: 1,
+               packageInfo: 1,
+               rating: 1,
+               ratingAverage: 1,
+               _LID: 1,
+               reviews: 1
+            }
+         },
+         { $unwind: { path: "$variations" } },
+         { $sort: { 'variations._VID': -1 } },
+         { $limit: totalLimits }
+      ]);;
 
-      const topSellingProduct = await topSellingProducts();
+      const topSellingProduct = await Product.aggregate([
+         { $unwind: { path: '$variations' } },
+         { $match: { 'variations.status': "active" } },
+         { $sort: { 'variations.totalSold': -1 } },
+         { $limit: 6 }
+      ]);
 
-      const topRatedProduct = await topRatedProducts();
+      const topRatedProduct = await Product.aggregate([
+         { $addFields: { variations: { $first: "$variations" } } },
+         { $match: { 'variations.status': 'active' } },
+         {
+            $project: {
+               title: 1,
+               slug: 1,
+               variations: 1,
+               brand: 1,
+               packageInfo: 1,
+               rating: 1,
+               ratingAverage: 1,
+               _LID: 1,
+               reviews: 1
+            }
+         },
+         { $sort: { ratingAverage: -1 } },
+         { $limit: 6 }
+      ]);
 
       return res.status(200).send({
          success: true, statusCode: 200, data: {
@@ -267,11 +305,11 @@ module.exports.homeStoreController = async (req: Request, res: Response, next: N
 
 
 
-module.exports.fetchTopSellingProduct = async (req: Request, res: Response) => {
+module.exports.fetchTopSellingProduct = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const db = await dbConnection();
 
       const seller: any = req.query.seller;
+
       let filterQuery: any = {
          status: "active",
       };
@@ -279,15 +317,12 @@ module.exports.fetchTopSellingProduct = async (req: Request, res: Response) => {
          filterQuery['SELLER'] = seller;
       }
 
-      const result = await db
-         .collection("products")
-         .find(filterQuery)
-         .sort({ "stockInfo.sold": -1 })
-         .limit(6)
-         .toArray();
-      res.status(200).send(result);
+      const result = await Product.find(filterQuery).sort({ "stockInfo.sold": -1 }).limit(6).toArray();
+
+      return res.status(200).send(result);
+
    } catch (error: any) {
-      return res.status(500).send({ message: error?.message });
+      next(error);
    }
 };
 
@@ -296,25 +331,15 @@ module.exports.fetchTopSellingProduct = async (req: Request, res: Response) => {
 
 module.exports.purchaseProductController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-
       const authEmail = req.decoded.email;
-      const role = req.decoded.role;
       const body = req.body;
 
-      let result = await User.findOne(
-         {
-            $and: [{ email: authEmail }, { role: role }, { accountStatus: 'active' }]
-         },
-         {
-            password: 0, createdAt: 0,
-            phonePrefixCode: 0,
-            becomeSellerAt: 0
-         }
-      );
+      let user = await findUserByEmail(authEmail);
 
-      let areaType = (Array.isArray(result?.buyer?.shippingAddress) &&
-         result?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
-      areaType = areaType?.area_type;
+      let defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
+         user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
+
+      let areaType = defaultShippingAddress?.area_type;
 
       let buyProduct = await Product.aggregate([
          { $match: { _LID: body?.listingID } },
@@ -339,6 +364,8 @@ module.exports.purchaseProductController = async (req: Request, res: Response, n
                      default: "$shipping.delivery.zonalCharge"
                   }
                },
+               savingAmount: { $multiply: [{ $subtract: ["$variations.pricing.price", "$variations.pricing.sellingPrice"] }, parseInt(body?.quantity)] },
+               baseAmount: { $multiply: ['$variations.pricing.sellingPrice', body?.quantity] },
                totalAmount: {
                   $add: [{ $multiply: ['$variations.pricing.sellingPrice', body?.quantity] }, {
                      $switch: {
@@ -368,18 +395,20 @@ module.exports.purchaseProductController = async (req: Request, res: Response, n
          buyProduct["variationID"] = body?.variationID;
          buyProduct["customerEmail"] = body?.customerEmail;
 
-         const totalAmounts = buyProduct?.totalAmount && parseFloat(buyProduct?.totalAmount).toFixed(2);
+         const baseAmounts = buyProduct?.totalAmount && parseInt(buyProduct?.baseAmount);
          const totalQuantities = buyProduct?.quantity && parseInt(buyProduct?.quantity);
-         const shippingFees = buyProduct?.shippingCharge && parseFloat(buyProduct?.shippingCharge).toFixed(2);
-         const finalAmounts = buyProduct && (parseFloat(buyProduct?.totalAmount) + parseFloat(buyProduct?.shippingCharge)).toFixed(2);
+         const shippingFees = buyProduct?.shippingCharge && parseInt(buyProduct?.shippingCharge);
+         const finalAmounts = buyProduct && (parseInt(buyProduct?.totalAmount));
+         const savingAmounts = buyProduct && (parseInt(buyProduct?.savingAmount));
 
          let buyingCartData = {
             product: buyProduct,
             container_p: {
-               totalAmounts,
+               baseAmounts,
                totalQuantities,
                finalAmounts,
                shippingFees,
+               savingAmounts
             },
             numberOfProducts: buyProduct.length || 0
          }

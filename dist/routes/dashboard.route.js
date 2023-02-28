@@ -19,6 +19,7 @@ try {
     router.put("/seller/:storeName/start-flash-sale", verifyJWT, isRoleSeller, ManageProductCTRL === null || ManageProductCTRL === void 0 ? void 0 : ManageProductCTRL.productFlashSaleController);
     router.put("/admin/take-this-product", verifyJWT, isRoleAdmin, AdminCTRL === null || AdminCTRL === void 0 ? void 0 : AdminCTRL.takeThisProductByAdminController);
     router.put("/store/:storeName/order/dispatch-order", verifyJWT, isRoleSeller, ManageOrderCTRL === null || ManageOrderCTRL === void 0 ? void 0 : ManageOrderCTRL.dispatchOrder);
+    router.post("/order-status-management", verifyJWT, isRoleSeller, ManageOrderCTRL.orderStatusManagement);
     // get controllers
     router.get("/view-products", verifyJWT, isPermitForDashboard, ManageProductCTRL.viewAllProductsInDashboard);
     router.get("/admin/:uuid/provider", verifyJWT, isRoleAdmin, AdminCTRL === null || AdminCTRL === void 0 ? void 0 : AdminCTRL.getAdminController);
