@@ -1,36 +1,47 @@
 "use strict";
 const product_listing_template_engine = (body) => {
     var _a, _b, _c;
+    let price = parseFloat(body === null || body === void 0 ? void 0 : body.price);
+    let sellingPrice = parseFloat(body === null || body === void 0 ? void 0 : body.sellingPrice);
+    let discount = ((price - sellingPrice) / price);
+    discount = parseInt(discount) * 100;
+    let volumetricWeight = ((parseFloat(body === null || body === void 0 ? void 0 : body.packageHeight) * parseFloat(body === null || body === void 0 ? void 0 : body.packageLength) * parseFloat(body === null || body === void 0 ? void 0 : body.packageWidth)) / 5000).toFixed(1);
+    volumetricWeight = parseFloat(volumetricWeight);
     return {
         title: body === null || body === void 0 ? void 0 : body.title,
         slug: body === null || body === void 0 ? void 0 : body.slug,
         categories: [body === null || body === void 0 ? void 0 : body.category, body === null || body === void 0 ? void 0 : body.subCategory, body === null || body === void 0 ? void 0 : body.postCategory] || [],
         brand: body === null || body === void 0 ? void 0 : body.brand,
+        images: body === null || body === void 0 ? void 0 : body.images,
+        pricing: {
+            price,
+            sellingPrice,
+            discount,
+            currency: 'us'
+        },
         sellerData: {
             sellerID: ((_a = body === null || body === void 0 ? void 0 : body.sellerData) === null || _a === void 0 ? void 0 : _a.sellerID) || "",
             sellerName: ((_b = body === null || body === void 0 ? void 0 : body.sellerData) === null || _b === void 0 ? void 0 : _b.sellerName) || "",
             storeName: ((_c = body === null || body === void 0 ? void 0 : body.sellerData) === null || _c === void 0 ? void 0 : _c.storeName) || ""
+        },
+        package: {
+            dimension: {
+                height: parseFloat(body === null || body === void 0 ? void 0 : body.packageHeight),
+                length: parseFloat(body === null || body === void 0 ? void 0 : body.packageLength),
+                width: parseFloat(body === null || body === void 0 ? void 0 : body.packageWidth)
+            },
+            weight: parseFloat(body === null || body === void 0 ? void 0 : body.packageWeight),
+            weightUnit: 'kg',
+            dimensionUnit: 'cm',
+            volumetricWeight,
+            inTheBox: body === null || body === void 0 ? void 0 : body.inTheBox
         },
         shipping: {
             fulfilledBy: body === null || body === void 0 ? void 0 : body.fulfilledBy,
             procurementType: body === null || body === void 0 ? void 0 : body.procurementType,
             procurementSLA: body === null || body === void 0 ? void 0 : body.procurementSLA,
             provider: body === null || body === void 0 ? void 0 : body.shippingProvider,
-            delivery: {
-                localCharge: parseInt(body === null || body === void 0 ? void 0 : body.localCharge),
-                zonalCharge: parseInt(body === null || body === void 0 ? void 0 : body.zonalCharge),
-            },
-            package: {
-                dimension: {
-                    height: body === null || body === void 0 ? void 0 : body.packageHeight,
-                    length: body === null || body === void 0 ? void 0 : body.packageLength,
-                    width: body === null || body === void 0 ? void 0 : body.packageWidth
-                },
-                weight: body === null || body === void 0 ? void 0 : body.packageWeight,
-                weightUnit: 'kg',
-                dimensionUnit: 'cm',
-                inTheBox: body === null || body === void 0 ? void 0 : body.inTheBox
-            }
+            isFree: body === null || body === void 0 ? void 0 : body.isFree
         },
         tax: {
             hsn: body === null || body === void 0 ? void 0 : body.taxHsn,
@@ -40,14 +51,15 @@ const product_listing_template_engine = (body) => {
             origin: body === null || body === void 0 ? void 0 : body.manufacturerOrigin,
             details: body === null || body === void 0 ? void 0 : body.manufacturerDetails,
         },
-        paymentInfo: (body === null || body === void 0 ? void 0 : body.paymentInformation) || [],
         warranty: body === null || body === void 0 ? void 0 : body.warranty,
         bodyInfo: (body === null || body === void 0 ? void 0 : body.bodyInfo) || {},
-        specification: (body === null || body === void 0 ? void 0 : body.specification) || {}
+        specification: (body === null || body === void 0 ? void 0 : body.specification) || {},
+        description: (body === null || body === void 0 ? void 0 : body.description) || ""
     };
 };
-const productVariation = (body) => {
-    let available = parseInt(body === null || body === void 0 ? void 0 : body.available);
+const product_variation_template_engine = (body) => {
+    let available = parseInt(body === null || body === void 0 ? void 0 : body.available) || 0;
+    let priceModifier = parseInt(body === null || body === void 0 ? void 0 : body.priceModifier) || 0;
     let stock;
     if (available && available >= 1) {
         stock = "in";
@@ -56,18 +68,14 @@ const productVariation = (body) => {
         stock = "out";
     }
     return {
-        images: body === null || body === void 0 ? void 0 : body.images,
+        vTitle: body === null || body === void 0 ? void 0 : body.vTitle,
         sku: body === null || body === void 0 ? void 0 : body.sku,
-        pricing: {
-            price: parseFloat(body === null || body === void 0 ? void 0 : body.price),
-            sellingPrice: parseFloat(body === null || body === void 0 ? void 0 : body.sellingPrice),
-            discount: body === null || body === void 0 ? void 0 : body.discount,
-            currency: 'BDT'
-        },
         variant: (body === null || body === void 0 ? void 0 : body.variant) || {},
+        attrs: (body === null || body === void 0 ? void 0 : body.attrs) || {},
+        priceModifier,
         stock,
         available: parseInt(body === null || body === void 0 ? void 0 : body.available),
         status: body === null || body === void 0 ? void 0 : body.status
     };
 };
-module.exports = { product_listing_template_engine, productVariation };
+module.exports = { product_listing_template_engine, product_variation_template_engine };

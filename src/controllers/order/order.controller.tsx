@@ -1,11 +1,8 @@
 import { NextFunction, Request, Response } from "express";
 const { dbConnection } = require("../../utils/db");
-const { ObjectId } = require("mongodb");
-const { updateProductStock } = require("../../utils/common");
-const { orderModel } = require("../../templates/order.template");
 const Product = require("../../model/product.model");
-const User = require("../../model/user.model");
 const Order = require("../../model/order.model");
+const { order_status_updater, update_variation_stock_available } = require("../../services/common.services");
 
 
 module.exports.myOrder = async (req: Request, res: Response, next: NextFunction) => {
@@ -52,73 +49,34 @@ module.exports.removeOrder = async (req: Request, res: Response, next: any) => {
 module.exports.cancelMyOrder = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userEmail = req.params.userEmail;
-    const { cancel_reason, orderID } = req.body;
 
-    const timestamp = Date.now();
+    const body = req.body;
 
-    let cancelTime = {
-      iso: new Date(timestamp),
-      time: new Date(timestamp).toLocaleTimeString(),
-      date: new Date(timestamp).toDateString(),
-      timestamp: timestamp
-    }
+    const { cancelReason, orderID } = body;
 
-    const result = await Order.findOneAndUpdate(
-      { user_email: userEmail },
+    if (!orderID) throw new Error("Required order ID !");
+
+    if (!cancelReason) throw new Error("Required cancel reason !");
+
+    let existOrder = await Order.aggregate([
+      { $match: { user_email: userEmail } },
+      { $unwind: { path: "$orders" } },
       {
-        $set: {
-          "orders.$[i].orderStatus": "canceled",
-          "orders.$[i].cancelReason": cancel_reason,
-          "orders.$[i].orderCanceledAT": cancelTime,
-        },
+        $replaceRoot: { newRoot: "$orders" }
       },
-      { arrayFilters: [{ "i.orderID": orderID }], upsert: true }
-    );
+      {
+        $match: { $and: [{ orderID: orderID }] }
+      }
+    ]);
 
-    if (result) {
-      let existOrder = await Order.aggregate([
-        { $match: { user_email: userEmail } },
-        { $unwind: { path: "$orders" } },
-        {
-          $replaceRoot: { newRoot: "$orders" }
-        },
-        {
-          $match: { $and: [{ orderID: orderID }] }
-        }
-      ]);
+    existOrder = existOrder[0];
 
-      existOrder = existOrder[0];
-
-      let products = await Product.aggregate([
-        { $match: { $and: [{ _LID: existOrder?.listingID }] } },
-        { $unwind: { path: "$variations" } },
-        {
-          $project: {
-            variations: 1
-          }
-        },
-        { $match: { $and: [{ "variations._VID": existOrder?.variationID }] } },
-      ]);
-      products = products[0];
-
-
-      let availableProduct = products?.variations?.available;
-      let restAvailable = availableProduct + existOrder?.quantity;
-      let stock = restAvailable <= 0 ? "out" : "in";
-
-      await Product.findOneAndUpdate(
-        { _id: ObjectId(existOrder?.productID) },
-        {
-          $set: {
-            "variations.$[i].available": restAvailable,
-            "variations.$[i].stock": stock
-          }
-        },
-        { arrayFilters: [{ "i._VID": existOrder?.variationID }] }
-      );
+    if (existOrder) {
+      await order_status_updater({ type: "canceled", cancelReason, customerEmail: existOrder?.customerEmail, trackingID: existOrder?.trackingID });
+      await update_variation_stock_available("inc", existOrder);
     }
 
-    res.send({ success: true, statusCode: 200, message: "Order canceled successfully" });
+    return res.status(200).send({ success: true, statusCode: 200, message: "Order canceled successfully" });
   } catch (error: any) {
     next(error);
   }

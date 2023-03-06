@@ -10,9 +10,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const Order = require("../../model/order.model");
-const { order_status_updater } = require("../../services/common.services");
+const { order_status_updater, update_variation_stock_available } = require("../../services/common.services");
 const Product = require("../../model/product.model");
-const { ObjectId } = require("mongodb");
 module.exports.manageOrders = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
@@ -98,37 +97,23 @@ module.exports.manageOrders = (req, res, next) => __awaiter(void 0, void 0, void
         next(error);
     }
 });
-module.exports.dispatchOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _b;
-    try {
-        const body = req.body;
-        if (((_b = body === null || body === void 0 ? void 0 : body.context) === null || _b === void 0 ? void 0 : _b.MARKET_PLACE) !== "WooKart") {
-            throw new Error("Invalid operation !");
-        }
-        if (!(body === null || body === void 0 ? void 0 : body.module)) {
-            throw new Error("Invalid operation !");
-        }
-        const { trackingID, orderID, customerEmail } = body && (body === null || body === void 0 ? void 0 : body.module);
-        const result = yield order_status_updater({
-            type: "dispatch",
-            customerEmail,
-            orderID,
-            trackingID
-        });
-        return ((result === null || result === void 0 ? void 0 : result.success) && (result === null || result === void 0 ? void 0 : result.success)) ?
-            res.status(200).send({ success: true, statusCode: 200, message: "Successfully order dispatched" }) :
-            res.status(500).send({ success: false, statusCode: 500, message: "failed to update" });
-    }
-    catch (error) {
-        next(error);
-    }
-});
 module.exports.orderStatusManagement = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const body = req.body;
+        const storeName = req.params.storeName;
+        if (!storeName)
+            throw new Error("Required store name in param !");
         if (!body)
             throw new Error("Required body information about orders !");
         const { type, customerEmail, productID, variationID, orderID, listingID, trackingID, quantity, cancelReason } = body;
+        if (!type || type === "")
+            throw new Error("Required status type !");
+        if (!customerEmail || customerEmail === "")
+            throw new Error("Required customer email !");
+        if (!orderID || orderID === "")
+            throw new Error("Required Order ID !");
+        if (!trackingID || trackingID === "")
+            throw new Error("Required Tracking ID !");
         const result = yield order_status_updater({
             type: type,
             customerEmail,
@@ -138,31 +123,7 @@ module.exports.orderStatusManagement = (req, res, next) => __awaiter(void 0, voi
         });
         if (result) {
             if (type === "canceled" && cancelReason) {
-                let product = yield Product.aggregate([
-                    { $match: { $and: [{ _LID: listingID }, { _id: ObjectId(productID) }] } },
-                    { $unwind: { path: "$variations" } },
-                    {
-                        $project: {
-                            variations: 1
-                        }
-                    },
-                    { $match: { $and: [{ "variations._VID": variationID }] } },
-                    {
-                        $project: {
-                            available: "$variations.available"
-                        }
-                    }
-                ]);
-                product = product[0];
-                let availableProduct = parseInt(product === null || product === void 0 ? void 0 : product.available);
-                let restAvailable = availableProduct + parseInt(quantity);
-                let stock = restAvailable <= 0 ? "out" : "in";
-                yield Product.findOneAndUpdate({ $and: [{ _LID: listingID }, { _id: ObjectId(productID) }] }, {
-                    $set: {
-                        "variations.$[i].available": restAvailable,
-                        "variations.$[i].stock": stock
-                    }
-                }, { arrayFilters: [{ "i._VID": variationID }] });
+                yield update_variation_stock_available("inc", { listingID, productID, variationID, quantity });
             }
             return res.status(200).send({ success: true, statusCode: 200, message: "Order status updated to " + type });
         }

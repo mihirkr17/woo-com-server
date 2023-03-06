@@ -10,12 +10,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const { dbConnection } = require("../../utils/db");
-const { ObjectId } = require("mongodb");
-const { updateProductStock } = require("../../utils/common");
-const { orderModel } = require("../../templates/order.template");
 const Product = require("../../model/product.model");
-const User = require("../../model/user.model");
 const Order = require("../../model/order.model");
+const { order_status_updater, update_variation_stock_available } = require("../../services/common.services");
 module.exports.myOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const db = yield dbConnection();
@@ -50,58 +47,30 @@ module.exports.removeOrder = (req, res, next) => __awaiter(void 0, void 0, void 
     }
 });
 module.exports.cancelMyOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     try {
         const userEmail = req.params.userEmail;
-        const { cancel_reason, orderID } = req.body;
-        const timestamp = Date.now();
-        let cancelTime = {
-            iso: new Date(timestamp),
-            time: new Date(timestamp).toLocaleTimeString(),
-            date: new Date(timestamp).toDateString(),
-            timestamp: timestamp
-        };
-        const result = yield Order.findOneAndUpdate({ user_email: userEmail }, {
-            $set: {
-                "orders.$[i].orderStatus": "canceled",
-                "orders.$[i].cancelReason": cancel_reason,
-                "orders.$[i].orderCanceledAT": cancelTime,
+        const body = req.body;
+        const { cancelReason, orderID } = body;
+        if (!orderID)
+            throw new Error("Required order ID !");
+        if (!cancelReason)
+            throw new Error("Required cancel reason !");
+        let existOrder = yield Order.aggregate([
+            { $match: { user_email: userEmail } },
+            { $unwind: { path: "$orders" } },
+            {
+                $replaceRoot: { newRoot: "$orders" }
             },
-        }, { arrayFilters: [{ "i.orderID": orderID }], upsert: true });
-        if (result) {
-            let existOrder = yield Order.aggregate([
-                { $match: { user_email: userEmail } },
-                { $unwind: { path: "$orders" } },
-                {
-                    $replaceRoot: { newRoot: "$orders" }
-                },
-                {
-                    $match: { $and: [{ orderID: orderID }] }
-                }
-            ]);
-            existOrder = existOrder[0];
-            let products = yield Product.aggregate([
-                { $match: { $and: [{ _LID: existOrder === null || existOrder === void 0 ? void 0 : existOrder.listingID }] } },
-                { $unwind: { path: "$variations" } },
-                {
-                    $project: {
-                        variations: 1
-                    }
-                },
-                { $match: { $and: [{ "variations._VID": existOrder === null || existOrder === void 0 ? void 0 : existOrder.variationID }] } },
-            ]);
-            products = products[0];
-            let availableProduct = (_a = products === null || products === void 0 ? void 0 : products.variations) === null || _a === void 0 ? void 0 : _a.available;
-            let restAvailable = availableProduct + (existOrder === null || existOrder === void 0 ? void 0 : existOrder.quantity);
-            let stock = restAvailable <= 0 ? "out" : "in";
-            yield Product.findOneAndUpdate({ _id: ObjectId(existOrder === null || existOrder === void 0 ? void 0 : existOrder.productID) }, {
-                $set: {
-                    "variations.$[i].available": restAvailable,
-                    "variations.$[i].stock": stock
-                }
-            }, { arrayFilters: [{ "i._VID": existOrder === null || existOrder === void 0 ? void 0 : existOrder.variationID }] });
+            {
+                $match: { $and: [{ orderID: orderID }] }
+            }
+        ]);
+        existOrder = existOrder[0];
+        if (existOrder) {
+            yield order_status_updater({ type: "canceled", cancelReason, customerEmail: existOrder === null || existOrder === void 0 ? void 0 : existOrder.customerEmail, trackingID: existOrder === null || existOrder === void 0 ? void 0 : existOrder.trackingID });
+            yield update_variation_stock_available("inc", existOrder);
         }
-        res.send({ success: true, statusCode: 200, message: "Order canceled successfully" });
+        return res.status(200).send({ success: true, statusCode: 200, message: "Order canceled successfully" });
     }
     catch (error) {
         next(error);

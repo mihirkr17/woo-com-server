@@ -15,11 +15,11 @@ try {
     router.get("/overview", verifyJWT, isPermitForDashboard, dashboardCTRL === null || dashboardCTRL === void 0 ? void 0 : dashboardCTRL.dashboardOverview);
     router.put("/seller/:storeName/product-control", verifyJWT, isRoleSeller, ManageProductCTRL === null || ManageProductCTRL === void 0 ? void 0 : ManageProductCTRL.productControlController);
     router.put("/seller/:storeName/product/update-stock", verifyJWT, isRoleSeller, ManageProductCTRL.updateStockController);
-    router.put("/seller/products/set-product-variation", verifyJWT, variationOne, ManageProductCTRL.productOperationController);
+    router.put("/seller/products/set-product-variation", verifyJWT, isRoleSeller, ManageProductCTRL.variationController);
     router.put("/seller/:storeName/start-flash-sale", verifyJWT, isRoleSeller, ManageProductCTRL === null || ManageProductCTRL === void 0 ? void 0 : ManageProductCTRL.productFlashSaleController);
     router.put("/admin/take-this-product", verifyJWT, isRoleAdmin, AdminCTRL === null || AdminCTRL === void 0 ? void 0 : AdminCTRL.takeThisProductByAdminController);
-    router.put("/store/:storeName/order/dispatch-order", verifyJWT, isRoleSeller, ManageOrderCTRL === null || ManageOrderCTRL === void 0 ? void 0 : ManageOrderCTRL.dispatchOrder);
-    router.post("/order-status-management", verifyJWT, isRoleSeller, ManageOrderCTRL.orderStatusManagement);
+    router.post("/store/:storeName/order/order-status-management", verifyJWT, isRoleSeller, ManageOrderCTRL.orderStatusManagement);
+    router.post('/seller/store/product/update-product/:paramsType', verifyJWT, isRoleSeller, ManageProductCTRL === null || ManageProductCTRL === void 0 ? void 0 : ManageProductCTRL.updateProductData);
     // get controllers
     router.get("/view-products", verifyJWT, isPermitForDashboard, ManageProductCTRL.viewAllProductsInDashboard);
     router.get("/admin/:uuid/provider", verifyJWT, isRoleAdmin, AdminCTRL === null || AdminCTRL === void 0 ? void 0 : AdminCTRL.getAdminController);

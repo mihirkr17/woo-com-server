@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const ShoppingCart = require("../../model/shoppingCart.model");
-const { findUserByEmail } = require("../../services/common.services");
+const { findUserByEmail, actualSellingPrice, calculateShippingCost } = require("../../services/common.services");
 module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     try {
@@ -32,9 +32,7 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
                     as: "main_product"
                 }
             },
-            {
-                $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } }
-            },
+            { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } } },
             { $project: { main_product: 0 } },
             { $unwind: { path: "$variations" } },
             {
@@ -52,58 +50,49 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
             {
                 $project: {
                     cartID: "$_id",
+                    dim: 1,
                     _id: 0,
-                    title: 1,
+                    title: "$variations.vTitle",
                     slug: 1,
+                    package: 1,
                     listingID: 1,
                     productID: 1,
                     customerEmail: 1,
                     variationID: 1,
                     variations: 1,
+                    shipping: 1,
                     brand: 1,
-                    image: { $first: "$variations.images" },
+                    image: { $first: "$images" },
                     sku: "$variations.sku",
                     sellerData: 1,
                     quantity: 1,
-                    shippingCharge: {
-                        $switch: {
-                            branches: [
-                                { case: { $eq: [areaType, "zonal"] }, then: "$shipping.delivery.zonalCharge" },
-                                { case: { $eq: [areaType, "local"] }, then: "$shipping.delivery.localCharge" }
-                            ],
-                            default: "$shipping.delivery.zonalCharge"
-                        }
-                    },
-                    savingAmount: { $multiply: [{ $subtract: ["$variations.pricing.price", "$variations.pricing.sellingPrice"] }, '$quantity'] },
-                    baseAmount: { $multiply: ['$variations.pricing.sellingPrice', '$quantity'] },
-                    totalAmount: {
-                        $add: [
-                            { $multiply: ['$variations.pricing.sellingPrice', '$quantity'] },
-                            {
-                                $switch: {
-                                    branches: [
-                                        { case: { $eq: [areaType, "zonal"] }, then: "$shipping.delivery.zonalCharge" },
-                                        { case: { $eq: [areaType, "local"] }, then: "$shipping.delivery.localCharge" }
-                                    ],
-                                    default: "$shipping.delivery.zonalCharge"
-                                }
-                            }
-                        ]
-                    },
+                    savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPrice] }, '$quantity'] },
+                    baseAmount: { $multiply: [actualSellingPrice, '$quantity'] },
                     paymentInfo: 1,
-                    sellingPrice: "$variations.pricing.sellingPrice",
+                    sellingPrice: actualSellingPrice,
                     variant: "$variations.variant",
                     stock: "$variations.stock"
                 }
-            }, {
+            },
+            {
                 $unset: ["variations"]
             }
         ]);
         if (typeof cart === "object") {
+            cart && cart.map((p) => {
+                var _a, _b, _c;
+                if (((_a = p === null || p === void 0 ? void 0 : p.shipping) === null || _a === void 0 ? void 0 : _a.isFree) && ((_b = p === null || p === void 0 ? void 0 : p.shipping) === null || _b === void 0 ? void 0 : _b.isFree)) {
+                    p["shippingCharge"] = 0;
+                }
+                else {
+                    p["shippingCharge"] = calculateShippingCost((_c = p === null || p === void 0 ? void 0 : p.package) === null || _c === void 0 ? void 0 : _c.volumetricWeight, areaType);
+                }
+                return p;
+            });
             const baseAmounts = cart && cart.map((tAmount) => (parseInt(tAmount === null || tAmount === void 0 ? void 0 : tAmount.baseAmount))).reduce((p, c) => p + c, 0);
             const totalQuantities = cart && cart.map((tQuant) => (parseInt(tQuant === null || tQuant === void 0 ? void 0 : tQuant.quantity))).reduce((p, c) => p + c, 0);
             const shippingFees = cart && cart.map((p) => parseInt(p === null || p === void 0 ? void 0 : p.shippingCharge)).reduce((p, c) => p + c, 0);
-            const finalAmounts = cart && cart.map((fAmount) => (parseInt(fAmount === null || fAmount === void 0 ? void 0 : fAmount.totalAmount))).reduce((p, c) => p + c, 0);
+            const finalAmounts = cart && cart.map((fAmount) => (parseInt(fAmount === null || fAmount === void 0 ? void 0 : fAmount.baseAmount) + (fAmount === null || fAmount === void 0 ? void 0 : fAmount.shippingCharge))).reduce((p, c) => p + c, 0);
             const savingAmounts = cart && cart.map((fAmount) => (parseInt(fAmount === null || fAmount === void 0 ? void 0 : fAmount.savingAmount))).reduce((p, c) => p + c, 0);
             let shoppingCartData = {
                 products: cart,

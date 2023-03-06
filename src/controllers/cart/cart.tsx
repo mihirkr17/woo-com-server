@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 const ShoppingCart = require("../../model/shoppingCart.model");
-const { findUserByEmail } = require("../../services/common.services");
+const { findUserByEmail, actualSellingPrice, calculateShippingCost } = require("../../services/common.services");
 
 module.exports.getCartContext = async (req: Request, res: Response, next: NextFunction) => {
    try {
@@ -27,9 +27,7 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
                as: "main_product"
             }
          },
-         {
-            $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } }
-         },
+         { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } } },
          { $project: { main_product: 0 } },
          { $unwind: { path: "$variations" } },
          {
@@ -47,50 +45,31 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
          {
             $project: {
                cartID: "$_id",
+               dim: 1,
                _id: 0,
-               title: 1,
+               title: "$variations.vTitle",
                slug: 1,
+               package: 1,
                listingID: 1,
                productID: 1,
                customerEmail: 1,
                variationID: 1,
                variations: 1,
+               shipping: 1,
                brand: 1,
-               image: { $first: "$variations.images" },
+               image: { $first: "$images" },
                sku: "$variations.sku",
                sellerData: 1,
                quantity: 1,
-               shippingCharge: {
-                  $switch: {
-                     branches: [
-                        { case: { $eq: [areaType, "zonal"] }, then: "$shipping.delivery.zonalCharge" },
-                        { case: { $eq: [areaType, "local"] }, then: "$shipping.delivery.localCharge" }
-                     ],
-                     default: "$shipping.delivery.zonalCharge"
-                  }
-               },
-               savingAmount: { $multiply: [{ $subtract: ["$variations.pricing.price", "$variations.pricing.sellingPrice"] }, '$quantity'] },
-               baseAmount: { $multiply: ['$variations.pricing.sellingPrice', '$quantity'] },
-               totalAmount: {
-                  $add: [
-                     { $multiply: ['$variations.pricing.sellingPrice', '$quantity'] },
-                     {
-                        $switch: {
-                           branches: [
-                              { case: { $eq: [areaType, "zonal"] }, then: "$shipping.delivery.zonalCharge" },
-                              { case: { $eq: [areaType, "local"] }, then: "$shipping.delivery.localCharge" }
-                           ],
-                           default: "$shipping.delivery.zonalCharge"
-                        }
-                     }
-                  ]
-               },
+               savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPrice] }, '$quantity'] },
+               baseAmount: { $multiply: [actualSellingPrice, '$quantity'] },
                paymentInfo: 1,
-               sellingPrice: "$variations.pricing.sellingPrice",
+               sellingPrice: actualSellingPrice,
                variant: "$variations.variant",
                stock: "$variations.stock"
             }
-         }, {
+         },
+         {
             $unset: ["variations"]
          }
       ]);
@@ -99,10 +78,21 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
 
       if (typeof cart === "object") {
 
+         cart && cart.map((p: any) => {
+
+            if (p?.shipping?.isFree && p?.shipping?.isFree) {
+               p["shippingCharge"] = 0;
+            } else {
+               p["shippingCharge"] = calculateShippingCost(p?.package?.volumetricWeight, areaType);
+            }
+
+            return p;
+         });
+
          const baseAmounts = cart && cart.map((tAmount: any) => (parseInt(tAmount?.baseAmount))).reduce((p: any, c: any) => p + c, 0);
          const totalQuantities = cart && cart.map((tQuant: any) => (parseInt(tQuant?.quantity))).reduce((p: any, c: any) => p + c, 0);
          const shippingFees = cart && cart.map((p: any) => parseInt(p?.shippingCharge)).reduce((p: any, c: any) => p + c, 0);
-         const finalAmounts = cart && cart.map((fAmount: any) => (parseInt(fAmount?.totalAmount))).reduce((p: any, c: any) => p + c, 0);
+         const finalAmounts = cart && cart.map((fAmount: any) => (parseInt(fAmount?.baseAmount) + fAmount?.shippingCharge)).reduce((p: any, c: any) => p + c, 0);
          const savingAmounts = cart && cart.map((fAmount: any) => (parseInt(fAmount?.savingAmount))).reduce((p: any, c: any) => p + c, 0);
 
          let shoppingCartData = {

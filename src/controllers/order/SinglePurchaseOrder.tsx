@@ -3,7 +3,7 @@ const Order = require("../../model/order.model");
 const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
 const response = require("../../errors/apiResponse");
-const { findUserByEmail } = require("../../services/common.services");
+const { findUserByEmail, update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.services");
 
 
 module.exports = async function SinglePurchaseOrder(req: Request, res: Response, next: NextFunction) {
@@ -36,39 +36,20 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
          {
             $project: {
                _id: 0,
-               title: 1,
+               title: "$variations.vTitle",
                slug: 1,
                variations: 1,
                brand: 1,
-               image: { $first: "$variations.images" },
+               image: { $first: "$images" },
                sku: "$variations.sku",
                sellerData: {
                   sellerID: "$sellerData.sellerID",
                   storeName: "$sellerData.storeName"
                },
-               shippingCharge: {
-                  $switch: {
-                     branches: [
-                        { case: { $eq: [areaType, "zonal"] }, then: "$shipping.delivery.zonalCharge" },
-                        { case: { $eq: [areaType, "local"] }, then: "$shipping.delivery.localCharge" }
-                     ],
-                     default: "$shipping.delivery.zonalCharge"
-                  }
-               },
-               baseAmount: {
-                  $add: [{ $multiply: ['$variations.pricing.sellingPrice', parseInt(quantity)] }, {
-                     $switch: {
-                        branches: [
-                           { case: { $eq: [areaType, "zonal"] }, then: "$shipping.delivery.zonalCharge" },
-                           { case: { $eq: [areaType, "local"] }, then: "$shipping.delivery.localCharge" }
-                        ],
-                        default: "$shipping.delivery.zonalCharge"
-                     }
-                  }]
-               },
-               sellingPrice: "$variations.pricing.sellingPrice",
-               variant: "$variations.variant",
-               totalUnits: "$variations.available"
+               shipping: 1,
+               package: 1,
+               baseAmount: { $multiply: [actualSellingPrice, parseInt(quantity)] },
+               sellingPrice: actualSellingPrice,
             }
          },
          {
@@ -98,9 +79,19 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
          product = product[0];
          product["customerEmail"] = customerEmail;
 
-         product["orderID"] = "#" + (Math.floor(10000000 + Math.random() * 999999999999)).toString();
+         product["orderID"] = "oi_" + (Math.floor(10000000 + Math.random() * 999999999999)).toString();
 
-         product["trackingID"] = "TRC" + (Math.round(Math.random() * 9999999) + Math.round(Math.random() * 8888)).toString();
+         product["trackingID"] = "tri_" + (Math.round(Math.random() * 9999999) + Math.round(Math.random() * 8888)).toString();
+
+         if (product?.shipping?.isFree && product?.shipping?.isFree) {
+            product["shippingCharge"] = 0;
+         } else {
+            product["shippingCharge"] = calculateShippingCost(product?.package?.volumetricWeight, areaType);
+         }
+
+         let amountNew = product?.baseAmount + product?.shippingCharge;
+
+         product["baseAmount"] = parseInt(amountNew);
 
          const timestamp: any = Date.now();
 
@@ -119,21 +110,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
          );
 
          if (result) {
-            let availableUnits: number = (parseInt(product?.totalUnits) - parseInt(quantity)) || 0;
-
-            const stock: string = availableUnits <= 0 ? "out" : "in";
-
-
-            await Product.findOneAndUpdate(
-               { _id: ObjectId(productID) },
-               {
-                  $set: {
-                     "variations.$[i].available": availableUnits,
-                     "variations.$[i].stock": stock
-                  }
-               },
-               { arrayFilters: [{ "i._VID": variationID }] }
-            );
+            await update_variation_stock_available("dec", { variationID, productID, quantity, listingID });
 
             return res.status(200).send({ success: true, statusCode: 200, message: "Order Success." });
          }

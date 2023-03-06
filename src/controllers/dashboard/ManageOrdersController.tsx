@@ -1,9 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 const Order = require("../../model/order.model");
-const { order_status_updater } = require("../../services/common.services");
+const { order_status_updater, update_variation_stock_available } = require("../../services/common.services");
 const Product = require("../../model/product.model");
-const { ObjectId } = require("mongodb");
-
 
 module.exports.manageOrders = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -94,45 +92,23 @@ module.exports.manageOrders = async (req: Request, res: Response, next: NextFunc
 };
 
 
-module.exports.dispatchOrder = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const body = req.body;
-
-    if (body?.context?.MARKET_PLACE !== "WooKart") {
-      throw new Error("Invalid operation !");
-    }
-
-    if (!body?.module) {
-      throw new Error("Invalid operation !");
-    }
-
-    const { trackingID, orderID, customerEmail } = body && body?.module;
-
-    const result = await order_status_updater({
-      type: "dispatch",
-      customerEmail,
-      orderID,
-      trackingID
-    });
-
-    return (result?.success && result?.success) ?
-      res.status(200).send({ success: true, statusCode: 200, message: "Successfully order dispatched" }) :
-      res.status(500).send({ success: false, statusCode: 500, message: "failed to update" });
-
-  } catch (error: any) {
-    next(error);
-  }
-};
-
-
-
 module.exports.orderStatusManagement = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = req.body;
+    const storeName: string = req.params.storeName;
+
+    if (!storeName) throw new Error("Required store name in param !");
+
 
     if (!body) throw new Error("Required body information about orders !");
 
     const { type, customerEmail, productID, variationID, orderID, listingID, trackingID, quantity, cancelReason } = body;
+
+    if (!type || type === "") throw new Error("Required status type !");
+    if (!customerEmail || customerEmail === "") throw new Error("Required customer email !");
+    if (!orderID || orderID === "") throw new Error("Required Order ID !");
+    if (!trackingID || trackingID === "") throw new Error("Required Tracking ID !");
+
 
     const result = await order_status_updater({
       type: type,
@@ -144,45 +120,11 @@ module.exports.orderStatusManagement = async (req: Request, res: Response, next:
 
     if (result) {
       if (type === "canceled" && cancelReason) {
-
-        let product = await Product.aggregate([
-          { $match: { $and: [{ _LID: listingID }, { _id: ObjectId(productID) }] } },
-          { $unwind: { path: "$variations" } },
-          {
-            $project: {
-              variations: 1
-            }
-          },
-          { $match: { $and: [{ "variations._VID": variationID }] } },
-          {
-            $project: {
-              available: "$variations.available"
-            }
-          }
-        ]);
-
-        product = product[0];
-
-        let availableProduct = parseInt(product?.available);
-        let restAvailable = availableProduct + parseInt(quantity);
-        let stock = restAvailable <= 0 ? "out" : "in";
-
-        await Product.findOneAndUpdate(
-          { $and: [{ _LID: listingID }, { _id: ObjectId(productID) }] },
-          {
-            $set: {
-              "variations.$[i].available": restAvailable,
-              "variations.$[i].stock": stock
-            }
-          },
-          { arrayFilters: [{ "i._VID": variationID }] }
-        );
-
+        await update_variation_stock_available("inc", { listingID, productID, variationID, quantity });
       }
 
       return res.status(200).send({ success: true, statusCode: 200, message: "Order status updated to " + type });
     }
-
 
   } catch (error: any) {
     next(error);

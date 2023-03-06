@@ -6,6 +6,7 @@ const { product_listing_template_engine } = require("../../templates/product.tem
 const User = require("../../model/user.model");
 const QueueProduct = require("../../model/queueProduct.model");
 const Product = require("../../model/product.model");
+const { product_variation_template_engine } = require("../../templates/product.template");
 
 
 
@@ -59,77 +60,51 @@ module.exports.updateStockController = async (req: Request, res: Response, next:
 };
 
 // product variation controller
-module.exports.productOperationController = async (req: Request, res: Response, next: NextFunction) => {
+module.exports.variationController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-
-      const productID: String = req.headers?.authorization || "";
       const formTypes = req.query.formType || "";
-      const vId = req.query.vId;
-      const productAttr = req.query.attr;
-      let result;
-      let model = req.body;
+      const requestFor = req.query.requestFor;
+      let result: any;
+      const body = req.body;
+
+      if (!formTypes || formTypes === "") throw new Error("Required form type !");
+      if (!body) throw new Error("Required body !");
+
+      const { request } = body;
+
+      if (!request?.productID) throw new Error("Required product id !");
+
+      if (!request) throw new Error("Required body !");
+
+      let model = product_variation_template_engine(request?.variations);
+      const productID: string = request?.productID;
+      const variationID: string = request?.variationID || "";
 
       // Update variation
-      if (formTypes === 'update-variation') {
-         model['_VID'] = vId;
-         if (vId && productAttr === 'ProductVariations') {
+      if (formTypes === 'update-variation' && requestFor === 'product_variations') {
+         model['_VID'] = variationID;
+         if (variationID && variationID !== "") {
             result = await Product.findOneAndUpdate(
-               {
-                  $and: [{ _id: ObjectId(productID) }, { 'variations._VID': vId }]
-               },
-               {
-                  $set: {
-                     'variations.$[i]': model,
-                  }
-               },
-               { arrayFilters: [{ "i._VID": vId }] }
+               { _id: ObjectId(productID) },
+               { $set: { 'variations.$[i]': model } },
+               { arrayFilters: [{ "i._VID": variationID }] }
             );
          }
       }
 
       // create new variation
       if (formTypes === 'new-variation') {
-         result = await Product.updateOne(
-            {
-               _id: ObjectId(productID)
-            },
-            {
-               $push: { variations: model }
-            },
+         let newVariationID = "vi_" + Math.random().toString(36).toLowerCase().slice(2, 18);
+         model['_VID'] = newVariationID;
+         result = await Product.findOneAndUpdate(
+            { _id: ObjectId(productID) },
+            { $push: { variations: model } },
             { upsert: true }
          );
       }
 
-      // next condition
-      else if (formTypes === 'update') {
-
-         if (productAttr === 'ProductSpecs') {
-
-            result = await Product.updateOne(
-               { _id: ObjectId(productID) },
-               {
-                  $set: { specification: model }
-               },
-               { upsert: true }
-            );
-         }
-
-         if (productAttr === 'bodyInformation') {
-
-            result = await Product.updateOne(
-               { _id: ObjectId(productID) },
-               {
-                  $set: { bodyInfo: model }
-               },
-               { upsert: true }
-            );
-         }
-      }
-
-      if (result) {
-         return res.status(200).send({ success: true, statusCode: 200, message: "Data Saved" });
-      }
-      return res.status(500).send({ success: false, statusCode: 500, error: "Failed" });
+      return result ? res.status(200).send({ success: true, statusCode: 200, message: "Data Saved" })
+         : res.status(500).send({ success: false, statusCode: 500, message: "Server error !" });
 
    } catch (error: any) {
       next(error);
@@ -242,24 +217,54 @@ module.exports.viewAllProductsInDashboard = async (
             }
          },
          {
+            $project: {
+               title: 1, slug: 1, categories: 1, pricing: 1,
+               images: 1, variations: 1, brand: 1, _LID: 1,
+               package: 1,
+               save_as: 1,
+               shipping: 1,
+               bodyInfo: 1,
+               specification: 1,
+               description: 1,
+               manufacturer: 1,
+               sellerData: 1,
+               totalVariation: { $cond: { if: { $isArray: "$variations" }, then: { $size: "$variations" }, else: 0 } }
+            }
+         },
+         {
             $skip: page * parseInt(item)
          }, {
             $limit: (parseInt(item))
          }
       ]);
 
-   //  products = await Product.aggregate([
-   //       { $match: { $and: showFor, $or: src } },
-   //       { $unwind: { path: "$variations" } },
-   //       { $replaceRoot: { newRoot: { $mergeObjects: ["$variations", "$$ROOT"] } } },
-   //       { $unset: ["variations"] },
-   //       { $skip: page * parseInt(item) },
-   //       { $limit: (parseInt(item)) }
-   //    ]);
-
-      draftProducts = await Product.find({
-         $and: [user?.role === 'SELLER' && { "sellerData.storeName": user?.seller?.storeInfos?.storeName }, { save_as: "draft" }],
-      });
+      draftProducts = await Product.aggregate([
+         {
+            $match: {
+               $and: [{ save_as: "draft" }, { "sellerData.storeName": user?.seller?.storeInfos?.storeName }]
+            }
+         },
+         {
+            $project: {
+               title: 1, slug: 1, categories: 1, pricing: 1,
+               images: 1, variations: 1, brand: 1, _LID: 1,
+               package: 1,
+               save_as: 1,
+               shipping: 1,
+               bodyInfo: 1,
+               specification: 1,
+               description: 1,
+               manufacturer: 1,
+               sellerData: 1,
+               totalVariation: { $cond: { if: { $isArray: "$variations" }, then: { $size: "$variations" }, else: 0 } }
+            }
+         },
+         {
+            $skip: page * parseInt(item)
+         }, {
+            $limit: (parseInt(item))
+         }
+      ]);
 
       inactiveProduct = await Product.aggregate([
          { $unwind: { path: "$variations" } },
@@ -366,8 +371,8 @@ module.exports.productListingController = async (
          model.sellerData.sellerName = user?.fullName;
          model.sellerData.storeName = user?.seller?.storeInfos?.storeName;
 
-         let result = await Product.updateOne(
-            { _LID: lId, save_as: { $and: ['draft', 'fulfilled'] } },
+         let result = await Product.findOneAndUpdate(
+            { _LID: lId },
             { $set: model },
             { upsert: true }
          );
@@ -548,3 +553,112 @@ module.exports.productFlashSaleController = async (req: Request, res: Response, 
 
 
 
+module.exports.updateProductData = async (req: Request, res: Response, next: NextFunction) => {
+   try {
+      const body = req.body;
+      const urlParams = req.params.paramsType;
+      let setFilter: any;
+
+      if (!body) throw new Error("Required body !");
+
+      const { listingID, productID, actionType, pricing, shipping, packageInfo, manufacturer } = body;
+
+      if (!productID) throw new Error("Required product ID !");
+
+      if (!listingID) throw new Error("Required listing ID !");
+
+      if (!actionType) throw new Error("Required actionType !");
+
+      if (actionType === "PRICING" && urlParams === "pricing") {
+
+         if (!pricing) throw new Error("Required pricing !");
+
+         const { price, sellingPrice } = pricing;
+         let discount: any = 0;
+
+
+         if (!price && price === "") throw new Error("Required price identifier !");
+
+         if (!sellingPrice && sellingPrice === "") throw new Error("Required selling price identifier !");
+
+         discount = (parseInt(price) - parseInt(sellingPrice)) / parseInt(price);
+         discount = discount * 100;
+         discount = parseInt(discount);
+
+         setFilter = {
+            $set: {
+               "pricing.price": parseInt(price),
+               "pricing.sellingPrice": parseInt(sellingPrice),
+               "pricing.discount": discount
+            }
+         }
+      }
+
+      if (actionType === "SHIPPING-INFORMATION" && urlParams === "shipping-information") {
+
+         if (!shipping) throw new Error("Required shipping information !");
+
+         const { fulfilledBy, procurementType, procurementSLA, provider } = shipping && shipping;
+
+         if (procurementType === "" || fulfilledBy === "" || procurementSLA === "" || provider === "") throw new Error("Required fulfilledBy, procurementType, procurementSLA");
+
+         setFilter = {
+            $set: { shipping: shipping }
+         }
+      }
+
+      if (actionType === "PACKAGE-DIMENSION" && urlParams === "package-dimension") {
+
+         if (!packageInfo) throw new Error("Required package information about product");
+
+         const { packageWeight, packageLength, packageWidth, packageHeight, inTheBox } = packageInfo && packageInfo;
+
+         let volumetricWeight: any = ((parseFloat(packageHeight) * parseFloat(packageLength) * parseFloat(packageWidth)) / 5000).toFixed(1);
+         volumetricWeight = parseFloat(volumetricWeight);
+
+         let newPackage = {
+            dimension: {
+               height: parseFloat(packageHeight),
+               length: parseFloat(packageLength),
+               width: parseFloat(packageWidth)
+            },
+            weight: parseFloat(packageWeight),
+            weightUnit: 'kg',
+            dimensionUnit: 'cm',
+            volumetricWeight,
+            inTheBox: inTheBox
+         }
+
+         setFilter = {
+            $set: { package: newPackage }
+         }
+      }
+
+      if (actionType === "MANUFACTURER-INFORMATION" && urlParams === "manufacturer-information") {
+
+         if (!manufacturer || typeof manufacturer !== "object") throw new Error("Required manufacturer details about product !");
+
+         const { manufacturerOrigin, manufacturerDetails } = manufacturer && manufacturer;
+
+         setFilter = {
+            $set: {
+               "manufacturer.origin": manufacturerOrigin,
+               "manufacturer.details": manufacturerDetails
+            }
+         }
+      }
+
+
+      const result = await Product.findOneAndUpdate(
+         { $and: [{ _LID: listingID }, { _id: ObjectId(productID) }] },
+         setFilter,
+         { upsert: true }
+      );
+
+      return result ? res.status(200).send({ success: true, statusCode: 200, message: urlParams + " updated successfully." })
+         : next({ message: "Failed to updated!" });
+
+   } catch (error: any) {
+      next(error);
+   }
+}

@@ -15,15 +15,16 @@ try {
 
   router.put("/seller/:storeName/product/update-stock", verifyJWT, isRoleSeller, ManageProductCTRL.updateStockController);
 
-  router.put("/seller/products/set-product-variation", verifyJWT, variationOne, ManageProductCTRL.productOperationController);
+  router.put("/seller/products/set-product-variation", verifyJWT, isRoleSeller, ManageProductCTRL.variationController);
 
   router.put("/seller/:storeName/start-flash-sale", verifyJWT, isRoleSeller, ManageProductCTRL?.productFlashSaleController);
 
   router.put("/admin/take-this-product", verifyJWT, isRoleAdmin, AdminCTRL?.takeThisProductByAdminController);
 
-  router.put("/store/:storeName/order/dispatch-order", verifyJWT, isRoleSeller, ManageOrderCTRL?.dispatchOrder);
+  router.post("/store/:storeName/order/order-status-management", verifyJWT, isRoleSeller, ManageOrderCTRL.orderStatusManagement);
 
-  router.post("/order-status-management", verifyJWT, isRoleSeller, ManageOrderCTRL.orderStatusManagement);
+
+  router.post('/seller/store/product/update-product/:paramsType', verifyJWT, isRoleSeller, ManageProductCTRL?.updateProductData);
 
 
 

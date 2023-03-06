@@ -16,10 +16,7 @@ const shippingType = new Schema({
    procurementType: { type: String, required: true },
    procurementSLA: { type: String, required: true },
    provider: { type: String, required: true },
-   delivery: {
-      localCharge: { type: Number, required: true },
-      zonalCharge: { type: Number, required: true }
-   }
+   isFree: { type: Boolean }
 }, { _id: false });
 
 const manufacturerType = new Schema({
@@ -31,8 +28,7 @@ const manufacturerType = new Schema({
 const bodyInfoType = new Schema({
    keyFeatures: { type: Array, required: true },
    searchKeywords: { type: Array, required: true },
-   metaDescription: { type: String, required: true },
-   description: { type: String, required: true }
+   metaDescription: { type: String, required: true }
 }, { _id: false });
 
 var QueueProductSchema = new Schema({
@@ -49,13 +45,18 @@ var QueueProductSchema = new Schema({
    ratingAverage: { type: Number, required: false, default: 0 },
    bodyInfo: { type: bodyInfoType, required: true },
    specification: { type: Object, required: false, default: {} },
+   description: { type: String, required: true },
    variations: { type: Array, required: false, default: [] },
    tax: { type: taxType, required: true },
    sellerData: { type: sellerDataType, required: true },
    save_as: { type: String, required: true, default: "queue" },
    createdAt: { type: Date, default: Date.now },
+   package: { type: Object, required: true },
    modifiedAt: { type: Date, required: false, default: "" },
    isVerified: { type: Boolean, default: false },
+   pricing: { type: Object, required: true },
+   images: { type: Array, required: true },
+   warranty: { type: Object },
    verifyStatus: {
       verifiedBy: { type: String, required: false },
       email: { type: String, required: false },

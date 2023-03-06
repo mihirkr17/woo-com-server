@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const Order = require("../../model/order.model");
 const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
+const { update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.services");
 module.exports = function confirmOrder(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -29,25 +30,27 @@ module.exports = function confirmOrder(req, res, next) {
                 return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
             }
             function confirmOrderHandler(item) {
+                var _a, _b, _c;
                 return __awaiter(this, void 0, void 0, function* () {
                     if (!item) {
                         return;
                     }
-                    if ((item === null || item === void 0 ? void 0 : item.areaType) !== "local" && (item === null || item === void 0 ? void 0 : item.areaType) !== "zonal") {
+                    const { productID, variationID, listingID, quantity, areaType } = item;
+                    if (areaType !== "local" && areaType !== "zonal") {
                         return;
                     }
                     let product;
                     let newProduct = yield Product.aggregate([
-                        { $match: { $and: [{ _LID: item === null || item === void 0 ? void 0 : item.listingID }, { _id: ObjectId(item === null || item === void 0 ? void 0 : item.productID) }] } },
+                        { $match: { $and: [{ _LID: listingID }, { _id: ObjectId(productID) }] } },
                         { $unwind: { path: "$variations" } },
                         {
                             $match: {
                                 $expr: {
                                     $and: [
-                                        { $eq: ['$variations._VID', item === null || item === void 0 ? void 0 : item.variationID] },
+                                        { $eq: ['$variations._VID', variationID] },
                                         { $eq: ["$variations.stock", "in"] },
                                         { $eq: ["$variations.status", "active"] },
-                                        { $gte: ["$variations.available", parseInt(item === null || item === void 0 ? void 0 : item.quantity)] }
+                                        { $gte: ["$variations.available", parseInt(quantity)] }
                                     ]
                                 }
                             }
@@ -55,39 +58,20 @@ module.exports = function confirmOrder(req, res, next) {
                         {
                             $project: {
                                 _id: 0,
-                                title: 1,
+                                title: "$variations.vTitle",
                                 slug: 1,
                                 variations: 1,
                                 brand: 1,
-                                image: { $first: "$variations.images" },
+                                image: { $first: "$images" },
                                 sku: "$variations.sku",
+                                shipping: 1,
+                                package: 1,
                                 sellerData: {
                                     sellerID: "$sellerData.sellerID",
                                     storeName: "$sellerData.storeName"
                                 },
-                                shippingCharge: {
-                                    $switch: {
-                                        branches: [
-                                            { case: { $eq: [item === null || item === void 0 ? void 0 : item.areaType, "zonal"] }, then: "$shipping.delivery.zonalCharge" },
-                                            { case: { $eq: [item === null || item === void 0 ? void 0 : item.areaType, "local"] }, then: "$shipping.delivery.localCharge" }
-                                        ],
-                                        default: "$shipping.delivery.zonalCharge"
-                                    }
-                                },
-                                baseAmount: {
-                                    $add: [{ $multiply: ['$variations.pricing.sellingPrice', parseInt(item === null || item === void 0 ? void 0 : item.quantity)] }, {
-                                            $switch: {
-                                                branches: [
-                                                    { case: { $eq: [item === null || item === void 0 ? void 0 : item.areaType, "zonal"] }, then: "$shipping.delivery.zonalCharge" },
-                                                    { case: { $eq: [item === null || item === void 0 ? void 0 : item.areaType, "local"] }, then: "$shipping.delivery.localCharge" }
-                                                ],
-                                                default: "$shipping.delivery.zonalCharge"
-                                            }
-                                        }]
-                                },
-                                sellingPrice: "$variations.pricing.sellingPrice",
-                                variant: "$variations.variant",
-                                totalUnits: "$variations.available"
+                                baseAmount: { $multiply: [actualSellingPrice, parseInt(quantity)] },
+                                sellingPrice: actualSellingPrice
                             }
                         },
                         {
@@ -102,10 +86,10 @@ module.exports = function confirmOrder(req, res, next) {
                                 paymentIntentID: paymentIntentID,
                                 paymentMethodID: paymentMethodID,
                                 orderPaymentID: orderPaymentID,
-                                productID: item === null || item === void 0 ? void 0 : item.productID,
-                                listingID: item === null || item === void 0 ? void 0 : item.listingID,
-                                variationID: item === null || item === void 0 ? void 0 : item.variationID,
-                                quantity: item === null || item === void 0 ? void 0 : item.quantity
+                                productID: productID,
+                                listingID: listingID,
+                                variationID: variationID,
+                                quantity: quantity
                             }
                         },
                         {
@@ -113,8 +97,16 @@ module.exports = function confirmOrder(req, res, next) {
                         }
                     ]);
                     product = newProduct[0];
-                    product["orderID"] = "#" + (Math.floor(10000000 + Math.random() * 999999999999)).toString();
-                    product["trackingID"] = "TRC" + (Math.round(Math.random() * 9999999) + Math.round(Math.random() * 8888)).toString();
+                    product["orderID"] = "oi_" + (Math.floor(10000000 + Math.random() * 999999999999)).toString();
+                    product["trackingID"] = "tri_" + (Math.round(Math.random() * 9999999) + Math.round(Math.random() * 8888)).toString();
+                    if (((_a = product === null || product === void 0 ? void 0 : product.shipping) === null || _a === void 0 ? void 0 : _a.isFree) && ((_b = product === null || product === void 0 ? void 0 : product.shipping) === null || _b === void 0 ? void 0 : _b.isFree)) {
+                        product["shippingCharge"] = 0;
+                    }
+                    else {
+                        product["shippingCharge"] = calculateShippingCost((_c = product === null || product === void 0 ? void 0 : product.package) === null || _c === void 0 ? void 0 : _c.volumetricWeight, areaType);
+                    }
+                    let amountNew = (product === null || product === void 0 ? void 0 : product.baseAmount) + (product === null || product === void 0 ? void 0 : product.shippingCharge);
+                    product["baseAmount"] = parseInt(amountNew);
                     const timestamp = Date.now();
                     product["orderAT"] = {
                         iso: new Date(timestamp),
@@ -124,14 +116,7 @@ module.exports = function confirmOrder(req, res, next) {
                     };
                     let result = yield Order.findOneAndUpdate({ user_email: email }, { $push: { orders: product } }, { upsert: true });
                     if (result) {
-                        let availableUnits = (parseInt(product === null || product === void 0 ? void 0 : product.totalUnits) - parseInt(item === null || item === void 0 ? void 0 : item.quantity)) || 0;
-                        const stock = availableUnits <= 0 ? "out" : "in";
-                        yield Product.findOneAndUpdate({ _id: ObjectId(product === null || product === void 0 ? void 0 : product.productID) }, {
-                            $set: {
-                                "variations.$[i].available": availableUnits,
-                                "variations.$[i].stock": stock
-                            }
-                        }, { arrayFilters: [{ "i._VID": product === null || product === void 0 ? void 0 : product.variationID }] });
+                        yield update_variation_stock_available("dec", { productID, listingID, variationID, quantity });
                         return {
                             orderConfirmSuccess: true,
                             message: "Order success for " + (product === null || product === void 0 ? void 0 : product.title),

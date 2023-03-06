@@ -10,19 +10,21 @@ module.exports.variationOne = async (req: Request, res: Response, next: NextFunc
       const body = req.body;
       let variation = body?.request?.variations;
 
+
+
       let model;
 
-      if (variation) {
+      // if (variation) {
 
-         if (variation?.images.length < 2) {
-            return res.status(400).send({ success: false, statusCode: 400, error: 'Please select at least 2 images!!!' });
-         }
-      }
+      //    if (variation?.images.length < 2) {
+      //       return res.status(400).send({ success: false, statusCode: 400, error: 'Please select at least 2 images!!!' });
+      //    }
+      // }
 
       // for new variation 
       if (formTypes === 'new-variation' && attrs === 'ProductVariations') {
          let variationID = Math.random().toString(36).toUpperCase().slice(2, 18);
-         model = productTemplates.productVariation(variation);
+         model = productTemplates.product_variation_template_engine(variation);
          model['_VID'] = variationID
          req.body = model;
          next();
@@ -33,7 +35,9 @@ module.exports.variationOne = async (req: Request, res: Response, next: NextFunc
       if (formTypes === 'update-variation') {
 
          if (vId && attrs === 'ProductVariations') {
-            model = productTemplates.productVariation(variation);
+            model = productTemplates.product_variation_template_engine(variation);
+
+            console.log(model);
             req.body = model;
             next();
             return;

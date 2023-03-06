@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 const Order = require("../../model/order.model");
 const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
+const { update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.services");
 
 
 module.exports = async function confirmOrder(req: Request, res: Response, next: NextFunction) {
@@ -30,23 +31,25 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
             return;
          }
 
-         if (item?.areaType !== "local" && item?.areaType !== "zonal") {
+         const { productID, variationID, listingID, quantity, areaType } = item;
+
+         if (areaType !== "local" && areaType !== "zonal") {
             return;
          }
 
          let product;
 
          let newProduct = await Product.aggregate([
-            { $match: { $and: [{ _LID: item?.listingID }, { _id: ObjectId(item?.productID) }] } },
+            { $match: { $and: [{ _LID: listingID }, { _id: ObjectId(productID) }] } },
             { $unwind: { path: "$variations" } },
             {
                $match: {
                   $expr: {
                      $and: [
-                        { $eq: ['$variations._VID', item?.variationID] },
+                        { $eq: ['$variations._VID', variationID] },
                         { $eq: ["$variations.stock", "in"] },
                         { $eq: ["$variations.status", "active"] },
-                        { $gte: ["$variations.available", parseInt(item?.quantity)] }
+                        { $gte: ["$variations.available", parseInt(quantity)] }
                      ]
                   }
                }
@@ -54,39 +57,20 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
             {
                $project: {
                   _id: 0,
-                  title: 1,
+                  title: "$variations.vTitle",
                   slug: 1,
                   variations: 1,
                   brand: 1,
-                  image: { $first: "$variations.images" },
+                  image: { $first: "$images" },
                   sku: "$variations.sku",
+                  shipping: 1,
+                  package: 1,
                   sellerData: {
                      sellerID: "$sellerData.sellerID",
                      storeName: "$sellerData.storeName"
                   },
-                  shippingCharge: {
-                     $switch: {
-                        branches: [
-                           { case: { $eq: [item?.areaType, "zonal"] }, then: "$shipping.delivery.zonalCharge" },
-                           { case: { $eq: [item?.areaType, "local"] }, then: "$shipping.delivery.localCharge" }
-                        ],
-                        default: "$shipping.delivery.zonalCharge"
-                     }
-                  },
-                  baseAmount: {
-                     $add: [{ $multiply: ['$variations.pricing.sellingPrice', parseInt(item?.quantity)] }, {
-                        $switch: {
-                           branches: [
-                              { case: { $eq: [item?.areaType, "zonal"] }, then: "$shipping.delivery.zonalCharge" },
-                              { case: { $eq: [item?.areaType, "local"] }, then: "$shipping.delivery.localCharge" }
-                           ],
-                           default: "$shipping.delivery.zonalCharge"
-                        }
-                     }]
-                  },
-                  sellingPrice: "$variations.pricing.sellingPrice",
-                  variant: "$variations.variant",
-                  totalUnits: "$variations.available"
+                  baseAmount: { $multiply: [actualSellingPrice, parseInt(quantity)] },
+                  sellingPrice: actualSellingPrice
                }
             },
             {
@@ -101,10 +85,10 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
                   paymentIntentID: paymentIntentID,
                   paymentMethodID: paymentMethodID,
                   orderPaymentID: orderPaymentID,
-                  productID: item?.productID,
-                  listingID: item?.listingID,
-                  variationID: item?.variationID,
-                  quantity: item?.quantity
+                  productID: productID,
+                  listingID: listingID,
+                  variationID: variationID,
+                  quantity: quantity
                }
             },
             {
@@ -114,9 +98,20 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
 
          product = newProduct[0];
 
-         product["orderID"] = "#" + (Math.floor(10000000 + Math.random() * 999999999999)).toString();
+         product["orderID"] = "oi_" + (Math.floor(10000000 + Math.random() * 999999999999)).toString();
 
-         product["trackingID"] = "TRC" + (Math.round(Math.random() * 9999999) + Math.round(Math.random() * 8888)).toString();
+         product["trackingID"] = "tri_" + (Math.round(Math.random() * 9999999) + Math.round(Math.random() * 8888)).toString();
+
+
+         if (product?.shipping?.isFree && product?.shipping?.isFree) {
+            product["shippingCharge"] = 0;
+         } else {
+            product["shippingCharge"] = calculateShippingCost(product?.package?.volumetricWeight, areaType);
+         }
+
+         let amountNew = product?.baseAmount + product?.shippingCharge;
+
+         product["baseAmount"] = parseInt(amountNew);
 
          const timestamp: any = Date.now();
 
@@ -135,21 +130,7 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
          );
 
          if (result) {
-            let availableUnits: number = (parseInt(product?.totalUnits) - parseInt(item?.quantity)) || 0;
-
-            const stock: string = availableUnits <= 0 ? "out" : "in";
-
-
-            await Product.findOneAndUpdate(
-               { _id: ObjectId(product?.productID) },
-               {
-                  $set: {
-                     "variations.$[i].available": availableUnits,
-                     "variations.$[i].stock": stock
-                  }
-               },
-               { arrayFilters: [{ "i._VID": product?.variationID }] }
-            );
+            await update_variation_stock_available("dec", { productID, listingID, variationID, quantity });
 
             return {
                orderConfirmSuccess: true,

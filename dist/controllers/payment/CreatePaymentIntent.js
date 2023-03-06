@@ -27,7 +27,7 @@ module.exports = function CreatePaymentIntent(req, res, next) {
                 currency: 'bdt',
                 payment_method_types: ['card'],
                 metadata: {
-                    order_id: "OP-" + (Math.round(Math.random() * 99999999) + parseInt(totalAmount)).toString()
+                    order_id: "opi_" + (Math.round(Math.random() * 99999999) + parseInt(totalAmount)).toString()
                 }
             });
             return res.status(200).send({

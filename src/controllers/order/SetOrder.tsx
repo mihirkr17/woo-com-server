@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from "express";
 const response = require("../../errors/apiResponse");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const ShoppingCart = require("../../model/shoppingCart.model");
-const { findUserByEmail } = require("../../services/common.services");
+const { findUserByEmail, actualSellingPrice, calculateShippingCost } = require("../../services/common.services");
 
 
 module.exports = async function SetOrder(req: Request, res: Response, next: NextFunction) {
@@ -61,23 +61,12 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
                _id: 0,
                variations: 1,
                quantity: 1,
+               shipping: 1,
                productID: 1,
+               package: 1,
                listingID: 1,
                variationID: 1,
-               baseAmount: {
-                  $add: [
-                     { $multiply: ['$variations.pricing.sellingPrice', '$quantity'] },
-                     {
-                        $switch: {
-                           branches: [
-                              { case: { $eq: [areaType, "zonal"] }, then: "$shipping.delivery.zonalCharge" },
-                              { case: { $eq: [areaType, "local"] }, then: "$shipping.delivery.localCharge" }
-                           ],
-                           default: "$shipping.delivery.zonalCharge"
-                        }
-                     }
-                  ]
-               }
+               baseAmount: { $multiply: [actualSellingPrice, '$quantity'] }
             }
          },
          {
@@ -94,9 +83,20 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
          throw new response.Api400Error("ClientError", "Nothing for purchase ! Please add product in your cart.");
       }
 
+      orderItems && orderItems.map((p: any) => {
+
+         if (p?.shipping?.isFree && p?.shipping?.isFree) {
+            p["shippingCharge"] = 0;
+         } else {
+            p["shippingCharge"] = calculateShippingCost(p?.package?.volumetricWeight, areaType);
+         }
+
+         return p;
+      });
+
 
       let totalAmount = Array.isArray(orderItems) &&
-         orderItems.map((item: any) => parseFloat(item?.baseAmount)).reduce((p: any, n: any) => p + n, 0).toFixed(2);
+         orderItems.map((item: any) => (parseFloat(item?.baseAmount) + item?.shippingCharge)).reduce((p: any, n: any) => p + n, 0).toFixed(2);
 
       totalAmount = parseFloat(totalAmount);
 
@@ -107,10 +107,10 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
       // Creating payment intent after getting total amount of order items. 
       const paymentIntent = await stripe.paymentIntents.create({
          amount: (totalAmount * 100),
-         currency: 'bdt',
+         currency: 'usd',
          payment_method_types: ['card'],
          metadata: {
-            order_id: "OP-" + (Math.round(Math.random() * 99999999) + parseInt(totalAmount)).toString()
+            order_id: "opi_" + (Math.round(Math.random() * 99999999) + parseInt(totalAmount)).toString()
          }
       });
 

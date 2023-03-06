@@ -1,16 +1,18 @@
 
-
+// RefundPayment.tsx
 import { NextFunction, Request, Response } from "express";
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-const Order = require("../../model/order.model");
+const { order_status_updater } = require("../../services/common.services");
 
 module.exports = async function RefundPayment(req: Request, res: Response, next: NextFunction) {
    try {
       const body = req.body;
 
-      const { chargeID, reason, amount, orderID, customerEmail } = body;
+      const { chargeID, reason, amount, orderID, customerEmail, trackingID } = body;
 
       if (!chargeID) throw new Error("Required charge ID !");
+
+      if (!orderID) throw new Error("Required Order ID !");
 
       if (amount && typeof amount !== "number") throw new Error("Amount should be number");
 
@@ -21,19 +23,8 @@ module.exports = async function RefundPayment(req: Request, res: Response, next:
       });
 
       if (refund) {
-         await Order.findOneAndUpdate(
-            { user_email: customerEmail },
-            {
-               $set: {
-                  "orders.$[i].refund.isRefunded": true,
-                  "orders.$[i].refund.refundAT": refund?.created,
-                  "orders.$[i].orderStatus": "refunded"
-               }
-            },
-            {
-               arrayFilters: [{ "i.orderID": orderID }]
-            }
-         );
+
+         await order_status_updater({ type: "refunded", orderID, customerEmail, trackingID, refundAT: refund?.created });
 
          return res.status(200).send({ success: true, statusCode: 200, data: refund });
       }

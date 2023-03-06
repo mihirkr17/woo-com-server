@@ -20,7 +20,7 @@ module.exports = async function CreatePaymentIntent(req: Request, res: Response,
          currency: 'bdt',
          payment_method_types: ['card'],
          metadata: {
-            order_id: "OP-" + (Math.round(Math.random() * 99999999) + parseInt(totalAmount)).toString()
+            order_id: "opi_" + (Math.round(Math.random() * 99999999) + parseInt(totalAmount)).toString()
          }
       });
 

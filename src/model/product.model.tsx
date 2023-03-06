@@ -16,10 +16,7 @@ const shippingType = new Schema({
    procurementType: { type: String, required: true },
    procurementSLA: { type: String, required: true },
    provider: { type: String, required: true },
-   delivery: {
-      localCharge: { type: Number, required: true },
-      zonalCharge: { type: Number, required: true }
-   }
+   isFree: { type: Boolean }
 }, { _id: false });
 
 const manufacturerType = new Schema({
@@ -31,17 +28,19 @@ const manufacturerType = new Schema({
 const bodyInfoType = new Schema({
    keyFeatures: { type: Array, required: true },
    searchKeywords: { type: Array, required: true },
-   metaDescription: { type: String, required: true },
-   description: { type: String, required: true }
+   metaDescription: { type: String, required: true }
 }, { _id: false });
 
 var ProductSchema = new Schema({
    _LID: { type: String, required: true },
    title: { type: String, required: true },
    slug: { type: String, required: true },
+   pricing: { type: Object, required: true },
    categories: { type: Array, required: true },
    brand: { type: String, required: true },
+   images: { type: Array, required: true },
    manufacturer: { type: manufacturerType, required: true },
+   package: { type: Object, required: true },
    shipping: { type: shippingType, required: true },
    paymentInfo: { type: Array, required: true },
    rating: { type: Array, required: true },
@@ -49,9 +48,11 @@ var ProductSchema = new Schema({
    ratingAverage: { type: Number, required: true, default: 0 },
    bodyInfo: { type: bodyInfoType, required: true },
    specification: { type: Object, required: true },
+   description: { type: String, required: true },
    variations: { type: Array, required: true },
    tax: { type: taxType, required: true },
    sellerData: { type: sellerDataType, required: true },
+   warranty: { type: Object },
    save_as: { type: String, required: true, enum: ["fulfilled", "draft"] },
    createdAt: { type: Date, required: true },
    modifiedAt: { type: Date, required: false },
