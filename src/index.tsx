@@ -38,7 +38,7 @@ mongoose.connect(mongoUri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
   // serverApi: ServerApiVersion.v1,
-}).then(() => console.log("connection successful"))
+}).then(() => console.log("Connection Successful..."))
 .catch((err:any) => console.log(err));
 
 app.get("/", (req: Request, res: Response) => {

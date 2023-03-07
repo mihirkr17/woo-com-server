@@ -36,7 +36,7 @@ mongoose.connect(mongoUri, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
     // serverApi: ServerApiVersion.v1,
-}).then(() => console.log("connection successful"))
+}).then(() => console.log("Connection Successful..."))
     .catch((err) => console.log(err));
 app.get("/", (req, res) => {
     res.status(200).send("WooKart Server is running");

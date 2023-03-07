@@ -24,7 +24,7 @@ module.exports = function CreatePaymentIntent(req, res, next) {
             }
             const paymentIntent = yield stripe.paymentIntents.create({
                 amount: (parseInt(totalAmount) * 100),
-                currency: 'bdt',
+                currency: 'usd',
                 payment_method_types: ['card'],
                 metadata: {
                     order_id: "opi_" + (Math.round(Math.random() * 99999999) + parseInt(totalAmount)).toString()

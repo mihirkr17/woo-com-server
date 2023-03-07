@@ -26,7 +26,6 @@ module.exports = function FetchAuthUser(req, res, next) {
             // if uuid !== UUID then clear those cookies
             if (uuid !== UUID) {
                 res.clearCookie("token");
-                res.clearCookie('loggedUUID');
                 return res.status(401).send();
             }
             result = yield User.findOne({

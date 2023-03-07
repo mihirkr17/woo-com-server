@@ -17,7 +17,7 @@ module.exports = async function CreatePaymentIntent(req: Request, res: Response,
 
       const paymentIntent = await stripe.paymentIntents.create({
          amount: (parseInt(totalAmount) * 100),
-         currency: 'bdt',
+         currency: 'usd',
          payment_method_types: ['card'],
          metadata: {
             order_id: "opi_" + (Math.round(Math.random() * 99999999) + parseInt(totalAmount)).toString()
