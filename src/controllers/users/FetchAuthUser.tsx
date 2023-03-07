@@ -15,11 +15,11 @@ module.exports = async function FetchAuthUser(req: Request, res: Response, next:
 
       const ipAddress = req.socket?.remoteAddress;
 
-      if (uuid !== UUID) {
-         res.clearCookie("token");
-         res.clearCookie('loggedUUID');
-         return res.status(401).send();
-      }
+      // if (uuid !== UUID) {
+      //    res.clearCookie("token");
+      //    res.clearCookie('loggedUUID');
+      //    return res.status(401).send();
+      // }
 
       result = await User.findOne(
          {
