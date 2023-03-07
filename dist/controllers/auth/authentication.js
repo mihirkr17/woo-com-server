@@ -182,9 +182,9 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
         if (token) {
             res.cookie("token", token, cookieObject);
             // for logged uuid
-            res.cookie("loggedUUID", existUser === null || existUser === void 0 ? void 0 : existUser._UUID, { httpOnly: false, maxAge: 57600000, sameSite: "none", secure: false });
+            res.cookie("loggedUUID", existUser === null || existUser === void 0 ? void 0 : existUser._UUID, { httpOnly: false, maxAge: 57600000, sameSite: "none", secure: true });
             // if all success then return the response
-            return res.status(200).send({ name: "isLogin", message: "LoginSuccess" });
+            return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: existUser === null || existUser === void 0 ? void 0 : existUser._UUID });
         }
     }
     catch (error) {
