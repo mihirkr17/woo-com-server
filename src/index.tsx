@@ -42,7 +42,7 @@ mongoose.connect(mongoUri, {
 .catch((err:any) => console.log(err));
 
 app.get("/", (req: Request, res: Response) => {
-  res.status(200).send("Woo-Com Server is running");
+  res.status(200).send("WooKart Server is running");
 });
 
 // all the routes
