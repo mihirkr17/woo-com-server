@@ -39,7 +39,7 @@ mongoose.connect(mongoUri, {
 }).then(() => console.log("connection successful"))
     .catch((err) => console.log(err));
 app.get("/", (req, res) => {
-    res.status(200).send("Woo-Com Server is running");
+    res.status(200).send("WooKart Server is running");
 });
 // all the routes
 app.use("/api/v1/auth", authRoutes);

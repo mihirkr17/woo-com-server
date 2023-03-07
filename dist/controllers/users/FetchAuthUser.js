@@ -23,11 +23,11 @@ module.exports = function FetchAuthUser(req, res, next) {
             const uuid = req.headers.authorization || "";
             let result;
             const ipAddress = (_a = req.socket) === null || _a === void 0 ? void 0 : _a.remoteAddress;
-            if (uuid !== UUID) {
-                res.clearCookie("token");
-                res.clearCookie('loggedUUID');
-                return res.status(401).send();
-            }
+            // if (uuid !== UUID) {
+            //    res.clearCookie("token");
+            //    res.clearCookie('loggedUUID');
+            //    return res.status(401).send();
+            // }
             result = yield User.findOne({
                 $and: [{ email: authEmail }, { role: role }, { accountStatus: 'active' }]
             }, {
