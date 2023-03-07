@@ -15,6 +15,7 @@ module.exports = async function FetchAuthUser(req: Request, res: Response, next:
 
       const ipAddress = req.socket?.remoteAddress;
 
+      // if uuid !== UUID then clear those cookies
       if (uuid !== UUID) {
          res.clearCookie("token");
          res.clearCookie('loggedUUID');
