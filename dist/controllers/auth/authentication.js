@@ -126,8 +126,8 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
         let userData;
         let provider;
         const cookieObject = {
-            // sameSite: "none",
-            // secure: true,
+            sameSite: "none",
+            secure: true,
             maxAge: 57600000,
             httpOnly: true,
         };
