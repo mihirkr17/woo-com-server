@@ -3,7 +3,7 @@ const mdb = require("mongodb");
 const Product = require("../model/product.model");
 const UserModel = require("../model/user.model");
 const OrderModel = require("../model/order.model");
-const db = require("mongodb");
+
 
 
 module.exports.findUserByEmail = async (email: string) => {
@@ -96,7 +96,7 @@ module.exports.get_product_variation = async (data: any) => {
    try {
 
       let variation = await Product.aggregate([
-         { $match: { $and: [{ _LID: data?.listingID }, { _id: db.ObjectId(data?.productID) }] } },
+         { $match: { $and: [{ _LID: data?.listingID }, { _id: mdb.ObjectId(data?.productID) }] } },
          { $unwind: { path: "$variations" } },
          { $project: { variations: 1 } },
          { $match: { $and: [{ "variations._VID": data?.variationID }] } },
@@ -130,7 +130,7 @@ module.exports.update_variation_stock_available = async (type: string, data: any
       const { productID, variationID, listingID, quantity } = data;
 
       let variation = await Product.aggregate([
-         { $match: { $and: [{ _LID: listingID }, { _id: db.ObjectId(productID) }] } },
+         { $match: { $and: [{ _LID: listingID }, { _id: mdb.ObjectId(productID) }] } },
          { $unwind: { path: "$variations" } },
          { $project: { variations: 1 } },
          { $match: { $and: [{ "variations._VID": variationID }] } },
@@ -149,7 +149,7 @@ module.exports.update_variation_stock_available = async (type: string, data: any
       let stock: string = available <= 0 ? "out" : "in";
 
       return await Product.findOneAndUpdate(
-         { $and: [{ _id: db.ObjectId(productID) }, { _LID: listingID }] },
+         { $and: [{ _id: mdb.ObjectId(productID) }, { _LID: listingID }] },
          {
             $set: {
                "variations.$[i].available": available,
@@ -255,4 +255,18 @@ module.exports.calculateShippingCost = (volWeight: number, areaType: string) => 
 
    let sum = (count * charge).toFixed(0);
    return parseInt(sum);
+}
+
+
+module.exports.is_product = async (productID: string, variationID: string) => {
+   try {
+      return await Product.countDocuments({
+         $and: [
+            { _id: mdb.ObjectId(productID) },
+            { variations: { $elemMatch: { _VID: variationID } } }
+         ]
+      }) || 0;
+   } catch (error: any) {
+      return error;
+   }
 }

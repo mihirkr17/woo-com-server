@@ -13,7 +13,6 @@ const mdb = require("mongodb");
 const Product = require("../model/product.model");
 const UserModel = require("../model/user.model");
 const OrderModel = require("../model/order.model");
-const db = require("mongodb");
 module.exports.findUserByEmail = (email) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         return (yield UserModel.findOne({ $and: [{ email: email }, { accountStatus: 'active' }] }, {
@@ -95,7 +94,7 @@ module.exports.order_status_updater = (obj) => __awaiter(void 0, void 0, void 0,
 module.exports.get_product_variation = (data) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         let variation = yield Product.aggregate([
-            { $match: { $and: [{ _LID: data === null || data === void 0 ? void 0 : data.listingID }, { _id: db.ObjectId(data === null || data === void 0 ? void 0 : data.productID) }] } },
+            { $match: { $and: [{ _LID: data === null || data === void 0 ? void 0 : data.listingID }, { _id: mdb.ObjectId(data === null || data === void 0 ? void 0 : data.productID) }] } },
             { $unwind: { path: "$variations" } },
             { $project: { variations: 1 } },
             { $match: { $and: [{ "variations._VID": data === null || data === void 0 ? void 0 : data.variationID }] } },
@@ -121,7 +120,7 @@ module.exports.update_variation_stock_available = (type, data) => __awaiter(void
         }
         const { productID, variationID, listingID, quantity } = data;
         let variation = yield Product.aggregate([
-            { $match: { $and: [{ _LID: listingID }, { _id: db.ObjectId(productID) }] } },
+            { $match: { $and: [{ _LID: listingID }, { _id: mdb.ObjectId(productID) }] } },
             { $unwind: { path: "$variations" } },
             { $project: { variations: 1 } },
             { $match: { $and: [{ "variations._VID": variationID }] } },
@@ -136,7 +135,7 @@ module.exports.update_variation_stock_available = (type, data) => __awaiter(void
             available = parseInt(variation === null || variation === void 0 ? void 0 : variation.available) - parseInt(quantity);
         }
         let stock = available <= 0 ? "out" : "in";
-        return (yield Product.findOneAndUpdate({ $and: [{ _id: db.ObjectId(productID) }, { _LID: listingID }] }, {
+        return (yield Product.findOneAndUpdate({ $and: [{ _id: mdb.ObjectId(productID) }, { _LID: listingID }] }, {
             $set: {
                 "variations.$[i].available": available,
                 "variations.$[i].stock": stock
@@ -227,3 +226,16 @@ module.exports.calculateShippingCost = (volWeight, areaType) => {
     let sum = (count * charge).toFixed(0);
     return parseInt(sum);
 };
+module.exports.is_product = (productID, variationID) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        return (yield Product.countDocuments({
+            $and: [
+                { _id: mdb.ObjectId(productID) },
+                { variations: { $elemMatch: { _VID: variationID } } }
+            ]
+        })) || 0;
+    }
+    catch (error) {
+        return error;
+    }
+});

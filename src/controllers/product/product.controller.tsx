@@ -345,6 +345,7 @@ module.exports.purchaseProductController = async (req: Request, res: Response, n
                baseAmount: { $multiply: [actualSellingPrice, body?.quantity] },
                sellingPrice: actualSellingPrice,
                variant: "$variations.variant",
+               available: "$variations.available",
                stock: "$variations.stock"
             }
          }, {

@@ -18,22 +18,23 @@ module.exports.addToCartHandler = async (req: Request, res: Response, next: Next
       const availableProduct = await checkProductAvailability(body?.productID, body?.variationID);
 
       if (!availableProduct) {
-         return res.status(503).send({ success: false, statusCode: 503, error: "Sorry! This product is out of stock now!" });
+         return res.status(503).send({ success: false, statusCode: 503, message: "Sorry! This product is out of stock now!" });
       }
 
       const cartTemp = cartTemplate(authEmail, body?.productID, body?.listingID, body?.variationID);
 
       if (body?.action === "toCart") {
-         
-         const existsProduct = await ShoppingCart.findOne(
+
+         const existsProduct = await ShoppingCart.countDocuments(
             { $and: [{ customerEmail: authEmail }, { variationID: body?.variationID }] }
          );
-   
-         if (existsProduct) {
-            return res.status(400).send({ success: false, statusCode: 400, error: "Product Has Already In Your Cart!" });
+
+         if (existsProduct >= 1) {
+            return res.status(400).send({ success: false, statusCode: 400, message: "Product Has Already In Your Cart!" });
          }
-         
+
          cart = new ShoppingCart(cartTemp);
+
          let result = await cart.save();
 
          if (result?._id) {

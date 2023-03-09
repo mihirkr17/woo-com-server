@@ -66,6 +66,7 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
                paymentInfo: 1,
                sellingPrice: actualSellingPrice,
                variant: "$variations.variant",
+               available: "$variations.available",
                stock: "$variations.stock"
             }
          },

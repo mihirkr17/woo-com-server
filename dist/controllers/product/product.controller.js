@@ -303,6 +303,7 @@ module.exports.purchaseProductController = (req, res, next) => __awaiter(void 0,
                     baseAmount: { $multiply: [actualSellingPrice, body === null || body === void 0 ? void 0 : body.quantity] },
                     sellingPrice: actualSellingPrice,
                     variant: "$variations.variant",
+                    available: "$variations.available",
                     stock: "$variations.stock"
                 }
             }, {

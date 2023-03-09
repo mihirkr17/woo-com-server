@@ -71,6 +71,7 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
                     paymentInfo: 1,
                     sellingPrice: actualSellingPrice,
                     variant: "$variations.variant",
+                    available: "$variations.available",
                     stock: "$variations.stock"
                 }
             },
