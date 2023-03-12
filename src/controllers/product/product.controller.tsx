@@ -5,7 +5,7 @@ import { NextFunction, Request, Response } from "express";
 const { ObjectId } = require("mongodb");
 const Product = require("../../model/product.model");
 const ShoppingCart = require("../../model/shoppingCart.model");
-const { findUserByEmail, getSellerInformationByID, actualSellingPrice, newPricing, basicProductProject, calculateShippingCost } = require("../../services/common.services");
+const { findUserByEmail, findUserByUUID, getSellerInformationByID, actualSellingPrice, newPricing, basicProductProject, calculateShippingCost } = require("../../services/common.services");
 
 /**
  * @controller      --> Fetch the single product information in product details page.
@@ -15,23 +15,26 @@ const { findUserByEmail, getSellerInformationByID, actualSellingPrice, newPricin
 module.exports.fetchSingleProductController = async (req: Request, res: Response, next: any) => {
    try {
 
-      const email: String = req.headers.authorization || '';
+      const uuid: String = req.headers.authorization || '';
       const productID = req.query?.pId;
-      const variationID = req.query.vId;
+      const variationID = req.query?.vId;
       let existProductInCart: any = null;
       let areaType: any;
 
 
       // If user email address exists
-      if (email && typeof email === 'string') {
-         existProductInCart = await ShoppingCart.findOne({ $and: [{ customerEmail: email }, { variationID: variationID }] });
+      if (uuid && typeof uuid === 'string') {
 
-         let user = await findUserByEmail(email);
+         let user = await findUserByUUID(uuid);
 
-         let defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
-            user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
+         if (user && typeof user === "object") {
+            existProductInCart = await ShoppingCart.findOne({ $and: [{ customerEmail: user?.email }, { variationID: variationID }] });
 
-         areaType = defaultShippingAddress?.area_type;
+            let defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
+               user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
+
+            areaType = defaultShippingAddress?.area_type;
+         }
       }
 
       // Product Details

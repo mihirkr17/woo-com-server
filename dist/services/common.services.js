@@ -26,6 +26,19 @@ module.exports.findUserByEmail = (email) => __awaiter(void 0, void 0, void 0, fu
         return error;
     }
 });
+module.exports.findUserByUUID = (uuid) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        return (yield UserModel.findOne({ $and: [{ _UUID: uuid }, { accountStatus: 'active' }] }, {
+            password: 0,
+            createdAt: 0,
+            phonePrefixCode: 0,
+            becomeSellerAt: 0
+        })) || null;
+    }
+    catch (error) {
+        return error;
+    }
+});
 module.exports.order_status_updater = (obj) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { customerEmail, type, orderID, trackingID, cancelReason, refundAT } = obj;

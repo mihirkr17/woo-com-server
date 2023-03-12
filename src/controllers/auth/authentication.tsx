@@ -229,6 +229,11 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 
          if (existUser?.role && existUser?.role === "BUYER") {
 
+            existUser.buyer["defaultShippingAddress"] = (Array.isArray(existUser?.buyer?.shippingAddress) &&
+            existUser?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
+
+            existUser.buyer["shoppingCartItems"] = await ShoppingCart.countDocuments({ customerEmail: existUser?.email }) || 0;
+
             let user = {
                _UUID: existUser?._UUID,
                fullName: existUser?.fullName,
@@ -253,7 +258,6 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 
       if (token) {
          res.cookie("token", token, cookieObject);
-         res.cookie("u_data", userDataToken, { httpOnly: false, maxAge: 57600000, sameSite: "none", secure: true });
 
          // if all success then return the response
          return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: existUser?._UUID, u_data: userDataToken });
@@ -273,8 +277,6 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 module.exports.signOutController = async (req: Request, res: Response, next: NextFunction) => {
    try {
       res.clearCookie("token");
-      res.clearCookie("u_data");
-      res.clearCookie("uid");
       res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
    } catch (error: any) {
       next(error);

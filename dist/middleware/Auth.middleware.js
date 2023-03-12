@@ -22,7 +22,6 @@ const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function
     const token = req.cookies.token; // finding token in http only cookies.
     // if token not present in cookies then return 403 status code and terminate the request here....
     if (!token || typeof token === "undefined") {
-        res.clearCookie("u_data");
         return res.status(401).send();
         // return res.status(401).send({ success: false, statusCode: 401, error: 'Token not found' });
     }

@@ -120,7 +120,7 @@ module.exports.userVerifyTokenController = (req, res, next) => __awaiter(void 0,
  * @apiRequired --> BODY
  */
 module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _b;
+    var _b, _c, _d;
     try {
         const verify_token = ((_b = req.headers.authorization) === null || _b === void 0 ? void 0 : _b.split(' ')[1]) || undefined;
         const { emailOrPhone, password, authProvider } = req.body;
@@ -182,6 +182,9 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
             }
             token = setToken(existUser);
             if ((existUser === null || existUser === void 0 ? void 0 : existUser.role) && (existUser === null || existUser === void 0 ? void 0 : existUser.role) === "BUYER") {
+                existUser.buyer["defaultShippingAddress"] = (Array.isArray((_c = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress) &&
+                    ((_d = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _d === void 0 ? void 0 : _d.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
+                existUser.buyer["shoppingCartItems"] = (yield ShoppingCart.countDocuments({ customerEmail: existUser === null || existUser === void 0 ? void 0 : existUser.email })) || 0;
                 let user = {
                     _UUID: existUser === null || existUser === void 0 ? void 0 : existUser._UUID,
                     fullName: existUser === null || existUser === void 0 ? void 0 : existUser.fullName,
@@ -203,7 +206,6 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
         }
         if (token) {
             res.cookie("token", token, cookieObject);
-            res.cookie("u_data", userDataToken, { httpOnly: false, maxAge: 57600000, sameSite: "none", secure: true });
             // if all success then return the response
             return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: existUser === null || existUser === void 0 ? void 0 : existUser._UUID, u_data: userDataToken });
         }
@@ -220,8 +222,6 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
 module.exports.signOutController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         res.clearCookie("token");
-        res.clearCookie("u_data");
-        res.clearCookie("uid");
         res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
     }
     catch (error) {

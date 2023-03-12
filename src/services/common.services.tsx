@@ -22,6 +22,22 @@ module.exports.findUserByEmail = async (email: string) => {
    }
 }
 
+module.exports.findUserByUUID = async (uuid: string) => {
+   try {
+      return await UserModel.findOne(
+         { $and: [{ _UUID: uuid }, { accountStatus: 'active' }] },
+         {
+            password: 0,
+            createdAt: 0,
+            phonePrefixCode: 0,
+            becomeSellerAt: 0
+         }
+      ) || null;
+   } catch (error: any) {
+      return error;
+   }
+}
+
 module.exports.order_status_updater = async (obj: any) => {
    try {
       const { customerEmail, type, orderID, trackingID, cancelReason, refundAT } = obj;

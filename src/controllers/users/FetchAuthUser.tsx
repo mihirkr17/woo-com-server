@@ -12,11 +12,11 @@ module.exports = async function FetchAuthUser(req: Request, res: Response, next:
       const role: string = req.decoded.role;
       const UUID: string = req.decoded._UUID;
       const uuid: string = req.headers.authorization || "";
-      let result: any;
+      let user: any;
 
       const ipAddress = req.socket?.remoteAddress;
 
-      result = await User.findOne(
+      user = await User.findOne(
          {
             $and: [{ email: authEmail }, { role: role }, { accountStatus: 'active' }]
          },
@@ -27,44 +27,41 @@ module.exports = async function FetchAuthUser(req: Request, res: Response, next:
          }
       );
 
-
-      if (result && result?.role === 'SELLER' && result?.idFor === 'sell') {
-         await productCounter({ storeName: result.seller.storeInfos?.storeName, _UUID: result?._UUID });
-      }
-
-      if (result && result?.role === 'BUYER' && result?.idFor === 'buy') {
-
-         result.buyer["defaultShippingAddress"] = (Array.isArray(result?.buyer?.shippingAddress) &&
-            result?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
-
-         result.buyer["shoppingCartItems"] = await ShoppingCart.countDocuments({ customerEmail: result?.email });
-      }
-
-      if (!result || typeof result !== "object") {
+      if (!user || typeof user !== "object") {
          throw new response.Api404Error("AuthError", "User not found !");
       }
 
 
-      let user = {
-         _UUID: result?._UUID,
-         fullName: result?.fullName,
-         email: result?.email,
-         phone: result?.phone,
-         phonePrefixCode: result?.phonePrefixCode,
-         hasPassword: result?.hasPassword,
-         role: result?.role,
-         gender: result?.gender,
-         dob: result?.dob,
-         idFor: result?.idFor,
-         accountStatus: result?.accountStatus,
-         authProvider: result?.authProvider,
-         contactEmail: result?.contactEmail,
-         buyer: result?.buyer
+      if (user && user?.role === 'SELLER' && user?.idFor === 'sell') {
+         await productCounter({ storeName: user.seller.storeInfos?.storeName, _UUID: user?._UUID });
+      }
+
+      if (user && user?.role === 'BUYER' && user?.idFor === 'buy') {
+
+         user.buyer["defaultShippingAddress"] = (Array.isArray(user?.buyer?.shippingAddress) &&
+            user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
+
+         user.buyer["shoppingCartItems"] = await ShoppingCart.countDocuments({ customerEmail: user?.email }) || 0;
+      }
+
+      let newUser = {
+         _UUID: user?._UUID,
+         fullName: user?.fullName,
+         email: user?.email,
+         phone: user?.phone,
+         phonePrefixCode: user?.phonePrefixCode,
+         hasPassword: user?.hasPassword,
+         role: user?.role,
+         gender: user?.gender,
+         dob: user?.dob,
+         idFor: user?.idFor,
+         accountStatus: user?.accountStatus,
+         authProvider: user?.authProvider,
+         contactEmail: user?.contactEmail,
+         buyer: user?.buyer
       };
 
-      res.cookie("u_data", setUserDataToken(user), { httpOnly: false, maxAge: 57600000, sameSite: "none", secure: true });
-
-      return res.status(200).send({ success: true, statusCode: 200, message: 'Welcome ' + result?.fullName, data: user, ipAddress, u_data: setUserDataToken(user) });
+      return res.status(200).send({ success: true, statusCode: 200, message: 'Welcome ' + user?.fullName, data: user, ipAddress, u_data: setUserDataToken(newUser) });
 
    } catch (error: any) {
       next(error);

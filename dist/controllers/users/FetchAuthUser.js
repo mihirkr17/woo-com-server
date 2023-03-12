@@ -22,44 +22,43 @@ module.exports = function FetchAuthUser(req, res, next) {
             const role = req.decoded.role;
             const UUID = req.decoded._UUID;
             const uuid = req.headers.authorization || "";
-            let result;
+            let user;
             const ipAddress = (_a = req.socket) === null || _a === void 0 ? void 0 : _a.remoteAddress;
-            result = yield User.findOne({
+            user = yield User.findOne({
                 $and: [{ email: authEmail }, { role: role }, { accountStatus: 'active' }]
             }, {
                 password: 0, createdAt: 0,
                 phonePrefixCode: 0,
                 becomeSellerAt: 0
             });
-            if (result && (result === null || result === void 0 ? void 0 : result.role) === 'SELLER' && (result === null || result === void 0 ? void 0 : result.idFor) === 'sell') {
-                yield productCounter({ storeName: (_b = result.seller.storeInfos) === null || _b === void 0 ? void 0 : _b.storeName, _UUID: result === null || result === void 0 ? void 0 : result._UUID });
-            }
-            if (result && (result === null || result === void 0 ? void 0 : result.role) === 'BUYER' && (result === null || result === void 0 ? void 0 : result.idFor) === 'buy') {
-                result.buyer["defaultShippingAddress"] = (Array.isArray((_c = result === null || result === void 0 ? void 0 : result.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress) &&
-                    ((_d = result === null || result === void 0 ? void 0 : result.buyer) === null || _d === void 0 ? void 0 : _d.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
-                result.buyer["shoppingCartItems"] = yield ShoppingCart.countDocuments({ customerEmail: result === null || result === void 0 ? void 0 : result.email });
-            }
-            if (!result || typeof result !== "object") {
+            if (!user || typeof user !== "object") {
                 throw new response.Api404Error("AuthError", "User not found !");
             }
-            let user = {
-                _UUID: result === null || result === void 0 ? void 0 : result._UUID,
-                fullName: result === null || result === void 0 ? void 0 : result.fullName,
-                email: result === null || result === void 0 ? void 0 : result.email,
-                phone: result === null || result === void 0 ? void 0 : result.phone,
-                phonePrefixCode: result === null || result === void 0 ? void 0 : result.phonePrefixCode,
-                hasPassword: result === null || result === void 0 ? void 0 : result.hasPassword,
-                role: result === null || result === void 0 ? void 0 : result.role,
-                gender: result === null || result === void 0 ? void 0 : result.gender,
-                dob: result === null || result === void 0 ? void 0 : result.dob,
-                idFor: result === null || result === void 0 ? void 0 : result.idFor,
-                accountStatus: result === null || result === void 0 ? void 0 : result.accountStatus,
-                authProvider: result === null || result === void 0 ? void 0 : result.authProvider,
-                contactEmail: result === null || result === void 0 ? void 0 : result.contactEmail,
-                buyer: result === null || result === void 0 ? void 0 : result.buyer
+            if (user && (user === null || user === void 0 ? void 0 : user.role) === 'SELLER' && (user === null || user === void 0 ? void 0 : user.idFor) === 'sell') {
+                yield productCounter({ storeName: (_b = user.seller.storeInfos) === null || _b === void 0 ? void 0 : _b.storeName, _UUID: user === null || user === void 0 ? void 0 : user._UUID });
+            }
+            if (user && (user === null || user === void 0 ? void 0 : user.role) === 'BUYER' && (user === null || user === void 0 ? void 0 : user.idFor) === 'buy') {
+                user.buyer["defaultShippingAddress"] = (Array.isArray((_c = user === null || user === void 0 ? void 0 : user.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress) &&
+                    ((_d = user === null || user === void 0 ? void 0 : user.buyer) === null || _d === void 0 ? void 0 : _d.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
+                user.buyer["shoppingCartItems"] = (yield ShoppingCart.countDocuments({ customerEmail: user === null || user === void 0 ? void 0 : user.email })) || 0;
+            }
+            let newUser = {
+                _UUID: user === null || user === void 0 ? void 0 : user._UUID,
+                fullName: user === null || user === void 0 ? void 0 : user.fullName,
+                email: user === null || user === void 0 ? void 0 : user.email,
+                phone: user === null || user === void 0 ? void 0 : user.phone,
+                phonePrefixCode: user === null || user === void 0 ? void 0 : user.phonePrefixCode,
+                hasPassword: user === null || user === void 0 ? void 0 : user.hasPassword,
+                role: user === null || user === void 0 ? void 0 : user.role,
+                gender: user === null || user === void 0 ? void 0 : user.gender,
+                dob: user === null || user === void 0 ? void 0 : user.dob,
+                idFor: user === null || user === void 0 ? void 0 : user.idFor,
+                accountStatus: user === null || user === void 0 ? void 0 : user.accountStatus,
+                authProvider: user === null || user === void 0 ? void 0 : user.authProvider,
+                contactEmail: user === null || user === void 0 ? void 0 : user.contactEmail,
+                buyer: user === null || user === void 0 ? void 0 : user.buyer
             };
-            res.cookie("u_data", setUserDataToken(user), { httpOnly: false, maxAge: 57600000, sameSite: "none", secure: true });
-            return res.status(200).send({ success: true, statusCode: 200, message: 'Welcome ' + (result === null || result === void 0 ? void 0 : result.fullName), data: user, ipAddress, u_data: setUserDataToken(user) });
+            return res.status(200).send({ success: true, statusCode: 200, message: 'Welcome ' + (user === null || user === void 0 ? void 0 : user.fullName), data: user, ipAddress, u_data: setUserDataToken(newUser) });
         }
         catch (error) {
             next(error);
