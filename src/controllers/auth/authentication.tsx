@@ -253,11 +253,10 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 
       if (token) {
          res.cookie("token", token, cookieObject);
-         res.cookie("u_data", userDataToken, { httpOnly: false, maxAge: 57600000, sameSite: "none", secure: false });
-         res.cookie("uid", existUser?._UUID, { httpOnly: false, maxAge: 57600000, sameSite: "none", secure: false });
+         res.cookie("u_data", userDataToken, { httpOnly: false, maxAge: 57600000, sameSite: "none", secure: true });
 
          // if all success then return the response
-         return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: existUser?._UUID });
+         return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: existUser?._UUID, u_data: userDataToken });
 
       }
    } catch (error: any) {
