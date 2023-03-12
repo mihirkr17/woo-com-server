@@ -15,6 +15,8 @@ const generateVerifyToken = require("../../utils/generateVerifyToken");
 const apiResponse = require("../../errors/apiResponse");
 const setToken = require("../../utils/setToken");
 const comparePassword = require("../../utils/comparePassword");
+const setUserDataToken = require("../../utils/setUserDataToken");
+const ShoppingCart = require("../../model/shoppingCart.model");
 /**
  * @apiController --> Buyer Registration Controller
  * @apiMethod --> POST
@@ -123,6 +125,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
         const verify_token = ((_b = req.headers.authorization) === null || _b === void 0 ? void 0 : _b.split(' ')[1]) || undefined;
         const { emailOrPhone, password, authProvider } = req.body;
         let token;
+        let userDataToken;
         let userData;
         let provider;
         const cookieObject = {
@@ -178,9 +181,30 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
                 res.clearCookie('verifyToken');
             }
             token = setToken(existUser);
+            if ((existUser === null || existUser === void 0 ? void 0 : existUser.role) && (existUser === null || existUser === void 0 ? void 0 : existUser.role) === "BUYER") {
+                let user = {
+                    _UUID: existUser === null || existUser === void 0 ? void 0 : existUser._UUID,
+                    fullName: existUser === null || existUser === void 0 ? void 0 : existUser.fullName,
+                    email: existUser === null || existUser === void 0 ? void 0 : existUser.email,
+                    phone: existUser === null || existUser === void 0 ? void 0 : existUser.phone,
+                    phonePrefixCode: existUser === null || existUser === void 0 ? void 0 : existUser.phonePrefixCode,
+                    hasPassword: existUser === null || existUser === void 0 ? void 0 : existUser.hasPassword,
+                    role: existUser === null || existUser === void 0 ? void 0 : existUser.role,
+                    gender: existUser === null || existUser === void 0 ? void 0 : existUser.gender,
+                    dob: existUser === null || existUser === void 0 ? void 0 : existUser.dob,
+                    idFor: existUser === null || existUser === void 0 ? void 0 : existUser.idFor,
+                    accountStatus: existUser === null || existUser === void 0 ? void 0 : existUser.accountStatus,
+                    authProvider: existUser === null || existUser === void 0 ? void 0 : existUser.authProvider,
+                    contactEmail: existUser === null || existUser === void 0 ? void 0 : existUser.contactEmail,
+                    buyer: existUser === null || existUser === void 0 ? void 0 : existUser.buyer
+                };
+                userDataToken = setUserDataToken(user);
+            }
         }
         if (token) {
             res.cookie("token", token, cookieObject);
+            res.cookie("u_data", userDataToken, { httpOnly: false, maxAge: 57600000 });
+            res.cookie("uid", existUser === null || existUser === void 0 ? void 0 : existUser._UUID, { httpOnly: false, maxAge: 57600000 });
             // if all success then return the response
             return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: existUser === null || existUser === void 0 ? void 0 : existUser._UUID });
         }
@@ -197,6 +221,8 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
 module.exports.signOutController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         res.clearCookie("token");
+        res.clearCookie("u_data");
+        res.clearCookie("uid");
         res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
     }
     catch (error) {

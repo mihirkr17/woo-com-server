@@ -3,23 +3,18 @@ const { productCounter } = require("../../model/common.model");
 const User = require("../../model/user.model");
 const ShoppingCart = require("../../model/shoppingCart.model");
 const response = require("../../errors/apiResponse");
+const setUserDataToken = require("../../utils/setUserDataToken");
 
 
 module.exports = async function FetchAuthUser(req: Request, res: Response, next: NextFunction) {
    try {
       const authEmail = req.decoded.email;
       const role: string = req.decoded.role;
-      const UUID:string = req.decoded._UUID;
+      const UUID: string = req.decoded._UUID;
       const uuid: string = req.headers.authorization || "";
-      let result: any;  
+      let result: any;
 
       const ipAddress = req.socket?.remoteAddress;
-
-      // if uuid !== UUID then clear those cookies
-      if (uuid !== UUID) {
-         res.clearCookie("token");
-         return res.status(401).send();
-      }
 
       result = await User.findOne(
          {
@@ -49,7 +44,27 @@ module.exports = async function FetchAuthUser(req: Request, res: Response, next:
          throw new response.Api404Error("AuthError", "User not found !");
       }
 
-      return res.status(200).send({ success: true, statusCode: 200, message: 'Welcome ' + result?.fullName, data: result, ipAddress });
+
+      let user = {
+         _UUID: result?._UUID,
+         fullName: result?.fullName,
+         email: result?.email,
+         phone: result?.phone,
+         phonePrefixCode: result?.phonePrefixCode,
+         hasPassword: result?.hasPassword,
+         role: result?.role,
+         gender: result?.gender,
+         dob: result?.dob,
+         idFor: result?.idFor,
+         accountStatus: result?.accountStatus,
+         authProvider: result?.authProvider,
+         contactEmail: result?.contactEmail,
+         buyer: result?.buyer
+      };
+
+      res.cookie("u_data", setUserDataToken(user), { httpOnly: false, maxAge: 57600000 });
+
+      return res.status(200).send({ success: true, statusCode: 200, message: 'Welcome ' + result?.fullName, data: user, ipAddress });
 
    } catch (error: any) {
       next(error);

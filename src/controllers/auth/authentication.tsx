@@ -6,6 +6,8 @@ const generateVerifyToken = require("../../utils/generateVerifyToken");
 const apiResponse = require("../../errors/apiResponse");
 const setToken = require("../../utils/setToken");
 const comparePassword = require("../../utils/comparePassword");
+const setUserDataToken = require("../../utils/setUserDataToken");
+const ShoppingCart = require("../../model/shoppingCart.model");
 
 /**
  * @apiController --> Buyer Registration Controller
@@ -152,6 +154,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
       const verify_token = req.headers.authorization?.split(' ')[1] || undefined;
       const { emailOrPhone, password, authProvider } = req.body;
       let token: String;
+      let userDataToken: any;
       let userData;
       let provider: String;
 
@@ -223,14 +226,39 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
          }
 
          token = setToken(existUser);
+
+         if (existUser?.role && existUser?.role === "BUYER") {
+
+            let user = {
+               _UUID: existUser?._UUID,
+               fullName: existUser?.fullName,
+               email: existUser?.email,
+               phone: existUser?.phone,
+               phonePrefixCode: existUser?.phonePrefixCode,
+               hasPassword: existUser?.hasPassword,
+               role: existUser?.role,
+               gender: existUser?.gender,
+               dob: existUser?.dob,
+               idFor: existUser?.idFor,
+               accountStatus: existUser?.accountStatus,
+               authProvider: existUser?.authProvider,
+               contactEmail: existUser?.contactEmail,
+               buyer: existUser?.buyer
+            };
+
+
+            userDataToken = setUserDataToken(user);
+         }
       }
 
       if (token) {
          res.cookie("token", token, cookieObject);
+         res.cookie("u_data", userDataToken, { httpOnly: false, maxAge: 57600000 });
+         res.cookie("uid", existUser?._UUID, { httpOnly: false, maxAge: 57600000 });
 
          // if all success then return the response
          return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: existUser?._UUID });
-         
+
       }
    } catch (error: any) {
       return next(error);
@@ -246,6 +274,8 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 module.exports.signOutController = async (req: Request, res: Response, next: NextFunction) => {
    try {
       res.clearCookie("token");
+      res.clearCookie("u_data");
+      res.clearCookie("uid");
       res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
    } catch (error: any) {
       next(error);

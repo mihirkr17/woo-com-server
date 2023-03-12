@@ -12,6 +12,7 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
          return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
       }
 
+
       let defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
          user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
 
