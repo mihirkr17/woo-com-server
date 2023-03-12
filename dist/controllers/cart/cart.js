@@ -40,7 +40,7 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
                     $expr: {
                         $and: [
                             { $eq: ['$variations._VID', '$variationID'] },
-                            // { $eq: ["$variations.stock", "in"] },
+                            { $eq: ["$variations.stock", "in"] },
                             { $eq: ["$variations.status", "active"] },
                             { $eq: ["$save_as", "fulfilled"] }
                         ]
