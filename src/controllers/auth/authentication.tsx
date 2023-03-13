@@ -8,6 +8,8 @@ const setToken = require("../../utils/setToken");
 const comparePassword = require("../../utils/comparePassword");
 const setUserDataToken = require("../../utils/setUserDataToken");
 const ShoppingCart = require("../../model/shoppingCart.model");
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 
 /**
  * @apiController --> Buyer Registration Controller
@@ -230,7 +232,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
          if (existUser?.role && existUser?.role === "BUYER") {
 
             existUser.buyer["defaultShippingAddress"] = (Array.isArray(existUser?.buyer?.shippingAddress) &&
-            existUser?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
+               existUser?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
 
             existUser.buyer["shoppingCartItems"] = await ShoppingCart.countDocuments({ customerEmail: existUser?.email }) || 0;
 
@@ -282,3 +284,45 @@ module.exports.signOutController = async (req: Request, res: Response, next: Nex
       next(error);
    }
 };
+
+
+
+module.exports.changePasswordController = async (req: Request, res: Response, next: NextFunction) => {
+   try {
+      const authEmail = req.decoded.email;
+      let result: any;
+
+      const { oldPassword, newPassword } = req.body;
+
+      if (!oldPassword || !newPassword) {
+         throw new apiResponse.Api400Error("ClientError", `Required old password and new password !`);
+      }
+
+      const user = await User.findOne({ email: authEmail });
+
+      if (!user && typeof user !== "object") {
+         throw new apiResponse.Api404Error("ClientError", `User not found!`);
+      }
+
+      const comparedPassword = await comparePassword(oldPassword, user?.password);
+
+      if (!comparedPassword) {
+         throw new apiResponse.Api400Error("ClientError", "Password didn't match !");
+      }
+
+      let hashedPwd = await bcrypt.hash(newPassword, saltRounds);
+
+      if (hashedPwd) {
+         result = await User.findOneAndUpdate(
+            { email: authEmail },
+            { $set: { password: hashedPwd } },
+            { upsert: true }
+         );
+      }
+
+      if (result) return res.status(200).send({ success: true, statusCode: 200, message: "Password updated successfully." });
+
+   } catch (error: any) {
+      next(error);
+   }
+}

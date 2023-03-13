@@ -17,6 +17,8 @@ const setToken = require("../../utils/setToken");
 const comparePassword = require("../../utils/comparePassword");
 const setUserDataToken = require("../../utils/setUserDataToken");
 const ShoppingCart = require("../../model/shoppingCart.model");
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 /**
  * @apiController --> Buyer Registration Controller
  * @apiMethod --> POST
@@ -223,6 +225,33 @@ module.exports.signOutController = (req, res, next) => __awaiter(void 0, void 0,
     try {
         res.clearCookie("token");
         res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+module.exports.changePasswordController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const authEmail = req.decoded.email;
+        let result;
+        const { oldPassword, newPassword } = req.body;
+        if (!oldPassword || !newPassword) {
+            throw new apiResponse.Api400Error("ClientError", `Required old password and new password !`);
+        }
+        const user = yield User.findOne({ email: authEmail });
+        if (!user && typeof user !== "object") {
+            throw new apiResponse.Api404Error("ClientError", `User not found!`);
+        }
+        const comparedPassword = yield comparePassword(oldPassword, user === null || user === void 0 ? void 0 : user.password);
+        if (!comparedPassword) {
+            throw new apiResponse.Api400Error("ClientError", "Password didn't match !");
+        }
+        let hashedPwd = yield bcrypt.hash(newPassword, saltRounds);
+        if (hashedPwd) {
+            result = yield User.findOneAndUpdate({ email: authEmail }, { $set: { password: hashedPwd } }, { upsert: true });
+        }
+        if (result)
+            return res.status(200).send({ success: true, statusCode: 200, message: "Password updated successfully." });
     }
     catch (error) {
         next(error);
