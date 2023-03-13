@@ -10,18 +10,19 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const User = require("../../model/user.model");
-module.exports.createShippingAddress = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const { findUserByEmail } = require("../../services/common.services");
+module.exports.createShippingAddress = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const userEmail = req.decoded.email;
         let body = req.body;
-        body['_SA_UID'] = Math.floor(Math.random() * 100000000);
+        body['addrsID'] = Math.floor(Math.random() * 100000000);
         body['default_shipping_address'] = false;
-        const result = yield User.updateOne({ email: userEmail }, { $push: { "buyer.shippingAddress": body } }, { new: true });
+        const result = yield User.findOneAndUpdate({ email: userEmail }, { $push: { "buyer.shippingAddress": body } }, { upsert: true });
         if (!result) {
             return res.status(400).send({
                 success: false,
                 statusCode: 400,
-                error: "Failed to add address in this cart",
+                message: "Failed to add address in this cart",
             });
         }
         return res.status(200).send({
@@ -31,19 +32,18 @@ module.exports.createShippingAddress = (req, res) => __awaiter(void 0, void 0, v
         });
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });
-module.exports.updateShippingAddress = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.updateShippingAddress = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        // const db = await dbc.dbConnection();
         const userEmail = req.decoded.email;
         const body = req.body;
         const result = yield User.updateOne({ email: userEmail }, {
             $set: {
                 "buyer.shippingAddress.$[i]": body,
             },
-        }, { arrayFilters: [{ "i._SA_UID": body === null || body === void 0 ? void 0 : body._SA_UID }] });
+        }, { arrayFilters: [{ "i.addrsID": body === null || body === void 0 ? void 0 : body.addrsID }] });
         if (result) {
             return res.status(200).send({
                 success: true,
@@ -60,55 +60,57 @@ module.exports.updateShippingAddress = (req, res) => __awaiter(void 0, void 0, v
         }
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });
-module.exports.selectShippingAddress = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.selectShippingAddress = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        // const db = await dbc.dbConnection();
         const userEmail = req.decoded.email;
-        let { _SA_UID, default_shipping_address } = req.body;
+        let { addrsID, default_shipping_address } = req.body;
         default_shipping_address = default_shipping_address === true ? false : true;
-        const user = yield User.findOne({ email: userEmail });
-        if (!user) {
-            return res.status(503).send({ success: false, statusCode: 503, error: 'User not found !!!' });
+        const user = yield findUserByEmail(userEmail);
+        if (!user && typeof user !== "object") {
+            return res.status(404).send({ success: false, statusCode: 404, message: 'User not found !!!' });
         }
         const shippingAddress = ((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) || [];
         if (shippingAddress && shippingAddress.length > 0) {
-            const result = yield User.updateOne({ email: userEmail }, {
+            const result = yield User.findOneAndUpdate({ email: userEmail }, {
                 $set: {
                     "buyer.shippingAddress.$[j].default_shipping_address": false,
                     "buyer.shippingAddress.$[i].default_shipping_address": default_shipping_address,
                 },
             }, {
-                arrayFilters: [{ "j._SA_UID": { $ne: _SA_UID } }, { "i._SA_UID": _SA_UID }],
+                arrayFilters: [{ "j.addrsID": { $ne: addrsID } }, { "i.addrsID": addrsID }],
                 multi: true,
             });
             if (!result) {
                 return res.status(400).send({
                     success: false,
                     statusCode: 400,
-                    error: "Failed to select the address",
+                    message: "Failed to select the address",
                 });
             }
             return res.status(200).send({ success: true, statusCode: 200, message: "Shipping address Saved." });
         }
     }
     catch (error) {
-        res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });
-module.exports.deleteShippingAddress = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.deleteShippingAddress = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        // const db = await dbc.dbConnection();
         const email = req.decoded.email;
-        const _SA_UID = parseInt(req.params._SA_UID);
-        const result = yield User.updateOne({ email: email }, { $pull: { "buyer.shippingAddress": { _SA_UID } } });
+        let saUid = req.params.addrsID;
+        if (!saUid) {
+            return res.status(400).send({ success: false, statusCode: 400, message: "Required address id !" });
+        }
+        saUid = parseInt(saUid);
+        const result = yield User.findOneAndUpdate({ email: email }, { $pull: { "buyer.shippingAddress": { addrsID: saUid } } });
         if (result)
-            return res.send(result);
+            return res.status(200).send({ success: true, statusCode: 200, message: "Address deleted successfully." });
     }
     catch (error) {
-        res.status(500).send({ success: false, statusCode: 500, error: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });

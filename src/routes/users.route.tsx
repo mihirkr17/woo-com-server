@@ -56,7 +56,7 @@ try {
   router.post("/shipping-address", verifyJWT, shippingAddressController.createShippingAddress);
   router.put("/shipping-address", verifyJWT, shippingAddressController.updateShippingAddress);
   router.post("/shipping-address-select", verifyJWT, shippingAddressController.selectShippingAddress);
-  router.delete("/shipping-address-delete/:_SA_UID", verifyJWT, shippingAddressController.deleteShippingAddress);
+  router.delete("/shipping-address-delete/:addrsID", verifyJWT, shippingAddressController.deleteShippingAddress);
 
 } catch (error: any) {
   console.log(error?.message);

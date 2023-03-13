@@ -1,26 +1,27 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 const User = require("../../model/user.model");
+const { findUserByEmail } = require("../../services/common.services");
 
-module.exports.createShippingAddress = async (req: Request, res: Response) => {
+module.exports.createShippingAddress = async (req: Request, res: Response, next: NextFunction) => {
    try {
       const userEmail = req.decoded.email;
 
       let body = req.body;
 
-      body['_SA_UID'] = Math.floor(Math.random() * 100000000);
+      body['addrsID'] = Math.floor(Math.random() * 100000000);
       body['default_shipping_address'] = false;
 
-      const result = await User.updateOne(
-            { email: userEmail },
-            { $push: { "buyer.shippingAddress": body } },
-            { new: true }
-         );
+      const result = await User.findOneAndUpdate(
+         { email: userEmail },
+         { $push: { "buyer.shippingAddress": body } },
+         { upsert: true }
+      );
 
       if (!result) {
          return res.status(400).send({
             success: false,
             statusCode: 400,
-            error: "Failed to add address in this cart",
+            message: "Failed to add address in this cart",
          });
       }
 
@@ -30,14 +31,13 @@ module.exports.createShippingAddress = async (req: Request, res: Response) => {
          message: "Successfully shipping address added in your cart.",
       });
    } catch (error: any) {
-      res.status(500).send({ message: error?.message });
+      next(error);
    }
 };
 
 
-module.exports.updateShippingAddress = async (req: Request, res: Response) => {
+module.exports.updateShippingAddress = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      // const db = await dbc.dbConnection();
 
       const userEmail = req.decoded.email;
       const body = req.body;
@@ -49,7 +49,7 @@ module.exports.updateShippingAddress = async (req: Request, res: Response) => {
                "buyer.shippingAddress.$[i]": body,
             },
          },
-         { arrayFilters: [{ "i._SA_UID": body?._SA_UID }] }
+         { arrayFilters: [{ "i.addrsID": body?.addrsID }] }
       );
 
       if (result) {
@@ -66,30 +66,30 @@ module.exports.updateShippingAddress = async (req: Request, res: Response) => {
          });
       }
    } catch (error: any) {
-      res.status(500).send({ message: error?.message });
+      next(error);
    }
 };
 
 
-module.exports.selectShippingAddress = async (req: Request, res: Response) => {
+module.exports.selectShippingAddress = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      // const db = await dbc.dbConnection();
+
       const userEmail = req.decoded.email;
-      let { _SA_UID, default_shipping_address } = req.body;
+      let { addrsID, default_shipping_address } = req.body;
 
       default_shipping_address = default_shipping_address === true ? false : true;
 
-      const user = await User.findOne({ email: userEmail });
+      const user = await findUserByEmail(userEmail);
 
-      if (!user) {
-         return res.status(503).send({ success: false, statusCode: 503, error: 'User not found !!!' });
+      if (!user && typeof user !== "object") {
+         return res.status(404).send({ success: false, statusCode: 404, message: 'User not found !!!' });
       }
 
       const shippingAddress = user?.buyer?.shippingAddress || [];
 
       if (shippingAddress && shippingAddress.length > 0) {
 
-         const result = await User.updateOne(
+         const result = await User.findOneAndUpdate(
             { email: userEmail },
             {
                $set: {
@@ -98,7 +98,7 @@ module.exports.selectShippingAddress = async (req: Request, res: Response) => {
                },
             },
             {
-               arrayFilters: [{ "j._SA_UID": { $ne: _SA_UID } }, { "i._SA_UID": _SA_UID }],
+               arrayFilters: [{ "j.addrsID": { $ne: addrsID } }, { "i.addrsID": addrsID }],
                multi: true,
             }
          );
@@ -107,29 +107,34 @@ module.exports.selectShippingAddress = async (req: Request, res: Response) => {
             return res.status(400).send({
                success: false,
                statusCode: 400,
-               error: "Failed to select the address",
+               message: "Failed to select the address",
             });
          }
 
          return res.status(200).send({ success: true, statusCode: 200, message: "Shipping address Saved." });
       }
    } catch (error: any) {
-      res.status(500).send({ success: false, statusCode: 500, error: error?.message });
+      next(error);
    }
 }
 
 
-module.exports.deleteShippingAddress = async (req: Request, res: Response) => {
+module.exports.deleteShippingAddress = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      // const db = await dbc.dbConnection();
 
       const email = req.decoded.email;
-      const _SA_UID = parseInt(req.params._SA_UID);
+      let saUid: any = req.params.addrsID;
 
-      const result = await User.updateOne({ email: email }, { $pull: { "buyer.shippingAddress": { _SA_UID } } });
+      if (!saUid) {
+         return res.status(400).send({ success: false, statusCode: 400, message: "Required address id !" });
+      }
 
-      if (result) return res.send(result);
+      saUid = parseInt(saUid);
+
+      const result = await User.findOneAndUpdate({ email: email }, { $pull: { "buyer.shippingAddress": { addrsID: saUid } } });
+
+      if (result) return res.status(200).send({ success: true, statusCode: 200, message: "Address deleted successfully." })
    } catch (error: any) {
-      res.status(500).send({ success: false, statusCode: 500, error: error?.message });
+      next(error);
    }
 }

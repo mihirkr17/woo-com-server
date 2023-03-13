@@ -13,7 +13,7 @@ module.exports.updateProfileDataController = async (req: Request, res: Response,
       const clientEmail = req.headers.authorization || "";
 
       if (clientEmail !== email) {
-         throw new response.Api403Error("AuthError", "Invalid email address !");
+         throw new response.Api400Error("AuthError", "Invalid email address !");
       }
 
       const result = await User.updateOne({ email: email }, { $set: req.body }, { new: true });

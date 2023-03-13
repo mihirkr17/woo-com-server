@@ -22,7 +22,7 @@ module.exports.updateProfileDataController = (req, res, next) => __awaiter(void 
         const email = req.decoded.email;
         const clientEmail = req.headers.authorization || "";
         if (clientEmail !== email) {
-            throw new response.Api403Error("AuthError", "Invalid email address !");
+            throw new response.Api400Error("AuthError", "Invalid email address !");
         }
         const result = yield User.updateOne({ email: email }, { $set: req.body }, { new: true });
         if ((result === null || result === void 0 ? void 0 : result.matchedCount) === 1) {
