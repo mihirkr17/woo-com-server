@@ -66,16 +66,16 @@ module.exports.updateShippingAddress = (req, res, next) => __awaiter(void 0, voi
 module.exports.selectShippingAddress = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        const userEmail = req.decoded.email;
+        const authEmail = req.decoded.email;
         let { addrsID, default_shipping_address } = req.body;
-        default_shipping_address = default_shipping_address === true ? false : true;
-        const user = yield findUserByEmail(userEmail);
+        default_shipping_address = (default_shipping_address === true) ? false : true;
+        const user = yield findUserByEmail(authEmail);
         if (!user && typeof user !== "object") {
             return res.status(404).send({ success: false, statusCode: 404, message: 'User not found !!!' });
         }
         const shippingAddress = ((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) || [];
         if (shippingAddress && shippingAddress.length > 0) {
-            const result = yield User.findOneAndUpdate({ email: userEmail }, {
+            const result = yield User.findOneAndUpdate({ email: authEmail }, {
                 $set: {
                     "buyer.shippingAddress.$[j].default_shipping_address": false,
                     "buyer.shippingAddress.$[i].default_shipping_address": default_shipping_address,
@@ -91,7 +91,7 @@ module.exports.selectShippingAddress = (req, res, next) => __awaiter(void 0, voi
                     message: "Failed to select the address",
                 });
             }
-            return res.status(200).send({ success: true, statusCode: 200, message: "Shipping address Saved." });
+            return res.status(200).send({ success: true, statusCode: 200, message: "Default shipping address selected." });
         }
     }
     catch (error) {

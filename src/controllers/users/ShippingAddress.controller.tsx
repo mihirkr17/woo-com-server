@@ -74,12 +74,12 @@ module.exports.updateShippingAddress = async (req: Request, res: Response, next:
 module.exports.selectShippingAddress = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
-      const userEmail = req.decoded.email;
+      const authEmail = req.decoded.email;
       let { addrsID, default_shipping_address } = req.body;
 
-      default_shipping_address = default_shipping_address === true ? false : true;
+      default_shipping_address = (default_shipping_address === true) ? false : true;
 
-      const user = await findUserByEmail(userEmail);
+      const user = await findUserByEmail(authEmail);
 
       if (!user && typeof user !== "object") {
          return res.status(404).send({ success: false, statusCode: 404, message: 'User not found !!!' });
@@ -90,7 +90,7 @@ module.exports.selectShippingAddress = async (req: Request, res: Response, next:
       if (shippingAddress && shippingAddress.length > 0) {
 
          const result = await User.findOneAndUpdate(
-            { email: userEmail },
+            { email: authEmail },
             {
                $set: {
                   "buyer.shippingAddress.$[j].default_shipping_address": false,
@@ -111,7 +111,7 @@ module.exports.selectShippingAddress = async (req: Request, res: Response, next:
             });
          }
 
-         return res.status(200).send({ success: true, statusCode: 200, message: "Shipping address Saved." });
+         return res.status(200).send({ success: true, statusCode: 200, message: "Default shipping address selected." });
       }
    } catch (error: any) {
       next(error);
