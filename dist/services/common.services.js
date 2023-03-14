@@ -204,6 +204,7 @@ module.exports.basicProductProject = {
     title: "$variations.vTitle",
     slug: 1,
     brand: 1,
+    categories: 1,
     packageInfo: 1,
     rating: 1,
     ratingAverage: 1,
@@ -212,6 +213,8 @@ module.exports.basicProductProject = {
     image: { $first: "$images" },
     _VID: "$variations._VID",
     stock: "$variations.stock",
+    variant: "$variations.variant",
+    shipping: 1,
     pricing: {
         sellingPrice: { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] },
         price: "$pricing.price",
