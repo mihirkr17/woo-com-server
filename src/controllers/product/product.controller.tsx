@@ -160,6 +160,19 @@ module.exports.productsByCategoryController = async (req: Request, res: Response
 
 
       const products = await Product.aggregate([
+         {
+            $addFields: {
+               variations: {
+                  $slice: [{
+                     $filter: {
+                        input: "$variations",
+                        cond: { $and: [{ $eq: ["$$v.status", 'active'] }, { $eq: ["$$v.stock", "in"] }] },
+                        as: "v"
+                     }
+                  }, 1]
+               },
+            }
+         },
          { $unwind: { path: '$variations' } },
          {
             $match: {

@@ -145,6 +145,19 @@ module.exports.productsByCategoryController = (req, res, next) => __awaiter(void
             sorting = { $sort: { "variations.modifiedAt": 1 } };
         }
         const products = yield Product.aggregate([
+            {
+                $addFields: {
+                    variations: {
+                        $slice: [{
+                                $filter: {
+                                    input: "$variations",
+                                    cond: { $and: [{ $eq: ["$$v.status", 'active'] }, { $eq: ["$$v.stock", "in"] }] },
+                                    as: "v"
+                                }
+                            }, 1]
+                    },
+                }
+            },
             { $unwind: { path: '$variations' } },
             {
                 $match: {
