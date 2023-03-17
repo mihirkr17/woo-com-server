@@ -123,7 +123,6 @@ module.exports.userVerifyTokenController = (req, res, next) => __awaiter(void 0,
 module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _b, _c;
     try {
-        // const verify_token: string = req.headers.authorization?.split(' ')[1] || "";
         const { emailOrPhone, password, authProvider } = req.body;
         let token;
         let userDataToken;
@@ -212,7 +211,6 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
 module.exports.signOutController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         res.clearCookie("token");
-        res.clearCookie("u_data");
         res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
     }
     catch (error) {

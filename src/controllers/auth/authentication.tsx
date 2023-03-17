@@ -145,7 +145,7 @@ module.exports.userVerifyTokenController = async (req: Request, res: Response, n
  */
 module.exports.loginController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      // const verify_token: string = req.headers.authorization?.split(' ')[1] || "";
+
       const { emailOrPhone, password, authProvider } = req.body;
       let token: String;
       let userDataToken: any;
@@ -238,7 +238,6 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 
          // if all success then return the response
          return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: existUser?._UUID, u_data: userDataToken });
-
       }
    } catch (error: any) {
       return next(error);
@@ -254,7 +253,6 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 module.exports.signOutController = async (req: Request, res: Response, next: NextFunction) => {
    try {
       res.clearCookie("token");
-      res.clearCookie("u_data");
       res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
    } catch (error: any) {
       next(error);
