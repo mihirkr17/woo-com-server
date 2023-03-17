@@ -1,15 +1,15 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
 const authCTRL = require("../controllers/auth/authentication");
-const formInputValidator = require("../middleware/FormInputValidator.middleware");
 const { verifyJWT } = require("../middleware/Auth.middleware");
+const { loginMDL, registrationMDL } = require("../middleware/authentication.mdl");
 
 
 try {
 
-   router.post("/register-new-user", formInputValidator.validateBuyerRegistrationInputs, authCTRL.buyerRegistrationController);
+   router.post("/register-new-user", registrationMDL, authCTRL.buyerRegistrationController);
 
-   router.post("/login", authCTRL.loginController);
+   router.post("/login", loginMDL, authCTRL.loginController);
 
    router.post("/sign-out", authCTRL.signOutController);
 

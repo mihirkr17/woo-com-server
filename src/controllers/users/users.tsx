@@ -169,7 +169,7 @@ module.exports.makeSellerRequest = async (req: Request, res: Response, next: any
 
 
 // Permit the seller request
-module.exports.permitSellerRequest = async (req: Request, res: Response, next: any) => {
+module.exports.permitSellerRequest = async (req: Request, res: Response, next: NextFunction) => {
    try {
       const userId = req.headers.authorization?.split(',')[0];
       const UUID = req.headers.authorization?.split(',')[1];

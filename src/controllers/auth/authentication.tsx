@@ -24,7 +24,7 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
       let existUser = await User.findOne({ $or: [{ phone: body?.phone }, { email: body.email }] });
 
       if (existUser) {
-         throw new apiResponse.Api400Error("RegistrationError", "User already exists, Please try another phone number or email address !");
+         throw new apiResponse.Api400Error("AuthError", "User already exists, Please try another phone number or email address !");
       }
 
       body['_UUID'] = Math.random().toString(36).toUpperCase().slice(2, 18);
@@ -124,10 +124,10 @@ module.exports.userVerifyTokenController = async (req: Request, res: Response, n
       if (existUser.verifyToken && (verify_token && typeof verify_token !== 'undefined')) {
 
          if (existUser?.verifyToken !== verify_token) {
-            return res.status(400).send({ success: false, statusCode: 400, error: 'Invalid token !!!' });
+            throw new apiResponse.Api400Error("AuthError", "Invalid verify token !")
          }
 
-         await User.updateOne(
+         await User.findOneAndUpdate(
             { verifyToken: verify_token },
             {
                $unset: { verifyToken: 1 },
@@ -137,7 +137,7 @@ module.exports.userVerifyTokenController = async (req: Request, res: Response, n
 
          res.clearCookie('verifyToken');
 
-         return res.status(200).send({ success: true, statusCode: 200, message: "User verified.", data: { username: existUser?.username } });
+         return res.status(200).send({ success: true, statusCode: 200, message: "User verified.", data: { email: existUser?.email } });
       }
    } catch (error) {
       next(error);
@@ -260,6 +260,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 
       if (token) {
          res.cookie("token", token, cookieObject);
+         res.cookie("u_data", userDataToken, { httpOnly: false, maxAge: 57600000 });
 
          // if all success then return the response
          return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: existUser?._UUID, u_data: userDataToken });

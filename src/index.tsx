@@ -13,7 +13,7 @@ const wishlistRoutes = require("./routes/wishlist.route");
 const dashboardRoutes = require("./routes/dashboard.route");
 const paymentRoutes = require("./routes/payment.route");
 const returnErrors = require("./errors/errors");
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 9000;
 
 
 // Server setup
