@@ -58,7 +58,9 @@ module.exports = function FetchAuthUser(req, res, next) {
                 contactEmail: user === null || user === void 0 ? void 0 : user.contactEmail,
                 buyer: user === null || user === void 0 ? void 0 : user.buyer
             };
-            return res.status(200).send({ success: true, statusCode: 200, message: 'Welcome ' + (user === null || user === void 0 ? void 0 : user.fullName), data: user, ipAddress, u_data: setUserDataToken(newUser) });
+            let userDataToken = setUserDataToken(newUser);
+            res.cookie("u_data", userDataToken, { httpOnly: false, maxAge: 57600000, sameSite: "none" });
+            return res.status(200).send({ success: true, statusCode: 200, message: 'Welcome ' + (user === null || user === void 0 ? void 0 : user.fullName), data: user, ipAddress, u_data: userDataToken });
         }
         catch (error) {
             next(error);
