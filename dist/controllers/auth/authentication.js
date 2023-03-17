@@ -39,7 +39,7 @@ module.exports.buyerRegistrationController = (req, res, next) => __awaiter(void 
         if (!result) {
             throw new apiResponse.Api500Error("ServerError", "Something went wrong !");
         }
-        res.cookie("verifyToken", result === null || result === void 0 ? void 0 : result.verifyToken, { maxAge: 3600000, httpOnly: false });
+        res.cookie("verifyToken", result === null || result === void 0 ? void 0 : result.verifyToken, { maxAge: 3600000, httpOnly: false, secure: true, sameSite: "none" });
         return res.status(200).send({
             success: true,
             statusCode: 200,
@@ -171,7 +171,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
                 throw new apiResponse.Api400Error("LoginError", "Password didn't match !");
             }
             if (existUser.verifyToken && !verify_token) {
-                res.cookie("verifyToken", existUser.verifyToken, { maxAge: 3600000, httpOnly: false });
+                res.cookie("verifyToken", existUser.verifyToken, { maxAge: 3600000, httpOnly: false, secure: true, sameSite: "none" });
                 return res.send({ success: true, statusCode: 200, message: 'verifyTokenOnCookie' });
             }
             // next condition
@@ -204,11 +204,11 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
                     buyer: existUser === null || existUser === void 0 ? void 0 : existUser.buyer
                 };
                 userDataToken = setUserDataToken(user);
+                res.cookie("u_data", userDataToken, { httpOnly: false, maxAge: 57600000, sameSite: "none", secure: true });
             }
         }
         if (token) {
             res.cookie("token", token, cookieObject);
-            res.cookie("u_data", userDataToken, { httpOnly: false, maxAge: 57600000, sameSite: "none" });
             // if all success then return the response
             return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: existUser === null || existUser === void 0 ? void 0 : existUser._UUID, u_data: userDataToken });
         }
@@ -225,6 +225,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
 module.exports.signOutController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         res.clearCookie("token");
+        res.clearCookie("u_data");
         res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
     }
     catch (error) {

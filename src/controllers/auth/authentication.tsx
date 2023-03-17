@@ -41,7 +41,7 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
          throw new apiResponse.Api500Error("ServerError", "Something went wrong !");
       }
 
-      res.cookie("verifyToken", result?.verifyToken, { maxAge: 3600000, httpOnly: false });
+      res.cookie("verifyToken", result?.verifyToken, { maxAge: 3600000, httpOnly: false, secure: true, sameSite: "none" });
 
       return res.status(200).send({
          success: true,
@@ -211,7 +211,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
          }
 
          if (existUser.verifyToken && !verify_token) {
-            res.cookie("verifyToken", existUser.verifyToken, { maxAge: 3600000, httpOnly: false });
+            res.cookie("verifyToken", existUser.verifyToken, { maxAge: 3600000, httpOnly: false, secure: true, sameSite: "none" });
 
             return res.send({ success: true, statusCode: 200, message: 'verifyTokenOnCookie' });
          }
@@ -255,12 +255,12 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 
 
             userDataToken = setUserDataToken(user);
+            res.cookie("u_data", userDataToken, { httpOnly: false, maxAge: 57600000, sameSite: "none", secure: true });
          }
       }
 
       if (token) {
          res.cookie("token", token, cookieObject);
-         res.cookie("u_data", userDataToken, { httpOnly: false, maxAge: 57600000, sameSite: "none" });
 
          // if all success then return the response
          return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: existUser?._UUID, u_data: userDataToken });
@@ -280,6 +280,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 module.exports.signOutController = async (req: Request, res: Response, next: NextFunction) => {
    try {
       res.clearCookie("token");
+      res.clearCookie("u_data");
       res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
    } catch (error: any) {
       next(error);
