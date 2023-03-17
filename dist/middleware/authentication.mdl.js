@@ -12,7 +12,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const response = require("../errors/apiResponse");
 module.exports.loginMDL = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     const { emailOrPhone, password, authProvider } = req.body;
-    const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/;
     if (authProvider === "thirdParty") {
         next();
         return;
@@ -28,9 +27,6 @@ module.exports.loginMDL = (req, res, next) => __awaiter(void 0, void 0, void 0, 
     }
     else if (password.length < 5 || password.length > 8) {
         throw new response.Api400Error("ClientError", "Password length should be 5 to 8 characters !");
-    }
-    else if (!passwordRegex.test(password)) {
-        throw new response.Api400Error("ClientError", "Password should contains at least 1 digit, lowercase letter, special character !");
     }
     else {
         next();
