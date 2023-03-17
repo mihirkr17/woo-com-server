@@ -20,7 +20,7 @@ module.exports.loginMDL = async (req: Request, res: Response, next: NextFunction
       throw new response.Api400Error("ClientError", "Required password !");
    }
 
-   else if (password && typeof password !== "string") {
+   else if (typeof password !== "string") {
       throw new response.Api400Error("ClientError", "Password should be string !");
    }
 

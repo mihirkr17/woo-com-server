@@ -23,7 +23,7 @@ module.exports.loginMDL = (req, res, next) => __awaiter(void 0, void 0, void 0, 
     else if (!password) {
         throw new response.Api400Error("ClientError", "Required password !");
     }
-    else if (password && typeof password !== "string") {
+    else if (typeof password !== "string") {
         throw new response.Api400Error("ClientError", "Password should be string !");
     }
     else if (password.length < 5 || password.length > 8) {
