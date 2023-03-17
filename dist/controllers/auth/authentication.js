@@ -121,9 +121,9 @@ module.exports.userVerifyTokenController = (req, res, next) => __awaiter(void 0,
  * @apiRequired --> BODY
  */
 module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _b, _c, _d;
+    var _b, _c;
     try {
-        const verify_token = ((_b = req.headers.authorization) === null || _b === void 0 ? void 0 : _b.split(' ')[1]) || "";
+        // const verify_token: string = req.headers.authorization?.split(' ')[1] || "";
         const { emailOrPhone, password, authProvider } = req.body;
         let token;
         let userDataToken;
@@ -168,20 +168,20 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
             if (!comparedPassword) {
                 throw new apiResponse.Api400Error("LoginError", "Password didn't match !");
             }
-            if (existUser.verifyToken && !verify_token && verify_token === "") {
+            if (existUser.verifyToken && (existUser === null || existUser === void 0 ? void 0 : existUser.accountStatus) === "inactive") {
                 return res.status(200).send({ success: true, statusCode: 200, message: 'Verify token send....', verifyToken: existUser.verifyToken });
             }
             // next condition
-            if (existUser.verifyToken && verify_token) {
-                if (verify_token !== (existUser === null || existUser === void 0 ? void 0 : existUser.verifyToken)) {
-                    throw new apiResponse.Api400Error("TokenError", 'Required valid token !');
-                }
-                yield User.findOneAndUpdate({ email: emailOrPhone }, { $unset: { verifyToken: 1 }, $set: { accountStatus: 'active' } });
-            }
+            // if (existUser.verifyToken && verify_token) {
+            //    if (verify_token !== existUser?.verifyToken) {
+            //       throw new apiResponse.Api400Error("TokenError", 'Required valid token !');
+            //    }
+            //    await User.findOneAndUpdate({ email: emailOrPhone }, { $unset: { verifyToken: 1 }, $set: { accountStatus: 'active' } });
+            // }
             token = setToken(existUser);
             if ((existUser === null || existUser === void 0 ? void 0 : existUser.role) && (existUser === null || existUser === void 0 ? void 0 : existUser.role) === "BUYER") {
-                existUser.buyer["defaultShippingAddress"] = (Array.isArray((_c = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress) &&
-                    ((_d = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _d === void 0 ? void 0 : _d.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
+                existUser.buyer["defaultShippingAddress"] = (Array.isArray((_b = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress) &&
+                    ((_c = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
                 existUser.buyer["shoppingCartItems"] = (yield ShoppingCart.countDocuments({ customerEmail: existUser === null || existUser === void 0 ? void 0 : existUser.email })) || 0;
                 userDataToken = setUserDataToken({
                     _UUID: existUser === null || existUser === void 0 ? void 0 : existUser._UUID,
