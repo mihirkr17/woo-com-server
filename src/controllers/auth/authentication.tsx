@@ -28,10 +28,9 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
       }
 
       body['_UUID'] = Math.random().toString(36).toUpperCase().slice(2, 18);
-
       body['verifyToken'] = generateVerifyToken();
-
       body['idFor'] = 'buy';
+      body["buyer"] = {};
 
       let user = new User(body);
 
@@ -71,12 +70,10 @@ module.exports.sellerRegistrationController = async (req: Request, res: Response
       }
 
       body['_UUID'] = Math.random().toString(36).toUpperCase().slice(2, 18);
-
       body['authProvider'] = 'system';
-
       body['isSeller'] = 'pending';
-
       body['idFor'] = 'sell';
+      body["seller"] = {};
 
       let user = new User(body);
 
@@ -110,7 +107,7 @@ module.exports.userVerifyTokenController = async (req: Request, res: Response, n
       const existUser = await User.findOne({ verifyToken: verify_token });
 
       if (!existUser) {
-         throw new apiResponse.Api400Error("VerifyTokenError", "Sorry, User not found !");
+         throw new apiResponse.Api404Error("AuthError", "Sorry, User not found !");
       }
 
       if (existUser.verifyToken && !verify_token) {
@@ -121,7 +118,7 @@ module.exports.userVerifyTokenController = async (req: Request, res: Response, n
       if (existUser.verifyToken && (verify_token && typeof verify_token !== 'undefined')) {
 
          if (existUser?.verifyToken !== verify_token) {
-            throw new apiResponse.Api400Error("VerifyTokenError", "Invalid verify token !")
+            throw new apiResponse.Api400Error("TokenError", "Invalid verify token !")
          }
 
          await User.findOneAndUpdate(
@@ -215,7 +212,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
                throw new apiResponse.Api400Error("TokenError", 'Required valid token !');
             }
 
-            await User.updateOne({ email: emailOrPhone }, { $unset: { verifyToken: 1 }, $set: { accountStatus: 'active' } });
+            await User.findOneAndUpdate({ email: emailOrPhone }, { $unset: { verifyToken: 1 }, $set: { accountStatus: 'active' } });
          }
 
          token = setToken(existUser);
@@ -227,7 +224,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 
             existUser.buyer["shoppingCartItems"] = await ShoppingCart.countDocuments({ customerEmail: existUser?.email }) || 0;
 
-            let user = {
+            userDataToken = setUserDataToken({
                _UUID: existUser?._UUID,
                fullName: existUser?.fullName,
                email: existUser?.email,
@@ -242,10 +239,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
                authProvider: existUser?.authProvider,
                contactEmail: existUser?.contactEmail,
                buyer: existUser?.buyer
-            };
-
-
-            userDataToken = setUserDataToken(user);
+            });
          }
       }
 

@@ -34,6 +34,7 @@ module.exports.buyerRegistrationController = (req, res, next) => __awaiter(void 
         body['_UUID'] = Math.random().toString(36).toUpperCase().slice(2, 18);
         body['verifyToken'] = generateVerifyToken();
         body['idFor'] = 'buy';
+        body["buyer"] = {};
         let user = new User(body);
         const result = yield user.save();
         if (!result) {
@@ -66,6 +67,7 @@ module.exports.sellerRegistrationController = (req, res, next) => __awaiter(void
         body['authProvider'] = 'system';
         body['isSeller'] = 'pending';
         body['idFor'] = 'sell';
+        body["seller"] = {};
         let user = new User(body);
         const result = yield user.save();
         if (!result) {
@@ -92,7 +94,7 @@ module.exports.userVerifyTokenController = (req, res, next) => __awaiter(void 0,
         const verify_token = ((_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(' ')[1]) || undefined;
         const existUser = yield User.findOne({ verifyToken: verify_token });
         if (!existUser) {
-            throw new apiResponse.Api400Error("VerifyTokenError", "Sorry, User not found !");
+            throw new apiResponse.Api404Error("AuthError", "Sorry, User not found !");
         }
         if (existUser.verifyToken && !verify_token) {
             return res.status(200).send({ success: true, statusCode: 200, message: 'Verify token send....', verifyToken: existUser.verifyToken });
@@ -100,7 +102,7 @@ module.exports.userVerifyTokenController = (req, res, next) => __awaiter(void 0,
         // next condition
         if (existUser.verifyToken && (verify_token && typeof verify_token !== 'undefined')) {
             if ((existUser === null || existUser === void 0 ? void 0 : existUser.verifyToken) !== verify_token) {
-                throw new apiResponse.Api400Error("VerifyTokenError", "Invalid verify token !");
+                throw new apiResponse.Api400Error("TokenError", "Invalid verify token !");
             }
             yield User.findOneAndUpdate({ verifyToken: verify_token }, {
                 $unset: { verifyToken: 1 },
@@ -174,14 +176,14 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
                 if ((existUser === null || existUser === void 0 ? void 0 : existUser.verifyToken) !== verify_token) {
                     throw new apiResponse.Api400Error("TokenError", 'Required valid token !');
                 }
-                yield User.updateOne({ email: emailOrPhone }, { $unset: { verifyToken: 1 }, $set: { accountStatus: 'active' } });
+                yield User.findOneAndUpdate({ email: emailOrPhone }, { $unset: { verifyToken: 1 }, $set: { accountStatus: 'active' } });
             }
             token = setToken(existUser);
             if ((existUser === null || existUser === void 0 ? void 0 : existUser.role) && (existUser === null || existUser === void 0 ? void 0 : existUser.role) === "BUYER") {
                 existUser.buyer["defaultShippingAddress"] = (Array.isArray((_c = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress) &&
                     ((_d = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _d === void 0 ? void 0 : _d.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
                 existUser.buyer["shoppingCartItems"] = (yield ShoppingCart.countDocuments({ customerEmail: existUser === null || existUser === void 0 ? void 0 : existUser.email })) || 0;
-                let user = {
+                userDataToken = setUserDataToken({
                     _UUID: existUser === null || existUser === void 0 ? void 0 : existUser._UUID,
                     fullName: existUser === null || existUser === void 0 ? void 0 : existUser.fullName,
                     email: existUser === null || existUser === void 0 ? void 0 : existUser.email,
@@ -196,8 +198,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
                     authProvider: existUser === null || existUser === void 0 ? void 0 : existUser.authProvider,
                     contactEmail: existUser === null || existUser === void 0 ? void 0 : existUser.contactEmail,
                     buyer: existUser === null || existUser === void 0 ? void 0 : existUser.buyer
-                };
-                userDataToken = setUserDataToken(user);
+                });
             }
         }
         if (token) {

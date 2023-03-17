@@ -42,7 +42,7 @@ module.exports = function FetchAuthUser(req, res, next) {
                     ((_d = user === null || user === void 0 ? void 0 : user.buyer) === null || _d === void 0 ? void 0 : _d.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
                 user.buyer["shoppingCartItems"] = (yield ShoppingCart.countDocuments({ customerEmail: user === null || user === void 0 ? void 0 : user.email })) || 0;
             }
-            let newUser = {
+            let userDataToken = setUserDataToken({
                 _UUID: user === null || user === void 0 ? void 0 : user._UUID,
                 fullName: user === null || user === void 0 ? void 0 : user.fullName,
                 email: user === null || user === void 0 ? void 0 : user.email,
@@ -57,9 +57,7 @@ module.exports = function FetchAuthUser(req, res, next) {
                 authProvider: user === null || user === void 0 ? void 0 : user.authProvider,
                 contactEmail: user === null || user === void 0 ? void 0 : user.contactEmail,
                 buyer: user === null || user === void 0 ? void 0 : user.buyer
-            };
-            let userDataToken = setUserDataToken(newUser);
-            // res.cookie("u_data", userDataToken, { httpOnly: false, maxAge: 57600000, secure: true, sameSite: "none" });
+            });
             return res.status(200).send({ success: true, statusCode: 200, message: 'Welcome ' + (user === null || user === void 0 ? void 0 : user.fullName), data: user, ipAddress, u_data: userDataToken });
         }
         catch (error) {

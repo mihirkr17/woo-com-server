@@ -44,7 +44,7 @@ module.exports = async function FetchAuthUser(req: Request, res: Response, next:
          user.buyer["shoppingCartItems"] = await ShoppingCart.countDocuments({ customerEmail: user?.email }) || 0;
       }
 
-      let newUser = {
+      let userDataToken = setUserDataToken({
          _UUID: user?._UUID,
          fullName: user?.fullName,
          email: user?.email,
@@ -59,12 +59,7 @@ module.exports = async function FetchAuthUser(req: Request, res: Response, next:
          authProvider: user?.authProvider,
          contactEmail: user?.contactEmail,
          buyer: user?.buyer
-      };
-
-
-      let userDataToken = setUserDataToken(newUser);
-
-      // res.cookie("u_data", userDataToken, { httpOnly: false, maxAge: 57600000, secure: true, sameSite: "none" });
+      });
 
       return res.status(200).send({ success: true, statusCode: 200, message: 'Welcome ' + user?.fullName, data: user, ipAddress, u_data: userDataToken });
 
