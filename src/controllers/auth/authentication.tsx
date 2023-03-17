@@ -98,7 +98,7 @@ module.exports.sellerRegistrationController = async (req: Request, res: Response
 
 
 /**
- * @controller --> registration verify
+ * @controller --> registration verify by token
  */
 module.exports.userVerifyTokenController = async (req: Request, res: Response, next: NextFunction) => {
    try {
@@ -204,17 +204,6 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
          if (existUser.verifyToken && existUser?.accountStatus === "inactive") {
             return res.status(200).send({ success: true, statusCode: 200, message: 'Verify token send....', verifyToken: existUser.verifyToken });
          }
-
-         
-         // next condition
-         // if (existUser.verifyToken && verify_token) {
-
-         //    if (verify_token !== existUser?.verifyToken) {
-         //       throw new apiResponse.Api400Error("TokenError", 'Required valid token !');
-         //    }
-
-         //    await User.findOneAndUpdate({ email: emailOrPhone }, { $unset: { verifyToken: 1 }, $set: { accountStatus: 'active' } });
-         // }
 
          token = setToken(existUser);
 
