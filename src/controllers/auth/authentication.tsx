@@ -145,7 +145,7 @@ module.exports.userVerifyTokenController = async (req: Request, res: Response, n
  */
 module.exports.loginController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const verify_token = req.headers.authorization?.split(' ')[1] || undefined;
+      const verify_token: string = req.headers.authorization?.split(' ')[1] || "";
       const { emailOrPhone, password, authProvider } = req.body;
       let token: String;
       let userDataToken: any;
@@ -206,7 +206,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
          }
 
          // next condition
-         if (existUser.verifyToken && (verify_token && typeof verify_token !== 'undefined')) {
+         if (existUser.verifyToken && verify_token) {
 
             if (existUser?.verifyToken !== verify_token) {
                throw new apiResponse.Api400Error("TokenError", 'Required valid token !');

@@ -123,7 +123,7 @@ module.exports.userVerifyTokenController = (req, res, next) => __awaiter(void 0,
 module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _b, _c, _d;
     try {
-        const verify_token = ((_b = req.headers.authorization) === null || _b === void 0 ? void 0 : _b.split(' ')[1]) || undefined;
+        const verify_token = ((_b = req.headers.authorization) === null || _b === void 0 ? void 0 : _b.split(' ')[1]) || "";
         const { emailOrPhone, password, authProvider } = req.body;
         let token;
         let userDataToken;
@@ -172,7 +172,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
                 return res.status(200).send({ success: true, statusCode: 200, message: 'Verify token send....', verifyToken: existUser.verifyToken });
             }
             // next condition
-            if (existUser.verifyToken && (verify_token && typeof verify_token !== 'undefined')) {
+            if (existUser.verifyToken && verify_token) {
                 if ((existUser === null || existUser === void 0 ? void 0 : existUser.verifyToken) !== verify_token) {
                     throw new apiResponse.Api400Error("TokenError", 'Required valid token !');
                 }
