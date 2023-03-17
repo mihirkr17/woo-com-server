@@ -111,6 +111,7 @@ UserSchema.pre("save", function (next) {
         this.contactEmail = emailAddr;
         this.password = hashedPwd;
         this.hasPassword = true;
+        this.accountStatus = "inactive";
         next();
     });
 });

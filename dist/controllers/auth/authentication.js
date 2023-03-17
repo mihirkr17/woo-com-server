@@ -39,7 +39,6 @@ module.exports.buyerRegistrationController = (req, res, next) => __awaiter(void 
         if (!result) {
             throw new apiResponse.Api500Error("ServerError", "Something went wrong !");
         }
-        res.cookie("verifyToken", result === null || result === void 0 ? void 0 : result.verifyToken, { maxAge: 3600000, httpOnly: false, secure: true, sameSite: "none" });
         return res.status(200).send({
             success: true,
             statusCode: 200,
@@ -48,7 +47,7 @@ module.exports.buyerRegistrationController = (req, res, next) => __awaiter(void 
         });
     }
     catch (error) {
-        return next(error);
+        next(error);
     }
 });
 /**
@@ -96,19 +95,17 @@ module.exports.userVerifyTokenController = (req, res, next) => __awaiter(void 0,
             throw new apiResponse.Api400Error("VerifyTokenError", "Sorry, User not found !");
         }
         if (existUser.verifyToken && !verify_token) {
-            res.cookie("verifyToken", existUser.verifyToken, { maxAge: 3600000, httpOnly: false });
-            return res.send({ success: true, statusCode: 200, message: 'verifyTokenOnCookie' });
+            return res.status(200).send({ success: true, statusCode: 200, message: 'Verify token send....', verifyToken: existUser.verifyToken });
         }
         // next condition
         if (existUser.verifyToken && (verify_token && typeof verify_token !== 'undefined')) {
             if ((existUser === null || existUser === void 0 ? void 0 : existUser.verifyToken) !== verify_token) {
-                throw new apiResponse.Api400Error("AuthError", "Invalid verify token !");
+                throw new apiResponse.Api400Error("VerifyTokenError", "Invalid verify token !");
             }
             yield User.findOneAndUpdate({ verifyToken: verify_token }, {
                 $unset: { verifyToken: 1 },
                 $set: { accountStatus: 'active' }
             });
-            res.clearCookie('verifyToken');
             return res.status(200).send({ success: true, statusCode: 200, message: "User verified.", data: { email: existUser === null || existUser === void 0 ? void 0 : existUser.email } });
         }
     }
@@ -145,8 +142,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
         const existUser = yield User.findOne({
             $and: [
                 { $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] },
-                { authProvider: provider },
-                { accountStatus: 'active' }
+                { authProvider: provider }
             ]
         });
         /// third party login system like --> Google
@@ -171,8 +167,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
                 throw new apiResponse.Api400Error("LoginError", "Password didn't match !");
             }
             if (existUser.verifyToken && !verify_token) {
-                res.cookie("verifyToken", existUser.verifyToken, { maxAge: 3600000, httpOnly: false, secure: true, sameSite: "none" });
-                return res.send({ success: true, statusCode: 200, message: 'verifyTokenOnCookie' });
+                return res.status(200).send({ success: true, statusCode: 200, message: 'Verify token send....', verifyToken: existUser.verifyToken });
             }
             // next condition
             if (existUser.verifyToken && (verify_token && typeof verify_token !== 'undefined')) {
@@ -180,7 +175,6 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
                     throw new apiResponse.Api400Error("TokenError", 'Required valid token !');
                 }
                 yield User.updateOne({ email: emailOrPhone }, { $unset: { verifyToken: 1 }, $set: { accountStatus: 'active' } });
-                res.clearCookie('verifyToken');
             }
             token = setToken(existUser);
             if ((existUser === null || existUser === void 0 ? void 0 : existUser.role) && (existUser === null || existUser === void 0 ? void 0 : existUser.role) === "BUYER") {
@@ -204,7 +198,6 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
                     buyer: existUser === null || existUser === void 0 ? void 0 : existUser.buyer
                 };
                 userDataToken = setUserDataToken(user);
-                res.cookie("u_data", userDataToken, { httpOnly: false, maxAge: 57600000, sameSite: "none", secure: true });
             }
         }
         if (token) {

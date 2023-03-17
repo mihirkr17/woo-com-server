@@ -150,6 +150,7 @@ UserSchema.pre("save", async function (next: any) {
   this.contactEmail = emailAddr;
   this.password = hashedPwd;
   this.hasPassword = true;
+  this.accountStatus = "inactive";
 
   next();
 });

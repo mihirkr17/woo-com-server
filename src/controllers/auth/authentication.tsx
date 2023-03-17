@@ -41,8 +41,6 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
          throw new apiResponse.Api500Error("ServerError", "Something went wrong !");
       }
 
-      res.cookie("verifyToken", result?.verifyToken, { maxAge: 3600000, httpOnly: false, secure: true, sameSite: "none" });
-
       return res.status(200).send({
          success: true,
          statusCode: 200,
@@ -50,7 +48,7 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
          data: { phone: result?.phone, verifyToken: result?.verifyToken, email: result?.email }
       });
    } catch (error: any) {
-      return next(error);
+      next(error);
    }
 };
 
@@ -116,15 +114,14 @@ module.exports.userVerifyTokenController = async (req: Request, res: Response, n
       }
 
       if (existUser.verifyToken && !verify_token) {
-         res.cookie("verifyToken", existUser.verifyToken, { maxAge: 3600000, httpOnly: false });
-         return res.send({ success: true, statusCode: 200, message: 'verifyTokenOnCookie' });
+         return res.status(200).send({ success: true, statusCode: 200, message: 'Verify token send....', verifyToken: existUser.verifyToken });
       }
 
       // next condition
       if (existUser.verifyToken && (verify_token && typeof verify_token !== 'undefined')) {
 
          if (existUser?.verifyToken !== verify_token) {
-            throw new apiResponse.Api400Error("AuthError", "Invalid verify token !")
+            throw new apiResponse.Api400Error("VerifyTokenError", "Invalid verify token !")
          }
 
          await User.findOneAndUpdate(
@@ -134,8 +131,6 @@ module.exports.userVerifyTokenController = async (req: Request, res: Response, n
                $set: { accountStatus: 'active' }
             }
          );
-
-         res.clearCookie('verifyToken');
 
          return res.status(200).send({ success: true, statusCode: 200, message: "User verified.", data: { email: existUser?.email } });
       }
@@ -176,8 +171,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
       const existUser = await User.findOne({
          $and: [
             { $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] },
-            { authProvider: provider },
-            { accountStatus: 'active' }
+            { authProvider: provider }
          ]
       });
 
@@ -211,9 +205,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
          }
 
          if (existUser.verifyToken && !verify_token) {
-            res.cookie("verifyToken", existUser.verifyToken, { maxAge: 3600000, httpOnly: false, secure: true, sameSite: "none" });
-
-            return res.send({ success: true, statusCode: 200, message: 'verifyTokenOnCookie' });
+            return res.status(200).send({ success: true, statusCode: 200, message: 'Verify token send....', verifyToken: existUser.verifyToken });
          }
 
          // next condition
@@ -224,7 +216,6 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
             }
 
             await User.updateOne({ email: emailOrPhone }, { $unset: { verifyToken: 1 }, $set: { accountStatus: 'active' } });
-            res.clearCookie('verifyToken');
          }
 
          token = setToken(existUser);
@@ -255,7 +246,6 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 
 
             userDataToken = setUserDataToken(user);
-            res.cookie("u_data", userDataToken, { httpOnly: false, maxAge: 57600000, sameSite: "none", secure: true });
          }
       }
 
