@@ -133,7 +133,8 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
             secure: true,
             maxAge: 57600000,
             httpOnly: true,
-            domain: "https://wookart.vercel.app/"
+            domain: "https://wookart.vercel.app/",
+            path: "/"
         };
         if (typeof authProvider === 'undefined' || !authProvider) {
             provider = 'system';

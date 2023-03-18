@@ -155,9 +155,10 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
       const cookieObject: any = {
          sameSite: "none",
          secure: true,
-         maxAge: 57600000, // 16hr [3600000 -> 1hr]ms
+         maxAge: 57600000,  // 16hr [3600000 -> 1hr]ms
          httpOnly: true,
-         domain: "https://wookart.vercel.app/"
+         domain: "https://wookart.vercel.app/", // https://wookart.vercel.app/ client domain
+         path: "/"
       };
 
       if (typeof authProvider === 'undefined' || !authProvider) {
