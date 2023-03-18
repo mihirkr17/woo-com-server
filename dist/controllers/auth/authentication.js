@@ -175,7 +175,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
             if ((existUser === null || existUser === void 0 ? void 0 : existUser.role) && (existUser === null || existUser === void 0 ? void 0 : existUser.role) === "BUYER") {
                 existUser.buyer["defaultShippingAddress"] = (Array.isArray((_b = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress) &&
                     ((_c = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0])) || {};
-                existUser.buyer["shoppingCartItems"] = (yield ShoppingCart.find({ customerEmail: existUser === null || existUser === void 0 ? void 0 : existUser.email })) || [];
+                existUser.buyer["shoppingCartItems"] = (yield ShoppingCart.countDocuments({ customerEmail: existUser === null || existUser === void 0 ? void 0 : existUser.email })) || 0;
                 userDataToken = setUserDataToken({
                     _uuid: existUser === null || existUser === void 0 ? void 0 : existUser._uuid,
                     fullName: existUser === null || existUser === void 0 ? void 0 : existUser.fullName,

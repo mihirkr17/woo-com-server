@@ -31,7 +31,7 @@ module.exports = function FetchAuthUser(req, res, next) {
             if (user && (user === null || user === void 0 ? void 0 : user.role) === 'BUYER' && (user === null || user === void 0 ? void 0 : user.idFor) === 'buy') {
                 user.buyer["defaultShippingAddress"] = (Array.isArray((_c = user === null || user === void 0 ? void 0 : user.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress) &&
                     ((_d = user === null || user === void 0 ? void 0 : user.buyer) === null || _d === void 0 ? void 0 : _d.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0])) || {};
-                user.buyer["shoppingCartItems"] = (yield ShoppingCart.find({ customerEmail: user === null || user === void 0 ? void 0 : user.email })) || [];
+                user.buyer["shoppingCartItems"] = (yield ShoppingCart.countDocuments({ customerEmail: user === null || user === void 0 ? void 0 : user.email })) || 0;
                 userDataToken = setUserDataToken({
                     _uuid: user === null || user === void 0 ? void 0 : user._uuid,
                     fullName: user === null || user === void 0 ? void 0 : user.fullName,

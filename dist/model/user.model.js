@@ -17,7 +17,7 @@ const buyerType = new mongoose_1.Schema({
     taxId: { type: String },
     defaultShippingAddress: { type: Object },
     shoppingCartItems: { type: Array },
-    wishlist: { type: Array },
+    wishlist: { type: Number },
     shippingAddress: [
         {
             _id: false,

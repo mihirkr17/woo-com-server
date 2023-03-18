@@ -221,7 +221,7 @@ module.exports.basicProductProject = {
         discount: { $toInt: { $multiply: [{ $divide: [{ $subtract: ["$pricing.price", { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] }] }, "$pricing.price"] }, 100] } }
     }
 };
-module.exports.calculateShippingCost = (volWeight, areaType) => {
+module.exports.calculateShippingCost = (volWeight, areaType = "") => {
     let n = 0; // price initial 0.5 kg = 0.5 dollar
     let charge;
     let arr = [];

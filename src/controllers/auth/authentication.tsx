@@ -212,7 +212,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
             existUser.buyer["defaultShippingAddress"] = (Array.isArray(existUser?.buyer?.shippingAddress) &&
                existUser?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]) || {};
 
-            existUser.buyer["shoppingCartItems"] = await ShoppingCart.find({ customerEmail: existUser?.email }) || [];
+            existUser.buyer["shoppingCartItems"] = await ShoppingCart.countDocuments({ customerEmail: existUser?.email }) || 0;
 
             userDataToken = setUserDataToken({
                _uuid: existUser?._uuid,

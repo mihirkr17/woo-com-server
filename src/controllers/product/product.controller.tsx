@@ -18,37 +18,25 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
 
       const productID = req.query?.pId;
       const variationID = req.query?.vId;
-      // let existProductInCart: any = null;
+      let existProductInCart: any = null;
       let areaType: any;
 
-      // const token: any = req.cookies.token;
-
-      // let uuid: any = null;
-
-      // if (token && typeof token !== "undefined") {
-      //    jwt.verify(token, process.env.ACCESS_TOKEN, (err: any, decoded: any) => {
-      //       if (err) {
-      //          uuid = null;
-      //       } else {
-      //          uuid = decoded?._uuid || null;
-      //       }
-      //    });
-      // }
+      let uuid: string = req.headers?.authorization || "";
 
       // If user email address exists
-      // if (uuid && typeof uuid === 'string') {
+      if (uuid && typeof uuid === 'string') {
 
-      //    let user = await findUserByUUID(uuid);
+         let user = await findUserByUUID(uuid);
 
-      //    if (user && typeof user === "object") {
-      //       existProductInCart = await ShoppingCart.findOne({ $and: [{ customerEmail: user?.email }, { variationID: variationID }] });
+         if (user && typeof user === "object") {
+            existProductInCart = await ShoppingCart.findOne({ $and: [{ customerEmail: user?.email }, { variationID: variationID }] });
 
-      //       let defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
-      //          user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
+            let defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
+               user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
 
-      //       areaType = defaultShippingAddress?.area_type;
-      //    }
-      // }
+            areaType = defaultShippingAddress?.area_type || "";
+         }
+      }
 
       // Product Details
       let productDetail = await Product.aggregate([
@@ -96,11 +84,11 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
                isFreeShipping: "$shipping.isFree",
                volumetricWeight: "$package.volumetricWeight",
                _lid: 1,
-               // inCart: {
-               //    $cond: {
-               //       if: { $eq: [existProductInCart, null] }, then: false, else: true
-               //    }
-               // }
+               inCart: {
+                  $cond: {
+                     if: { $eq: [existProductInCart, null] }, then: false, else: true
+                  }
+               }
             }
          }
       ]);

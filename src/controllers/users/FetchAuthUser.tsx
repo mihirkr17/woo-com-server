@@ -29,7 +29,7 @@ module.exports = async function FetchAuthUser(req: Request, res: Response, next:
          user.buyer["defaultShippingAddress"] = (Array.isArray(user?.buyer?.shippingAddress) &&
             user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]) || {};
 
-         user.buyer["shoppingCartItems"] = await ShoppingCart.find({ customerEmail: user?.email }) || [];
+         user.buyer["shoppingCartItems"] = await ShoppingCart.countDocuments({ customerEmail: user?.email }) || 0;
 
          userDataToken = setUserDataToken({
             _uuid: user?._uuid,

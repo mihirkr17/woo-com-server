@@ -250,7 +250,7 @@ module.exports.basicProductProject = {
 
 
 
-module.exports.calculateShippingCost = (volWeight: number, areaType: string) => {
+module.exports.calculateShippingCost = (volWeight: number, areaType: string = "") => {
    let n = 0; // price initial 0.5 kg = 0.5 dollar
    let charge: any;
    let arr = [];
