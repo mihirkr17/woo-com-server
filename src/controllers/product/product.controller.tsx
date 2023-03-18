@@ -33,9 +33,6 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
          });
       }
 
-      console.log(token);
-
-
       // If user email address exists
       if (uuid && typeof uuid === 'string') {
 

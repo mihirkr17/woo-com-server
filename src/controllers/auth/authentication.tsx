@@ -157,6 +157,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
          secure: true,
          maxAge: 57600000, // 16hr [3600000 -> 1hr]ms
          httpOnly: true,
+         domain: "https://wookart.vercel.app/"
       };
 
       if (typeof authProvider === 'undefined' || !authProvider) {
