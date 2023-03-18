@@ -6,8 +6,8 @@ const saltRounds = 10;
 const buyerType = new Schema({
   taxId: { type: String },
   defaultShippingAddress: { type: Object },
-  shoppingCartItems: { type: Array },
-  wishlist: { type: Number },
+  shoppingCartItems: { type: Number },
+  wishlist: { type: Array },
   shippingAddress: [
     {
       _id: false,
