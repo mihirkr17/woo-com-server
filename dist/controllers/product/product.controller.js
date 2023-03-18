@@ -10,6 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+var jwt = require("jsonwebtoken");
 const { ObjectId } = require("mongodb");
 const Product = require("../../model/product.model");
 const ShoppingCart = require("../../model/shoppingCart.model");
@@ -22,11 +23,22 @@ const { findUserByEmail, findUserByUUID, getSellerInformationByID, actualSelling
 module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d, _e, _f;
     try {
-        const uuid = req.headers.authorization || '';
         const productID = (_a = req.query) === null || _a === void 0 ? void 0 : _a.pId;
         const variationID = (_b = req.query) === null || _b === void 0 ? void 0 : _b.vId;
         let existProductInCart = null;
         let areaType;
+        const token = req.cookies.token;
+        let uuid = null;
+        if (token && typeof token !== "undefined") {
+            jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
+                if (err) {
+                    uuid = null;
+                }
+                else {
+                    uuid = (decoded === null || decoded === void 0 ? void 0 : decoded._UUID) || null;
+                }
+            });
+        }
         // If user email address exists
         if (uuid && typeof uuid === 'string') {
             let user = yield findUserByUUID(uuid);

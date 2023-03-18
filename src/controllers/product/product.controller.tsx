@@ -2,6 +2,7 @@
 // product.controller.tsx
 
 import { NextFunction, Request, Response } from "express";
+var jwt = require("jsonwebtoken");
 const { ObjectId } = require("mongodb");
 const Product = require("../../model/product.model");
 const ShoppingCart = require("../../model/shoppingCart.model");
@@ -14,12 +15,23 @@ const { findUserByEmail, findUserByUUID, getSellerInformationByID, actualSelling
  */
 module.exports.fetchSingleProductController = async (req: Request, res: Response, next: any) => {
    try {
-
-      const uuid: String = req.headers.authorization || '';
       const productID = req.query?.pId;
       const variationID = req.query?.vId;
       let existProductInCart: any = null;
       let areaType: any;
+
+      const token: string = req.cookies.token;
+      let uuid: any = null;
+
+      if (token && typeof token !== "undefined") {
+         jwt.verify(token, process.env.ACCESS_TOKEN, (err: any, decoded: any) => {
+            if (err) {
+               uuid = null;
+            } else {
+               uuid = decoded?._UUID || null;
+            }
+         });
+      }
 
 
       // If user email address exists
