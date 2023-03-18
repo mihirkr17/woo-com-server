@@ -15,12 +15,14 @@ const { findUserByEmail, findUserByUUID, getSellerInformationByID, actualSelling
  */
 module.exports.fetchSingleProductController = async (req: Request, res: Response, next: NextFunction) => {
    try {
+
       const productID = req.query?.pId;
       const variationID = req.query?.vId;
       let existProductInCart: any = null;
       let areaType: any;
 
-      const token: any = req.cookies.token;
+      const token: any = req.cookies.token || req.headers?.authorization;
+      
       let uuid: any = null;
 
       if (token && typeof token !== "undefined") {
