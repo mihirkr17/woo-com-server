@@ -13,14 +13,14 @@ const { findUserByEmail, findUserByUUID, getSellerInformationByID, actualSelling
  * @required        --> [req.headers.authorization:email, req.query:productID, req.query:variationID, req.params:product slug]
  * @request_method  --> GET
  */
-module.exports.fetchSingleProductController = async (req: Request, res: Response, next: any) => {
+module.exports.fetchSingleProductController = async (req: Request, res: Response, next: NextFunction) => {
    try {
       const productID = req.query?.pId;
       const variationID = req.query?.vId;
       let existProductInCart: any = null;
       let areaType: any;
 
-      const token: string = req.cookies.token;
+      const token: any = req.cookies.token;
       let uuid: any = null;
 
       if (token && typeof token !== "undefined") {
@@ -32,6 +32,8 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
             }
          });
       }
+
+      console.log(token);
 
 
       // If user email address exists

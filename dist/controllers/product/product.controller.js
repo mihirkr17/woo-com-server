@@ -39,6 +39,7 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
                 }
             });
         }
+        console.log(token);
         // If user email address exists
         if (uuid && typeof uuid === 'string') {
             let user = yield findUserByUUID(uuid);
