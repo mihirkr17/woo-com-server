@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 var jwt = require("jsonwebtoken");
-const response = require("../errors/apiResponse");
+const apiResponse = require("../errors/apiResponse");
 
 
 /**
@@ -17,8 +17,7 @@ const verifyJWT = async (req: Request, res: Response, next: NextFunction) => {
 
   // if token not present in cookies then return 403 status code and terminate the request here....
   if (!token || typeof token === "undefined") {
-    return res.status(401).send();
-    // return res.status(401).send({ success: false, statusCode: 401, error: 'Token not found' });
+    throw new apiResponse.Api401Error('Token not found');
   }
 
 
@@ -29,11 +28,7 @@ const verifyJWT = async (req: Request, res: Response, next: NextFunction) => {
       // verifying the token with jwt verify method and if token broken then 401 status code will send and terminate the request
       if (err) {
         res.clearCookie("token");
-        return res.status(401).send({
-          success: false,
-          statusCode: 401,
-          error: err.message,
-        });
+        throw new apiResponse.Api401Error(err?.message);
       }
 
       // if success then return email throw req.decoded
@@ -51,7 +46,7 @@ const isRoleOwnerOrAdmin = async (req: Request, res: Response, next: NextFunctio
     if (authRole === "OWNER" || authRole === "ADMIN") {
       next();
     } else {
-      return res.status(401).send({ success: false, statusCode: 401, error: "Unauthorized access!" });
+      throw new apiResponse.Api403Error("Forbidden access !");
     }
   } catch (error: any) {
     next(error);
@@ -66,7 +61,7 @@ const isRoleSeller = async (req: Request, res: Response, next: NextFunction) => 
     if (authRole === 'SELLER') {
       next();
     } else {
-      return res.status(401).send({ success: false, statusCode: 401, error: "Unauthorized access!" });
+      throw new apiResponse.Api403Error("Forbidden access !");
     }
   } catch (error: any) {
     next(error);
@@ -82,11 +77,7 @@ const isRoleBuyer = async (req: Request, res: Response, next: NextFunction) => {
     if (authRole === "BUYER") {
       next();
     } else {
-      return res.status(400).send({
-        success: false,
-        statusCode: 400,
-        error: "You are not a user, So you are not authorized for process this.",
-      });
+      throw new apiResponse.Api403Error("Forbidden access !");
     }
   } catch (error: any) {
     next(error);
@@ -103,7 +94,7 @@ const isRoleAdmin = async (req: Request, res: Response, next: NextFunction) => {
     if (authRole === 'ADMIN') {
       next();
     } else {
-      return res.status(401).send({ success: false, statusCode: 401, error: "Unauthorized access!" });
+      throw new apiResponse.Api403Error("Forbidden access !");
     }
 
   } catch (error: any) {
@@ -119,7 +110,7 @@ const isPermitForDashboard = async (req: Request, res: Response, next: NextFunct
     if (authRole === 'SELLER' || authRole === 'ADMIN' || authRole === 'OWNER') {
       next();
     } else {
-      return res.status(401).send({ success: false, statusCode: 401, error: "Unauthorized access!" });
+      throw new apiResponse.Api403Error("Forbidden access !");
     }
 
   } catch (error: any) {

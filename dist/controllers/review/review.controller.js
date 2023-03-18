@@ -9,27 +9,24 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
-module.exports.addProductRating = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const Product = require("../../model/product.model");
+const Order = require("../../model/order.model");
+module.exports.addProductRating = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const db = yield dbConnection();
         const productID = req.params.productID;
         const email = req.decoded.email;
         const body = req.body;
         const orderId = parseInt(body === null || body === void 0 ? void 0 : body.orderId);
-        yield db.collection("orders").updateOne({ user_email: email }, {
+        yield Order.findOneAndUpdate({ user_email: email }, {
             $set: {
-                "orders.$[i].isRating": true,
+                "orders.$[i].isRated": true,
             },
-        }, { upsert: true, arrayFilters: [{ "i.orderId": orderId }] });
-        const products = yield db.collection("products").findOne({
-            _id: ObjectId(productID),
-            status: "active",
-        });
+        }, { arrayFilters: [{ "i.orderID": orderId }], upsert: true });
+        const product = yield Product.findOne({ _id: ObjectId(productID) });
         const point = parseInt(body === null || body === void 0 ? void 0 : body.rating_point);
-        let ratingPoints = (products === null || products === void 0 ? void 0 : products.rating) && (products === null || products === void 0 ? void 0 : products.rating.length) > 0
-            ? products === null || products === void 0 ? void 0 : products.rating
+        let ratingPoints = (product === null || product === void 0 ? void 0 : product.rating) && (product === null || product === void 0 ? void 0 : product.rating.length) > 0
+            ? product === null || product === void 0 ? void 0 : product.rating
             : [
                 { weight: 5, count: 0 },
                 { weight: 4, count: 0 },
@@ -61,7 +58,7 @@ module.exports.addProductRating = (req, res) => __awaiter(void 0, void 0, void 0
         const average = parseFloat(ava.toFixed(1));
         let filters;
         let options;
-        if ((products === null || products === void 0 ? void 0 : products.rating) && (products === null || products === void 0 ? void 0 : products.rating.length) > 0) {
+        if ((product === null || product === void 0 ? void 0 : product.rating) && (product === null || product === void 0 ? void 0 : product.rating.length) > 0) {
             filters = {
                 $set: {
                     "rating.$[i].count": counter + 1,
@@ -81,12 +78,12 @@ module.exports.addProductRating = (req, res) => __awaiter(void 0, void 0, void 0
             };
             options = { upsert: true };
         }
-        const result = yield db.collection("products").updateOne({ _id: ObjectId(productID) }, filters, options);
+        const result = yield Product.findOneAndUpdate({ _id: ObjectId(productID) }, filters, options);
         if (result) {
-            return res.status(200).send({ message: "Thanks for your review !" });
+            return res.status(200).send({ success: true, statusCode: 200, message: "Thanks for your review !" });
         }
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });

@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const response = require("../errors/apiResponse");
+const apiResponse = require("../errors/apiResponse");
 module.exports.loginMDL = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { emailOrPhone, password, authProvider } = req.body;
@@ -18,16 +18,16 @@ module.exports.loginMDL = (req, res, next) => __awaiter(void 0, void 0, void 0, 
             return;
         }
         if (!emailOrPhone) {
-            throw new response.Api400Error("ClientError", "Required email or phone number !");
+            throw new apiResponse.Api400Error("Required email or phone number !");
         }
         else if (!password) {
-            throw new response.Api400Error("ClientError", "Required password !");
+            throw new apiResponse.Api400Error("Required password !");
         }
         else if (typeof password !== "string") {
-            throw new response.Api400Error("ClientError", "Password should be string !");
+            throw new apiResponse.Api400Error("Password should be string !");
         }
         else if (password.length < 5 || password.length > 8) {
-            throw new response.Api400Error("ClientError", "Password length should be 5 to 8 characters !");
+            throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
         }
         else {
             next();
@@ -43,31 +43,31 @@ module.exports.registrationMDL = (req, res, next) => __awaiter(void 0, void 0, v
         const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/;
         const { phone, email, password, gender, fullName, dob } = body;
         if (!phone) {
-            throw new response.Api400Error("ClientError", "Required phone number !");
+            throw new apiResponse.Api400Error("Required phone number !");
         }
         else if (!email) {
-            throw new response.Api400Error("ClientError", "Required email address !");
+            throw new apiResponse.Api400Error("Required email address !");
         }
         else if (!gender) {
-            throw new response.Api400Error("ClientError", "Required gender !");
+            throw new apiResponse.Api400Error("Required gender !");
         }
         else if (!fullName) {
-            throw new response.Api400Error("ClientError", "Required full name !");
+            throw new apiResponse.Api400Error("Required full name !");
         }
         else if (!dob) {
-            throw new response.Api400Error("ClientError", "Required date of birth !");
+            throw new apiResponse.Api400Error("Required date of birth !");
         }
         else if (!password) {
-            throw new response.Api400Error("ClientError", "Required password !");
+            throw new apiResponse.Api400Error("Required password !");
         }
         else if (password && typeof password !== "string") {
-            throw new response.Api400Error("ClientError", "Password should be string !");
+            throw new apiResponse.Api400Error("Password should be string !");
         }
         else if (password.length < 5 || password.length > 8) {
-            throw new response.Api400Error("ClientError", "Password length should be 5 to 8 characters !");
+            throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
         }
         else if (!passwordRegex.test(password)) {
-            throw new response.Api400Error("ClientError", "Password should contains at least 1 digit, lowercase letter, special character !");
+            throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
         }
         else {
             next();

@@ -1,43 +1,40 @@
-import { Request, Response } from "express";
-const { dbConnection } = require("../../utils/db");
+import { NextFunction, Request, Response } from "express";
 const { ObjectId } = require("mongodb");
+const Product = require("../../model/product.model");
+const Order = require("../../model/order.model");
 
-module.exports.addProductRating = async (req: Request, res: Response) => {
+module.exports.addProductRating = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const db = await dbConnection();
 
     const productID = req.params.productID;
     const email = req.decoded.email;
     const body = req.body;
     const orderId = parseInt(body?.orderId);
 
-    await db.collection("orders").updateOne(
+    await Order.findOneAndUpdate(
       { user_email: email },
       {
         $set: {
-          "orders.$[i].isRating": true,
+          "orders.$[i].isRated": true,
         },
       },
-      { upsert: true, arrayFilters: [{ "i.orderId": orderId }] }
+      { arrayFilters: [{ "i.orderID": orderId }], upsert: true }
     );
 
-    const products = await db.collection("products").findOne({
-      _id: ObjectId(productID),
-      status: "active",
-    });
+    const product = await Product.findOne({ _id: ObjectId(productID) });
 
     const point = parseInt(body?.rating_point);
 
     let ratingPoints =
-      products?.rating && products?.rating.length > 0
-        ? products?.rating
+      product?.rating && product?.rating.length > 0
+        ? product?.rating
         : [
-            { weight: 5, count: 0 },
-            { weight: 4, count: 0 },
-            { weight: 3, count: 0 },
-            { weight: 2, count: 0 },
-            { weight: 1, count: 0 },
-          ];
+          { weight: 5, count: 0 },
+          { weight: 4, count: 0 },
+          { weight: 3, count: 0 },
+          { weight: 2, count: 0 },
+          { weight: 1, count: 0 },
+        ];
 
     let counter: number = 0;
     let newRatingArray: any[] = [];
@@ -68,7 +65,7 @@ module.exports.addProductRating = async (req: Request, res: Response) => {
     let filters: any;
     let options: any;
 
-    if (products?.rating && products?.rating.length > 0) {
+    if (product?.rating && product?.rating.length > 0) {
       filters = {
         $set: {
           "rating.$[i].count": counter + 1,
@@ -88,16 +85,16 @@ module.exports.addProductRating = async (req: Request, res: Response) => {
       options = { upsert: true };
     }
 
-    const result = await db.collection("products").updateOne(
+    const result = await Product.findOneAndUpdate(
       { _id: ObjectId(productID) },
       filters,
       options
     );
 
     if (result) {
-      return res.status(200).send({ message: "Thanks for your review !" });
+      return res.status(200).send({ success: true, statusCode: 200, message: "Thanks for your review !" });
     }
   } catch (error: any) {
-    res.status(500).send({ message: error?.message });
+    next(error);
   }
 };

@@ -24,6 +24,7 @@ var orderSchemaList = new mongoose_1.Schema({
     sellingPrice: Number,
     state: String,
     trackingID: String,
+    isRated: { type: Boolean, required: false },
     orderAT: Object,
     orderPlacedAT: { type: Date, required: false },
     orderShippedAT: { type: Date, required: false },

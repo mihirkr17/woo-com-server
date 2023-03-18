@@ -19,7 +19,7 @@ module.exports.updateProductStock = async (
           "variations.$[i].stock": stock
         }
       },
-      { arrayFilters: [{ "i._VID": variationID }] }
+      { arrayFilters: [{ "i._vrid": variationID }] }
     );
 
   } catch (error: any) {

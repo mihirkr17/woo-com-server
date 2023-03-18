@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const { cartTemplate } = require("../../templates/cart.template");
-const { checkProductAvailability } = require("../../model/common.model");
+const { checkProductAvailability } = require("../../services/common.services");
 const ShoppingCart = require("../../model/shoppingCart.model");
 // add to cart controller
 /**

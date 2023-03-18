@@ -40,14 +40,14 @@ module.exports.takeThisProductByAdminController = (req, res, next) => __awaiter(
         if (!listingID) {
             throw new Error("Listing ID required !");
         }
-        var queueProduct = yield QueueProduct.findOne({ _LID: listingID }, { __v: 0 });
+        var queueProduct = yield QueueProduct.findOne({ _lid: listingID }, { __v: 0 });
         if (!queueProduct) {
             throw new Error("Sorry product not found !");
         }
         queueProduct.isVerified = true;
         queueProduct.save_as = "draft";
         queueProduct["verifyStatus"] = { verifiedBy: role, email: adminEmail, verifiedAt: new Date(Date.now()) };
-        let filter = { $and: [{ _id: ObjectId(queueProduct === null || queueProduct === void 0 ? void 0 : queueProduct._id) }, { _LID: queueProduct === null || queueProduct === void 0 ? void 0 : queueProduct._LID }] };
+        let filter = { $and: [{ _id: ObjectId(queueProduct === null || queueProduct === void 0 ? void 0 : queueProduct._id) }, { _lid: queueProduct === null || queueProduct === void 0 ? void 0 : queueProduct._lid }] };
         const result = yield Product.updateOne(filter, { $set: queueProduct }, { upsert: true });
         if ((result === null || result === void 0 ? void 0 : result.upsertedCount) === 1) {
             yield QueueProduct.deleteOne(filter);

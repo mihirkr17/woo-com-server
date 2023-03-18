@@ -19,7 +19,7 @@ module.exports.updateProductStock = (productID, variationID, restAvailable) => _
                 "variations.$[i].available": restAvailable,
                 "variations.$[i].stock": stock
             }
-        }, { arrayFilters: [{ "i._VID": variationID }] });
+        }, { arrayFilters: [{ "i._vrid": variationID }] });
     }
     catch (error) {
         return error;

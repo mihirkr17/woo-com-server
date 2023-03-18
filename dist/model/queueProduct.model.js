@@ -36,7 +36,7 @@ const bodyInfoType = new mongoose_1.Schema({
     metaDescription: { type: String, required: true }
 }, { _id: false });
 var QueueProductSchema = new mongoose_1.Schema({
-    _LID: { type: String },
+    _lid: { type: String },
     title: { type: String, required: true },
     slug: { type: String, required: true },
     categories: { type: Array, required: true },
@@ -71,7 +71,7 @@ QueueProductSchema.pre("save", function (next) {
     return __awaiter(this, void 0, void 0, function* () {
         let listingID = "LID" + Math.random().toString(36).toUpperCase().slice(2, 18);
         if (listingID) {
-            this._LID = listingID;
+            this._lid = listingID;
         }
         next();
     });

@@ -18,7 +18,7 @@ module.exports.updateStockController = async (req: Request, res: Response, next:
       const body = req.body;
       const storeName = req.params.storeName;
 
-      if (!body?.variations?._VID || !body?.variations?.available) {
+      if (!body?.variations?._vrid || !body?.variations?.available) {
          throw new Error("Variation ID and unit required !");
       }
 
@@ -34,7 +34,7 @@ module.exports.updateStockController = async (req: Request, res: Response, next:
                },
             },
             {
-               arrayFilters: [{ "i._VID": body?.variations?._VID }]
+               arrayFilters: [{ "i._vrid": body?.variations?._vrid }]
             }
          );
 
@@ -82,12 +82,12 @@ module.exports.variationController = async (req: Request, res: Response, next: N
 
       // Update variation
       if (formTypes === 'update-variation' && requestFor === 'product_variations') {
-         model['_VID'] = variationID;
+         model['_vrid'] = variationID;
          if (variationID && variationID !== "") {
             result = await Product.findOneAndUpdate(
                { _id: ObjectId(productID) },
                { $set: { 'variations.$[i]': model } },
-               { arrayFilters: [{ "i._VID": variationID }] }
+               { arrayFilters: [{ "i._vrid": variationID }] }
             );
          }
       }
@@ -95,7 +95,7 @@ module.exports.variationController = async (req: Request, res: Response, next: N
       // create new variation
       if (formTypes === 'new-variation') {
          let newVariationID = "vi_" + Math.random().toString(36).toLowerCase().slice(2, 18);
-         model['_VID'] = newVariationID;
+         model['_vrid'] = newVariationID;
          result = await Product.findOneAndUpdate(
             { _id: ObjectId(productID) },
             { $push: { variations: model } },
@@ -127,12 +127,12 @@ module.exports.productControlController = async (req: Request, res: Response, ne
             {
                $and: [
                   { _id: ObjectId(body?.data?.pId) },
-                  { _LID: body?.data?.lId },
+                  { _lid: body?.data?.lId },
                   { save_as: 'fulfilled' }
                ]
             },
             { $set: { 'variations.$[i].status': body?.data?.action } },
-            { arrayFilters: [{ "i._VID": body?.data?.vId }] }
+            { arrayFilters: [{ "i._vrid": body?.data?.vId }] }
          );
 
       } else {
@@ -140,7 +140,7 @@ module.exports.productControlController = async (req: Request, res: Response, ne
             {
                $and: [
                   { _id: ObjectId(body?.data?.pId) },
-                  { _LID: body?.data?.lId }
+                  { _lid: body?.data?.lId }
                ]
             },
             { $set: { save_as: body?.data?.action, "variations.$[].status": "inactive" } },
@@ -164,7 +164,7 @@ module.exports.viewAllProductsInDashboard = async (
    next: NextFunction
 ) => {
    try {
-      // await db.collection("products").createIndex({ _LID: 1, slug: 1, save_as: 1, categories: 1, brand: 1, "sellerData.storeName": 1, "sellerData.sellerName": 1, "sellerData.sellerID": 1 });
+      // await db.collection("products").createIndex({ _lid: 1, slug: 1, save_as: 1, categories: 1, brand: 1, "sellerData.storeName": 1, "sellerData.sellerName": 1, "sellerData.sellerID": 1 });
 
       const authEmail = req.decoded.email;
       const role = req.decoded.role;
@@ -219,7 +219,7 @@ module.exports.viewAllProductsInDashboard = async (
          {
             $project: {
                title: 1, slug: 1, categories: 1, pricing: 1,
-               images: 1, variations: 1, brand: 1, _LID: 1,
+               images: 1, variations: 1, brand: 1, _lid: 1,
                package: 1,
                save_as: 1,
                shipping: 1,
@@ -247,7 +247,7 @@ module.exports.viewAllProductsInDashboard = async (
          {
             $project: {
                title: 1, slug: 1, categories: 1, pricing: 1,
-               images: 1, variations: 1, brand: 1, _LID: 1,
+               images: 1, variations: 1, brand: 1, _lid: 1,
                package: 1,
                save_as: 1,
                shipping: 1,
@@ -316,7 +316,7 @@ module.exports.getProductForSellerDSBController = async (req: Request, res: Resp
                $unwind: { path: "$variations" },
             },
             {
-               $match: { 'variations._VID': variationID }
+               $match: { 'variations._vrid': variationID }
             }
          ]);
          product = product[0];
@@ -367,12 +367,12 @@ module.exports.productListingController = async (
       if (formTypes === "update" && lId) {
          model = product_listing_template_engine(body);
          model['modifiedAt'] = new Date(Date.now());
-         model.sellerData.sellerID = user?._UUID;
+         model.sellerData.sellerID = user?._uuid;
          model.sellerData.sellerName = user?.fullName;
          model.sellerData.storeName = user?.seller?.storeInfos?.storeName;
 
          let result = await Product.findOneAndUpdate(
-            { _LID: lId },
+            { _lid: lId },
             { $set: model },
             { upsert: true }
          );
@@ -394,7 +394,7 @@ module.exports.productListingController = async (
 
       if (formTypes === 'create') {
          model = product_listing_template_engine(body);
-         model.sellerData.sellerID = user?._UUID;
+         model.sellerData.sellerID = user?._uuid;
          model.sellerData.sellerName = user?.fullName;
          model.sellerData.storeName = user?.seller?.storeInfos?.storeName;
 
@@ -431,7 +431,7 @@ module.exports.deleteProductVariationController = async (req: Request, res: Resp
    try {
 
       const productID = req.params.productID;
-      const _VID = req.params.vId;
+      const _vrid = req.params.vId;
       const storeName = req.params.storeName;
 
       const product = await Product.findOne({ $and: [{ _id: ObjectId(productID) }, { "sellerData.storeName": storeName }] });
@@ -446,7 +446,7 @@ module.exports.deleteProductVariationController = async (req: Request, res: Resp
 
       const result = await Product.updateOne(
          { $and: [{ _id: ObjectId(productID) }, { "sellerData.storeName": storeName }] },
-         { $pull: { variations: { _VID } } }
+         { $pull: { variations: { _vrid } } }
       );
 
       if (result) {
@@ -466,14 +466,14 @@ module.exports.deleteProductController = async (req: Request, res: Response, nex
    try {
 
       const productID: string = req.headers?.authorization?.split(',')[0] || "";
-      const _LID: string = req.headers?.authorization?.split(',')[1] || "";
+      const _lid: string = req.headers?.authorization?.split(',')[1] || "";
       const storeName = req.params.storeName;
 
       //return --> "acknowledged" : true, "deletedCount" : 1
       const deletedProduct = await Product.deleteOne({
          $and: [
             { _id: ObjectId(productID) },
-            { _LID },
+            { _lid },
             { 'sellerData.storeName': storeName }
          ]
       });
@@ -511,7 +511,7 @@ module.exports.productFlashSaleController = async (req: Request, res: Response, 
 
       const fSale = body?.data?.fSale;
 
-      const product = await Product.findOne({ $and: [{ _id: ObjectId(productID) }, { _LID: listingID }, { "sellerData.storeName": storeName }] });
+      const product = await Product.findOne({ $and: [{ _id: ObjectId(productID) }, { _lid: listingID }, { "sellerData.storeName": storeName }] });
 
 
       if (!product) {
@@ -522,7 +522,7 @@ module.exports.productFlashSaleController = async (req: Request, res: Response, 
          {
             $and:
                [
-                  { _id: ObjectId(productID) }, { _LID: listingID }, { "sellerData.storeName": storeName }
+                  { _id: ObjectId(productID) }, { _lid: listingID }, { "sellerData.storeName": storeName }
                ]
          },
 
@@ -650,7 +650,7 @@ module.exports.updateProductData = async (req: Request, res: Response, next: Nex
 
 
       const result = await Product.findOneAndUpdate(
-         { $and: [{ _LID: listingID }, { _id: ObjectId(productID) }] },
+         { $and: [{ _lid: listingID }, { _id: ObjectId(productID) }] },
          setFilter,
          { upsert: true }
       );

@@ -1,72 +1,84 @@
-import { Request, Response } from "express";
-const { dbConnection } = require("../../utils/db");
+import { NextFunction, Request, Response } from "express";
+const User = require("../../model/user.model");
+const apiResponse = require("../../errors/apiResponse");
+const { findUserByEmail } = require("../../services/common.services");
 
-module.exports.addToWishlistHandler = async (req: Request, res: Response) => {
+module.exports.addToWishlistHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const db = await dbConnection();
-
     const userEmail = req.params.email;
     const verifiedEmail = req.decoded.email;
     const body = req.body;
 
     if (userEmail !== verifiedEmail) {
-      return res.status(403).send({ message: "Forbidden" });
+      throw new apiResponse.Api403Error("Forbidden !");
     }
-    const existsProduct = await db.collection("users").findOne(
-      {
-        email: userEmail,
-        "wishlist._id": body?._id,
-      },
-      {
-        "wishlist.$": 1,
-      }
-    );
-    if (existsProduct) {
-      return res
-        .status(200)
-        .send({ message: "Product Has Already In Your Wishlist" });
-    } else {
-      const up = {
-        $push: { wishlist: body },
-      };
 
-      const wishlistRes = await db
-        .collection("users")
-        .updateOne({ email: userEmail }, up, { upsert: true });
-      res.status(200).send({
+    if (!body || typeof body === "undefined") {
+      throw new apiResponse.Api400Error("Required body !");
+    }
+
+    const { productID, variationID, listingID } = body;
+
+    interface WImodel {
+      productID: string;
+      listingID: string;
+      variationID: string;
+    }
+
+    let model: WImodel = {
+      productID,
+      variationID,
+      listingID
+    }
+
+    let user = await findUserByEmail(verifiedEmail);
+
+    if (user) {
+
+      let existsProduct = (Array.isArray(user?.buyer?.wishlist) && user?.buyer?.wishlist.filter((e: any) => (e?.productID === body?.productID && e?.variationID === body?.variationID))) || [];
+
+      if (existsProduct && existsProduct.length >= 1) {
+        return res.status(200).send({ success: true, statusCode: 200, message: "Product Has Already In Your Wishlist" })
+      }
+
+      const wishlistRes = await User.findOneAndUpdate({ email: userEmail },
+        { $push: { "buyer.wishlist": model } },
+        { upsert: true });
+
+      return res.status(200).send({
+        success: true,
+        statusCode: 200,
         data: wishlistRes,
         message: "Product Added To Your wishlist",
       });
     }
+
+
   } catch (error: any) {
-    res.status(500).send({ message: error?.message });
+    next(error);
   }
 };
 
-module.exports.removeFromWishlistHandler = async (
+module.exports.removeFromWishlist = async (
   req: Request,
-  res: Response
+  res: Response,
+  next: NextFunction
 ) => {
   try {
-    const db = await dbConnection();
-
     const productID = req.params.productID;
     const userEmail = req.decoded.email;
-    const result = await db
-      .collection("users")
-      .updateOne(
-        { email: userEmail },
-        { $pull: { wishlist: { _id: productID } } }
-      );
+
+    const result = await User.findOneAndUpdate(
+      { email: userEmail },
+      { $pull: { "buyer.wishlist": { productID } } }
+    );
 
     if (result) {
-      return res
-        .status(200)
-        .send({ message: "Product removed from your wishlist" });
+      return res.status(200).send({ success: true, statusCode: 200, message: "Product removed from your wishlist" });
     } else {
-      return res.status(501).send({ message: "Service unavailable" });
+      throw new apiResponse.Api500Error("Service unavailable");
     }
   } catch (error: any) {
-    res.status(500).send({ message: error?.message });
+    next(error);
   }
 };

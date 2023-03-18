@@ -29,7 +29,7 @@ module.exports.variationOne = (req, res, next) => __awaiter(void 0, void 0, void
         if (formTypes === 'new-variation' && attrs === 'ProductVariations') {
             let variationID = Math.random().toString(36).toUpperCase().slice(2, 18);
             model = productTemplates.product_variation_template_engine(variation);
-            model['_VID'] = variationID;
+            model['_vrid'] = variationID;
             req.body = model;
             next();
             return;

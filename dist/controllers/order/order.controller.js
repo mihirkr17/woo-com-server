@@ -9,13 +9,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const { dbConnection } = require("../../utils/db");
 const Product = require("../../model/product.model");
 const Order = require("../../model/order.model");
 const { order_status_updater, update_variation_stock_available } = require("../../services/common.services");
 module.exports.myOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const db = yield dbConnection();
         const email = req.params.email;
         const authEmail = req.decoded.email;
         if (email !== authEmail) {
@@ -34,12 +32,9 @@ module.exports.myOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, f
 });
 module.exports.removeOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const db = yield dbConnection();
         const orderUserEmail = req.params.email;
         const id = parseInt(req.params.orderId);
-        const result = yield db
-            .collection("orders")
-            .updateOne({ user_email: orderUserEmail }, { $pull: { orders: { orderId: id } } });
+        const result = yield Order.findOneAndUpdate({ user_email: orderUserEmail }, { $pull: { orders: { orderId: id } } });
         res.status(200).send({ result, message: "Order Removed successfully" });
     }
     catch (error) {

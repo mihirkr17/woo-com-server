@@ -17,7 +17,7 @@ module.exports.manageOrders = (req, res, next) => __awaiter(void 0, void 0, void
     try {
         const view = ((_a = req.query) === null || _a === void 0 ? void 0 : _a.view) || "";
         const storeName = req.params.storeName;
-        const uuid = req.decoded._UUID;
+        const uuid = req.decoded._uuid;
         let result;
         if (storeName) {
             if (view === "group") {
@@ -28,7 +28,7 @@ module.exports.manageOrders = (req, res, next) => __awaiter(void 0, void 0, void
                         $lookup: {
                             from: 'products',
                             localField: 'listingID',
-                            foreignField: "_LID",
+                            foreignField: "_lid",
                             as: "main_product"
                         }
                     },
@@ -43,7 +43,7 @@ module.exports.manageOrders = (req, res, next) => __awaiter(void 0, void 0, void
                             'bodyInfo', 'main_product',
                             "modifiedAt", "paymentInfo",
                             "variations", "_id", "tax", "save_as", "reviews",
-                            "ratingAverage", "_LID", "specification", "rating", "isVerified", "createdAt", "categories"
+                            "ratingAverage", "_lid", "specification", "rating", "isVerified", "createdAt", "categories"
                         ]
                     }, {
                         $group: {
@@ -67,7 +67,7 @@ module.exports.manageOrders = (req, res, next) => __awaiter(void 0, void 0, void
                         $lookup: {
                             from: 'products',
                             localField: 'listingID',
-                            foreignField: "_LID",
+                            foreignField: "_lid",
                             as: "main_product"
                         }
                     },
@@ -82,7 +82,7 @@ module.exports.manageOrders = (req, res, next) => __awaiter(void 0, void 0, void
                             'bodyInfo', 'main_product',
                             "modifiedAt", "paymentInfo",
                             "variations", "_id", "tax", "save_as", "reviews",
-                            "ratingAverage", "_LID", "specification", "rating", "isVerified", "createdAt", "categories"
+                            "ratingAverage", "_lid", "specification", "rating", "isVerified", "createdAt", "categories"
                         ]
                     }
                 ]);

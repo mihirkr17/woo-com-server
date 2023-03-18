@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from "express";
 const Order = require("../../model/order.model");
 const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
-const response = require("../../errors/apiResponse");
+const apiResponse = require("../../errors/apiResponse");
 const { findUserByEmail, update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.services");
 
 
@@ -10,7 +10,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
    try {
       const authEmail = req.decoded.email;
       const body = req.body;
-      const uuid = req.decoded._UUID;
+      const uuid = req.decoded._uuid;
 
       if (!body) {
          return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
@@ -30,9 +30,9 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
       let areaType = defaultShippingAddress?.area_type;
 
       let product = await Product.aggregate([
-         { $match: { $and: [{ _LID: listingID }, { _id: ObjectId(productID) }] } },
+         { $match: { $and: [{ _lid: listingID }, { _id: ObjectId(productID) }] } },
          { $unwind: { path: "$variations" } },
-         { $match: { $and: [{ 'variations._VID': variationID }] } },
+         { $match: { $and: [{ 'variations._vrid': variationID }] } },
          {
             $project: {
                _id: 0,

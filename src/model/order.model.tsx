@@ -7,38 +7,39 @@ interface IOrder {
    listingID: string;
    variationID: string;
    productID: string;
-   customerEmail: string,
-   customerID: string,
-   title: string,
-   slug: string,
-   image: string,
-   brand: string,
-   baseAmount: number,
-   quantity: number,
-   paymentMode: string,
-   shippingAddress: object,
-   shippingCharge: number,
-   sellerData: object,
-   sellingPrice: number,
-   state: string,
-   sku: string,
-   trackingID: string,
-   orderAT: object,
-   orderStatus: string,
-   orderPlacedAT: Date,
-   orderShippedAT: Date,
-   isShipped: boolean,
-   cancelReason: string,
-   orderCanceledAT: object,
-   isCanceled: boolean,
-   orderDispatchAT: object,
-   isDispatch: boolean,
-   orderCompletedAT: object,
-   isCompleted: boolean,
-   paymentIntentID?: string,
-   paymentMethodID?: string,
-   paymentStatus?: string,
-   refund?: object
+   customerEmail: string;
+   customerID: string;
+   title: string;
+   slug: string;
+   image: string;
+   brand: string;
+   baseAmount: number;
+   quantity: number;
+   paymentMode: string;
+   shippingAddress: object;
+   shippingCharge: number;
+   sellerData: object;
+   sellingPrice: number;
+   state: string;
+   sku: string;
+   trackingID: string;
+   isRated?: boolean;
+   orderAT: object;
+   orderStatus: string;
+   orderPlacedAT: Date;
+   orderShippedAT: Date;
+   isShipped: boolean;
+   cancelReason: string;
+   orderCanceledAT: object;
+   isCanceled: boolean;
+   orderDispatchAT: object;
+   isDispatch: boolean;
+   orderCompletedAT: object;
+   isCompleted: boolean;
+   paymentIntentID?: string;
+   paymentMethodID?: string;
+   paymentStatus?: string;
+   refund?: object;
 };
 
 var orderSchemaList = new Schema<IOrder>({
@@ -63,6 +64,7 @@ var orderSchemaList = new Schema<IOrder>({
    sellingPrice: Number,
    state: String,
    trackingID: String,
+   isRated: { type: Boolean, required: false },
    orderAT: Object,
    orderPlacedAT: { type: Date, required: false },
    orderShippedAT: { type: Date, required: false },

@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 var jwt = require("jsonwebtoken");
-const response = require("../errors/apiResponse");
+const apiResponse = require("../errors/apiResponse");
 /**
  *
  * @param req
@@ -23,18 +23,13 @@ const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function
     const token = req.cookies.token; // finding token in http only cookies.
     // if token not present in cookies then return 403 status code and terminate the request here....
     if (!token || typeof token === "undefined") {
-        return res.status(401).send();
-        // return res.status(401).send({ success: false, statusCode: 401, error: 'Token not found' });
+        throw new apiResponse.Api401Error('Token not found');
     }
     jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
         // verifying the token with jwt verify method and if token broken then 401 status code will send and terminate the request
         if (err) {
             res.clearCookie("token");
-            return res.status(401).send({
-                success: false,
-                statusCode: 401,
-                error: err.message,
-            });
+            throw new apiResponse.Api401Error(err === null || err === void 0 ? void 0 : err.message);
         }
         // if success then return email throw req.decoded
         req.decoded = decoded;
@@ -49,7 +44,7 @@ const isRoleOwnerOrAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0,
             next();
         }
         else {
-            return res.status(401).send({ success: false, statusCode: 401, error: "Unauthorized access!" });
+            throw new apiResponse.Api403Error("Forbidden access !");
         }
     }
     catch (error) {
@@ -64,7 +59,7 @@ const isRoleSeller = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
             next();
         }
         else {
-            return res.status(401).send({ success: false, statusCode: 401, error: "Unauthorized access!" });
+            throw new apiResponse.Api403Error("Forbidden access !");
         }
     }
     catch (error) {
@@ -79,11 +74,7 @@ const isRoleBuyer = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
             next();
         }
         else {
-            return res.status(400).send({
-                success: false,
-                statusCode: 400,
-                error: "You are not a user, So you are not authorized for process this.",
-            });
+            throw new apiResponse.Api403Error("Forbidden access !");
         }
     }
     catch (error) {
@@ -98,7 +89,7 @@ const isRoleAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
             next();
         }
         else {
-            return res.status(401).send({ success: false, statusCode: 401, error: "Unauthorized access!" });
+            throw new apiResponse.Api403Error("Forbidden access !");
         }
     }
     catch (error) {
@@ -112,7 +103,7 @@ const isPermitForDashboard = (req, res, next) => __awaiter(void 0, void 0, void 
             next();
         }
         else {
-            return res.status(401).send({ success: false, statusCode: 401, error: "Unauthorized access!" });
+            throw new apiResponse.Api403Error("Forbidden access !");
         }
     }
     catch (error) {

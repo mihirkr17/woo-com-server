@@ -1,4 +1,5 @@
 "use strict";
+// src/controllers/order/SetOrder.tsx
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -9,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const response = require("../../errors/apiResponse");
+const apiResponse = require("../../errors/apiResponse");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const ShoppingCart = require("../../model/shoppingCart.model");
 const { findUserByEmail, actualSellingPrice, calculateShippingCost } = require("../../services/common.services");
@@ -21,16 +22,16 @@ module.exports = function SetOrder(req, res, next) {
             const authEmail = req.decoded.email;
             const body = req.body;
             if (userEmail !== authEmail) {
-                throw new response.Api401Error("AuthError", "Unauthorized access !");
+                throw new apiResponse.Api401Error("Unauthorized access !");
             }
             if (!body || typeof body === "undefined") {
-                throw new response.Api400Error("ClientError", "Required body !");
+                throw new apiResponse.Api400Error("Required body !");
             }
             let user = yield findUserByEmail(authEmail);
             let defaultAddress = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
                 ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
             if (!defaultAddress) {
-                throw new response.Api400Error("ClientError", "Required shipping address !");
+                throw new apiResponse.Api400Error("Required shipping address !");
             }
             let areaType = defaultAddress === null || defaultAddress === void 0 ? void 0 : defaultAddress.area_type;
             const orderItems = yield ShoppingCart.aggregate([
@@ -39,7 +40,7 @@ module.exports = function SetOrder(req, res, next) {
                     $lookup: {
                         from: 'products',
                         localField: 'listingID',
-                        foreignField: "_LID",
+                        foreignField: "_lid",
                         as: "main_product"
                     }
                 },
@@ -50,7 +51,7 @@ module.exports = function SetOrder(req, res, next) {
                     $match: {
                         $expr: {
                             $and: [
-                                { $eq: ['$variations._VID', '$variationID'] },
+                                { $eq: ['$variations._vrid', '$variationID'] },
                                 { $eq: ["$variations.stock", "in"] },
                                 { $eq: ["$variations.status", "active"] },
                                 { $gt: ["$variations.available", "$quantity"] }
@@ -81,7 +82,7 @@ module.exports = function SetOrder(req, res, next) {
                 { $unset: ["variations"] }
             ]);
             if (!orderItems || orderItems.length <= 0) {
-                throw new response.Api400Error("ClientError", "Nothing for purchase ! Please add product in your cart.");
+                throw new apiResponse.Api400Error("Nothing for purchase ! Please add product in your cart.");
             }
             orderItems && orderItems.map((p) => {
                 var _a, _b, _c;
@@ -109,7 +110,7 @@ module.exports = function SetOrder(req, res, next) {
                 }
             });
             if (!(paymentIntent === null || paymentIntent === void 0 ? void 0 : paymentIntent.client_secret)) {
-                throw new response.Api400Error("ClientError", "Payment failed.");
+                throw new apiResponse.Api400Error("Payment failed.");
             }
             return res.status(200).send({
                 success: true,

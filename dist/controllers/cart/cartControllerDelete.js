@@ -9,49 +9,31 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
+const ShoppingCart = require("../../model/shoppingCart.model");
 /**
  * @controller --> Delete cart items by product ID
  * @request_method --> DELETE
  * @required --> productID:req.headers.authorization & cartTypes:req.params
  */
-module.exports.deleteCartItem = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.deleteCartItem = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const productID = req.headers.authorization;
         const authEmail = req.decoded.email;
         const cart_types = req.params.cartTypes;
         let updateDocuments;
-        const db = yield dbConnection();
         if (!ObjectId.isValid(productID) || !productID) {
             return res.status(500).send({ success: false, statusCode: 500, message: "headers missing!!!" });
         }
         if (cart_types === "toCart") {
-            updateDocuments = yield db.collection('shoppingCarts').deleteOne({ $and: [{ customerEmail: authEmail }, { productID }] });
+            updateDocuments = yield ShoppingCart.deleteOne({ $and: [{ customerEmail: authEmail }, { productID }] });
         }
         if (updateDocuments) {
-            const countCartItems = yield db.collection("shoppingCarts").countDocuments({ customerEmail: authEmail });
-            res.cookie("cart_p", countCartItems, { httpOnly: false, maxAge: 57600000 });
             return res.status(200).send({ success: true, statusCode: 200, message: "Item removed successfully from your cart." });
         }
         return res.status(500).send({ success: false, statusCode: 500, message: "Sorry! failed to remove!!!" });
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
-    }
-});
-module.exports.deleteCartAddress = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const db = yield dbConnection();
-        const email = req.decoded.email;
-        const addressId = parseInt(req.params.addressId);
-        const result = yield db
-            .collection("users")
-            .updateOne({ email: email }, { $pull: { shippingAddress: { addressId } } });
-        if (result)
-            return res.send(result);
-    }
-    catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });

@@ -6,7 +6,8 @@ const saltRounds = 10;
 const buyerType = new Schema({
   taxId: { type: String },
   defaultShippingAddress: { type: Object },
-  shoppingCartItems: { type: Number },
+  shoppingCartItems: { type: Array },
+  wishlist: { type: Array },
   shippingAddress: [
     {
       _id: false,
@@ -46,7 +47,7 @@ const sellerType = new Schema({
 
 // Interface of user
 interface IUser {
-  _UUID: String;
+  _uuid: String;
   fullName: String;
   phone: String;
   phonePrefixCode: String;
@@ -70,7 +71,7 @@ interface IUser {
 
 // user schema design
 var UserSchema = new Schema<IUser>({
-  _UUID: { type: String },
+  _uuid: { type: String },
   fullName: { type: String, required: true },
 
   email: {

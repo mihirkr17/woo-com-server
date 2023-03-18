@@ -42,7 +42,7 @@ module.exports.takeThisProductByAdminController = async (req: Request, res: Resp
          throw new Error("Listing ID required !");
       }
 
-      var queueProduct = await QueueProduct.findOne({ _LID: listingID }, { __v: 0 });
+      var queueProduct = await QueueProduct.findOne({ _lid: listingID }, { __v: 0 });
 
       if (!queueProduct) {
          throw new Error("Sorry product not found !");
@@ -52,7 +52,7 @@ module.exports.takeThisProductByAdminController = async (req: Request, res: Resp
       queueProduct.save_as = "draft";
       queueProduct["verifyStatus"] = { verifiedBy: role, email: adminEmail, verifiedAt: new Date(Date.now()) };
 
-      let filter = { $and: [{ _id: ObjectId(queueProduct?._id) }, { _LID: queueProduct?._LID }] };
+      let filter = { $and: [{ _id: ObjectId(queueProduct?._id) }, { _lid: queueProduct?._lid }] };
 
       const result = await Product.updateOne(
          filter,

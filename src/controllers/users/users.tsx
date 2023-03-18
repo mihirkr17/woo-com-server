@@ -1,24 +1,50 @@
 import { NextFunction, Request, Response } from "express";
 const { ObjectId } = require("mongodb");
 const User = require("../../model/user.model");
-const response = require("../../errors/apiResponse");
+const apiResponse = require("../../errors/apiResponse");
 /**
  * @apiController --> Update Profile Data Controller
  * @apiMethod --> PUT
  * @apiRequired --> client email in header 
  */
-module.exports.updateProfileDataController = async (req: Request, res: Response, next: any) => {
+module.exports.updateProfileDataController = async (req: Request, res: Response, next: NextFunction) => {
    try {
       const email: string = req.decoded.email;
       const clientEmail = req.headers.authorization || "";
+      const body = req.body;
 
       if (clientEmail !== email) {
-         throw new response.Api400Error("AuthError", "Invalid email address !");
+         throw new apiResponse.Api400Error("Invalid email address !");
       }
 
-      const result = await User.updateOne({ email: email }, { $set: req.body }, { new: true });
+      if (!body || typeof body === "undefined") {
+         throw new apiResponse.Api400Error("Required body with request !");
+      }
 
-      if (result?.matchedCount === 1) {
+      const { fullName, dob, gender } = body;
+
+      if (!fullName || typeof fullName !== "string") throw new apiResponse.Api400Error("Required full name !");
+
+      if (!dob || typeof dob !== "string") throw new apiResponse.Api400Error("Required date of birth !");
+
+      if (!gender || typeof gender !== "string") throw new apiResponse.Api400Error("Required gender !");
+
+      interface IProfileData {
+         fullName: string;
+         dob: string;
+         gender: string;
+      }
+
+      let profileModel: IProfileData = {
+         fullName,
+         dob,
+         gender,
+      }
+
+
+      const result = await User.findOneAndUpdate({ email: email }, { $set: profileModel }, { upsert: true });
+
+      if (result) {
          return res.status(200).send({ success: true, statusCode: 200, message: "Profile updated." });
       }
 
@@ -33,7 +59,7 @@ module.exports.updateProfileDataController = async (req: Request, res: Response,
  * @apiMethod --> PUT
  * @apiRequired --> userId in params
  */
-module.exports.makeAdminController = async (req: Request, res: Response, next: any) => {
+module.exports.makeAdminController = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
       const userId: string = req.params.userId;
@@ -91,7 +117,7 @@ module.exports.demoteToUser = async (
 };
 
 
-module.exports.makeSellerRequest = async (req: Request, res: Response, next: any) => {
+module.exports.makeSellerRequest = async (req: Request, res: Response, next: NextFunction) => {
    try {
       const authEmail = req.decoded.email;
       const authRole = req.decoded.role;
@@ -175,7 +201,7 @@ module.exports.permitSellerRequest = async (req: Request, res: Response, next: N
       const UUID = req.headers.authorization?.split(',')[1];
       const userEmail = req.headers.authorization?.split(',')[2];
 
-      const user = await User.findOne({ $and: [{ email: userEmail }, { _id: userId }, { _UUID: UUID }, { isSeller: 'pending' }] });
+      const user = await User.findOne({ $and: [{ email: userEmail }, { _id: userId }, { _uuid: UUID }, { isSeller: 'pending' }] });
 
       // console.log(user);
 
@@ -185,7 +211,7 @@ module.exports.permitSellerRequest = async (req: Request, res: Response, next: N
 
       let result = await User.updateOne(
          {
-            $and: [{ email: userEmail }, { _UUID: UUID }, { isSeller: 'pending' }]
+            $and: [{ email: userEmail }, { _uuid: UUID }, { isSeller: 'pending' }]
          }
          ,
          {

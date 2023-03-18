@@ -25,7 +25,7 @@ module.exports.findUserByEmail = async (email: string) => {
 module.exports.findUserByUUID = async (uuid: string) => {
    try {
       return await UserModel.findOne(
-         { $and: [{ _UUID: uuid }, { accountStatus: 'active' }] },
+         { $and: [{ _uuid: uuid }, { accountStatus: 'active' }] },
          {
             password: 0,
             createdAt: 0,
@@ -112,10 +112,10 @@ module.exports.get_product_variation = async (data: any) => {
    try {
 
       let variation = await Product.aggregate([
-         { $match: { $and: [{ _LID: data?.listingID }, { _id: mdb.ObjectId(data?.productID) }] } },
+         { $match: { $and: [{ _lid: data?.listingID }, { _id: mdb.ObjectId(data?.productID) }] } },
          { $unwind: { path: "$variations" } },
          { $project: { variations: 1 } },
-         { $match: { $and: [{ "variations._VID": data?.variationID }] } },
+         { $match: { $and: [{ "variations._vrid": data?.variationID }] } },
          { $replaceRoot: { newRoot: { $mergeObjects: ["$variations", "$$ROOT"] } } },
          { $unset: ["variations"] }
       ]);
@@ -146,10 +146,10 @@ module.exports.update_variation_stock_available = async (type: string, data: any
       const { productID, variationID, listingID, quantity } = data;
 
       let variation = await Product.aggregate([
-         { $match: { $and: [{ _LID: listingID }, { _id: mdb.ObjectId(productID) }] } },
+         { $match: { $and: [{ _lid: listingID }, { _id: mdb.ObjectId(productID) }] } },
          { $unwind: { path: "$variations" } },
          { $project: { variations: 1 } },
-         { $match: { $and: [{ "variations._VID": variationID }] } },
+         { $match: { $and: [{ "variations._vrid": variationID }] } },
          { $replaceRoot: { newRoot: { $mergeObjects: ["$variations", "$$ROOT"] } } },
          { $unset: ["variations"] }
       ]);
@@ -165,14 +165,14 @@ module.exports.update_variation_stock_available = async (type: string, data: any
       let stock: string = available <= 0 ? "out" : "in";
 
       return await Product.findOneAndUpdate(
-         { $and: [{ _id: mdb.ObjectId(productID) }, { _LID: listingID }] },
+         { $and: [{ _id: mdb.ObjectId(productID) }, { _lid: listingID }] },
          {
             $set: {
                "variations.$[i].available": available,
                "variations.$[i].stock": stock
             }
          },
-         { arrayFilters: [{ "i._VID": variationID }] }
+         { arrayFilters: [{ "i._vrid": variationID }] }
       ) || null;
    } catch (error: any) {
       return error?.message;
@@ -183,7 +183,7 @@ module.exports.update_variation_stock_available = async (type: string, data: any
 module.exports.getSellerInformationByID = async (uuid: string) => {
    try {
       let result = await UserModel.aggregate([
-         { $match: { _UUID: uuid } },
+         { $match: { _uuid: uuid } },
          {
             $project: {
                fullName: 1,
@@ -234,10 +234,10 @@ module.exports.basicProductProject = {
    packageInfo: 1,
    rating: 1,
    ratingAverage: 1,
-   _LID: 1,
+   _lid: 1,
    reviews: 1,
    image: { $first: "$images" },
-   _VID: "$variations._VID",
+   _vrid: "$variations._vrid",
    stock: "$variations.stock",
    variant: "$variations.variant",
    shipping: 1,
@@ -282,10 +282,84 @@ module.exports.is_product = async (productID: string, variationID: string) => {
       return await Product.countDocuments({
          $and: [
             { _id: mdb.ObjectId(productID) },
-            { variations: { $elemMatch: { _VID: variationID } } }
+            { variations: { $elemMatch: { _vrid: variationID } } }
          ]
       }) || 0;
    } catch (error: any) {
       return error;
    }
 }
+
+
+
+
+module.exports.productCounter = async (sellerInfo: any) => {
+   try {
+
+      async function cps(saveAs: string = "") {
+         let f;
+         let isSaveAs;
+
+         if (saveAs) {
+            isSaveAs = { 'save_as': saveAs };
+         } else {
+            isSaveAs = {};
+         }
+
+         if (sellerInfo) {
+            f = {
+               $and: [
+                  isSaveAs,
+                  { 'sellerData.storeName': sellerInfo?.storeName },
+                  { 'sellerData.sellerID': sellerInfo?._uuid }
+               ]
+            }
+         } else {
+            f = isSaveAs;
+
+         }
+         return await Product.countDocuments(f);
+      }
+
+      let totalProducts: Number = await cps();
+
+      let productInFulfilled: Number = await cps("fulfilled");
+
+      let productInDraft: Number = await cps("draft");
+
+      const setData = await UserModel.updateOne({ $and: [{ _uuid: sellerInfo?._uuid }, { role: 'SELLER' }] }, {
+         $set: {
+            "seller.storeInfos.numOfProduct": totalProducts,
+            "seller.storeInfos.productInFulfilled": productInFulfilled,
+            "seller.storeInfos.productInDraft": productInDraft
+         }
+      }, {});
+
+      if (setData) return true;
+
+   } catch (error: any) {
+      return error;
+   }
+}
+
+
+
+module.exports.checkProductAvailability = async (productID: string, variationID: String) => {
+
+   let product = await Product.aggregate([
+      { $match: { _id: mdb.ObjectId(productID) } },
+      { $unwind: { path: "$variations" } },
+      {
+         $project: {
+            _vrid: "$variations._vrid",
+            available: "$variations.available",
+            stock: "$variations.stock"
+         }
+      },
+      { $match: { $and: [{ _vrid: variationID }, { available: { $gte: 1 } }, { stock: 'in' }] } }
+   ]);
+
+   product = product[0];
+
+   return product;
+};

@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const Order = require("../../model/order.model");
 const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
-const response = require("../../errors/apiResponse");
+const apiResponse = require("../../errors/apiResponse");
 const { findUserByEmail, update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.services");
 module.exports = function SinglePurchaseOrder(req, res, next) {
     var _a, _b, _c, _d, _e;
@@ -20,7 +20,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
         try {
             const authEmail = req.decoded.email;
             const body = req.body;
-            const uuid = req.decoded._UUID;
+            const uuid = req.decoded._uuid;
             if (!body) {
                 return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
             }
@@ -33,9 +33,9 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                 ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
             let areaType = defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type;
             let product = yield Product.aggregate([
-                { $match: { $and: [{ _LID: listingID }, { _id: ObjectId(productID) }] } },
+                { $match: { $and: [{ _lid: listingID }, { _id: ObjectId(productID) }] } },
                 { $unwind: { path: "$variations" } },
-                { $match: { $and: [{ 'variations._VID': variationID }] } },
+                { $match: { $and: [{ 'variations._vrid': variationID }] } },
                 {
                     $project: {
                         _id: 0,

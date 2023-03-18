@@ -9,62 +9,59 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const { dbConnection } = require("../../utils/db");
-module.exports.addToWishlistHandler = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const User = require("../../model/user.model");
+const apiResponse = require("../../errors/apiResponse");
+const { findUserByEmail } = require("../../services/common.services");
+module.exports.addToWishlistHandler = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
     try {
-        const db = yield dbConnection();
         const userEmail = req.params.email;
         const verifiedEmail = req.decoded.email;
         const body = req.body;
         if (userEmail !== verifiedEmail) {
-            return res.status(403).send({ message: "Forbidden" });
+            throw new apiResponse.Api403Error("Forbidden !");
         }
-        const existsProduct = yield db.collection("users").findOne({
-            email: userEmail,
-            "wishlist._id": body === null || body === void 0 ? void 0 : body._id,
-        }, {
-            "wishlist.$": 1,
-        });
-        if (existsProduct) {
-            return res
-                .status(200)
-                .send({ message: "Product Has Already In Your Wishlist" });
+        if (!body || typeof body === "undefined") {
+            throw new apiResponse.Api400Error("Required body !");
         }
-        else {
-            const up = {
-                $push: { wishlist: body },
-            };
-            const wishlistRes = yield db
-                .collection("users")
-                .updateOne({ email: userEmail }, up, { upsert: true });
-            res.status(200).send({
+        const { productID, variationID, listingID } = body;
+        let model = {
+            productID,
+            variationID,
+            listingID
+        };
+        let user = yield findUserByEmail(verifiedEmail);
+        if (user) {
+            let existsProduct = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.wishlist) && ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.wishlist.filter((e) => ((e === null || e === void 0 ? void 0 : e.productID) === (body === null || body === void 0 ? void 0 : body.productID) && (e === null || e === void 0 ? void 0 : e.variationID) === (body === null || body === void 0 ? void 0 : body.variationID))))) || [];
+            if (existsProduct && existsProduct.length >= 1) {
+                return res.status(200).send({ success: true, statusCode: 200, message: "Product Has Already In Your Wishlist" });
+            }
+            const wishlistRes = yield User.findOneAndUpdate({ email: userEmail }, { $push: { "buyer.wishlist": model } }, { upsert: true });
+            return res.status(200).send({
+                success: true,
+                statusCode: 200,
                 data: wishlistRes,
                 message: "Product Added To Your wishlist",
             });
         }
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });
-module.exports.removeFromWishlistHandler = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.removeFromWishlist = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const db = yield dbConnection();
         const productID = req.params.productID;
         const userEmail = req.decoded.email;
-        const result = yield db
-            .collection("users")
-            .updateOne({ email: userEmail }, { $pull: { wishlist: { _id: productID } } });
+        const result = yield User.findOneAndUpdate({ email: userEmail }, { $pull: { "buyer.wishlist": { productID } } });
         if (result) {
-            return res
-                .status(200)
-                .send({ message: "Product removed from your wishlist" });
+            return res.status(200).send({ success: true, statusCode: 200, message: "Product removed from your wishlist" });
         }
         else {
-            return res.status(501).send({ message: "Service unavailable" });
+            throw new apiResponse.Api500Error("Service unavailable");
         }
     }
     catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
+        next(error);
     }
 });

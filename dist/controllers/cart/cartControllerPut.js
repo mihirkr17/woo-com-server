@@ -9,28 +9,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const ShoppingCart = require("../../model/shoppingCart.model");
 const User = require("../../model/user.model");
 const Product = require("../../model/product.model");
-const checkProductAvailability = (productID, variationID) => __awaiter(void 0, void 0, void 0, function* () {
-    let product = yield Product.aggregate([
-        { $match: { _id: ObjectId(productID) } },
-        { $unwind: { path: "$variations" } },
-        {
-            $match: {
-                $and: [
-                    { 'variations._VID': variationID },
-                    { 'variations.available': { $gte: 1 } },
-                    { 'variations.stock': 'in' }
-                ]
-            }
-        }
-    ]);
-    product = product[0];
-    return product;
-});
+const { checkProductAvailability } = require("../../services/common.services");
 module.exports.updateCartProductQuantityController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     try {
@@ -87,10 +70,9 @@ module.exports.updateCartProductQuantityController = (req, res, next) => __await
 });
 module.exports.updateCartAddress = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const db = yield dbConnection();
         const userEmail = req.decoded.email;
         const body = req.body;
-        const result = yield db.collection("users").updateOne({ email: userEmail }, {
+        const result = yield User.findOneAndUpdate({ email: userEmail }, {
             $set: {
                 "shippingAddress.$[i]": body,
             },

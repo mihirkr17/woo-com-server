@@ -32,7 +32,7 @@ const bodyInfoType = new Schema({
 }, { _id: false });
 
 var QueueProductSchema = new Schema({
-   _LID: { type: String },
+   _lid: { type: String },
    title: { type: String, required: true },
    slug: { type: String, required: true },
    categories: { type: Array, required: true },
@@ -68,7 +68,7 @@ QueueProductSchema.pre("save", async function (next: any) {
    let listingID = "LID" + Math.random().toString(36).toUpperCase().slice(2, 18);
 
    if (listingID) {
-      this._LID = listingID;
+      this._lid = listingID;
    }
 
    next();

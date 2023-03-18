@@ -1,7 +1,7 @@
 "use strict";
 // baseErrors.tsx
 class BaseError extends Error {
-    constructor(name, message, statusCode, success) {
+    constructor(message, name, statusCode, success) {
         super(message);
         this.name = "";
         this.message = "";

@@ -7,7 +7,7 @@ class BaseError extends Error {
    statusCode = 500;
    success = false;
 
-   constructor(name: string, message: string, statusCode: any, success: boolean) {
+   constructor(message: string, name: string, statusCode: any, success: boolean) {
 
       super(message);
 

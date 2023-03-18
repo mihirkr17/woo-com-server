@@ -1,27 +1,9 @@
 import { NextFunction, Request, Response } from "express";
-const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const ShoppingCart = require("../../model/shoppingCart.model");
 const User = require("../../model/user.model");
 const Product = require("../../model/product.model");
-
-const checkProductAvailability = async (productID: string, variationID: String) => {
-   let product = await Product.aggregate([
-      { $match: { _id: ObjectId(productID) } },
-      { $unwind: { path: "$variations" } },
-      {
-         $match: {
-            $and: [
-               { 'variations._VID': variationID },
-               { 'variations.available': { $gte: 1 } },
-               { 'variations.stock': 'in' }]
-         }
-      }
-   ]);
-
-   product = product[0];
-   return product;
-};
+const { checkProductAvailability } = require("../../services/common.services");
 
 
 module.exports.updateCartProductQuantityController = async (req: Request, res: Response, next: NextFunction) => {
@@ -103,12 +85,10 @@ module.exports.updateCartProductQuantityController = async (req: Request, res: R
 
 module.exports.updateCartAddress = async (req: Request, res: Response) => {
    try {
-      const db = await dbConnection();
-
       const userEmail = req.decoded.email;
       const body = req.body;
 
-      const result = await db.collection("users").updateOne(
+      const result = await User.findOneAndUpdate(
          { email: userEmail },
          {
             $set: {

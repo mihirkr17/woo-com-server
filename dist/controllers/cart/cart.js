@@ -28,7 +28,7 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
                 $lookup: {
                     from: 'products',
                     localField: 'listingID',
-                    foreignField: "_LID",
+                    foreignField: "_lid",
                     as: "main_product"
                 }
             },
@@ -39,7 +39,7 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
                 $match: {
                     $expr: {
                         $and: [
-                            { $eq: ['$variations._VID', '$variationID'] },
+                            { $eq: ['$variations._vrid', '$variationID'] },
                             { $eq: ["$variations.stock", "in"] },
                             { $eq: ["$variations.status", "active"] },
                             { $eq: ["$save_as", "fulfilled"] }

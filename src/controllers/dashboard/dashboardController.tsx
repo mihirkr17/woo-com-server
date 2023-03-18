@@ -1,11 +1,9 @@
 import { NextFunction, Request, Response } from "express";
-var { dbConnection } = require("../../utils/db");
 const User = require("../../model/user.model");
+const Product = require("../../model/product.model");
 
 module.exports.dashboardOverview = async (req: Request, res: Response, next:NextFunction) => {
    try {
-      const db = await dbConnection();
-
       const authEmail: String = req.decoded.email;
       const role: String = req.decoded.role;
 
@@ -39,7 +37,7 @@ module.exports.dashboardOverview = async (req: Request, res: Response, next:Next
          matches = { $match: { 'seller.storeInfos.totalSold': { $exists: true } } }
       }
 
-      topSoldProducts = await db.collection('products').aggregate([
+      topSoldProducts = await Product.aggregate([
          { $unwind: { path: '$variations' } },
          matches,
          {
@@ -56,7 +54,7 @@ module.exports.dashboardOverview = async (req: Request, res: Response, next:Next
          },
          { $sort: { totalSold: -1 } },
          { $limit: 10 }
-      ]).toArray();
+      ]);
 
 
 

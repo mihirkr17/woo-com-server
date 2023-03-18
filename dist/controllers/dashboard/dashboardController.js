@@ -9,12 +9,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-var { dbConnection } = require("../../utils/db");
 const User = require("../../model/user.model");
+const Product = require("../../model/product.model");
 module.exports.dashboardOverview = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     try {
-        const db = yield dbConnection();
         const authEmail = req.decoded.email;
         const role = req.decoded.role;
         let topSellers;
@@ -40,7 +39,7 @@ module.exports.dashboardOverview = (req, res, next) => __awaiter(void 0, void 0,
             ]);
             matches = { $match: { 'seller.storeInfos.totalSold': { $exists: true } } };
         }
-        topSoldProducts = yield db.collection('products').aggregate([
+        topSoldProducts = yield Product.aggregate([
             { $unwind: { path: '$variations' } },
             matches,
             {
@@ -57,7 +56,7 @@ module.exports.dashboardOverview = (req, res, next) => __awaiter(void 0, void 0,
             },
             { $sort: { totalSold: -1 } },
             { $limit: 10 }
-        ]).toArray();
+        ]);
         return res.status(200).send({ success: true, statusCode: 200, data: { topSellers, topSoldProducts } });
     }
     catch (error) {

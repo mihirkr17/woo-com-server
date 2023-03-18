@@ -27,7 +27,7 @@ const bodyInfoType = new mongoose_1.Schema({
     metaDescription: { type: String, required: true }
 }, { _id: false });
 var ProductSchema = new mongoose_1.Schema({
-    _LID: { type: String, required: true },
+    _lid: { type: String, required: true },
     title: { type: String, required: true },
     slug: { type: String, required: true },
     pricing: { type: Object, required: true },

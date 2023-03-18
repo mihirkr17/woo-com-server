@@ -1,5 +1,8 @@
+
+// src/controllers/order/SetOrder.tsx
+
 import { NextFunction, Request, Response } from "express";
-const response = require("../../errors/apiResponse");
+const apiResponse = require("../../errors/apiResponse");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const ShoppingCart = require("../../model/shoppingCart.model");
 const { findUserByEmail, actualSellingPrice, calculateShippingCost } = require("../../services/common.services");
@@ -12,11 +15,11 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
       const body: any = req.body;
 
       if (userEmail !== authEmail) {
-         throw new response.Api401Error("AuthError", "Unauthorized access !");
+         throw new apiResponse.Api401Error("Unauthorized access !");
       }
 
       if (!body || typeof body === "undefined") {
-         throw new response.Api400Error("ClientError", "Required body !");
+         throw new apiResponse.Api400Error("Required body !");
       }
 
       let user = await findUserByEmail(authEmail);
@@ -25,7 +28,7 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
          user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
 
       if (!defaultAddress) {
-         throw new response.Api400Error("ClientError", "Required shipping address !");
+         throw new apiResponse.Api400Error("Required shipping address !");
       }
 
       let areaType = defaultAddress?.area_type;
@@ -36,7 +39,7 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
             $lookup: {
                from: 'products',
                localField: 'listingID',
-               foreignField: "_LID",
+               foreignField: "_lid",
                as: "main_product"
             }
          },
@@ -47,7 +50,7 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
             $match: {
                $expr: {
                   $and: [
-                     { $eq: ['$variations._VID', '$variationID'] },
+                     { $eq: ['$variations._vrid', '$variationID'] },
                      { $eq: ["$variations.stock", "in"] },
                      { $eq: ["$variations.status", "active"] },
                      { $gt: ["$variations.available", "$quantity"] }
@@ -80,7 +83,7 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
       ]);
 
       if (!orderItems || orderItems.length <= 0) {
-         throw new response.Api400Error("ClientError", "Nothing for purchase ! Please add product in your cart.");
+         throw new apiResponse.Api400Error("Nothing for purchase ! Please add product in your cart.");
       }
 
       orderItems && orderItems.map((p: any) => {
@@ -115,7 +118,7 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
       });
 
       if (!paymentIntent?.client_secret) {
-         throw new response.Api400Error("ClientError", "Payment failed.");
+         throw new apiResponse.Api400Error("Payment failed.");
       }
 
 

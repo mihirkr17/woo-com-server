@@ -11,7 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const { ObjectId } = require("mongodb");
 const User = require("../../model/user.model");
-const response = require("../../errors/apiResponse");
+const apiResponse = require("../../errors/apiResponse");
 /**
  * @apiController --> Update Profile Data Controller
  * @apiMethod --> PUT
@@ -21,11 +21,27 @@ module.exports.updateProfileDataController = (req, res, next) => __awaiter(void 
     try {
         const email = req.decoded.email;
         const clientEmail = req.headers.authorization || "";
+        const body = req.body;
         if (clientEmail !== email) {
-            throw new response.Api400Error("AuthError", "Invalid email address !");
+            throw new apiResponse.Api400Error("Invalid email address !");
         }
-        const result = yield User.updateOne({ email: email }, { $set: req.body }, { new: true });
-        if ((result === null || result === void 0 ? void 0 : result.matchedCount) === 1) {
+        if (!body || typeof body === "undefined") {
+            throw new apiResponse.Api400Error("Required body with request !");
+        }
+        const { fullName, dob, gender } = body;
+        if (!fullName || typeof fullName !== "string")
+            throw new apiResponse.Api400Error("Required full name !");
+        if (!dob || typeof dob !== "string")
+            throw new apiResponse.Api400Error("Required date of birth !");
+        if (!gender || typeof gender !== "string")
+            throw new apiResponse.Api400Error("Required gender !");
+        let profileModel = {
+            fullName,
+            dob,
+            gender,
+        };
+        const result = yield User.findOneAndUpdate({ email: email }, { $set: profileModel }, { upsert: true });
+        if (result) {
             return res.status(200).send({ success: true, statusCode: 200, message: "Profile updated." });
         }
     }
@@ -142,13 +158,13 @@ module.exports.permitSellerRequest = (req, res, next) => __awaiter(void 0, void 
         const userId = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(',')[0];
         const UUID = (_b = req.headers.authorization) === null || _b === void 0 ? void 0 : _b.split(',')[1];
         const userEmail = (_c = req.headers.authorization) === null || _c === void 0 ? void 0 : _c.split(',')[2];
-        const user = yield User.findOne({ $and: [{ email: userEmail }, { _id: userId }, { _UUID: UUID }, { isSeller: 'pending' }] });
+        const user = yield User.findOne({ $and: [{ email: userEmail }, { _id: userId }, { _uuid: UUID }, { isSeller: 'pending' }] });
         // console.log(user);
         if (!user) {
             return res.status(400).send({ success: false, statusCode: 400, error: 'Sorry! request user not found.' });
         }
         let result = yield User.updateOne({
-            $and: [{ email: userEmail }, { _UUID: UUID }, { isSeller: 'pending' }]
+            $and: [{ email: userEmail }, { _uuid: UUID }, { isSeller: 'pending' }]
         }, {
             $set: { isSeller: 'fulfilled', accountStatus: 'active', becomeSellerAt: new Date() }
         }, { new: true });

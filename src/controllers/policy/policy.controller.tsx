@@ -1,33 +1,33 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
+const apiResponse = require("../../errors/apiResponse");
 
-module.exports.privacyPolicy = async (req: Request, res: Response) => {
+module.exports.privacyPolicy = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const db = await dbConnection();
 
     res.status(200).send(await db.collection("privacy-policy").findOne({}));
   } catch (error: any) {
-    res.status(500).send({ message: error?.message });
+    next(error);
   }
 };
 
-module.exports.updatePolicy = async (req: Request, res: Response) => {
+module.exports.updatePolicy = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const db = await dbConnection();
 
     const policyId: string = req.params.policyId;
     const body = req.body;
-    const result = await db
-      .collection("privacy-policy")
-      .updateOne({ _id: ObjectId(policyId) }, { $set: body }, { upsert: true });
+
+    const result = await db.collection("privacy-policy").updateOne({ _id: ObjectId(policyId) }, { $set: body }, { upsert: true });
 
     if (result) {
-      return res.status(200).send({ message: "Policy updated successfully" });
+      return res.status(200).send({ success: true, statusCode: 200, message: "Policy updated successfully" });
     } else {
-      return res.status(400).send({ message: "Update failed" });
+      throw new apiResponse.Api500Error("Update failed !");
     }
   } catch (error: any) {
-    res.status(500).send({ message: error?.message });
+    next(error);
   }
 };

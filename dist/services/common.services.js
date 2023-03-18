@@ -28,7 +28,7 @@ module.exports.findUserByEmail = (email) => __awaiter(void 0, void 0, void 0, fu
 });
 module.exports.findUserByUUID = (uuid) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        return (yield UserModel.findOne({ $and: [{ _UUID: uuid }, { accountStatus: 'active' }] }, {
+        return (yield UserModel.findOne({ $and: [{ _uuid: uuid }, { accountStatus: 'active' }] }, {
             password: 0,
             createdAt: 0,
             phonePrefixCode: 0,
@@ -107,10 +107,10 @@ module.exports.order_status_updater = (obj) => __awaiter(void 0, void 0, void 0,
 module.exports.get_product_variation = (data) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         let variation = yield Product.aggregate([
-            { $match: { $and: [{ _LID: data === null || data === void 0 ? void 0 : data.listingID }, { _id: mdb.ObjectId(data === null || data === void 0 ? void 0 : data.productID) }] } },
+            { $match: { $and: [{ _lid: data === null || data === void 0 ? void 0 : data.listingID }, { _id: mdb.ObjectId(data === null || data === void 0 ? void 0 : data.productID) }] } },
             { $unwind: { path: "$variations" } },
             { $project: { variations: 1 } },
-            { $match: { $and: [{ "variations._VID": data === null || data === void 0 ? void 0 : data.variationID }] } },
+            { $match: { $and: [{ "variations._vrid": data === null || data === void 0 ? void 0 : data.variationID }] } },
             { $replaceRoot: { newRoot: { $mergeObjects: ["$variations", "$$ROOT"] } } },
             { $unset: ["variations"] }
         ]);
@@ -133,10 +133,10 @@ module.exports.update_variation_stock_available = (type, data) => __awaiter(void
         }
         const { productID, variationID, listingID, quantity } = data;
         let variation = yield Product.aggregate([
-            { $match: { $and: [{ _LID: listingID }, { _id: mdb.ObjectId(productID) }] } },
+            { $match: { $and: [{ _lid: listingID }, { _id: mdb.ObjectId(productID) }] } },
             { $unwind: { path: "$variations" } },
             { $project: { variations: 1 } },
-            { $match: { $and: [{ "variations._VID": variationID }] } },
+            { $match: { $and: [{ "variations._vrid": variationID }] } },
             { $replaceRoot: { newRoot: { $mergeObjects: ["$variations", "$$ROOT"] } } },
             { $unset: ["variations"] }
         ]);
@@ -148,12 +148,12 @@ module.exports.update_variation_stock_available = (type, data) => __awaiter(void
             available = parseInt(variation === null || variation === void 0 ? void 0 : variation.available) - parseInt(quantity);
         }
         let stock = available <= 0 ? "out" : "in";
-        return (yield Product.findOneAndUpdate({ $and: [{ _id: mdb.ObjectId(productID) }, { _LID: listingID }] }, {
+        return (yield Product.findOneAndUpdate({ $and: [{ _id: mdb.ObjectId(productID) }, { _lid: listingID }] }, {
             $set: {
                 "variations.$[i].available": available,
                 "variations.$[i].stock": stock
             }
-        }, { arrayFilters: [{ "i._VID": variationID }] })) || null;
+        }, { arrayFilters: [{ "i._vrid": variationID }] })) || null;
     }
     catch (error) {
         return error === null || error === void 0 ? void 0 : error.message;
@@ -162,7 +162,7 @@ module.exports.update_variation_stock_available = (type, data) => __awaiter(void
 module.exports.getSellerInformationByID = (uuid) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         let result = yield UserModel.aggregate([
-            { $match: { _UUID: uuid } },
+            { $match: { _uuid: uuid } },
             {
                 $project: {
                     fullName: 1,
@@ -208,10 +208,10 @@ module.exports.basicProductProject = {
     packageInfo: 1,
     rating: 1,
     ratingAverage: 1,
-    _LID: 1,
+    _lid: 1,
     reviews: 1,
     image: { $first: "$images" },
-    _VID: "$variations._VID",
+    _vrid: "$variations._vrid",
     stock: "$variations.stock",
     variant: "$variations.variant",
     shipping: 1,
@@ -247,11 +247,71 @@ module.exports.is_product = (productID, variationID) => __awaiter(void 0, void 0
         return (yield Product.countDocuments({
             $and: [
                 { _id: mdb.ObjectId(productID) },
-                { variations: { $elemMatch: { _VID: variationID } } }
+                { variations: { $elemMatch: { _vrid: variationID } } }
             ]
         })) || 0;
     }
     catch (error) {
         return error;
     }
+});
+module.exports.productCounter = (sellerInfo) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        function cps(saveAs = "") {
+            return __awaiter(this, void 0, void 0, function* () {
+                let f;
+                let isSaveAs;
+                if (saveAs) {
+                    isSaveAs = { 'save_as': saveAs };
+                }
+                else {
+                    isSaveAs = {};
+                }
+                if (sellerInfo) {
+                    f = {
+                        $and: [
+                            isSaveAs,
+                            { 'sellerData.storeName': sellerInfo === null || sellerInfo === void 0 ? void 0 : sellerInfo.storeName },
+                            { 'sellerData.sellerID': sellerInfo === null || sellerInfo === void 0 ? void 0 : sellerInfo._uuid }
+                        ]
+                    };
+                }
+                else {
+                    f = isSaveAs;
+                }
+                return yield Product.countDocuments(f);
+            });
+        }
+        let totalProducts = yield cps();
+        let productInFulfilled = yield cps("fulfilled");
+        let productInDraft = yield cps("draft");
+        const setData = yield UserModel.updateOne({ $and: [{ _uuid: sellerInfo === null || sellerInfo === void 0 ? void 0 : sellerInfo._uuid }, { role: 'SELLER' }] }, {
+            $set: {
+                "seller.storeInfos.numOfProduct": totalProducts,
+                "seller.storeInfos.productInFulfilled": productInFulfilled,
+                "seller.storeInfos.productInDraft": productInDraft
+            }
+        }, {});
+        if (setData)
+            return true;
+    }
+    catch (error) {
+        return error;
+    }
+});
+module.exports.checkProductAvailability = (productID, variationID) => __awaiter(void 0, void 0, void 0, function* () {
+    let product = yield Product.aggregate([
+        { $match: { _id: mdb.ObjectId(productID) } },
+        { $unwind: { path: "$variations" } },
+        {
+            $project: {
+                _vrid: "$variations._vrid",
+                available: "$variations.available",
+                stock: "$variations.stock"
+            }
+        },
+        { $match: { $and: [{ _vrid: variationID }, { available: { $gte: 1 } }, { stock: 'in' }] } }
+    ]);
+    product = product[0];
+    return product;
 });

@@ -16,7 +16,7 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
       const { paymentIntentID, paymentMethodID, orderPaymentID, orderItems } = body;
 
       const email = req.decoded.email;
-      const uuid = req.decoded._UUID;
+      const uuid = req.decoded._uuid;
 
       if (!paymentIntentID || !paymentMethodID) {
          return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
@@ -40,13 +40,13 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
          let product;
 
          let newProduct = await Product.aggregate([
-            { $match: { $and: [{ _LID: listingID }, { _id: ObjectId(productID) }] } },
+            { $match: { $and: [{ _lid: listingID }, { _id: ObjectId(productID) }] } },
             { $unwind: { path: "$variations" } },
             {
                $match: {
                   $expr: {
                      $and: [
-                        { $eq: ['$variations._VID', variationID] },
+                        { $eq: ['$variations._vrid', variationID] },
                         { $eq: ["$variations.stock", "in"] },
                         { $eq: ["$variations.status", "active"] },
                         { $gte: ["$variations.available", parseInt(quantity)] }

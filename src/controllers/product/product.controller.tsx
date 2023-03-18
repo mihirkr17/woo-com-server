@@ -18,39 +18,37 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
 
       const productID = req.query?.pId;
       const variationID = req.query?.vId;
-      let existProductInCart: any = null;
+      // let existProductInCart: any = null;
       let areaType: any;
 
-      const token: any = req.cookies.token || req.headers?.authorization || req.query?.token;
+      // const token: any = req.cookies.token;
 
-      console.log(token);
+      // let uuid: any = null;
 
-      let uuid: any = null;
-
-      if (token && typeof token !== "undefined") {
-         jwt.verify(token, process.env.ACCESS_TOKEN, (err: any, decoded: any) => {
-            if (err) {
-               uuid = null;
-            } else {
-               uuid = decoded?._UUID || null;
-            }
-         });
-      }
+      // if (token && typeof token !== "undefined") {
+      //    jwt.verify(token, process.env.ACCESS_TOKEN, (err: any, decoded: any) => {
+      //       if (err) {
+      //          uuid = null;
+      //       } else {
+      //          uuid = decoded?._uuid || null;
+      //       }
+      //    });
+      // }
 
       // If user email address exists
-      if (uuid && typeof uuid === 'string') {
+      // if (uuid && typeof uuid === 'string') {
 
-         let user = await findUserByUUID(uuid);
+      //    let user = await findUserByUUID(uuid);
 
-         if (user && typeof user === "object") {
-            existProductInCart = await ShoppingCart.findOne({ $and: [{ customerEmail: user?.email }, { variationID: variationID }] });
+      //    if (user && typeof user === "object") {
+      //       existProductInCart = await ShoppingCart.findOne({ $and: [{ customerEmail: user?.email }, { variationID: variationID }] });
 
-            let defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
-               user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
+      //       let defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
+      //          user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
 
-            areaType = defaultShippingAddress?.area_type;
-         }
-      }
+      //       areaType = defaultShippingAddress?.area_type;
+      //    }
+      // }
 
       // Product Details
       let productDetail = await Product.aggregate([
@@ -69,13 +67,13 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
                         }
                      },
                      as: "variation",
-                     in: { variant: "$$variation.variant", _VID: "$$variation._VID" }
+                     in: { variant: "$$variation.variant", _vrid: "$$variation._vrid" }
                   }
                }
             }
          },
          { $unwind: { path: '$variations' } },
-         { $match: { 'variations._VID': variationID } },
+         { $match: { 'variations._vrid': variationID } },
          {
             $project: {
                title: '$variations.vTitle',
@@ -97,12 +95,12 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
                pricing: newPricing,
                isFreeShipping: "$shipping.isFree",
                volumetricWeight: "$package.volumetricWeight",
-               _LID: 1,
-               inCart: {
-                  $cond: {
-                     if: { $eq: [existProductInCart, null] }, then: false, else: true
-                  }
-               }
+               _lid: 1,
+               // inCart: {
+               //    $cond: {
+               //       if: { $eq: [existProductInCart, null] }, then: false, else: true
+               //    }
+               // }
             }
          }
       ]);
@@ -128,7 +126,7 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
             $match: {
                $and: [
                   { categories: { $in: productDetail.categories } },
-                  { "variations._VID": { $ne: variationID } },
+                  { "variations._vrid": { $ne: variationID } },
                   { "variations.status": "active" },
                ],
             },
@@ -244,10 +242,10 @@ module.exports.searchProducts = async (req: Request, res: Response, next: NextFu
             $project: {
                title: "$variations.vTitle",
                categories: 1,
-               _VID: "$variations._VID",
+               _vrid: "$variations._vrid",
                image: { $first: "$images" },
                slug: 1,
-               _LID: 1
+               _lid: 1
             },
          },
       ])) || [];
@@ -285,7 +283,7 @@ module.exports.homeStoreController = async (req: Request, res: Response, next: N
          },
          { $unwind: { path: "$variations" } },
          { $project: basicProductProject },
-         { $sort: { "variations._VID": -1 } },
+         { $sort: { "variations._vrid": -1 } },
          { $limit: totalLimits }
       ]);
 
@@ -357,9 +355,9 @@ module.exports.purchaseProductController = async (req: Request, res: Response, n
       let areaType = defaultShippingAddress?.area_type;
 
       let product = await Product.aggregate([
-         { $match: { _LID: body?.listingID } },
+         { $match: { _lid: body?.listingID } },
          { $unwind: { path: "$variations" } },
-         { $match: { $and: [{ 'variations._VID': body?.variationID }] } },
+         { $match: { $and: [{ 'variations._vrid': body?.variationID }] } },
          {
             $project: {
                _id: 0,

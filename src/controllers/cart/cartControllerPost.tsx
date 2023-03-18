@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 const { cartTemplate } = require("../../templates/cart.template");
-const { checkProductAvailability } = require("../../model/common.model");
+const { checkProductAvailability } = require("../../services/common.services");
 const ShoppingCart = require("../../model/shoppingCart.model");
 // add to cart controller
 /**

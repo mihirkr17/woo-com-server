@@ -1,5 +1,4 @@
 import { NextFunction, Request, Response } from "express";
-const { dbConnection } = require("../../utils/db");
 const Product = require("../../model/product.model");
 const Order = require("../../model/order.model");
 const { order_status_updater, update_variation_stock_available } = require("../../services/common.services");
@@ -7,7 +6,6 @@ const { order_status_updater, update_variation_stock_available } = require("../.
 
 module.exports.myOrder = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const db = await dbConnection();
     const email = req.params.email;
     const authEmail = req.decoded.email;
 
@@ -29,16 +27,14 @@ module.exports.myOrder = async (req: Request, res: Response, next: NextFunction)
 
 module.exports.removeOrder = async (req: Request, res: Response, next: any) => {
   try {
-    const db = await dbConnection();
 
     const orderUserEmail = req.params.email;
     const id = parseInt(req.params.orderId);
-    const result = await db
-      .collection("orders")
-      .updateOne(
-        { user_email: orderUserEmail },
-        { $pull: { orders: { orderId: id } } }
-      );
+
+    const result = await Order.findOneAndUpdate(
+      { user_email: orderUserEmail },
+      { $pull: { orders: { orderId: id } } }
+    );
 
     res.status(200).send({ result, message: "Order Removed successfully" });
   } catch (error: any) {

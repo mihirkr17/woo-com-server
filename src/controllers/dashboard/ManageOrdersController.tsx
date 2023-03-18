@@ -8,7 +8,7 @@ module.exports.manageOrders = async (req: Request, res: Response, next: NextFunc
 
     const view: any = req.query?.view || "";
     const storeName = req.params.storeName;
-    const uuid = req.decoded._UUID;
+    const uuid = req.decoded._uuid;
     let result: any;
 
 
@@ -22,7 +22,7 @@ module.exports.manageOrders = async (req: Request, res: Response, next: NextFunc
             $lookup: {
               from: 'products',
               localField: 'listingID',
-              foreignField: "_LID",
+              foreignField: "_lid",
               as: "main_product"
             }
           },
@@ -37,7 +37,7 @@ module.exports.manageOrders = async (req: Request, res: Response, next: NextFunc
               'bodyInfo', 'main_product',
               "modifiedAt", "paymentInfo",
               "variations", "_id", "tax", "save_as", "reviews",
-              "ratingAverage", "_LID", "specification", "rating", "isVerified", "createdAt", "categories"
+              "ratingAverage", "_lid", "specification", "rating", "isVerified", "createdAt", "categories"
             ]
           }, {
             $group: {
@@ -60,7 +60,7 @@ module.exports.manageOrders = async (req: Request, res: Response, next: NextFunc
             $lookup: {
               from: 'products',
               localField: 'listingID',
-              foreignField: "_LID",
+              foreignField: "_lid",
               as: "main_product"
             }
           },
@@ -75,7 +75,7 @@ module.exports.manageOrders = async (req: Request, res: Response, next: NextFunc
               'bodyInfo', 'main_product',
               "modifiedAt", "paymentInfo",
               "variations", "_id", "tax", "save_as", "reviews",
-              "ratingAverage", "_LID", "specification", "rating", "isVerified", "createdAt", "categories"
+              "ratingAverage", "_lid", "specification", "rating", "isVerified", "createdAt", "categories"
             ]
           }
         ]);

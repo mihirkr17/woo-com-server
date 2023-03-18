@@ -32,7 +32,7 @@ const bodyInfoType = new Schema({
 }, { _id: false });
 
 var ProductSchema = new Schema({
-   _LID: { type: String, required: true },
+   _lid: { type: String, required: true },
    title: { type: String, required: true },
    slug: { type: String, required: true },
    pricing: { type: Object, required: true },

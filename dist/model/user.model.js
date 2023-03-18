@@ -16,7 +16,8 @@ const saltRounds = 10;
 const buyerType = new mongoose_1.Schema({
     taxId: { type: String },
     defaultShippingAddress: { type: Object },
-    shoppingCartItems: { type: Number },
+    shoppingCartItems: { type: Array },
+    wishlist: { type: Array },
     shippingAddress: [
         {
             _id: false,
@@ -53,7 +54,7 @@ const sellerType = new mongoose_1.Schema({
 }, { _id: false });
 // user schema design
 var UserSchema = new mongoose_1.Schema({
-    _UUID: { type: String },
+    _uuid: { type: String },
     fullName: { type: String, required: true },
     email: {
         type: String,
