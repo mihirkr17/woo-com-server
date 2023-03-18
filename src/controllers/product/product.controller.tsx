@@ -21,8 +21,10 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
       let existProductInCart: any = null;
       let areaType: any;
 
-      const token: any = req.cookies.token || req.headers?.authorization;
-      
+      const token: any = req.cookies.token || req.headers?.authorization || req.query?.token;
+
+      console.log(token);
+
       let uuid: any = null;
 
       if (token && typeof token !== "undefined") {
