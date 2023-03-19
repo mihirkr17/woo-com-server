@@ -8,6 +8,10 @@ const setUserDataToken = require("../../utils/setUserDataToken");
 module.exports = async function FetchAuthUser(req: Request, res: Response, next: NextFunction) {
    try {
       const authEmail = req.decoded.email;
+
+      let token = req.cookies.token;
+
+      let maxAgeOfCookie = token && token.maxAge;
       let user: any;
       let userDataToken: any;
 
@@ -48,7 +52,15 @@ module.exports = async function FetchAuthUser(req: Request, res: Response, next:
          });
       }
 
-      return res.status(200).send({ success: true, statusCode: 200, message: 'Welcome ' + user?.fullName, data: user, ipAddress, u_data: userDataToken });
+      return res.status(200).send({
+         success: true,
+         statusCode: 200,
+         message: 'Welcome ' + user?.fullName,
+         data: user,
+         ipAddress,
+         u_data: userDataToken,
+         maxAgeOfCookie
+      });
 
    } catch (error: any) {
       next(error);
