@@ -23,7 +23,7 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
 
       let uuid: string = req.headers?.authorization || req.cookies["_uuid"] || "";
 
-      console.log(req);
+      console.log(req.cookies);
 
       // If user email address exists
       if (uuid && typeof uuid === 'string') {

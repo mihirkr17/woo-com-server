@@ -28,7 +28,7 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
         let existProductInCart = null;
         let areaType;
         let uuid = ((_c = req.headers) === null || _c === void 0 ? void 0 : _c.authorization) || req.cookies["_uuid"] || "";
-        console.log(req);
+        console.log(req.cookies);
         // If user email address exists
         if (uuid && typeof uuid === 'string') {
             let user = yield findUserByUUID(uuid);
