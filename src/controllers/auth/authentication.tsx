@@ -145,6 +145,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
    try {
 
       const { emailOrPhone, password, authProvider } = req.body;
+      
       let token: String;
       let userDataToken: any;
       let userData;
