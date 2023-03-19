@@ -23,7 +23,7 @@ const app: Express = express();
 // middleware
 app.use(
   cors({
-    origin: true,
+    origin: "https://wookart.vercel.app/" || true,
     methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
     credentials: true,
   })
