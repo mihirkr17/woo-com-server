@@ -21,10 +21,16 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
       let existProductInCart: any = null;
       let areaType: any;
 
-      let uuid: string = req.headers?.authorization || req.cookies["_uuid"] || "";
+      const clientDataToken = req.cookies["client_data"];
 
-      console.log(req.cookies);
+      let uuid: any = clientDataToken && jwt.verify(clientDataToken, process.env.ACCESS_TOKEN, (err: any, decoded: any) => {
+         if (err) {
+            return null;
+         }
+         return decoded._uuid;
+      });
 
+      console.log(uuid);
       // If user email address exists
       if (uuid && typeof uuid === 'string') {
 

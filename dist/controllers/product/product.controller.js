@@ -21,21 +21,27 @@ const { findUserByEmail, findUserByUUID, getSellerInformationByID, actualSelling
  * @request_method  --> GET
  */
 module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f;
     try {
         const productID = (_a = req.query) === null || _a === void 0 ? void 0 : _a.pId;
         const variationID = (_b = req.query) === null || _b === void 0 ? void 0 : _b.vId;
         let existProductInCart = null;
         let areaType;
-        let uuid = ((_c = req.headers) === null || _c === void 0 ? void 0 : _c.authorization) || req.cookies["_uuid"] || "";
-        console.log(req.cookies);
+        const clientDataToken = req.cookies["client_data"];
+        let uuid = clientDataToken && jwt.verify(clientDataToken, process.env.ACCESS_TOKEN, (err, decoded) => {
+            if (err) {
+                return null;
+            }
+            return decoded._uuid;
+        });
+        console.log(uuid);
         // If user email address exists
         if (uuid && typeof uuid === 'string') {
             let user = yield findUserByUUID(uuid);
             if (user && typeof user === "object") {
                 existProductInCart = yield ShoppingCart.findOne({ $and: [{ customerEmail: user === null || user === void 0 ? void 0 : user.email }, { variationID: variationID }] });
-                let defaultShippingAddress = (Array.isArray((_d = user === null || user === void 0 ? void 0 : user.buyer) === null || _d === void 0 ? void 0 : _d.shippingAddress) &&
-                    ((_e = user === null || user === void 0 ? void 0 : user.buyer) === null || _e === void 0 ? void 0 : _e.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
+                let defaultShippingAddress = (Array.isArray((_c = user === null || user === void 0 ? void 0 : user.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress) &&
+                    ((_d = user === null || user === void 0 ? void 0 : user.buyer) === null || _d === void 0 ? void 0 : _d.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
                 areaType = (defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type) || "";
             }
         }
@@ -100,8 +106,8 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
         else {
             productDetail["shippingCharge"] = calculateShippingCost(productDetail === null || productDetail === void 0 ? void 0 : productDetail.volumetricWeight, areaType);
         }
-        if ((_f = productDetail === null || productDetail === void 0 ? void 0 : productDetail.sellerData) === null || _f === void 0 ? void 0 : _f.sellerID) {
-            productDetail["sellerInfo"] = yield getSellerInformationByID((_g = productDetail === null || productDetail === void 0 ? void 0 : productDetail.sellerData) === null || _g === void 0 ? void 0 : _g.sellerID);
+        if ((_e = productDetail === null || productDetail === void 0 ? void 0 : productDetail.sellerData) === null || _e === void 0 ? void 0 : _e.sellerID) {
+            productDetail["sellerInfo"] = yield getSellerInformationByID((_f = productDetail === null || productDetail === void 0 ? void 0 : productDetail.sellerData) === null || _f === void 0 ? void 0 : _f.sellerID);
         }
         // Related products
         const relatedProducts = yield Product.aggregate([
@@ -292,13 +298,13 @@ module.exports.fetchTopSellingProduct = (req, res, next) => __awaiter(void 0, vo
     }
 });
 module.exports.purchaseProductController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _h, _j, _k, _l, _m;
+    var _g, _h, _j, _k, _l;
     try {
         const authEmail = req.decoded.email;
         const body = req.body;
         let user = yield findUserByEmail(authEmail);
-        let defaultShippingAddress = (Array.isArray((_h = user === null || user === void 0 ? void 0 : user.buyer) === null || _h === void 0 ? void 0 : _h.shippingAddress) &&
-            ((_j = user === null || user === void 0 ? void 0 : user.buyer) === null || _j === void 0 ? void 0 : _j.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
+        let defaultShippingAddress = (Array.isArray((_g = user === null || user === void 0 ? void 0 : user.buyer) === null || _g === void 0 ? void 0 : _g.shippingAddress) &&
+            ((_h = user === null || user === void 0 ? void 0 : user.buyer) === null || _h === void 0 ? void 0 : _h.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
         let areaType = defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type;
         let product = yield Product.aggregate([
             { $match: { _lid: body === null || body === void 0 ? void 0 : body.listingID } },
@@ -334,11 +340,11 @@ module.exports.purchaseProductController = (req, res, next) => __awaiter(void 0,
             product["listingID"] = body === null || body === void 0 ? void 0 : body.listingID;
             product["variationID"] = body === null || body === void 0 ? void 0 : body.variationID;
             product["customerEmail"] = body === null || body === void 0 ? void 0 : body.customerEmail;
-            if (((_k = product === null || product === void 0 ? void 0 : product.shipping) === null || _k === void 0 ? void 0 : _k.isFree) && ((_l = product === null || product === void 0 ? void 0 : product.shipping) === null || _l === void 0 ? void 0 : _l.isFree)) {
+            if (((_j = product === null || product === void 0 ? void 0 : product.shipping) === null || _j === void 0 ? void 0 : _j.isFree) && ((_k = product === null || product === void 0 ? void 0 : product.shipping) === null || _k === void 0 ? void 0 : _k.isFree)) {
                 product["shippingCharge"] = 0;
             }
             else {
-                product["shippingCharge"] = calculateShippingCost((_m = product === null || product === void 0 ? void 0 : product.package) === null || _m === void 0 ? void 0 : _m.volumetricWeight, areaType);
+                product["shippingCharge"] = calculateShippingCost((_l = product === null || product === void 0 ? void 0 : product.package) === null || _l === void 0 ? void 0 : _l.volumetricWeight, areaType);
             }
             const baseAmounts = (product === null || product === void 0 ? void 0 : product.baseAmount) && parseInt(product === null || product === void 0 ? void 0 : product.baseAmount);
             const totalQuantities = (product === null || product === void 0 ? void 0 : product.quantity) && parseInt(product === null || product === void 0 ? void 0 : product.quantity);
