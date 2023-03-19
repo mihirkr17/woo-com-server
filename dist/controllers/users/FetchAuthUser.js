@@ -14,7 +14,7 @@ const ShoppingCart = require("../../model/shoppingCart.model");
 const apiResponse = require("../../errors/apiResponse");
 const setUserDataToken = require("../../utils/setUserDataToken");
 module.exports = function FetchAuthUser(req, res, next) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c;
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const authEmail = req.decoded.email;
@@ -22,17 +22,17 @@ module.exports = function FetchAuthUser(req, res, next) {
             let maxAgeOfCookie = token && token.maxAge;
             let user;
             let userDataToken;
-            const ipAddress = (_a = req.socket) === null || _a === void 0 ? void 0 : _a.remoteAddress;
+            // const ipAddress = req.socket?.remoteAddress;
             user = yield findUserByEmail(authEmail);
             if (!user || typeof user !== "object") {
                 throw new apiResponse.Api404Error("User not found !");
             }
             if (user && (user === null || user === void 0 ? void 0 : user.role) === 'SELLER' && (user === null || user === void 0 ? void 0 : user.idFor) === 'sell') {
-                yield productCounter({ storeName: (_b = user.seller.storeInfos) === null || _b === void 0 ? void 0 : _b.storeName, _uuid: user === null || user === void 0 ? void 0 : user._uuid });
+                yield productCounter({ storeName: (_a = user.seller.storeInfos) === null || _a === void 0 ? void 0 : _a.storeName, _uuid: user === null || user === void 0 ? void 0 : user._uuid });
             }
             if (user && (user === null || user === void 0 ? void 0 : user.role) === 'BUYER' && (user === null || user === void 0 ? void 0 : user.idFor) === 'buy') {
-                user.buyer["defaultShippingAddress"] = (Array.isArray((_c = user === null || user === void 0 ? void 0 : user.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress) &&
-                    ((_d = user === null || user === void 0 ? void 0 : user.buyer) === null || _d === void 0 ? void 0 : _d.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0])) || {};
+                user.buyer["defaultShippingAddress"] = (Array.isArray((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress) &&
+                    ((_c = user === null || user === void 0 ? void 0 : user.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0])) || {};
                 user.buyer["shoppingCartItems"] = (yield ShoppingCart.countDocuments({ customerEmail: user === null || user === void 0 ? void 0 : user.email })) || 0;
                 userDataToken = setUserDataToken({
                     _uuid: user === null || user === void 0 ? void 0 : user._uuid,
@@ -54,8 +54,6 @@ module.exports = function FetchAuthUser(req, res, next) {
                 success: true,
                 statusCode: 200,
                 message: 'Welcome ' + (user === null || user === void 0 ? void 0 : user.fullName),
-                data: user,
-                ipAddress,
                 u_data: userDataToken,
                 maxAgeOfCookie
             });

@@ -15,7 +15,7 @@ module.exports = async function FetchAuthUser(req: Request, res: Response, next:
       let user: any;
       let userDataToken: any;
 
-      const ipAddress = req.socket?.remoteAddress;
+      // const ipAddress = req.socket?.remoteAddress;
 
       user = await findUserByEmail(authEmail);
 
@@ -56,8 +56,6 @@ module.exports = async function FetchAuthUser(req: Request, res: Response, next:
          success: true,
          statusCode: 200,
          message: 'Welcome ' + user?.fullName,
-         data: user,
-         ipAddress,
          u_data: userDataToken,
          maxAgeOfCookie
       });

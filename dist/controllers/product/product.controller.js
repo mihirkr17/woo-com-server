@@ -28,13 +28,12 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
         let existProductInCart = null;
         let areaType;
         const clientDataToken = req.cookies["client_data"];
-        let uuid = clientDataToken && jwt.verify(clientDataToken, process.env.ACCESS_TOKEN, (err, decoded) => {
+        let uuid = (clientDataToken && jwt.verify(clientDataToken, process.env.ACCESS_TOKEN, (err, decoded) => {
             if (err) {
                 return null;
             }
             return decoded._uuid;
-        });
-        console.log(uuid);
+        })) || null;
         // If user email address exists
         if (uuid && typeof uuid === 'string') {
             let user = yield findUserByUUID(uuid);

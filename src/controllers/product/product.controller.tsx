@@ -23,14 +23,13 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
 
       const clientDataToken = req.cookies["client_data"];
 
-      let uuid: any = clientDataToken && jwt.verify(clientDataToken, process.env.ACCESS_TOKEN, (err: any, decoded: any) => {
+      let uuid: any = (clientDataToken && jwt.verify(clientDataToken, process.env.ACCESS_TOKEN, (err: any, decoded: any) => {
          if (err) {
             return null;
          }
          return decoded._uuid;
-      });
+      })) || null;
 
-      console.log(uuid);
       // If user email address exists
       if (uuid && typeof uuid === 'string') {
 
