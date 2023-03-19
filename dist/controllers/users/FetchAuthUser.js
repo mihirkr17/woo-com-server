@@ -47,7 +47,6 @@ module.exports = function FetchAuthUser(req, res, next) {
                     contactEmail: user === null || user === void 0 ? void 0 : user.contactEmail,
                     buyer: user === null || user === void 0 ? void 0 : user.buyer
                 });
-                res.cookie("_uuid", user === null || user === void 0 ? void 0 : user._uuid, { httpOnly: false, sameSite: "none", secure: true, maxAge: 57600000 });
             }
             return res.status(200).send({ success: true, statusCode: 200, message: 'Welcome ' + (user === null || user === void 0 ? void 0 : user.fullName), data: user, ipAddress, u_data: userDataToken });
         }

@@ -46,8 +46,6 @@ module.exports = async function FetchAuthUser(req: Request, res: Response, next:
             contactEmail: user?.contactEmail,
             buyer: user?.buyer
          });
-
-         res.cookie("_uuid", user?._uuid, { httpOnly: false, sameSite: "none", secure: true, maxAge: 57600000 });
       }
 
       return res.status(200).send({ success: true, statusCode: 200, message: 'Welcome ' + user?.fullName, data: user, ipAddress, u_data: userDataToken });
