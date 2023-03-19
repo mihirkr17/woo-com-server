@@ -48,7 +48,8 @@ module.exports = async function FetchAuthUser(req: Request, res: Response, next:
             idFor: user?.idFor,
             accountStatus: user?.accountStatus,
             contactEmail: user?.contactEmail,
-            buyer: user?.buyer
+            buyer: user?.buyer,
+            authProvider: user?.authProvider
          });
       }
 

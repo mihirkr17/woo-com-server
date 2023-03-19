@@ -187,7 +187,8 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
                     idFor: existUser === null || existUser === void 0 ? void 0 : existUser.idFor,
                     accountStatus: existUser === null || existUser === void 0 ? void 0 : existUser.accountStatus,
                     contactEmail: existUser === null || existUser === void 0 ? void 0 : existUser.contactEmail,
-                    buyer: existUser === null || existUser === void 0 ? void 0 : existUser.buyer
+                    buyer: existUser === null || existUser === void 0 ? void 0 : existUser.buyer,
+                    authProvider: existUser === null || existUser === void 0 ? void 0 : existUser.authProvider
                 });
             }
         }

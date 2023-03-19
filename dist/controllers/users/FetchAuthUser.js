@@ -47,7 +47,8 @@ module.exports = function FetchAuthUser(req, res, next) {
                     idFor: user === null || user === void 0 ? void 0 : user.idFor,
                     accountStatus: user === null || user === void 0 ? void 0 : user.accountStatus,
                     contactEmail: user === null || user === void 0 ? void 0 : user.contactEmail,
-                    buyer: user === null || user === void 0 ? void 0 : user.buyer
+                    buyer: user === null || user === void 0 ? void 0 : user.buyer,
+                    authProvider: user === null || user === void 0 ? void 0 : user.authProvider
                 });
             }
             return res.status(200).send({

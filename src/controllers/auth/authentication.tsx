@@ -226,7 +226,8 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
                idFor: existUser?.idFor,
                accountStatus: existUser?.accountStatus,
                contactEmail: existUser?.contactEmail,
-               buyer: existUser?.buyer
+               buyer: existUser?.buyer,
+               authProvider: existUser?.authProvider
             });
          }
       }
