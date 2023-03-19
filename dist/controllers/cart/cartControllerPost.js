@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const { cartTemplate } = require("../../templates/cart.template");
 const { checkProductAvailability } = require("../../services/common.services");
 const ShoppingCart = require("../../model/shoppingCart.model");
+const apiResponse = require("../../errors/apiResponse");
 // add to cart controller
 /**
  * @controller --> add product to cart
@@ -23,13 +24,20 @@ module.exports.addToCartHandler = (req, res, next) => __awaiter(void 0, void 0, 
         const authEmail = req.decoded.email;
         const body = req.body;
         let cart;
-        const availableProduct = yield checkProductAvailability(body === null || body === void 0 ? void 0 : body.productID, body === null || body === void 0 ? void 0 : body.variationID);
+        if (!body || typeof body !== "object") {
+            throw new apiResponse.Api400Error("Required body !");
+        }
+        const { productID, variationID, listingID, action } = body;
+        if (!productID || !variationID || !listingID) {
+            throw new apiResponse.Api400Error("Required product id, listing id, variation id in body !");
+        }
+        const availableProduct = yield checkProductAvailability(productID, variationID);
         if (!availableProduct) {
             return res.status(503).send({ success: false, statusCode: 503, message: "Sorry! This product is out of stock now!" });
         }
-        const cartTemp = cartTemplate(authEmail, body === null || body === void 0 ? void 0 : body.productID, body === null || body === void 0 ? void 0 : body.listingID, body === null || body === void 0 ? void 0 : body.variationID);
-        if ((body === null || body === void 0 ? void 0 : body.action) === "toCart") {
-            const existsProduct = yield ShoppingCart.countDocuments({ $and: [{ customerEmail: authEmail }, { variationID: body === null || body === void 0 ? void 0 : body.variationID }] });
+        const cartTemp = cartTemplate(authEmail, productID, listingID, variationID);
+        if (action === "toCart") {
+            const existsProduct = yield ShoppingCart.countDocuments({ $and: [{ customerEmail: authEmail }, { variationID: variationID }] });
             if (existsProduct >= 1) {
                 return res.status(400).send({ success: false, statusCode: 400, message: "Product Has Already In Your Cart!" });
             }

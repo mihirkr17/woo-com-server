@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 const { cartTemplate } = require("../../templates/cart.template");
 const { checkProductAvailability } = require("../../services/common.services");
 const ShoppingCart = require("../../model/shoppingCart.model");
+const apiResponse = require("../../errors/apiResponse");
 // add to cart controller
 /**
  * @controller --> add product to cart
@@ -15,18 +16,28 @@ module.exports.addToCartHandler = async (req: Request, res: Response, next: Next
       const body = req.body;
       let cart: any;
 
-      const availableProduct = await checkProductAvailability(body?.productID, body?.variationID);
+      if (!body || typeof body !== "object") {
+         throw new apiResponse.Api400Error("Required body !");
+      }
+
+      const { productID, variationID, listingID, action } = body;
+
+      if (!productID || !variationID || !listingID) {
+         throw new apiResponse.Api400Error("Required product id, listing id, variation id in body !");
+      }
+
+      const availableProduct = await checkProductAvailability(productID, variationID);
 
       if (!availableProduct) {
          return res.status(503).send({ success: false, statusCode: 503, message: "Sorry! This product is out of stock now!" });
       }
 
-      const cartTemp = cartTemplate(authEmail, body?.productID, body?.listingID, body?.variationID);
+      const cartTemp = cartTemplate(authEmail, productID, listingID, variationID);
 
-      if (body?.action === "toCart") {
+      if (action === "toCart") {
 
          const existsProduct = await ShoppingCart.countDocuments(
-            { $and: [{ customerEmail: authEmail }, { variationID: body?.variationID }] }
+            { $and: [{ customerEmail: authEmail }, { variationID: variationID }] }
          );
 
          if (existsProduct >= 1) {
