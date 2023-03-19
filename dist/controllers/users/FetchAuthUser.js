@@ -18,8 +18,6 @@ module.exports = function FetchAuthUser(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const authEmail = req.decoded.email;
-            let token = req.cookies.token;
-            let maxAgeOfCookie = token && token.maxAge;
             let user;
             let userDataToken;
             // const ipAddress = req.socket?.remoteAddress;
@@ -55,8 +53,7 @@ module.exports = function FetchAuthUser(req, res, next) {
                 success: true,
                 statusCode: 200,
                 message: 'Welcome ' + (user === null || user === void 0 ? void 0 : user.fullName),
-                u_data: userDataToken,
-                maxAgeOfCookie
+                u_data: userDataToken
             });
         }
         catch (error) {

@@ -9,9 +9,6 @@ module.exports = async function FetchAuthUser(req: Request, res: Response, next:
    try {
       const authEmail = req.decoded.email;
 
-      let token = req.cookies.token;
-
-      let maxAgeOfCookie = token && token.maxAge;
       let user: any;
       let userDataToken: any;
 
@@ -57,8 +54,7 @@ module.exports = async function FetchAuthUser(req: Request, res: Response, next:
          success: true,
          statusCode: 200,
          message: 'Welcome ' + user?.fullName,
-         u_data: userDataToken,
-         maxAgeOfCookie
+         u_data: userDataToken
       });
 
    } catch (error: any) {
