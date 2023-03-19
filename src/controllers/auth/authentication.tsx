@@ -145,7 +145,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
    try {
 
       const { emailOrPhone, password, authProvider } = req.body;
-      
+
       let token: String;
       let userDataToken: any;
       let userData;
@@ -155,9 +155,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
          sameSite: "none",
          secure: true,
          maxAge: 57600000,  // 16hr [3600000 -> 1hr]ms
-         httpOnly: true,
-         domain: 'wookart.vercel.app',
-         path: "/"
+         httpOnly: true
       };
 
       if (typeof authProvider === 'undefined' || !authProvider) {
@@ -236,10 +234,10 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
       if (token) {
          // if token then set it to client cookie
          res.cookie("token", token, cookieObject);
-         res.cookie("_uuid", existUser?._uuid, { httpOnly: false, sameSite: "none", secure: true, maxAge: 57600000, domain: 'wookart.vercel.app', path: "/" });
+         res.cookie("_uuid", existUser?._uuid, { httpOnly: false, sameSite: "none", secure: true, maxAge: 57600000 });
 
          // if all success then return the response
-         return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: existUser?._uuid, u_data: userDataToken });
+         return res.status(200).send({ name: "isLogin", message: "LoginSuccess", token, uuid: existUser?._uuid, u_data: userDataToken });
       }
    } catch (error: any) {
       return next(error);
