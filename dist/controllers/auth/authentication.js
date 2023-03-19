@@ -194,9 +194,8 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
         if (token) {
             // if token then set it to client cookie
             res.cookie("token", token, cookieObject);
-            res.cookie("_uuid", existUser === null || existUser === void 0 ? void 0 : existUser._uuid, { httpOnly: false, sameSite: "none", secure: true, maxAge: 57600000 });
-            // if all success then return the response
-            return res.status(200).send({ name: "isLogin", message: "LoginSuccess", token, uuid: existUser === null || existUser === void 0 ? void 0 : existUser._uuid, u_data: userDataToken });
+            // if all operation success then return the response
+            return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: existUser === null || existUser === void 0 ? void 0 : existUser._uuid, u_data: userDataToken });
         }
     }
     catch (error) {
@@ -211,7 +210,6 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
 module.exports.signOutController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         res.clearCookie("token");
-        res.clearCookie("_uuid");
         res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
     }
     catch (error) {

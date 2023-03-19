@@ -23,14 +23,12 @@ const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function
     const token = req.cookies.token; // finding token in http only cookies.
     // if token not present in cookies then return 403 status code and terminate the request here....
     if (!token || typeof token === "undefined") {
-        res.clearCookie("_uuid");
         throw new apiResponse.Api401Error('Token not found');
     }
     jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
         // verifying the token with jwt verify method and if token broken then 401 status code will send and terminate the request
         if (err) {
             res.clearCookie("token");
-            res.clearCookie("_uuid");
             throw new apiResponse.Api401Error(err === null || err === void 0 ? void 0 : err.message);
         }
         // if success then return email throw req.decoded

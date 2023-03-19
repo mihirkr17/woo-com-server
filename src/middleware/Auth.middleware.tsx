@@ -17,7 +17,6 @@ const verifyJWT = async (req: Request, res: Response, next: NextFunction) => {
 
   // if token not present in cookies then return 403 status code and terminate the request here....
   if (!token || typeof token === "undefined") {
-    res.clearCookie("_uuid");
     throw new apiResponse.Api401Error('Token not found');
   }
 
@@ -29,7 +28,6 @@ const verifyJWT = async (req: Request, res: Response, next: NextFunction) => {
       // verifying the token with jwt verify method and if token broken then 401 status code will send and terminate the request
       if (err) {
         res.clearCookie("token");
-        res.clearCookie("_uuid");
         throw new apiResponse.Api401Error(err?.message);
       }
 
