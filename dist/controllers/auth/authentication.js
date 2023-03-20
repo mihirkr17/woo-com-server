@@ -210,7 +210,12 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
  */
 module.exports.signOutController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        return res.clearCookie("token") && res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
+        const token = req.cookies.token; // finding token in http only cookies.
+        if (token && typeof token !== "undefined") {
+            res.clearCookie("token");
+            return res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
+        }
+        throw new apiResponse.Api400Error("You already logged out !");
     }
     catch (error) {
         next(error);
