@@ -252,8 +252,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
  */
 module.exports.signOutController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      res.clearCookie("token");
-      res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
+      return res.clearCookie("token") && res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
    } catch (error: any) {
       next(error);
    }

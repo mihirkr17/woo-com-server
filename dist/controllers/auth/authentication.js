@@ -210,8 +210,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
  */
 module.exports.signOutController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        res.clearCookie("token");
-        res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
+        return res.clearCookie("token") && res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
     }
     catch (error) {
         next(error);
