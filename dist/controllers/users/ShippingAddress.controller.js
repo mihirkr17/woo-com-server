@@ -18,6 +18,9 @@ module.exports.createShippingAddress = (req, res, next) => __awaiter(void 0, voi
         let body = req.body;
         if (!body || typeof body !== "object")
             throw new apiResponse.Api400Error("Required body !");
+        if (!Object.values(body).some((e) => e !== null && e !== "")) {
+            throw new apiResponse.Api400Error("Required all fields !");
+        }
         const { name, division, city, area, area_type, landmark, phone_number, postal_code, default_shipping_address } = body;
         let shippingAddressModel = {
             addrsID: "spi_" + (Math.floor(Math.random() * 100000000)).toString(),
@@ -53,11 +56,31 @@ module.exports.updateShippingAddress = (req, res, next) => __awaiter(void 0, voi
     try {
         const userEmail = req.decoded.email;
         const body = req.body;
-        const result = yield User.updateOne({ email: userEmail }, {
+        if (!body || typeof body !== "object")
+            throw new apiResponse.Api400Error("Required body !");
+        if (!Object.values(body).some((e) => e !== null && e !== "")) {
+            throw new apiResponse.Api400Error("Required all fields !");
+        }
+        const { addrsID, name, division, city, area, area_type, landmark, phone_number, postal_code, default_shipping_address } = body;
+        if (!addrsID)
+            throw new apiResponse.Api400Error("Required address id !");
+        let shippingAddressModel = {
+            addrsID,
+            name,
+            division,
+            city,
+            area,
+            area_type,
+            landmark,
+            phone_number,
+            postal_code,
+            default_shipping_address
+        };
+        const result = yield User.findOneAndUpdate({ email: userEmail }, {
             $set: {
-                "buyer.shippingAddress.$[i]": body,
+                "buyer.shippingAddress.$[i]": shippingAddressModel,
             },
-        }, { arrayFilters: [{ "i.addrsID": body === null || body === void 0 ? void 0 : body.addrsID }] });
+        }, { arrayFilters: [{ "i.addrsID": addrsID }] });
         if (result) {
             return res.status(200).send({
                 success: true,
@@ -78,7 +101,7 @@ module.exports.selectShippingAddress = (req, res, next) => __awaiter(void 0, voi
     try {
         const authEmail = req.decoded.email;
         let { addrsID, default_shipping_address } = req.body;
-        if (!addrsID)
+        if (!addrsID || typeof addrsID !== "string")
             throw new apiResponse.Api400Error("Required address id !");
         default_shipping_address = (default_shipping_address === true) ? false : true;
         const user = yield findUserByEmail(authEmail);
@@ -109,7 +132,7 @@ module.exports.deleteShippingAddress = (req, res, next) => __awaiter(void 0, voi
     try {
         const email = req.decoded.email;
         let addrsID = req.params.addrsID;
-        if (!addrsID)
+        if (!addrsID || typeof addrsID !== "string")
             throw new apiResponse.Api400Error("Required address id !");
         const result = yield User.findOneAndUpdate({ email: email }, { $pull: { "buyer.shippingAddress": { addrsID } } });
         if (result)

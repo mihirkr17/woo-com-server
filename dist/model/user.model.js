@@ -21,15 +21,15 @@ const buyerType = new mongoose_1.Schema({
     shippingAddress: [
         {
             _id: false,
-            addrsID: { type: Number },
+            addrsID: { type: String },
             name: { type: String, default: "" },
             division: { type: String, default: "" },
             city: { type: String, default: "" },
             area: { type: String, default: "" },
             area_type: { type: String, default: "" },
             landmark: { type: String, default: "" },
-            phone_number: { type: Number, default: 0 },
-            postal_code: { type: Number, default: 0 },
+            phone_number: { type: String, default: "" },
+            postal_code: { type: String, default: "" },
             default_shipping_address: { type: Boolean }
         }
     ],
