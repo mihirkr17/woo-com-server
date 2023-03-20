@@ -260,3 +260,84 @@ module.exports.changePasswordController = (req, res, next) => __awaiter(void 0, 
         next(error);
     }
 });
+module.exports.checkUserAuthentication = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const body = req.body;
+        if (!body || typeof body === "undefined")
+            throw new apiResponse.Api400Error("Required body !");
+        const { emailOrPhone } = body;
+        const user = yield User.findOne({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] });
+        if (!user || typeof user === "undefined")
+            throw new apiResponse.Api404Error("Sorry user not found with this " + emailOrPhone);
+        let securityCode = Math.round(Math.random() * 9999999).toString();
+        const result = yield User.findOneAndUpdate({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] }, {
+            $set: { securityCode }
+        }, { upsert: true });
+        if (!result)
+            throw new apiResponse.Api500Error("Failed !");
+        result && res.status(200).send({ success: true, statusCode: 200, message: "Security code..", securityCode, email_phone: emailOrPhone });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+module.exports.checkUserForgotPwdSecurityKey = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const body = req.body;
+        if (!body || typeof body === "undefined")
+            throw new apiResponse.Api400Error("Required body !");
+        const { emailOrPhone, securityCode } = body;
+        const user = yield User.findOne({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] });
+        if (!user || typeof user === "undefined")
+            throw new apiResponse.Api404Error("Sorry user not found with this " + emailOrPhone);
+        if (securityCode !== (user === null || user === void 0 ? void 0 : user.securityCode)) {
+            throw new apiResponse.Api400Error("Invalid security code");
+        }
+        const result = yield User.findOneAndUpdate({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] }, {
+            $unset: { securityCode: 1 }
+        }, { upsert: true });
+        if (!result)
+            throw new apiResponse.Api500Error("Failed !");
+        result && res.status(200).send({ success: true, statusCode: 200, message: "Success...", data: { email: user === null || user === void 0 ? void 0 : user.email, securityCode } });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+module.exports.userSetNewPassword = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        let result;
+        const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/;
+        const { email, password } = req.body;
+        if (!email)
+            throw new apiResponse.Api400Error("Required email address !");
+        const authEmail = email;
+        if (!password) {
+            throw new apiResponse.Api400Error(`Required password !`);
+        }
+        else if (password && typeof password !== "string") {
+            throw new apiResponse.Api400Error("Password should be string !");
+        }
+        else if (password.length < 5 || password.length > 8) {
+            throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
+        }
+        else if (!passwordRegex.test(password)) {
+            throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
+        }
+        else {
+            const user = yield User.findOne({ email: authEmail });
+            if (!user && typeof user !== "object") {
+                throw new apiResponse.Api404Error(`User not found!`);
+            }
+            let hashedPwd = yield bcrypt.hash(password, saltRounds);
+            if (hashedPwd) {
+                result = yield User.findOneAndUpdate({ email: authEmail }, { $set: { password: hashedPwd } }, { upsert: true });
+            }
+            if (result)
+                return res.status(200).send({ success: true, statusCode: 200, message: "Password updated successfully." });
+        }
+    }
+    catch (error) {
+        next(error);
+    }
+});

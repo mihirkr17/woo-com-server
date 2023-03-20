@@ -19,6 +19,12 @@ try {
 
    router.post("/user/changed-password", verifyJWT, authCTRL?.changePasswordController);
 
+   router.post("/check-user-authentication", authCTRL?.checkUserAuthentication);
+
+   router.post("/check-user-forgot-pwd-security-key", authCTRL?.checkUserForgotPwdSecurityKey);
+
+   router.post("/user/set-new-password", authCTRL?.userSetNewPassword);
+
 } catch (error: any) {
 
 }
