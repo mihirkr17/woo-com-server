@@ -375,7 +375,7 @@ module.exports.checkUserForgotPwdSecurityKey = async (req: Request, res: Respons
       let life = 120000;
       res.cookie("set_new_pwd_session", securityCode, { httpOnly: true, sameSite: "none", secure: true, maxAge: life });
 
-      return res.status(200).send({ success: true, statusCode: 200, message: "Success...", data: { email: user?.email, securityCode, sessionLifeTime: life } });
+      return res.status(200).send({ success: true, statusCode: 200, message: "Success. Please set a new password.", data: { email: user?.email, securityCode, sessionLifeTime: life } });
 
    } catch (error: any) {
       next(error);

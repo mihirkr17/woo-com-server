@@ -296,7 +296,7 @@ module.exports.checkUserForgotPwdSecurityKey = (req, res, next) => __awaiter(voi
         res.clearCookie("securityCode");
         let life = 120000;
         res.cookie("set_new_pwd_session", securityCode, { httpOnly: true, sameSite: "none", secure: true, maxAge: life });
-        return res.status(200).send({ success: true, statusCode: 200, message: "Success...", data: { email: user === null || user === void 0 ? void 0 : user.email, securityCode, sessionLifeTime: life } });
+        return res.status(200).send({ success: true, statusCode: 200, message: "Success. Please set a new password.", data: { email: user === null || user === void 0 ? void 0 : user.email, securityCode, sessionLifeTime: life } });
     }
     catch (error) {
         next(error);
