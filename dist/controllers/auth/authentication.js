@@ -270,12 +270,9 @@ module.exports.checkUserAuthentication = (req, res, next) => __awaiter(void 0, v
         if (!user || typeof user === "undefined")
             throw new apiResponse.Api404Error("Sorry user not found with this " + emailOrPhone);
         let securityCode = Math.round(Math.random() * 9999999).toString();
-        const result = yield User.findOneAndUpdate({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] }, {
-            $set: { securityCode }
-        }, { upsert: true });
-        if (!result)
-            throw new apiResponse.Api500Error("Failed !");
-        result && res.status(200).send({ success: true, statusCode: 200, message: "Security code..", securityCode, email_phone: emailOrPhone });
+        let lifeTime = 60000;
+        res.cookie("securityCode", securityCode, { httpOnly: true, sameSite: "none", secure: true, maxAge: lifeTime });
+        return res.status(200).send({ success: true, statusCode: 200, message: "Your Security code is " + securityCode, securityCode, lifeTime, email_phone: emailOrPhone });
     }
     catch (error) {
         next(error);
@@ -284,21 +281,22 @@ module.exports.checkUserAuthentication = (req, res, next) => __awaiter(void 0, v
 module.exports.checkUserForgotPwdSecurityKey = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const body = req.body;
+        const sCode = req.cookies.securityCode;
+        if (!sCode)
+            throw new apiResponse.Api400Error("Security code is expired !");
         if (!body || typeof body === "undefined")
             throw new apiResponse.Api400Error("Required body !");
         const { emailOrPhone, securityCode } = body;
         const user = yield User.findOne({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] });
         if (!user || typeof user === "undefined")
             throw new apiResponse.Api404Error("Sorry user not found with this " + emailOrPhone);
-        if (securityCode !== (user === null || user === void 0 ? void 0 : user.securityCode)) {
-            throw new apiResponse.Api400Error("Invalid security code");
+        if (securityCode !== sCode) {
+            throw new apiResponse.Api400Error("Invalid security code !");
         }
-        const result = yield User.findOneAndUpdate({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] }, {
-            $unset: { securityCode: 1 }
-        }, { upsert: true });
-        if (!result)
-            throw new apiResponse.Api500Error("Failed !");
-        result && res.status(200).send({ success: true, statusCode: 200, message: "Success...", data: { email: user === null || user === void 0 ? void 0 : user.email, securityCode } });
+        res.clearCookie("securityCode");
+        let life = 120000;
+        res.cookie("set_new_pwd_session", securityCode, { httpOnly: true, sameSite: "none", secure: true, maxAge: life });
+        return res.status(200).send({ success: true, statusCode: 200, message: "Success...", data: { email: user === null || user === void 0 ? void 0 : user.email, securityCode, sessionLifeTime: life } });
     }
     catch (error) {
         next(error);
@@ -306,9 +304,14 @@ module.exports.checkUserForgotPwdSecurityKey = (req, res, next) => __awaiter(voi
 });
 module.exports.userSetNewPassword = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        let set_new_pwd_session = req.cookies.set_new_pwd_session;
+        if (!set_new_pwd_session)
+            throw new apiResponse.Api400Error("Sorry ! your session is expired !");
         let result;
         const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/;
-        const { email, password } = req.body;
+        const { email, password, securityCode } = req.body;
+        if (securityCode !== set_new_pwd_session)
+            throw new apiResponse.Api400Error("Invalid security code !");
         if (!email)
             throw new apiResponse.Api400Error("Required email address !");
         const authEmail = email;
@@ -333,6 +336,7 @@ module.exports.userSetNewPassword = (req, res, next) => __awaiter(void 0, void 0
             if (hashedPwd) {
                 result = yield User.findOneAndUpdate({ email: authEmail }, { $set: { password: hashedPwd } }, { upsert: true });
             }
+            res.clearCookie('set_new_pwd_session');
             if (result)
                 return res.status(200).send({ success: true, statusCode: 200, message: "Password updated successfully." });
         }

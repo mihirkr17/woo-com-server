@@ -67,7 +67,6 @@ interface IUser {
   becomeSellerAt?: Date;
   seller: any;
   buyer: any;
-  securityCode?: string;
 }
 
 // user schema design
@@ -122,8 +121,6 @@ var UserSchema = new Schema<IUser>({
   authProvider: { type: String, enum: ['system', 'thirdParty'], default: 'system' },
 
   verifyToken: { type: String, default: undefined },
-
-  securityCode: { type: String, required: false, default: undefined },
 
   createdAt: { type: Date, default: Date.now },
 

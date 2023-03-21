@@ -338,13 +338,11 @@ module.exports.checkUserAuthentication = async (req: Request, res: Response, nex
 
       let securityCode = Math.round(Math.random() * 9999999).toString();
 
-      const result = await User.findOneAndUpdate({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] }, {
-         $set: { securityCode }
-      }, { upsert: true });
+      let lifeTime = 60000;
 
-      if (!result) throw new apiResponse.Api500Error("Failed !");
+      res.cookie("securityCode", securityCode, { httpOnly: true, sameSite: "none", secure: true, maxAge: lifeTime });
 
-      result && res.status(200).send({ success: true, statusCode: 200, message: "Security code..", securityCode, email_phone: emailOrPhone });
+      return res.status(200).send({ success: true, statusCode: 200, message: "Your Security code is " + securityCode, securityCode, lifeTime, email_phone: emailOrPhone });
 
    } catch (error: any) {
       next(error);
@@ -356,6 +354,9 @@ module.exports.checkUserForgotPwdSecurityKey = async (req: Request, res: Respons
    try {
 
       const body = req.body;
+      const sCode = req.cookies.securityCode;
+
+      if (!sCode) throw new apiResponse.Api400Error("Security code is expired !");
 
       if (!body || typeof body === "undefined") throw new apiResponse.Api400Error("Required body !");
 
@@ -365,17 +366,16 @@ module.exports.checkUserForgotPwdSecurityKey = async (req: Request, res: Respons
 
       if (!user || typeof user === "undefined") throw new apiResponse.Api404Error("Sorry user not found with this " + emailOrPhone);
 
-      if (securityCode !== user?.securityCode) {
-         throw new apiResponse.Api400Error("Invalid security code");
+
+      if (securityCode !== sCode) {
+         throw new apiResponse.Api400Error("Invalid security code !");
       }
 
-      const result = await User.findOneAndUpdate({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] }, {
-         $unset: { securityCode: 1 }
-      }, { upsert: true });
+      res.clearCookie("securityCode");
+      let life = 120000;
+      res.cookie("set_new_pwd_session", securityCode, { httpOnly: true, sameSite: "none", secure: true, maxAge: life });
 
-      if (!result) throw new apiResponse.Api500Error("Failed !");
-
-      result && res.status(200).send({ success: true, statusCode: 200, message: "Success...", data: { email: user?.email, securityCode } });
+      return res.status(200).send({ success: true, statusCode: 200, message: "Success...", data: { email: user?.email, securityCode, sessionLifeTime: life } });
 
    } catch (error: any) {
       next(error);
@@ -385,13 +385,20 @@ module.exports.checkUserForgotPwdSecurityKey = async (req: Request, res: Respons
 module.exports.userSetNewPassword = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
+      let set_new_pwd_session = req.cookies.set_new_pwd_session;
+
+      if (!set_new_pwd_session) throw new apiResponse.Api400Error("Sorry ! your session is expired !");
+
       let result: any;
+
       const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/;
 
-      const { email, password } = req.body;
+      const { email, password, securityCode } = req.body;
+
+      if (securityCode !== set_new_pwd_session) throw new apiResponse.Api400Error("Invalid security code !");
 
       if (!email) throw new apiResponse.Api400Error("Required email address !");
-      
+
       const authEmail = email;
 
       if (!password) {
@@ -427,6 +434,8 @@ module.exports.userSetNewPassword = async (req: Request, res: Response, next: Ne
                { upsert: true }
             );
          }
+
+         res.clearCookie('set_new_pwd_session');
 
          if (result) return res.status(200).send({ success: true, statusCode: 200, message: "Password updated successfully." });
       }

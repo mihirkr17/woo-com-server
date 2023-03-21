@@ -89,7 +89,6 @@ var UserSchema = new mongoose_1.Schema({
     accountStatus: { type: String, enum: ["active", "inactive", "blocked"], default: "inactive", },
     authProvider: { type: String, enum: ['system', 'thirdParty'], default: 'system' },
     verifyToken: { type: String, default: undefined },
-    securityCode: { type: String, required: false, default: undefined },
     createdAt: { type: Date, default: Date.now },
     becomeSellerAt: { type: Date, default: undefined }
 });
