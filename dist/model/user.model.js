@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = require("mongoose");
 const bcrypt = require("bcrypt");
@@ -91,30 +82,6 @@ var UserSchema = new mongoose_1.Schema({
     verifyToken: { type: String, default: undefined },
     createdAt: { type: Date, default: Date.now },
     becomeSellerAt: { type: Date, default: undefined }
-});
-// user password hashing before save into database
-UserSchema.pre("save", function (next) {
-    return __awaiter(this, void 0, void 0, function* () {
-        let password = this.password;
-        let authProvider = this.authProvider;
-        let emailAddr = this.email;
-        if (this.idFor === 'sell') {
-            this.role = 'SELLER';
-        }
-        if (this.idFor === 'buy') {
-            this.role = 'BUYER';
-        }
-        if (authProvider === 'thirdParty') {
-            next();
-        }
-        // hashing password throw bcrypt
-        let hashedPwd = yield bcrypt.hash(password, saltRounds);
-        this.contactEmail = emailAddr;
-        this.password = hashedPwd;
-        this.hasPassword = true;
-        this.accountStatus = "inactive";
-        next();
-    });
 });
 var User = (0, mongoose_1.model)("User", UserSchema, "users");
 module.exports = User;

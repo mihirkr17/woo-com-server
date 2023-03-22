@@ -34,4 +34,4 @@ class Api500Error extends BaseErrors {
    }
 }
 
-module.exports = { Api400Error, Api401Error, Api403Error, Api404Error }
+module.exports = { Api400Error, Api401Error, Api403Error, Api404Error, Api500Error }

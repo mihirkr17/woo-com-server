@@ -11,16 +11,18 @@ const { findUserByEmail, actualSellingPrice, calculateShippingCost } = require("
 module.exports = async function SetOrder(req: Request, res: Response, next: NextFunction) {
    try {
       const userEmail: string = req.headers.authorization || "";
-      const authEmail: string = req.decoded.email;
-      const body: any = req.body;
+
+      const { email: authEmail } = req.decoded;
 
       if (userEmail !== authEmail) {
          throw new apiResponse.Api401Error("Unauthorized access !");
       }
 
-      if (!body || typeof body === "undefined") {
+      if (!req.body || typeof req.body === "undefined") {
          throw new apiResponse.Api400Error("Required body !");
       }
+
+      const { state } = req.body;
 
       let user = await findUserByEmail(authEmail);
 
@@ -76,7 +78,7 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
             $set: {
                shippingAddress: defaultAddress,
                areaType: areaType,
-               state: body?.state
+               state: state
             }
          },
          { $unset: ["variations"] }

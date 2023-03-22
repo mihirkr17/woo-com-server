@@ -18,17 +18,15 @@ module.exports = function FetchAuthUser(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const authEmail = req.decoded.email;
-            let user;
             let userDataToken;
             // const ipAddress = req.socket?.remoteAddress;
-            user = yield findUserByEmail(authEmail);
-            if (!user || typeof user !== "object") {
+            let user = yield findUserByEmail(authEmail);
+            if (!user || typeof user !== "object")
                 throw new apiResponse.Api404Error("User not found !");
-            }
-            if (user && (user === null || user === void 0 ? void 0 : user.role) === 'SELLER' && (user === null || user === void 0 ? void 0 : user.idFor) === 'sell') {
+            if ((user === null || user === void 0 ? void 0 : user.role) === 'SELLER' && (user === null || user === void 0 ? void 0 : user.idFor) === 'sell') {
                 yield productCounter({ storeName: (_a = user.seller.storeInfos) === null || _a === void 0 ? void 0 : _a.storeName, _uuid: user === null || user === void 0 ? void 0 : user._uuid });
             }
-            if (user && (user === null || user === void 0 ? void 0 : user.role) === 'BUYER' && (user === null || user === void 0 ? void 0 : user.idFor) === 'buy') {
+            if ((user === null || user === void 0 ? void 0 : user.role) === 'BUYER' && (user === null || user === void 0 ? void 0 : user.idFor) === 'buy') {
                 user.buyer["defaultShippingAddress"] = (Array.isArray((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress) &&
                     ((_c = user === null || user === void 0 ? void 0 : user.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0])) || {};
                 user.buyer["shoppingCartItems"] = (yield ShoppingCart.countDocuments({ customerEmail: user === null || user === void 0 ? void 0 : user.email })) || 0;

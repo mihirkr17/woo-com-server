@@ -10,6 +10,8 @@ const setUserDataToken = require("../../utils/setUserDataToken");
 const ShoppingCart = require("../../model/shoppingCart.model");
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
+const { transporter } = require("../../services/email.service");
+const { get_six_digit_random_number } = require("../../services/common.services");
 
 /**
  * @apiController --> Buyer Registration Controller
@@ -23,29 +25,45 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
 
       let existUser = await User.findOne({ $or: [{ phone: body?.phone }, { email: body.email }] });
 
-      if (existUser) {
+      if (existUser)
          throw new apiResponse.Api400Error("User already exists, Please try another phone number or email address !");
-      }
 
       body['_uuid'] = Math.random().toString(36).toUpperCase().slice(2, 18);
       body['verifyToken'] = generateVerifyToken();
-      body['idFor'] = 'buy';
       body["buyer"] = {};
+      body["password"] = await bcrypt.hash(body?.password, saltRounds);
+      body["accountStatus"] = "inactive";
+      body["hasPassword"] = true;
+      body["contactEmail"] = body?.email;
+      body["idFor"] = "buy";
+      body["role"] = "BUYER";
+      body["authProvider"] = "system";
 
-      let user = new User(body);
+      const info = await transporter.sendMail({
+         from: process.env.GMAIL_USER,
+         to: body?.email,
+         subject: "Verify email address",
+         html: `<p>Please verify your email address. please click link below </p> 
+         </br> 
+         <a href="${process.env.BACKEND_URL}api/v1/auth/verify-register-user?token=${body?.verifyToken}">
+            Click Here To Verify
+         </a>`
+      });
 
-      const result = await user.save();
 
-      if (!result) {
-         throw new apiResponse.Api500Error("Something went wrong !");
+      if (info?.response) {
+
+         let user = new User(body);
+         await user.save();
+         return res.status(200).send({
+            success: true,
+            statusCode: 200,
+            message: "Email was sent to " + body?.email + ". Please verify your account.",
+         });
       }
 
-      return res.status(200).send({
-         success: true,
-         statusCode: 200,
-         message: "Registration success. Please verify your account.",
-         data: { phone: result?.phone, verifyToken: result?.verifyToken, email: result?.email }
-      });
+      throw new apiResponse.Api500Error("Sorry registration failed !");
+
    } catch (error: any) {
       next(error);
    }
@@ -100,35 +118,28 @@ module.exports.sellerRegistrationController = async (req: Request, res: Response
  */
 module.exports.userVerifyTokenController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const verify_token = req.headers.authorization?.split(' ')[1] || undefined;
 
-      const existUser = await User.findOne({ verifyToken: verify_token });
+      const { token } = req.query;
 
-      if (!existUser) {
+      if (!token) throw new apiResponse.Api400Error("Required token in query !");
+
+      const user = await User.findOne({ verifyToken: token });
+
+      if (!user) {
          throw new apiResponse.Api404Error("Sorry, User not found !");
       }
 
-      if (existUser.verifyToken && !verify_token) {
-         return res.status(200).send({ success: true, statusCode: 200, message: 'Verify token send....', verifyToken: existUser.verifyToken });
-      }
+      if (user?.verifyToken !== token)
+         throw new apiResponse.Api400Error("Invalid verify token !");
 
-      // next condition
-      if (existUser.verifyToken && (verify_token && typeof verify_token !== 'undefined')) {
+      user.accountStatus = "active";
 
-         if (existUser?.verifyToken !== verify_token) {
-            throw new apiResponse.Api400Error("Invalid verify token !")
-         }
+      user.verifyToken = undefined;
 
-         await User.findOneAndUpdate(
-            { verifyToken: verify_token },
-            {
-               $unset: { verifyToken: 1 },
-               $set: { accountStatus: 'active' }
-            }
-         );
+      await user.save();
 
-         return res.status(200).send({ success: true, statusCode: 200, message: "User verified.", data: { email: existUser?.email } });
-      }
+      return res.redirect(`${process.env.FRONTEND_URL}login?email=${user?.email}`);
+
    } catch (error) {
       next(error);
    }
@@ -190,18 +201,33 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
       // system login
       else {
 
-         if (!existUser) {
-            throw new apiResponse.Api400Error(`User with ${emailOrPhone} not found!`);
-         }
+         if (!existUser) throw new apiResponse.Api400Error(`User with ${emailOrPhone} not found!`);
 
          let comparedPassword = await comparePassword(password, existUser?.password);
 
-         if (!comparedPassword) {
-            throw new apiResponse.Api400Error("Password didn't match !");
-         }
+         if (!comparedPassword) throw new apiResponse.Api400Error("Password didn't match !");
 
          if (existUser.verifyToken && existUser?.accountStatus === "inactive") {
-            return res.status(200).send({ success: true, statusCode: 200, message: 'Verify token send....', verifyToken: existUser.verifyToken });
+            const info = await transporter.sendMail({
+               from: process.env.GMAIL_USER,
+               to: existUser?.email,
+               subject: "Verify email address",
+               html: `<p>Please verify your email address. please click link below </p> 
+               </br> 
+               <a href="${process.env.BACKEND_URL}api/v1/auth/verify-register-user?token=${existUser?.verifyToken}">
+                  Click Here To Verify
+               </a>`
+            });
+
+            if (info?.response) {
+               return res.status(200).send({
+                  success: true,
+                  statusCode: 200,
+                  message: "Email was sent to " + existUser?.email + ". Please verify your account.",
+               });
+            }
+
+            return;
          }
 
          token = setToken(existUser);
@@ -252,7 +278,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
  */
 module.exports.signOutController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const token = req.cookies.token; // finding token in http only cookies.
+      const { token } = req.cookies; // finding token in http only cookies.
 
       if (token && typeof token !== "undefined") {
          res.clearCookie("token");
@@ -270,53 +296,48 @@ module.exports.signOutController = async (req: Request, res: Response, next: Nex
 module.exports.changePasswordController = async (req: Request, res: Response, next: NextFunction) => {
    try {
       const authEmail = req.decoded.email;
+
       let result: any;
+
       const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/;
 
       const { oldPassword, newPassword } = req.body;
 
-      if (!oldPassword || !newPassword) {
+      if (!oldPassword || !newPassword)
          throw new apiResponse.Api400Error(`Required old password and new password !`);
-      }
 
-      else if (newPassword && typeof newPassword !== "string") {
+      if (newPassword && typeof newPassword !== "string")
          throw new apiResponse.Api400Error("Password should be string !");
-      }
 
-      else if (newPassword.length < 5 || newPassword.length > 8) {
+      if (newPassword.length < 5 || newPassword.length > 8)
          throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
-      }
 
-      else if (!passwordRegex.test(newPassword)) {
+      if (!passwordRegex.test(newPassword))
          throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
+
+      const user = await User.findOne({ email: authEmail });
+
+      if (!user && typeof user !== "object")
+         throw new apiResponse.Api404Error(`User not found!`);
+
+      const comparedPassword = await comparePassword(oldPassword, user?.password);
+
+      if (!comparedPassword) {
+         throw new apiResponse.Api400Error("Password didn't match !");
       }
 
-      else {
+      let hashedPwd = await bcrypt.hash(newPassword, saltRounds);
 
-         const user = await User.findOne({ email: authEmail });
-
-         if (!user && typeof user !== "object") {
-            throw new apiResponse.Api404Error(`User not found!`);
-         }
-
-         const comparedPassword = await comparePassword(oldPassword, user?.password);
-
-         if (!comparedPassword) {
-            throw new apiResponse.Api400Error("Password didn't match !");
-         }
-
-         let hashedPwd = await bcrypt.hash(newPassword, saltRounds);
-
-         if (hashedPwd) {
-            result = await User.findOneAndUpdate(
-               { email: authEmail },
-               { $set: { password: hashedPwd } },
-               { upsert: true }
-            );
-         }
-
-         if (result) return res.status(200).send({ success: true, statusCode: 200, message: "Password updated successfully." });
+      if (hashedPwd) {
+         result = await User.findOneAndUpdate(
+            { email: authEmail },
+            { $set: { password: hashedPwd } },
+            { upsert: true }
+         );
       }
+
+      if (result) return res.status(200).send({ success: true, statusCode: 200, message: "Password updated successfully." });
+
    } catch (error: any) {
       next(error);
    }
@@ -330,19 +351,37 @@ module.exports.checkUserAuthentication = async (req: Request, res: Response, nex
 
       if (!body || typeof body === "undefined") throw new apiResponse.Api400Error("Required body !");
 
-      const { emailOrPhone } = body;
+      const { email } = body;
 
-      const user = await User.findOne({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] });
+      const user = await User.findOne({ email });
 
-      if (!user || typeof user === "undefined") throw new apiResponse.Api404Error("Sorry user not found with this " + emailOrPhone);
+      if (!user || typeof user === "undefined") throw new apiResponse.Api404Error("Sorry user not found with this " + email);
 
-      let securityCode = Math.round(Math.random() * 9999999).toString();
+      let securityCode = get_six_digit_random_number();
+      let lifeTime = 300000;
 
-      let lifeTime = 60000;
+      const mailOptions = {
+         from: process.env.GMAIL_USER,
+         to: email, // the user email
+         subject: 'Reset your WooKart Password',
+         html: `<p>Your Security Code is <b>${securityCode}</b> and expire in 5 minutes.</p>`
+      }
 
-      res.cookie("securityCode", securityCode, { httpOnly: true, sameSite: "none", secure: true, maxAge: lifeTime });
+      const info = await transporter.sendMail(mailOptions);
 
-      return res.status(200).send({ success: true, statusCode: 200, message: "Your Security code is " + securityCode, securityCode, lifeTime, email_phone: emailOrPhone });
+      if (info?.response) {
+         res.cookie("securityCode", securityCode, { httpOnly: true, sameSite: "none", secure: true, maxAge: lifeTime });
+
+         return res.status(200).send({
+            success: true,
+            statusCode: 200,
+            message: "We have to send security code to your email..",
+            lifeTime,
+            email
+         });
+      } else {
+         throw new apiResponse.Api500Error("Sorry ! Something wrong in your email. please provide valid email address.");
+      }
 
    } catch (error: any) {
       next(error);
@@ -352,24 +391,27 @@ module.exports.checkUserAuthentication = async (req: Request, res: Response, nex
 
 module.exports.checkUserForgotPwdSecurityKey = async (req: Request, res: Response, next: NextFunction) => {
    try {
-
-      const body = req.body;
       const sCode = req.cookies.securityCode;
 
       if (!sCode) throw new apiResponse.Api400Error("Security code is expired !");
 
-      if (!body || typeof body === "undefined") throw new apiResponse.Api400Error("Required body !");
+      if (!req.body || typeof req.body === "undefined") throw new apiResponse.Api400Error("Required body !");
 
-      const { emailOrPhone, securityCode } = body;
+      const { email, securityCode } = req.body;
 
-      const user = await User.findOne({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] });
+      if (!email) throw new apiResponse.Api400Error("Required email !");
 
-      if (!user || typeof user === "undefined") throw new apiResponse.Api404Error("Sorry user not found with this " + emailOrPhone);
+      if (!securityCode)
+         throw new apiResponse.Api400Error("Required security code !");
 
+      const user = await User.findOne({ email });
 
-      if (securityCode !== sCode) {
+      if (!user || typeof user === "undefined")
+         throw new apiResponse.Api404Error("Sorry user not found with this " + email);
+
+      if (securityCode !== sCode)
          throw new apiResponse.Api400Error("Invalid security code !");
-      }
+
 
       res.clearCookie("securityCode");
       let life = 120000;
@@ -384,12 +426,9 @@ module.exports.checkUserForgotPwdSecurityKey = async (req: Request, res: Respons
 
 module.exports.userSetNewPassword = async (req: Request, res: Response, next: NextFunction) => {
    try {
-
       let set_new_pwd_session = req.cookies.set_new_pwd_session;
 
       if (!set_new_pwd_session) throw new apiResponse.Api400Error("Sorry ! your session is expired !");
-
-      let result: any;
 
       const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/;
 
@@ -399,46 +438,38 @@ module.exports.userSetNewPassword = async (req: Request, res: Response, next: Ne
 
       if (!email) throw new apiResponse.Api400Error("Required email address !");
 
-      const authEmail = email;
-
-      if (!password) {
+      if (!password)
          throw new apiResponse.Api400Error(`Required password !`);
-      }
 
-      else if (password && typeof password !== "string") {
+      if (password && typeof password !== "string")
          throw new apiResponse.Api400Error("Password should be string !");
-      }
 
-      else if (password.length < 5 || password.length > 8) {
+      if (password.length < 5 || password.length > 8)
          throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
-      }
 
-      else if (!passwordRegex.test(password)) {
+      if (!passwordRegex.test(password))
          throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
+
+      const user = await User.findOne({ email });
+
+      if (!user && typeof user !== "object") {
+         throw new apiResponse.Api404Error(`User not found!`);
       }
 
-      else {
+      let hashedPwd = await bcrypt.hash(password, saltRounds);
 
-         const user = await User.findOne({ email: authEmail });
+      let result = hashedPwd ? await User.findOneAndUpdate(
+         { email },
+         { $set: { password: hashedPwd } },
+         { upsert: true }
+      ) : false;
 
-         if (!user && typeof user !== "object") {
-            throw new apiResponse.Api404Error(`User not found!`);
-         }
+      res.clearCookie('set_new_pwd_session');
 
-         let hashedPwd = await bcrypt.hash(password, saltRounds);
+      if (!result) throw new apiResponse.Api500Error("Something wrong in server !");
 
-         if (hashedPwd) {
-            result = await User.findOneAndUpdate(
-               { email: authEmail },
-               { $set: { password: hashedPwd } },
-               { upsert: true }
-            );
-         }
+      return result && res.status(200).send({ success: true, statusCode: 200, message: "Password updated successfully." });
 
-         res.clearCookie('set_new_pwd_session');
-
-         if (result) return res.status(200).send({ success: true, statusCode: 200, message: "Password updated successfully." });
-      }
    } catch (error: any) {
       next(error);
    }

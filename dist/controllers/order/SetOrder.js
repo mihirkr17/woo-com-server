@@ -19,14 +19,14 @@ module.exports = function SetOrder(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const userEmail = req.headers.authorization || "";
-            const authEmail = req.decoded.email;
-            const body = req.body;
+            const { email: authEmail } = req.decoded;
             if (userEmail !== authEmail) {
                 throw new apiResponse.Api401Error("Unauthorized access !");
             }
-            if (!body || typeof body === "undefined") {
+            if (!req.body || typeof req.body === "undefined") {
                 throw new apiResponse.Api400Error("Required body !");
             }
+            const { state } = req.body;
             let user = yield findUserByEmail(authEmail);
             let defaultAddress = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
                 ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
@@ -76,7 +76,7 @@ module.exports = function SetOrder(req, res, next) {
                     $set: {
                         shippingAddress: defaultAddress,
                         areaType: areaType,
-                        state: body === null || body === void 0 ? void 0 : body.state
+                        state: state
                     }
                 },
                 { $unset: ["variations"] }

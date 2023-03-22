@@ -19,6 +19,8 @@ const setUserDataToken = require("../../utils/setUserDataToken");
 const ShoppingCart = require("../../model/shoppingCart.model");
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
+const { transporter } = require("../../services/email.service");
+const { get_six_digit_random_number } = require("../../services/common.services");
 /**
  * @apiController --> Buyer Registration Controller
  * @apiMethod --> POST
@@ -28,24 +30,38 @@ module.exports.buyerRegistrationController = (req, res, next) => __awaiter(void 
     try {
         let body = req.body;
         let existUser = yield User.findOne({ $or: [{ phone: body === null || body === void 0 ? void 0 : body.phone }, { email: body.email }] });
-        if (existUser) {
+        if (existUser)
             throw new apiResponse.Api400Error("User already exists, Please try another phone number or email address !");
-        }
         body['_uuid'] = Math.random().toString(36).toUpperCase().slice(2, 18);
         body['verifyToken'] = generateVerifyToken();
-        body['idFor'] = 'buy';
         body["buyer"] = {};
-        let user = new User(body);
-        const result = yield user.save();
-        if (!result) {
-            throw new apiResponse.Api500Error("Something went wrong !");
-        }
-        return res.status(200).send({
-            success: true,
-            statusCode: 200,
-            message: "Registration success. Please verify your account.",
-            data: { phone: result === null || result === void 0 ? void 0 : result.phone, verifyToken: result === null || result === void 0 ? void 0 : result.verifyToken, email: result === null || result === void 0 ? void 0 : result.email }
+        body["password"] = yield bcrypt.hash(body === null || body === void 0 ? void 0 : body.password, saltRounds);
+        body["accountStatus"] = "inactive";
+        body["hasPassword"] = true;
+        body["contactEmail"] = body === null || body === void 0 ? void 0 : body.email;
+        body["idFor"] = "buy";
+        body["role"] = "BUYER";
+        body["authProvider"] = "system";
+        const info = yield transporter.sendMail({
+            from: process.env.GMAIL_USER,
+            to: body === null || body === void 0 ? void 0 : body.email,
+            subject: "Verify email address",
+            html: `<p>Please verify your email address. please click link below </p> 
+         </br> 
+         <a href="${process.env.BACKEND_URL}api/v1/auth/verify-register-user?token=${body === null || body === void 0 ? void 0 : body.verifyToken}">
+            Click Here To Verify
+         </a>`
         });
+        if (info === null || info === void 0 ? void 0 : info.response) {
+            let user = new User(body);
+            yield user.save();
+            return res.status(200).send({
+                success: true,
+                statusCode: 200,
+                message: "Email was sent to " + (body === null || body === void 0 ? void 0 : body.email) + ". Please verify your account.",
+            });
+        }
+        throw new apiResponse.Api500Error("Sorry registration failed !");
     }
     catch (error) {
         next(error);
@@ -88,27 +104,20 @@ module.exports.sellerRegistrationController = (req, res, next) => __awaiter(void
  * @controller --> registration verify by token
  */
 module.exports.userVerifyTokenController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     try {
-        const verify_token = ((_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(' ')[1]) || undefined;
-        const existUser = yield User.findOne({ verifyToken: verify_token });
-        if (!existUser) {
+        const { token } = req.query;
+        if (!token)
+            throw new apiResponse.Api400Error("Required token in query !");
+        const user = yield User.findOne({ verifyToken: token });
+        if (!user) {
             throw new apiResponse.Api404Error("Sorry, User not found !");
         }
-        if (existUser.verifyToken && !verify_token) {
-            return res.status(200).send({ success: true, statusCode: 200, message: 'Verify token send....', verifyToken: existUser.verifyToken });
-        }
-        // next condition
-        if (existUser.verifyToken && (verify_token && typeof verify_token !== 'undefined')) {
-            if ((existUser === null || existUser === void 0 ? void 0 : existUser.verifyToken) !== verify_token) {
-                throw new apiResponse.Api400Error("Invalid verify token !");
-            }
-            yield User.findOneAndUpdate({ verifyToken: verify_token }, {
-                $unset: { verifyToken: 1 },
-                $set: { accountStatus: 'active' }
-            });
-            return res.status(200).send({ success: true, statusCode: 200, message: "User verified.", data: { email: existUser === null || existUser === void 0 ? void 0 : existUser.email } });
-        }
+        if ((user === null || user === void 0 ? void 0 : user.verifyToken) !== token)
+            throw new apiResponse.Api400Error("Invalid verify token !");
+        user.accountStatus = "active";
+        user.verifyToken = undefined;
+        yield user.save();
+        return res.redirect(`${process.env.FRONTEND_URL}login?email=${user === null || user === void 0 ? void 0 : user.email}`);
     }
     catch (error) {
         next(error);
@@ -120,7 +129,7 @@ module.exports.userVerifyTokenController = (req, res, next) => __awaiter(void 0,
  * @apiRequired --> BODY
  */
 module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _b, _c;
+    var _a, _b;
     try {
         const { emailOrPhone, password, authProvider } = req.body;
         let token;
@@ -159,20 +168,35 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
         }
         // system login
         else {
-            if (!existUser) {
+            if (!existUser)
                 throw new apiResponse.Api400Error(`User with ${emailOrPhone} not found!`);
-            }
             let comparedPassword = yield comparePassword(password, existUser === null || existUser === void 0 ? void 0 : existUser.password);
-            if (!comparedPassword) {
+            if (!comparedPassword)
                 throw new apiResponse.Api400Error("Password didn't match !");
-            }
             if (existUser.verifyToken && (existUser === null || existUser === void 0 ? void 0 : existUser.accountStatus) === "inactive") {
-                return res.status(200).send({ success: true, statusCode: 200, message: 'Verify token send....', verifyToken: existUser.verifyToken });
+                const info = yield transporter.sendMail({
+                    from: process.env.GMAIL_USER,
+                    to: existUser === null || existUser === void 0 ? void 0 : existUser.email,
+                    subject: "Verify email address",
+                    html: `<p>Please verify your email address. please click link below </p> 
+               </br> 
+               <a href="${process.env.BACKEND_URL}api/v1/auth/verify-register-user?token=${existUser === null || existUser === void 0 ? void 0 : existUser.verifyToken}">
+                  Click Here To Verify
+               </a>`
+                });
+                if (info === null || info === void 0 ? void 0 : info.response) {
+                    return res.status(200).send({
+                        success: true,
+                        statusCode: 200,
+                        message: "Email was sent to " + (existUser === null || existUser === void 0 ? void 0 : existUser.email) + ". Please verify your account.",
+                    });
+                }
+                return;
             }
             token = setToken(existUser);
             if ((existUser === null || existUser === void 0 ? void 0 : existUser.role) && (existUser === null || existUser === void 0 ? void 0 : existUser.role) === "BUYER") {
-                existUser.buyer["defaultShippingAddress"] = (Array.isArray((_b = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress) &&
-                    ((_c = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0])) || {};
+                existUser.buyer["defaultShippingAddress"] = (Array.isArray((_a = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
+                    ((_b = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0])) || {};
                 existUser.buyer["shoppingCartItems"] = (yield ShoppingCart.countDocuments({ customerEmail: existUser === null || existUser === void 0 ? void 0 : existUser.email })) || 0;
                 userDataToken = setUserDataToken({
                     _uuid: existUser === null || existUser === void 0 ? void 0 : existUser._uuid,
@@ -210,7 +234,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
  */
 module.exports.signOutController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const token = req.cookies.token; // finding token in http only cookies.
+        const { token } = req.cookies; // finding token in http only cookies.
         if (token && typeof token !== "undefined") {
             res.clearCookie("token");
             return res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
@@ -227,34 +251,27 @@ module.exports.changePasswordController = (req, res, next) => __awaiter(void 0, 
         let result;
         const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/;
         const { oldPassword, newPassword } = req.body;
-        if (!oldPassword || !newPassword) {
+        if (!oldPassword || !newPassword)
             throw new apiResponse.Api400Error(`Required old password and new password !`);
-        }
-        else if (newPassword && typeof newPassword !== "string") {
+        if (newPassword && typeof newPassword !== "string")
             throw new apiResponse.Api400Error("Password should be string !");
-        }
-        else if (newPassword.length < 5 || newPassword.length > 8) {
+        if (newPassword.length < 5 || newPassword.length > 8)
             throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
-        }
-        else if (!passwordRegex.test(newPassword)) {
+        if (!passwordRegex.test(newPassword))
             throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
+        const user = yield User.findOne({ email: authEmail });
+        if (!user && typeof user !== "object")
+            throw new apiResponse.Api404Error(`User not found!`);
+        const comparedPassword = yield comparePassword(oldPassword, user === null || user === void 0 ? void 0 : user.password);
+        if (!comparedPassword) {
+            throw new apiResponse.Api400Error("Password didn't match !");
         }
-        else {
-            const user = yield User.findOne({ email: authEmail });
-            if (!user && typeof user !== "object") {
-                throw new apiResponse.Api404Error(`User not found!`);
-            }
-            const comparedPassword = yield comparePassword(oldPassword, user === null || user === void 0 ? void 0 : user.password);
-            if (!comparedPassword) {
-                throw new apiResponse.Api400Error("Password didn't match !");
-            }
-            let hashedPwd = yield bcrypt.hash(newPassword, saltRounds);
-            if (hashedPwd) {
-                result = yield User.findOneAndUpdate({ email: authEmail }, { $set: { password: hashedPwd } }, { upsert: true });
-            }
-            if (result)
-                return res.status(200).send({ success: true, statusCode: 200, message: "Password updated successfully." });
+        let hashedPwd = yield bcrypt.hash(newPassword, saltRounds);
+        if (hashedPwd) {
+            result = yield User.findOneAndUpdate({ email: authEmail }, { $set: { password: hashedPwd } }, { upsert: true });
         }
+        if (result)
+            return res.status(200).send({ success: true, statusCode: 200, message: "Password updated successfully." });
     }
     catch (error) {
         next(error);
@@ -265,14 +282,32 @@ module.exports.checkUserAuthentication = (req, res, next) => __awaiter(void 0, v
         const body = req.body;
         if (!body || typeof body === "undefined")
             throw new apiResponse.Api400Error("Required body !");
-        const { emailOrPhone } = body;
-        const user = yield User.findOne({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] });
+        const { email } = body;
+        const user = yield User.findOne({ email });
         if (!user || typeof user === "undefined")
-            throw new apiResponse.Api404Error("Sorry user not found with this " + emailOrPhone);
-        let securityCode = Math.round(Math.random() * 9999999).toString();
-        let lifeTime = 60000;
-        res.cookie("securityCode", securityCode, { httpOnly: true, sameSite: "none", secure: true, maxAge: lifeTime });
-        return res.status(200).send({ success: true, statusCode: 200, message: "Your Security code is " + securityCode, securityCode, lifeTime, email_phone: emailOrPhone });
+            throw new apiResponse.Api404Error("Sorry user not found with this " + email);
+        let securityCode = get_six_digit_random_number();
+        let lifeTime = 300000;
+        const mailOptions = {
+            from: process.env.GMAIL_USER,
+            to: email,
+            subject: 'Reset your WooKart Password',
+            html: `<p>Your Security Code is <b>${securityCode}</b> and expire in 5 minutes.</p>`
+        };
+        const info = yield transporter.sendMail(mailOptions);
+        if (info === null || info === void 0 ? void 0 : info.response) {
+            res.cookie("securityCode", securityCode, { httpOnly: true, sameSite: "none", secure: true, maxAge: lifeTime });
+            return res.status(200).send({
+                success: true,
+                statusCode: 200,
+                message: "We have to send security code to your email..",
+                lifeTime,
+                email
+            });
+        }
+        else {
+            throw new apiResponse.Api500Error("Sorry ! Something wrong in your email. please provide valid email address.");
+        }
     }
     catch (error) {
         next(error);
@@ -280,19 +315,21 @@ module.exports.checkUserAuthentication = (req, res, next) => __awaiter(void 0, v
 });
 module.exports.checkUserForgotPwdSecurityKey = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const body = req.body;
         const sCode = req.cookies.securityCode;
         if (!sCode)
             throw new apiResponse.Api400Error("Security code is expired !");
-        if (!body || typeof body === "undefined")
+        if (!req.body || typeof req.body === "undefined")
             throw new apiResponse.Api400Error("Required body !");
-        const { emailOrPhone, securityCode } = body;
-        const user = yield User.findOne({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] });
+        const { email, securityCode } = req.body;
+        if (!email)
+            throw new apiResponse.Api400Error("Required email !");
+        if (!securityCode)
+            throw new apiResponse.Api400Error("Required security code !");
+        const user = yield User.findOne({ email });
         if (!user || typeof user === "undefined")
-            throw new apiResponse.Api404Error("Sorry user not found with this " + emailOrPhone);
-        if (securityCode !== sCode) {
+            throw new apiResponse.Api404Error("Sorry user not found with this " + email);
+        if (securityCode !== sCode)
             throw new apiResponse.Api400Error("Invalid security code !");
-        }
         res.clearCookie("securityCode");
         let life = 120000;
         res.cookie("set_new_pwd_session", securityCode, { httpOnly: true, sameSite: "none", secure: true, maxAge: life });
@@ -307,39 +344,30 @@ module.exports.userSetNewPassword = (req, res, next) => __awaiter(void 0, void 0
         let set_new_pwd_session = req.cookies.set_new_pwd_session;
         if (!set_new_pwd_session)
             throw new apiResponse.Api400Error("Sorry ! your session is expired !");
-        let result;
         const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/;
         const { email, password, securityCode } = req.body;
         if (securityCode !== set_new_pwd_session)
             throw new apiResponse.Api400Error("Invalid security code !");
         if (!email)
             throw new apiResponse.Api400Error("Required email address !");
-        const authEmail = email;
-        if (!password) {
+        if (!password)
             throw new apiResponse.Api400Error(`Required password !`);
-        }
-        else if (password && typeof password !== "string") {
+        if (password && typeof password !== "string")
             throw new apiResponse.Api400Error("Password should be string !");
-        }
-        else if (password.length < 5 || password.length > 8) {
+        if (password.length < 5 || password.length > 8)
             throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
-        }
-        else if (!passwordRegex.test(password)) {
+        if (!passwordRegex.test(password))
             throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
+        const user = yield User.findOne({ email });
+        if (!user && typeof user !== "object") {
+            throw new apiResponse.Api404Error(`User not found!`);
         }
-        else {
-            const user = yield User.findOne({ email: authEmail });
-            if (!user && typeof user !== "object") {
-                throw new apiResponse.Api404Error(`User not found!`);
-            }
-            let hashedPwd = yield bcrypt.hash(password, saltRounds);
-            if (hashedPwd) {
-                result = yield User.findOneAndUpdate({ email: authEmail }, { $set: { password: hashedPwd } }, { upsert: true });
-            }
-            res.clearCookie('set_new_pwd_session');
-            if (result)
-                return res.status(200).send({ success: true, statusCode: 200, message: "Password updated successfully." });
-        }
+        let hashedPwd = yield bcrypt.hash(password, saltRounds);
+        let result = hashedPwd ? yield User.findOneAndUpdate({ email }, { $set: { password: hashedPwd } }, { upsert: true }) : false;
+        res.clearCookie('set_new_pwd_session');
+        if (!result)
+            throw new apiResponse.Api500Error("Something wrong in server !");
+        return result && res.status(200).send({ success: true, statusCode: 200, message: "Password updated successfully." });
     }
     catch (error) {
         next(error);

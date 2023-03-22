@@ -3,20 +3,20 @@ const Order = require("../../model/order.model");
 const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
 const { update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.services");
+const { transporter } = require("../../services/email.service");
 
 
 module.exports = async function confirmOrder(req: Request, res: Response, next: NextFunction) {
    try {
-      const body = req.body;
 
-      if (!body || typeof body !== "object") {
+      const { email, _uuid } = req.decoded;
+
+      if (!req.body || typeof req.body !== "object") {
          return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
       }
 
-      const { paymentIntentID, paymentMethodID, orderPaymentID, orderItems } = body;
+      const { paymentIntentID, paymentMethodID, orderPaymentID, orderItems } = req.body;
 
-      const email = req.decoded.email;
-      const uuid = req.decoded._uuid;
 
       if (!paymentIntentID || !paymentMethodID) {
          return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
@@ -27,6 +27,8 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
       }
 
       async function confirmOrderHandler(item: any) {
+
+
          if (!item) {
             return;
          }
@@ -79,7 +81,7 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
                   state: item?.state,
                   shippingAddress: item?.shippingAddress,
                   paymentStatus: "success",
-                  customerID: uuid,
+                  customerID: _uuid,
                   customerEmail: email,
                   orderStatus: "pending",
                   paymentIntentID: paymentIntentID,
@@ -136,7 +138,8 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
                orderConfirmSuccess: true,
                message: "Order success for " + product?.title,
                orderID: product?.orderID,
-               baseAmount: item?.baseAmount
+               baseAmount: item?.baseAmount,
+               title: product?.title
             };
          }
       }
@@ -144,6 +147,28 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
       const promises: any = Array.isArray(orderItems) && orderItems.map(async (orderItem: any) => await confirmOrderHandler(orderItem));
 
       let upRes: any = await Promise.all(promises);
+
+      let totalAmount = Array.isArray(upRes) &&
+         upRes.map((item: any) => (parseFloat(item?.baseAmount) + item?.shippingCharge)).reduce((p: any, n: any) => p + n, 0).toFixed(2);
+
+
+
+
+      const mailOption = {
+         from: process.env.GMAIL_USER,
+         to: email,
+         subject: "Order confirm",
+         html: `<div>
+            <ul>
+            ${upRes && upRes.map((e: any) => {
+            return `<li>${e?.title}</li>`
+         })}
+            </ul>
+            <b>Total amount = ${totalAmount && totalAmount} $</b>
+         </div>`
+      }
+
+      const mail = await transporter.sendMail(mailOption);
 
 
       if (upRes) {

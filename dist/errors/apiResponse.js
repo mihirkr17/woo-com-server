@@ -27,4 +27,4 @@ class Api500Error extends BaseErrors {
         super(message, name, statusCode, success);
     }
 }
-module.exports = { Api400Error, Api401Error, Api403Error, Api404Error };
+module.exports = { Api400Error, Api401Error, Api403Error, Api404Error, Api500Error };

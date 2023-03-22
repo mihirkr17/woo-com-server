@@ -127,35 +127,5 @@ var UserSchema = new Schema<IUser>({
   becomeSellerAt: { type: Date, default: undefined }
 });
 
-// user password hashing before save into database
-UserSchema.pre("save", async function (next: any) {
-  let password = this.password;
-  let authProvider = this.authProvider;
-  let emailAddr = this.email;
-
-  if (this.idFor === 'sell') {
-    this.role = 'SELLER'
-  }
-
-  if (this.idFor === 'buy') {
-    this.role = 'BUYER'
-  }
-
-  if (authProvider === 'thirdParty') {
-    next();
-  }
-
-  // hashing password throw bcrypt
-  let hashedPwd = await bcrypt.hash(password, saltRounds);
-
-  this.contactEmail = emailAddr;
-  this.password = hashedPwd;
-  this.hasPassword = true;
-  this.accountStatus = "inactive";
-
-  next();
-});
-
-
 var User = model<IUser>("User", UserSchema, "users");
 module.exports = User;

@@ -3,6 +3,7 @@ const mdb = require("mongodb");
 const Product = require("../model/product.model");
 const UserModel = require("../model/user.model");
 const OrderModel = require("../model/order.model");
+const cryptos = require("crypto");
 
 
 
@@ -363,3 +364,11 @@ module.exports.checkProductAvailability = async (productID: string, variationID:
 
    return product;
 };
+
+
+
+module.exports.get_six_digit_random_number = () => {
+   let randomBytes = cryptos.randomBytes(4);
+   let randomNumber = parseInt(randomBytes.toString('hex'), 16) % 900000 + 100000;
+   return randomNumber.toString();
+} 

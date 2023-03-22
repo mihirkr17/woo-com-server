@@ -13,16 +13,15 @@ const Order = require("../../model/order.model");
 const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
 const { update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.services");
+const { transporter } = require("../../services/email.service");
 module.exports = function confirmOrder(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const body = req.body;
-            if (!body || typeof body !== "object") {
+            const { email, _uuid } = req.decoded;
+            if (!req.body || typeof req.body !== "object") {
                 return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
             }
-            const { paymentIntentID, paymentMethodID, orderPaymentID, orderItems } = body;
-            const email = req.decoded.email;
-            const uuid = req.decoded._uuid;
+            const { paymentIntentID, paymentMethodID, orderPaymentID, orderItems } = req.body;
             if (!paymentIntentID || !paymentMethodID) {
                 return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
             }
@@ -80,7 +79,7 @@ module.exports = function confirmOrder(req, res, next) {
                                 state: item === null || item === void 0 ? void 0 : item.state,
                                 shippingAddress: item === null || item === void 0 ? void 0 : item.shippingAddress,
                                 paymentStatus: "success",
-                                customerID: uuid,
+                                customerID: _uuid,
                                 customerEmail: email,
                                 orderStatus: "pending",
                                 paymentIntentID: paymentIntentID,
@@ -121,13 +120,30 @@ module.exports = function confirmOrder(req, res, next) {
                             orderConfirmSuccess: true,
                             message: "Order success for " + (product === null || product === void 0 ? void 0 : product.title),
                             orderID: product === null || product === void 0 ? void 0 : product.orderID,
-                            baseAmount: item === null || item === void 0 ? void 0 : item.baseAmount
+                            baseAmount: item === null || item === void 0 ? void 0 : item.baseAmount,
+                            title: product === null || product === void 0 ? void 0 : product.title
                         };
                     }
                 });
             }
             const promises = Array.isArray(orderItems) && orderItems.map((orderItem) => __awaiter(this, void 0, void 0, function* () { return yield confirmOrderHandler(orderItem); }));
             let upRes = yield Promise.all(promises);
+            let totalAmount = Array.isArray(upRes) &&
+                upRes.map((item) => (parseFloat(item === null || item === void 0 ? void 0 : item.baseAmount) + (item === null || item === void 0 ? void 0 : item.shippingCharge))).reduce((p, n) => p + n, 0).toFixed(2);
+            const mailOption = {
+                from: process.env.GMAIL_USER,
+                to: email,
+                subject: "Order confirm",
+                html: `<div>
+            <ul>
+            ${upRes && upRes.map((e) => {
+                    return `<li>${e === null || e === void 0 ? void 0 : e.title}</li>`;
+                })}
+            </ul>
+            <b>Total amount = ${totalAmount && totalAmount} $</b>
+         </div>`
+            };
+            const mail = yield transporter.sendMail(mailOption);
             if (upRes) {
                 return res.status(200).send({ message: "order success", statusCode: 200, success: true, data: upRes });
             }

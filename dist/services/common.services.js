@@ -13,6 +13,7 @@ const mdb = require("mongodb");
 const Product = require("../model/product.model");
 const UserModel = require("../model/user.model");
 const OrderModel = require("../model/order.model");
+const cryptos = require("crypto");
 module.exports.findUserByEmail = (email) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         return (yield UserModel.findOne({ $and: [{ email: email }, { accountStatus: 'active' }] }, {
@@ -315,3 +316,8 @@ module.exports.checkProductAvailability = (productID, variationID) => __awaiter(
     product = product[0];
     return product;
 });
+module.exports.get_six_digit_random_number = () => {
+    let randomBytes = cryptos.randomBytes(4);
+    let randomNumber = parseInt(randomBytes.toString('hex'), 16) % 900000 + 100000;
+    return randomNumber.toString();
+};
