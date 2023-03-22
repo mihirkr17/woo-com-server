@@ -43,10 +43,10 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
          from: process.env.GMAIL_USER,
          to: body?.email,
          subject: "Verify email address",
-         html: `<p>Please verify your email address. please click link below </p> 
+         html: `<p>Verify your email address. please click the link below </p> 
          </br> 
          <a href="${process.env.BACKEND_URL}api/v1/auth/verify-register-user?token=${body?.verifyToken}">
-            Click Here To Verify
+            <b>Click Here To Verify</b>
          </a>`
       });
 
@@ -215,7 +215,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
                html: `<p>Please verify your email address. please click link below </p> 
                </br> 
                <a href="${process.env.BACKEND_URL}api/v1/auth/verify-register-user?token=${existUser?.verifyToken}">
-                  Click Here To Verify
+                  <b>Click Here To Verify</b>
                </a>`
             });
 

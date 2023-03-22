@@ -46,10 +46,10 @@ module.exports.buyerRegistrationController = (req, res, next) => __awaiter(void 
             from: process.env.GMAIL_USER,
             to: body === null || body === void 0 ? void 0 : body.email,
             subject: "Verify email address",
-            html: `<p>Please verify your email address. please click link below </p> 
+            html: `<p>Verify your email address. please click the link below </p> 
          </br> 
          <a href="${process.env.BACKEND_URL}api/v1/auth/verify-register-user?token=${body === null || body === void 0 ? void 0 : body.verifyToken}">
-            Click Here To Verify
+            <b>Click Here To Verify</b>
          </a>`
         });
         if (info === null || info === void 0 ? void 0 : info.response) {
@@ -181,7 +181,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
                     html: `<p>Please verify your email address. please click link below </p> 
                </br> 
                <a href="${process.env.BACKEND_URL}api/v1/auth/verify-register-user?token=${existUser === null || existUser === void 0 ? void 0 : existUser.verifyToken}">
-                  Click Here To Verify
+                  <b>Click Here To Verify</b>
                </a>`
                 });
                 if (info === null || info === void 0 ? void 0 : info.response) {
