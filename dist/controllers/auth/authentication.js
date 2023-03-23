@@ -54,7 +54,7 @@ module.exports.buyerRegistrationController = (req, res, next) => __awaiter(void 
             return res.status(200).send({
                 success: true,
                 statusCode: 200,
-                message: "Email was sent to " + (body === null || body === void 0 ? void 0 : body.email) + ". Please verify your account.",
+                message: "Thanks for your information. Verification email was sent to " + (body === null || body === void 0 ? void 0 : body.email) + ". Please verify your account.",
             });
         }
         throw new apiResponse.Api500Error("Sorry registration failed !");
@@ -127,30 +127,23 @@ module.exports.userVerifyTokenController = (req, res, next) => __awaiter(void 0,
 module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     try {
-        const { emailOrPhone, password, authProvider } = req.body;
+        const { emailOrPhone, password } = req.body;
         let token;
         let userDataToken;
-        let userData;
-        let provider;
         const cookieObject = {
             sameSite: "none",
             secure: true,
             maxAge: 57600000,
             httpOnly: true
         };
-        if (typeof authProvider === 'undefined' || !authProvider) {
-            provider = 'system';
-        }
-        else {
-            provider = authProvider;
-        }
         let existUser = yield User.findOne({
             $and: [
-                { $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] },
-                { authProvider: provider }
+                { $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] }
             ]
         });
-        if (existUser.verifyToken && (existUser === null || existUser === void 0 ? void 0 : existUser.accountStatus) === "inactive") {
+        if (!existUser)
+            throw new apiResponse.Api400Error(`User with ${emailOrPhone} not found!`);
+        if ((existUser === null || existUser === void 0 ? void 0 : existUser.verifyToken) && (existUser === null || existUser === void 0 ? void 0 : existUser.accountStatus) === "inactive") {
             existUser.verifyToken = generateVerifyToken();
             let newToken = yield existUser.save();
             const info = yield transporter.sendMail({
@@ -168,47 +161,30 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
             }
             throw new apiResponse.Api500Error("Internal error !");
         }
-        /// third party login system like --> Google
-        if (authProvider === 'thirdParty') {
-            if (!existUser || typeof existUser === 'undefined') {
-                const UUID = Math.random().toString(36).toUpperCase().slice(2, 18);
-                const user = new User({ _uuid: UUID, email: emailOrPhone, authProvider, accountStatus: 'active' });
-                userData = yield user.save();
-            }
-            else {
-                userData = existUser;
-            }
-            token = setToken(userData);
-        }
-        // system login
-        else {
-            if (!existUser)
-                throw new apiResponse.Api400Error(`User with ${emailOrPhone} not found!`);
-            let comparedPassword = yield comparePassword(password, existUser === null || existUser === void 0 ? void 0 : existUser.password);
-            if (!comparedPassword)
-                throw new apiResponse.Api400Error("Password didn't match !");
-            token = setToken(existUser);
-            if ((existUser === null || existUser === void 0 ? void 0 : existUser.role) && (existUser === null || existUser === void 0 ? void 0 : existUser.role) === "BUYER") {
-                existUser.buyer["defaultShippingAddress"] = (Array.isArray((_a = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
-                    ((_b = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0])) || {};
-                existUser.buyer["shoppingCartItems"] = (yield ShoppingCart.countDocuments({ customerEmail: existUser === null || existUser === void 0 ? void 0 : existUser.email })) || 0;
-                userDataToken = setUserDataToken({
-                    _uuid: existUser === null || existUser === void 0 ? void 0 : existUser._uuid,
-                    fullName: existUser === null || existUser === void 0 ? void 0 : existUser.fullName,
-                    email: existUser === null || existUser === void 0 ? void 0 : existUser.email,
-                    phone: existUser === null || existUser === void 0 ? void 0 : existUser.phone,
-                    phonePrefixCode: existUser === null || existUser === void 0 ? void 0 : existUser.phonePrefixCode,
-                    hasPassword: existUser === null || existUser === void 0 ? void 0 : existUser.hasPassword,
-                    role: existUser === null || existUser === void 0 ? void 0 : existUser.role,
-                    gender: existUser === null || existUser === void 0 ? void 0 : existUser.gender,
-                    dob: existUser === null || existUser === void 0 ? void 0 : existUser.dob,
-                    idFor: existUser === null || existUser === void 0 ? void 0 : existUser.idFor,
-                    accountStatus: existUser === null || existUser === void 0 ? void 0 : existUser.accountStatus,
-                    contactEmail: existUser === null || existUser === void 0 ? void 0 : existUser.contactEmail,
-                    buyer: existUser === null || existUser === void 0 ? void 0 : existUser.buyer,
-                    authProvider: existUser === null || existUser === void 0 ? void 0 : existUser.authProvider
-                });
-            }
+        let comparedPassword = yield comparePassword(password, existUser === null || existUser === void 0 ? void 0 : existUser.password);
+        if (!comparedPassword)
+            throw new apiResponse.Api400Error("Password didn't match !");
+        token = setToken(existUser);
+        if ((existUser === null || existUser === void 0 ? void 0 : existUser.role) && (existUser === null || existUser === void 0 ? void 0 : existUser.role) === "BUYER") {
+            existUser.buyer["defaultShippingAddress"] = (Array.isArray((_a = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
+                ((_b = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0])) || {};
+            existUser.buyer["shoppingCartItems"] = (yield ShoppingCart.countDocuments({ customerEmail: existUser === null || existUser === void 0 ? void 0 : existUser.email })) || 0;
+            userDataToken = setUserDataToken({
+                _uuid: existUser === null || existUser === void 0 ? void 0 : existUser._uuid,
+                fullName: existUser === null || existUser === void 0 ? void 0 : existUser.fullName,
+                email: existUser === null || existUser === void 0 ? void 0 : existUser.email,
+                phone: existUser === null || existUser === void 0 ? void 0 : existUser.phone,
+                phonePrefixCode: existUser === null || existUser === void 0 ? void 0 : existUser.phonePrefixCode,
+                hasPassword: existUser === null || existUser === void 0 ? void 0 : existUser.hasPassword,
+                role: existUser === null || existUser === void 0 ? void 0 : existUser.role,
+                gender: existUser === null || existUser === void 0 ? void 0 : existUser.gender,
+                dob: existUser === null || existUser === void 0 ? void 0 : existUser.dob,
+                idFor: existUser === null || existUser === void 0 ? void 0 : existUser.idFor,
+                accountStatus: existUser === null || existUser === void 0 ? void 0 : existUser.accountStatus,
+                contactEmail: existUser === null || existUser === void 0 ? void 0 : existUser.contactEmail,
+                buyer: existUser === null || existUser === void 0 ? void 0 : existUser.buyer,
+                authProvider: existUser === null || existUser === void 0 ? void 0 : existUser.authProvider
+            });
         }
         if (token) {
             // if token then set it to client cookie

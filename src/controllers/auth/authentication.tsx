@@ -49,13 +49,12 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
 
 
       if (info?.response) {
-
          let user = new User(body);
          await user.save();
          return res.status(200).send({
             success: true,
             statusCode: 200,
-            message: "Email was sent to " + body?.email + ". Please verify your account.",
+            message: "Thanks for your information. Verification email was sent to " + body?.email + ". Please verify your account.",
          });
       }
 
@@ -152,12 +151,10 @@ module.exports.userVerifyTokenController = async (req: Request, res: Response, n
 module.exports.loginController = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
-      const { emailOrPhone, password, authProvider } = req.body;
+      const { emailOrPhone, password } = req.body;
 
       let token: String;
       let userDataToken: any;
-      let userData;
-      let provider: String;
 
       const cookieObject: any = {
          sameSite: "none",
@@ -166,20 +163,15 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
          httpOnly: true
       };
 
-      if (typeof authProvider === 'undefined' || !authProvider) {
-         provider = 'system';
-      } else {
-         provider = authProvider;
-      }
-
       let existUser = await User.findOne({
          $and: [
-            { $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] },
-            { authProvider: provider }
+            { $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] }
          ]
       });
 
-      if (existUser.verifyToken && existUser?.accountStatus === "inactive") {
+      if (!existUser) throw new apiResponse.Api400Error(`User with ${emailOrPhone} not found!`);
+
+      if (existUser?.verifyToken && existUser?.accountStatus === "inactive") {
 
          existUser.verifyToken = generateVerifyToken();
 
@@ -203,57 +195,35 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
          throw new apiResponse.Api500Error("Internal error !");
       }
 
-      /// third party login system like --> Google
-      if (authProvider === 'thirdParty') {
+      let comparedPassword = await comparePassword(password, existUser?.password);
 
-         if (!existUser || typeof existUser === 'undefined') {
-            const UUID = Math.random().toString(36).toUpperCase().slice(2, 18);
+      if (!comparedPassword) throw new apiResponse.Api400Error("Password didn't match !");
 
-            const user = new User({ _uuid: UUID, email: emailOrPhone, authProvider, accountStatus: 'active' });
-            userData = await user.save();
+      token = setToken(existUser);
 
-         } else {
-            userData = existUser;
-         }
+      if (existUser?.role && existUser?.role === "BUYER") {
 
-         token = setToken(userData);
-      }
+         existUser.buyer["defaultShippingAddress"] = (Array.isArray(existUser?.buyer?.shippingAddress) &&
+            existUser?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]) || {};
 
-      // system login
-      else {
+         existUser.buyer["shoppingCartItems"] = await ShoppingCart.countDocuments({ customerEmail: existUser?.email }) || 0;
 
-         if (!existUser) throw new apiResponse.Api400Error(`User with ${emailOrPhone} not found!`);
-
-         let comparedPassword = await comparePassword(password, existUser?.password);
-
-         if (!comparedPassword) throw new apiResponse.Api400Error("Password didn't match !");
-
-         token = setToken(existUser);
-
-         if (existUser?.role && existUser?.role === "BUYER") {
-
-            existUser.buyer["defaultShippingAddress"] = (Array.isArray(existUser?.buyer?.shippingAddress) &&
-               existUser?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]) || {};
-
-            existUser.buyer["shoppingCartItems"] = await ShoppingCart.countDocuments({ customerEmail: existUser?.email }) || 0;
-
-            userDataToken = setUserDataToken({
-               _uuid: existUser?._uuid,
-               fullName: existUser?.fullName,
-               email: existUser?.email,
-               phone: existUser?.phone,
-               phonePrefixCode: existUser?.phonePrefixCode,
-               hasPassword: existUser?.hasPassword,
-               role: existUser?.role,
-               gender: existUser?.gender,
-               dob: existUser?.dob,
-               idFor: existUser?.idFor,
-               accountStatus: existUser?.accountStatus,
-               contactEmail: existUser?.contactEmail,
-               buyer: existUser?.buyer,
-               authProvider: existUser?.authProvider
-            });
-         }
+         userDataToken = setUserDataToken({
+            _uuid: existUser?._uuid,
+            fullName: existUser?.fullName,
+            email: existUser?.email,
+            phone: existUser?.phone,
+            phonePrefixCode: existUser?.phonePrefixCode,
+            hasPassword: existUser?.hasPassword,
+            role: existUser?.role,
+            gender: existUser?.gender,
+            dob: existUser?.dob,
+            idFor: existUser?.idFor,
+            accountStatus: existUser?.accountStatus,
+            contactEmail: existUser?.contactEmail,
+            buyer: existUser?.buyer,
+            authProvider: existUser?.authProvider
+         });
       }
 
       if (token) {
