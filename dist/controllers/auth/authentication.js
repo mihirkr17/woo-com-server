@@ -46,7 +46,7 @@ module.exports.buyerRegistrationController = (req, res, next) => __awaiter(void 
             from: process.env.GMAIL_USER,
             to: body === null || body === void 0 ? void 0 : body.email,
             subject: "Verify email address",
-            html: verify_email_html_template(body === null || body === void 0 ? void 0 : body.verifyToken)
+            html: verify_email_html_template(body === null || body === void 0 ? void 0 : body.verifyToken, body === null || body === void 0 ? void 0 : body._uuid)
         });
         if (info === null || info === void 0 ? void 0 : info.response) {
             let user = new User(body);
@@ -101,12 +101,12 @@ module.exports.sellerRegistrationController = (req, res, next) => __awaiter(void
  */
 module.exports.userVerifyTokenController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { token } = req.query;
+        const { token, mailer } = req.query;
         if (!token)
             throw new apiResponse.Api400Error("Required token in query !");
-        const user = yield User.findOne({ verifyToken: token });
+        const user = yield User.findOne({ $and: [{ verifyToken: token }, { _uuid: mailer }] });
         if (!user) {
-            throw new apiResponse.Api404Error("Sorry, User not found !");
+            throw new apiResponse.Api400Error("Session is expired !");
         }
         if ((user === null || user === void 0 ? void 0 : user.verifyToken) !== token)
             throw new apiResponse.Api400Error("Invalid verify token !");
@@ -157,7 +157,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
                 from: process.env.GMAIL_USER,
                 to: existUser === null || existUser === void 0 ? void 0 : existUser.email,
                 subject: "Verify email address",
-                html: verify_email_html_template(newToken === null || newToken === void 0 ? void 0 : newToken.verifyToken)
+                html: verify_email_html_template(newToken === null || newToken === void 0 ? void 0 : newToken.verifyToken, existUser === null || existUser === void 0 ? void 0 : existUser._uuid)
             });
             if (info === null || info === void 0 ? void 0 : info.response) {
                 return res.status(200).send({
@@ -166,7 +166,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
                     message: "Email was sent to " + (existUser === null || existUser === void 0 ? void 0 : existUser.email) + ". Please verify your account.",
                 });
             }
-            return;
+            throw new apiResponse.Api500Error("Internal error !");
         }
         /// third party login system like --> Google
         if (authProvider === 'thirdParty') {

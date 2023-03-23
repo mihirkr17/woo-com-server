@@ -44,7 +44,7 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
          from: process.env.GMAIL_USER,
          to: body?.email,
          subject: "Verify email address",
-         html: verify_email_html_template(body?.verifyToken)
+         html: verify_email_html_template(body?.verifyToken, body?._uuid)
       });
 
 
@@ -116,14 +116,14 @@ module.exports.sellerRegistrationController = async (req: Request, res: Response
 module.exports.userVerifyTokenController = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
-      const { token } = req.query;
+      const { token, mailer } = req.query;
 
       if (!token) throw new apiResponse.Api400Error("Required token in query !");
 
-      const user = await User.findOne({ verifyToken: token });
+      const user = await User.findOne({ $and: [{ verifyToken: token }, { _uuid: mailer }] });
 
       if (!user) {
-         throw new apiResponse.Api404Error("Sorry, User not found !");
+         throw new apiResponse.Api400Error("Session is expired !");
       }
 
       if (user?.verifyToken !== token)
@@ -189,7 +189,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
             from: process.env.GMAIL_USER,
             to: existUser?.email,
             subject: "Verify email address",
-            html: verify_email_html_template(newToken?.verifyToken)
+            html: verify_email_html_template(newToken?.verifyToken, existUser?._uuid)
          });
 
          if (info?.response) {
@@ -200,7 +200,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
             });
          }
 
-         return;
+         throw new apiResponse.Api500Error("Internal error !");
       }
 
       /// third party login system like --> Google
