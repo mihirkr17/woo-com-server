@@ -17,7 +17,7 @@ module.exports.verify_email_html_template = (verifyToken) => {
       <td><h5>Verify your email address. please click the link below </h5></td>
    </tr>
    <tr>
-      <td align="center" bgcolor="#FFFFFF" style="padding: 2rem 2.5rem; border-radius: 4px;">
+      <td align="center" bgcolor="#FFFFFF" style="padding: 1.3rem 1.4rem; border-radius: 4px;">
          <a href="${process.env.BACKEND_URL}api/v1/auth/verify-register-user?token=${verifyToken}" 
          target="_blank" 
             style="font-weight: bold; 
@@ -30,7 +30,9 @@ module.exports.verify_email_html_template = (verifyToken) => {
             appearance: button;
             background-color: hotpink;
             border: 1px solid hotpink;
-            border-radius: 4px;"
+            border-radius: 4px;
+            padding: 0.3rem 0.8rem;
+            "
          >
             Click Here To Verify Email
          </a>
