@@ -48,12 +48,6 @@ module.exports.buyerRegistrationController = (req, res, next) => __awaiter(void 
             subject: "Verify email address",
             html: verify_email_html_template(body === null || body === void 0 ? void 0 : body.verifyToken, body === null || body === void 0 ? void 0 : body._uuid)
         });
-        // await transporter.sendMail({
-        //    from: process.env.GMAIL_USER,
-        //    to: body?.email,
-        //    subject: "Verify email address",
-        //    html: verify_email_html_template(body?.verifyToken, body?._uuid)
-        // });
         if (info === null || info === void 0 ? void 0 : info.response) {
             let user = new User(body);
             yield user.save();
@@ -214,6 +208,11 @@ module.exports.signOutController = (req, res, next) => __awaiter(void 0, void 0,
         next(error);
     }
 });
+/**
+ * @apiController --> Password change controller
+ * @apiMethod --> POST
+ * @apiRequired --> body {old-password, new-password}
+ */
 module.exports.changePasswordController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const authEmail = req.decoded.email;

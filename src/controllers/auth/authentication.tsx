@@ -47,14 +47,6 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
          html: verify_email_html_template(body?.verifyToken, body?._uuid)
       });
 
-      // await transporter.sendMail({
-      //    from: process.env.GMAIL_USER,
-      //    to: body?.email,
-      //    subject: "Verify email address",
-      //    html: verify_email_html_template(body?.verifyToken, body?._uuid)
-      // });
-
-
       if (info?.response) {
          let user = new User(body);
          await user.save();
@@ -172,13 +164,11 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 
          let newToken = await user.save();
 
-         const info = await email_service(
-            {
-               to: user?.email,
-               subject: "Verify email address",
-               html: verify_email_html_template(newToken?.verifyToken, user?._uuid)
-            }
-         );
+         const info = await email_service({
+            to: user?.email,
+            subject: "Verify email address",
+            html: verify_email_html_template(newToken?.verifyToken, user?._uuid)
+         });
 
          if (info?.response) {
             return res.status(200).send({
@@ -261,7 +251,11 @@ module.exports.signOutController = async (req: Request, res: Response, next: Nex
 };
 
 
-
+/**
+ * @apiController --> Password change controller
+ * @apiMethod --> POST
+ * @apiRequired --> body {old-password, new-password}
+ */
 module.exports.changePasswordController = async (req: Request, res: Response, next: NextFunction) => {
    try {
       const authEmail = req.decoded.email;

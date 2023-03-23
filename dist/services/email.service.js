@@ -9,17 +9,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 const nodemailer = require("nodemailer");
-module.exports.transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        type: 'OAuth2',
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_PWD,
-        clientId: process.env.GMAIL_CLIENT_ID,
-        clientSecret: process.env.GMAIL_CLIENT_SECRET,
-        refreshToken: process.env.GMAIL_REFRESH_TOKEN
-    }
-});
 module.exports = function email_service(option) {
     return __awaiter(this, void 0, void 0, function* () {
         try {

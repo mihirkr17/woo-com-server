@@ -3,7 +3,7 @@ const Order = require("../../model/order.model");
 const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
 const { update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
-const { transporter } = require("../../services/email.service");
+const email_service = require("../../services/email.service");
 
 
 module.exports = async function confirmOrder(req: Request, res: Response, next: NextFunction) {
@@ -151,11 +151,7 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
       let totalAmount = Array.isArray(upRes) &&
          upRes.map((item: any) => (parseFloat(item?.baseAmount) + item?.shippingCharge)).reduce((p: any, n: any) => p + n, 0).toFixed(2);
 
-
-
-
-      const mailOption = {
-         from: process.env.GMAIL_USER,
+      const mail = await email_service({
          to: email,
          subject: "Order confirm",
          html: `<div>
@@ -166,9 +162,7 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
             </ul>
             <b>Total amount = ${totalAmount && totalAmount} $</b>
          </div>`
-      }
-
-      const mail = await transporter.sendMail(mailOption);
+      });
 
 
       if (upRes) {
