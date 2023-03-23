@@ -172,12 +172,36 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
          provider = authProvider;
       }
 
-      const existUser = await User.findOne({
+      let existUser = await User.findOne({
          $and: [
             { $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] },
             { authProvider: provider }
          ]
       });
+
+      if (existUser.verifyToken && existUser?.accountStatus === "inactive") {
+
+         existUser.verifyToken = generateVerifyToken();
+
+         let newToken = await existUser.save();
+
+         const info = await transporter.sendMail({
+            from: process.env.GMAIL_USER,
+            to: existUser?.email,
+            subject: "Verify email address",
+            html: verify_email_html_template(newToken?.verifyToken)
+         });
+
+         if (info?.response) {
+            return res.status(200).send({
+               success: true,
+               statusCode: 200,
+               message: "Email was sent to " + existUser?.email + ". Please verify your account.",
+            });
+         }
+
+         return;
+      }
 
       /// third party login system like --> Google
       if (authProvider === 'thirdParty') {
@@ -203,25 +227,6 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
          let comparedPassword = await comparePassword(password, existUser?.password);
 
          if (!comparedPassword) throw new apiResponse.Api400Error("Password didn't match !");
-
-         if (existUser.verifyToken && existUser?.accountStatus === "inactive") {
-            const info = await transporter.sendMail({
-               from: process.env.GMAIL_USER,
-               to: existUser?.email,
-               subject: "Verify email address",
-               html: verify_email_html_template(existUser?.verifyToken)
-            });
-
-            if (info?.response) {
-               return res.status(200).send({
-                  success: true,
-                  statusCode: 200,
-                  message: "Email was sent to " + existUser?.email + ". Please verify your account.",
-               });
-            }
-
-            return;
-         }
 
          token = setToken(existUser);
 

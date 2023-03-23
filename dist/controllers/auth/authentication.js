@@ -144,12 +144,30 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
         else {
             provider = authProvider;
         }
-        const existUser = yield User.findOne({
+        let existUser = yield User.findOne({
             $and: [
                 { $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] },
                 { authProvider: provider }
             ]
         });
+        if (existUser.verifyToken && (existUser === null || existUser === void 0 ? void 0 : existUser.accountStatus) === "inactive") {
+            existUser.verifyToken = generateVerifyToken();
+            let newToken = yield existUser.save();
+            const info = yield transporter.sendMail({
+                from: process.env.GMAIL_USER,
+                to: existUser === null || existUser === void 0 ? void 0 : existUser.email,
+                subject: "Verify email address",
+                html: verify_email_html_template(newToken === null || newToken === void 0 ? void 0 : newToken.verifyToken)
+            });
+            if (info === null || info === void 0 ? void 0 : info.response) {
+                return res.status(200).send({
+                    success: true,
+                    statusCode: 200,
+                    message: "Email was sent to " + (existUser === null || existUser === void 0 ? void 0 : existUser.email) + ". Please verify your account.",
+                });
+            }
+            return;
+        }
         /// third party login system like --> Google
         if (authProvider === 'thirdParty') {
             if (!existUser || typeof existUser === 'undefined') {
@@ -169,22 +187,6 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
             let comparedPassword = yield comparePassword(password, existUser === null || existUser === void 0 ? void 0 : existUser.password);
             if (!comparedPassword)
                 throw new apiResponse.Api400Error("Password didn't match !");
-            if (existUser.verifyToken && (existUser === null || existUser === void 0 ? void 0 : existUser.accountStatus) === "inactive") {
-                const info = yield transporter.sendMail({
-                    from: process.env.GMAIL_USER,
-                    to: existUser === null || existUser === void 0 ? void 0 : existUser.email,
-                    subject: "Verify email address",
-                    html: verify_email_html_template(existUser === null || existUser === void 0 ? void 0 : existUser.verifyToken)
-                });
-                if (info === null || info === void 0 ? void 0 : info.response) {
-                    return res.status(200).send({
-                        success: true,
-                        statusCode: 200,
-                        message: "Email was sent to " + (existUser === null || existUser === void 0 ? void 0 : existUser.email) + ". Please verify your account.",
-                    });
-                }
-                return;
-            }
             token = setToken(existUser);
             if ((existUser === null || existUser === void 0 ? void 0 : existUser.role) && (existUser === null || existUser === void 0 ? void 0 : existUser.role) === "BUYER") {
                 existUser.buyer["defaultShippingAddress"] = (Array.isArray((_a = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&

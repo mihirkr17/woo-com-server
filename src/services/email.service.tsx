@@ -16,10 +16,10 @@ module.exports.transporter = nodemailer.createTransport({
 module.exports.verify_email_html_template = (verifyToken: string) => {
    return (`<table cellspacing="0" cellpadding="0" style="margin: 0 auto;">
    <tr>
-      <td><b>Verify your email address. please click the link below </b></td>
+      <td><h5>Verify your email address. please click the link below </h5></td>
    </tr>
    <tr>
-      <td align="center" bgcolor="#2C3E50" style="padding: 12px 18px; border-radius: 4px;">
+      <td align="center" bgcolor="#FFFFFF" style="padding: 2rem 2.5rem; border-radius: 4px;">
          <a href="${process.env.BACKEND_URL}api/v1/auth/verify-register-user?token=${verifyToken}" 
          target="_blank" 
             style="font-weight: bold; 
@@ -30,8 +30,8 @@ module.exports.verify_email_html_template = (verifyToken: string) => {
             letter-spacing: 1px;
             font-size: 1rem;
             appearance: button;
-            background-color: pink;
-            border: 1px solid pink;
+            background-color: hotpink;
+            border: 1px solid hotpink;
             border-radius: 4px;"
          >
             Click Here To Verify Email
