@@ -11,7 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const Product = require("../../model/product.model");
 const Order = require("../../model/order.model");
-const { order_status_updater, update_variation_stock_available } = require("../../services/common.services");
+const { order_status_updater, update_variation_stock_available } = require("../../services/common.service");
 module.exports.myOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const email = req.params.email;

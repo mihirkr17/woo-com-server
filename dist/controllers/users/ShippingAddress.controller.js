@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const User = require("../../model/user.model");
-const { findUserByEmail } = require("../../services/common.services");
+const { findUserByEmail } = require("../../services/common.service");
 const apiResponse = require("../../errors/apiResponse");
 module.exports.createShippingAddress = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {

@@ -10,8 +10,9 @@ const setUserDataToken = require("../../utils/setUserDataToken");
 const ShoppingCart = require("../../model/shoppingCart.model");
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
-const { transporter, verify_email_html_template } = require("../../services/email.service");
-const { get_six_digit_random_number } = require("../../services/common.services");
+const email_service = require("../../services/email.service");
+const { get_six_digit_random_number, isPasswordValid } = require("../../services/common.service");
+const { verify_email_html_template } = require("../../templates/email.template");
 
 /**
  * @apiController --> Buyer Registration Controller
@@ -40,12 +41,18 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
       body["authProvider"] = "system";
 
 
-      const info = await transporter.sendMail({
-         from: process.env.GMAIL_USER,
+      const info = await email_service({
          to: body?.email,
          subject: "Verify email address",
          html: verify_email_html_template(body?.verifyToken, body?._uuid)
       });
+
+      // await transporter.sendMail({
+      //    from: process.env.GMAIL_USER,
+      //    to: body?.email,
+      //    subject: "Verify email address",
+      //    html: verify_email_html_template(body?.verifyToken, body?._uuid)
+      // });
 
 
       if (info?.response) {
@@ -112,7 +119,7 @@ module.exports.sellerRegistrationController = async (req: Request, res: Response
 /**
  * @controller --> registration verify by token
  */
-module.exports.userVerifyTokenController = async (req: Request, res: Response, next: NextFunction) => {
+module.exports.userEmailVerifyTokenController = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
       const { token, mailer } = req.query;
@@ -153,85 +160,79 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 
       const { emailOrPhone, password } = req.body;
 
-      let token: String;
       let userDataToken: any;
 
-      const cookieObject: any = {
-         sameSite: "none",
-         secure: true,
-         maxAge: 57600000,  // 16hr [3600000 -> 1hr]ms
-         httpOnly: true
-      };
+      let user = await User.findOne({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] });
 
-      let existUser = await User.findOne({
-         $and: [
-            { $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] }
-         ]
-      });
+      if (!user) throw new apiResponse.Api400Error(`User with ${emailOrPhone} not found!`);
 
-      if (!existUser) throw new apiResponse.Api400Error(`User with ${emailOrPhone} not found!`);
+      if (user?.verifyToken && user?.accountStatus === "inactive") {
 
-      if (existUser?.verifyToken && existUser?.accountStatus === "inactive") {
+         user.verifyToken = generateVerifyToken();
 
-         existUser.verifyToken = generateVerifyToken();
+         let newToken = await user.save();
 
-         let newToken = await existUser.save();
-
-         const info = await transporter.sendMail({
-            from: process.env.GMAIL_USER,
-            to: existUser?.email,
-            subject: "Verify email address",
-            html: verify_email_html_template(newToken?.verifyToken, existUser?._uuid)
-         });
+         const info = await email_service(
+            {
+               to: user?.email,
+               subject: "Verify email address",
+               html: verify_email_html_template(newToken?.verifyToken, user?._uuid)
+            }
+         );
 
          if (info?.response) {
             return res.status(200).send({
                success: true,
                statusCode: 200,
-               message: "Email was sent to " + existUser?.email + ". Please verify your account.",
+               message: "Email was sent to " + user?.email + ". Please verify your account.",
             });
          }
 
          throw new apiResponse.Api500Error("Internal error !");
       }
 
-      let comparedPassword = await comparePassword(password, existUser?.password);
+      let comparedPassword = await comparePassword(password, user?.password);
 
       if (!comparedPassword) throw new apiResponse.Api400Error("Password didn't match !");
 
-      token = setToken(existUser);
+      let token = setToken(user);
 
-      if (existUser?.role && existUser?.role === "BUYER") {
+      if (user?.role && user?.role === "BUYER") {
 
-         existUser.buyer["defaultShippingAddress"] = (Array.isArray(existUser?.buyer?.shippingAddress) &&
-            existUser?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]) || {};
+         user.buyer["defaultShippingAddress"] = (Array.isArray(user?.buyer?.shippingAddress) &&
+            user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]) || {};
 
-         existUser.buyer["shoppingCartItems"] = await ShoppingCart.countDocuments({ customerEmail: existUser?.email }) || 0;
+         user.buyer["shoppingCartItems"] = await ShoppingCart.countDocuments({ customerEmail: user?.email }) || 0;
 
          userDataToken = setUserDataToken({
-            _uuid: existUser?._uuid,
-            fullName: existUser?.fullName,
-            email: existUser?.email,
-            phone: existUser?.phone,
-            phonePrefixCode: existUser?.phonePrefixCode,
-            hasPassword: existUser?.hasPassword,
-            role: existUser?.role,
-            gender: existUser?.gender,
-            dob: existUser?.dob,
-            idFor: existUser?.idFor,
-            accountStatus: existUser?.accountStatus,
-            contactEmail: existUser?.contactEmail,
-            buyer: existUser?.buyer,
-            authProvider: existUser?.authProvider
+            _uuid: user?._uuid,
+            fullName: user?.fullName,
+            email: user?.email,
+            phone: user?.phone,
+            phonePrefixCode: user?.phonePrefixCode,
+            hasPassword: user?.hasPassword,
+            role: user?.role,
+            gender: user?.gender,
+            dob: user?.dob,
+            idFor: user?.idFor,
+            accountStatus: user?.accountStatus,
+            contactEmail: user?.contactEmail,
+            buyer: user?.buyer,
+            authProvider: user?.authProvider
          });
       }
 
       if (token) {
          // if token then set it to client cookie
-         res.cookie("token", token, cookieObject);
+         res.cookie("token", token, {
+            sameSite: "none",
+            secure: true,
+            maxAge: 57600000,  // 16hr [3600000 -> 1hr]ms
+            httpOnly: true
+         });
 
          // if all operation success then return the response
-         return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: existUser?._uuid, u_data: userDataToken });
+         return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: user?._uuid, u_data: userDataToken });
       }
    } catch (error: any) {
       return next(error);
@@ -267,8 +268,6 @@ module.exports.changePasswordController = async (req: Request, res: Response, ne
 
       let result: any;
 
-      const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/;
-
       const { oldPassword, newPassword } = req.body;
 
       if (!oldPassword || !newPassword)
@@ -280,9 +279,10 @@ module.exports.changePasswordController = async (req: Request, res: Response, ne
       if (newPassword.length < 5 || newPassword.length > 8)
          throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
 
-      if (!passwordRegex.test(newPassword))
+      if (!isPasswordValid(newPassword))
          throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
 
+      // find user in user db
       const user = await User.findOne({ email: authEmail });
 
       if (!user && typeof user !== "object")
@@ -335,7 +335,11 @@ module.exports.checkUserAuthentication = async (req: Request, res: Response, nex
          html: `<p>Your Security Code is <b>${securityCode}</b> and expire in 5 minutes.</p>`
       }
 
-      const info = await transporter.sendMail(mailOptions);
+      const info = await email_service({
+         to: email, // the user email
+         subject: 'Reset your WooKart Password',
+         html: `<p>Your Security Code is <b>${securityCode}</b> and expire in 5 minutes.</p>`
+      })
 
       if (info?.response) {
          res.cookie("securityCode", securityCode, { httpOnly: true, sameSite: "none", secure: true, maxAge: lifeTime });

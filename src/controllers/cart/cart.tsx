@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 const ShoppingCart = require("../../model/shoppingCart.model");
-const { findUserByEmail, actualSellingPrice, calculateShippingCost } = require("../../services/common.services");
+const { findUserByEmail, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
 
 module.exports.getCartContext = async (req: Request, res: Response, next: NextFunction) => {
    try {

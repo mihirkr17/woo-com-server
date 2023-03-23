@@ -10,28 +10,21 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const apiResponse = require("../errors/apiResponse");
+const { isPasswordValid } = require("../services/common.service");
 module.exports.loginMDL = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { emailOrPhone, password, authProvider } = req.body;
-        if (authProvider === "thirdParty") {
-            next();
-            return;
-        }
-        if (!emailOrPhone) {
+        const { emailOrPhone, password } = req.body;
+        if (!emailOrPhone)
             throw new apiResponse.Api400Error("Required email or phone number !");
-        }
-        else if (!password) {
+        if (!password)
             throw new apiResponse.Api400Error("Required password !");
-        }
-        else if (typeof password !== "string") {
+        if (typeof password !== "string")
             throw new apiResponse.Api400Error("Password should be string !");
-        }
-        else if (password.length < 5 || password.length > 8) {
+        if (!isPasswordValid)
+            throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
+        if (password.length < 5 || password.length > 8)
             throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
-        }
-        else {
-            next();
-        }
+        next();
     }
     catch (error) {
         next(error);
@@ -39,9 +32,7 @@ module.exports.loginMDL = (req, res, next) => __awaiter(void 0, void 0, void 0, 
 });
 module.exports.registrationMDL = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        let body = req.body;
-        const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/;
-        const { phone, email, password, gender, fullName, dob } = body;
+        const { phone, email, password, gender, fullName, dob } = req === null || req === void 0 ? void 0 : req.body;
         if (!phone) {
             throw new apiResponse.Api400Error("Required phone number !");
         }
@@ -66,7 +57,7 @@ module.exports.registrationMDL = (req, res, next) => __awaiter(void 0, void 0, v
         else if (password.length < 5 || password.length > 8) {
             throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
         }
-        else if (!passwordRegex.test(password)) {
+        else if (!isPasswordValid) {
             throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
         }
         else {

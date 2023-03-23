@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 const Product = require("../../model/product.model");
 const Order = require("../../model/order.model");
-const { order_status_updater, update_variation_stock_available } = require("../../services/common.services");
+const { order_status_updater, update_variation_stock_available } = require("../../services/common.service");
 
 
 module.exports.myOrder = async (req: Request, res: Response, next: NextFunction) => {

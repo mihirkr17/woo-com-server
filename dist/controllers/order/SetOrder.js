@@ -13,7 +13,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const apiResponse = require("../../errors/apiResponse");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const ShoppingCart = require("../../model/shoppingCart.model");
-const { findUserByEmail, actualSellingPrice, calculateShippingCost } = require("../../services/common.services");
+const { findUserByEmail, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
 module.exports = function SetOrder(req, res, next) {
     var _a, _b, _c;
     return __awaiter(this, void 0, void 0, function* () {

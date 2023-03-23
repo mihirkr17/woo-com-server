@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 const User = require("../../model/user.model");
 const apiResponse = require("../../errors/apiResponse");
-const { findUserByEmail } = require("../../services/common.services");
+const { findUserByEmail } = require("../../services/common.service");
 
 module.exports.addToWishlistHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {

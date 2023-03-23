@@ -13,7 +13,7 @@ const Order = require("../../model/order.model");
 const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
 const apiResponse = require("../../errors/apiResponse");
-const { findUserByEmail, update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.services");
+const { findUserByEmail, update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
 module.exports = function SinglePurchaseOrder(req, res, next) {
     var _a, _b, _c, _d, _e;
     return __awaiter(this, void 0, void 0, function* () {

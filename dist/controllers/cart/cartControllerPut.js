@@ -13,7 +13,7 @@ const { ObjectId } = require("mongodb");
 const ShoppingCart = require("../../model/shoppingCart.model");
 const User = require("../../model/user.model");
 const Product = require("../../model/product.model");
-const { checkProductAvailability } = require("../../services/common.services");
+const { checkProductAvailability } = require("../../services/common.service");
 module.exports.updateCartProductQuantityController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     try {

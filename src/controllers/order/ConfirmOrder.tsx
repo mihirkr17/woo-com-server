@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from "express";
 const Order = require("../../model/order.model");
 const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
-const { update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.services");
+const { update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
 const { transporter } = require("../../services/email.service");
 
 

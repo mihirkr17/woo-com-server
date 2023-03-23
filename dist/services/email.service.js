@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 const nodemailer = require("nodemailer");
 module.exports.transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -11,32 +20,34 @@ module.exports.transporter = nodemailer.createTransport({
         refreshToken: process.env.GMAIL_REFRESH_TOKEN
     }
 });
-module.exports.verify_email_html_template = (verifyToken, uuid) => {
-    return (`<table cellspacing="0" cellpadding="0" style="margin: 0 auto;">
-   <tr>
-      <td><h5>Verify your email address. please click the link below </h5></td>
-   </tr>
-   <tr>
-      <td align="center" bgcolor="#FFFFFF" style="padding: 1.3rem 1.4rem; border-radius: 4px;">
-         <a href="${process.env.BACKEND_URL}api/v1/auth/verify-register-user?token=${verifyToken}&mailer=${uuid}" 
-         target="_blank" 
-            style="font-weight: bold; 
-            font-family: Arial, sans-serif; 
-            color: #FFFFFF; 
-            text-decoration: none; 
-            display: block;
-            letter-spacing: 1px;
-            font-size: 1rem;
-            appearance: button;
-            background-color: hotpink;
-            border: 1px solid hotpink;
-            border-radius: 4px;
-            padding: 0.3rem 0.8rem;
-            "
-         >
-            Click Here To Verify Email
-         </a>
-      </td>
-   </tr>
-</table>`);
+module.exports = function email_service(option) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const { to, subject, html } = option;
+            if (!to) {
+                return;
+            }
+            const transporter = nodemailer.createTransport({
+                service: 'gmail',
+                auth: {
+                    type: 'OAuth2',
+                    user: process.env.GMAIL_USER,
+                    pass: process.env.GMAIL_PWD,
+                    clientId: process.env.GMAIL_CLIENT_ID,
+                    clientSecret: process.env.GMAIL_CLIENT_SECRET,
+                    refreshToken: process.env.GMAIL_REFRESH_TOKEN
+                }
+            });
+            const info = yield transporter.sendMail({
+                from: process.env.GMAIL_USER,
+                to,
+                subject,
+                html
+            });
+            return info;
+        }
+        catch (error) {
+            return error;
+        }
+    });
 };

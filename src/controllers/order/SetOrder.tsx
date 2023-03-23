@@ -5,7 +5,7 @@ import { NextFunction, Request, Response } from "express";
 const apiResponse = require("../../errors/apiResponse");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const ShoppingCart = require("../../model/shoppingCart.model");
-const { findUserByEmail, actualSellingPrice, calculateShippingCost } = require("../../services/common.services");
+const { findUserByEmail, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
 
 
 module.exports = async function SetOrder(req: Request, res: Response, next: NextFunction) {

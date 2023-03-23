@@ -15,7 +15,7 @@ try {
 
    router.post("/register-new-seller", authCTRL.sellerRegistrationController);
 
-   router.get("/verify-register-user", authCTRL.userVerifyTokenController);
+   router.get("/verify-register-user", authCTRL.userEmailVerifyTokenController);
 
    router.post("/user/changed-password", verifyJWT, authCTRL?.changePasswordController);
 

@@ -3,7 +3,7 @@ const Order = require("../../model/order.model");
 const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
 const apiResponse = require("../../errors/apiResponse");
-const { findUserByEmail, update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.services");
+const { findUserByEmail, update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
 
 
 module.exports = async function SinglePurchaseOrder(req: Request, res: Response, next: NextFunction) {

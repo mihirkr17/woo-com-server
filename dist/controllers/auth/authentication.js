@@ -19,8 +19,9 @@ const setUserDataToken = require("../../utils/setUserDataToken");
 const ShoppingCart = require("../../model/shoppingCart.model");
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
-const { transporter, verify_email_html_template } = require("../../services/email.service");
-const { get_six_digit_random_number } = require("../../services/common.services");
+const email_service = require("../../services/email.service");
+const { get_six_digit_random_number, isPasswordValid } = require("../../services/common.service");
+const { verify_email_html_template } = require("../../templates/email.template");
 /**
  * @apiController --> Buyer Registration Controller
  * @apiMethod --> POST
@@ -42,12 +43,17 @@ module.exports.buyerRegistrationController = (req, res, next) => __awaiter(void 
         body["idFor"] = "buy";
         body["role"] = "BUYER";
         body["authProvider"] = "system";
-        const info = yield transporter.sendMail({
-            from: process.env.GMAIL_USER,
+        const info = yield email_service({
             to: body === null || body === void 0 ? void 0 : body.email,
             subject: "Verify email address",
             html: verify_email_html_template(body === null || body === void 0 ? void 0 : body.verifyToken, body === null || body === void 0 ? void 0 : body._uuid)
         });
+        // await transporter.sendMail({
+        //    from: process.env.GMAIL_USER,
+        //    to: body?.email,
+        //    subject: "Verify email address",
+        //    html: verify_email_html_template(body?.verifyToken, body?._uuid)
+        // });
         if (info === null || info === void 0 ? void 0 : info.response) {
             let user = new User(body);
             yield user.save();
@@ -99,7 +105,7 @@ module.exports.sellerRegistrationController = (req, res, next) => __awaiter(void
 /**
  * @controller --> registration verify by token
  */
-module.exports.userVerifyTokenController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.userEmailVerifyTokenController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { token, mailer } = req.query;
         if (!token)
@@ -128,69 +134,62 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
     var _a, _b;
     try {
         const { emailOrPhone, password } = req.body;
-        let token;
         let userDataToken;
-        const cookieObject = {
-            sameSite: "none",
-            secure: true,
-            maxAge: 57600000,
-            httpOnly: true
-        };
-        let existUser = yield User.findOne({
-            $and: [
-                { $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] }
-            ]
-        });
-        if (!existUser)
+        let user = yield User.findOne({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] });
+        if (!user)
             throw new apiResponse.Api400Error(`User with ${emailOrPhone} not found!`);
-        if ((existUser === null || existUser === void 0 ? void 0 : existUser.verifyToken) && (existUser === null || existUser === void 0 ? void 0 : existUser.accountStatus) === "inactive") {
-            existUser.verifyToken = generateVerifyToken();
-            let newToken = yield existUser.save();
-            const info = yield transporter.sendMail({
-                from: process.env.GMAIL_USER,
-                to: existUser === null || existUser === void 0 ? void 0 : existUser.email,
+        if ((user === null || user === void 0 ? void 0 : user.verifyToken) && (user === null || user === void 0 ? void 0 : user.accountStatus) === "inactive") {
+            user.verifyToken = generateVerifyToken();
+            let newToken = yield user.save();
+            const info = yield email_service({
+                to: user === null || user === void 0 ? void 0 : user.email,
                 subject: "Verify email address",
-                html: verify_email_html_template(newToken === null || newToken === void 0 ? void 0 : newToken.verifyToken, existUser === null || existUser === void 0 ? void 0 : existUser._uuid)
+                html: verify_email_html_template(newToken === null || newToken === void 0 ? void 0 : newToken.verifyToken, user === null || user === void 0 ? void 0 : user._uuid)
             });
             if (info === null || info === void 0 ? void 0 : info.response) {
                 return res.status(200).send({
                     success: true,
                     statusCode: 200,
-                    message: "Email was sent to " + (existUser === null || existUser === void 0 ? void 0 : existUser.email) + ". Please verify your account.",
+                    message: "Email was sent to " + (user === null || user === void 0 ? void 0 : user.email) + ". Please verify your account.",
                 });
             }
             throw new apiResponse.Api500Error("Internal error !");
         }
-        let comparedPassword = yield comparePassword(password, existUser === null || existUser === void 0 ? void 0 : existUser.password);
+        let comparedPassword = yield comparePassword(password, user === null || user === void 0 ? void 0 : user.password);
         if (!comparedPassword)
             throw new apiResponse.Api400Error("Password didn't match !");
-        token = setToken(existUser);
-        if ((existUser === null || existUser === void 0 ? void 0 : existUser.role) && (existUser === null || existUser === void 0 ? void 0 : existUser.role) === "BUYER") {
-            existUser.buyer["defaultShippingAddress"] = (Array.isArray((_a = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
-                ((_b = existUser === null || existUser === void 0 ? void 0 : existUser.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0])) || {};
-            existUser.buyer["shoppingCartItems"] = (yield ShoppingCart.countDocuments({ customerEmail: existUser === null || existUser === void 0 ? void 0 : existUser.email })) || 0;
+        let token = setToken(user);
+        if ((user === null || user === void 0 ? void 0 : user.role) && (user === null || user === void 0 ? void 0 : user.role) === "BUYER") {
+            user.buyer["defaultShippingAddress"] = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
+                ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0])) || {};
+            user.buyer["shoppingCartItems"] = (yield ShoppingCart.countDocuments({ customerEmail: user === null || user === void 0 ? void 0 : user.email })) || 0;
             userDataToken = setUserDataToken({
-                _uuid: existUser === null || existUser === void 0 ? void 0 : existUser._uuid,
-                fullName: existUser === null || existUser === void 0 ? void 0 : existUser.fullName,
-                email: existUser === null || existUser === void 0 ? void 0 : existUser.email,
-                phone: existUser === null || existUser === void 0 ? void 0 : existUser.phone,
-                phonePrefixCode: existUser === null || existUser === void 0 ? void 0 : existUser.phonePrefixCode,
-                hasPassword: existUser === null || existUser === void 0 ? void 0 : existUser.hasPassword,
-                role: existUser === null || existUser === void 0 ? void 0 : existUser.role,
-                gender: existUser === null || existUser === void 0 ? void 0 : existUser.gender,
-                dob: existUser === null || existUser === void 0 ? void 0 : existUser.dob,
-                idFor: existUser === null || existUser === void 0 ? void 0 : existUser.idFor,
-                accountStatus: existUser === null || existUser === void 0 ? void 0 : existUser.accountStatus,
-                contactEmail: existUser === null || existUser === void 0 ? void 0 : existUser.contactEmail,
-                buyer: existUser === null || existUser === void 0 ? void 0 : existUser.buyer,
-                authProvider: existUser === null || existUser === void 0 ? void 0 : existUser.authProvider
+                _uuid: user === null || user === void 0 ? void 0 : user._uuid,
+                fullName: user === null || user === void 0 ? void 0 : user.fullName,
+                email: user === null || user === void 0 ? void 0 : user.email,
+                phone: user === null || user === void 0 ? void 0 : user.phone,
+                phonePrefixCode: user === null || user === void 0 ? void 0 : user.phonePrefixCode,
+                hasPassword: user === null || user === void 0 ? void 0 : user.hasPassword,
+                role: user === null || user === void 0 ? void 0 : user.role,
+                gender: user === null || user === void 0 ? void 0 : user.gender,
+                dob: user === null || user === void 0 ? void 0 : user.dob,
+                idFor: user === null || user === void 0 ? void 0 : user.idFor,
+                accountStatus: user === null || user === void 0 ? void 0 : user.accountStatus,
+                contactEmail: user === null || user === void 0 ? void 0 : user.contactEmail,
+                buyer: user === null || user === void 0 ? void 0 : user.buyer,
+                authProvider: user === null || user === void 0 ? void 0 : user.authProvider
             });
         }
         if (token) {
             // if token then set it to client cookie
-            res.cookie("token", token, cookieObject);
+            res.cookie("token", token, {
+                sameSite: "none",
+                secure: true,
+                maxAge: 57600000,
+                httpOnly: true
+            });
             // if all operation success then return the response
-            return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: existUser === null || existUser === void 0 ? void 0 : existUser._uuid, u_data: userDataToken });
+            return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: user === null || user === void 0 ? void 0 : user._uuid, u_data: userDataToken });
         }
     }
     catch (error) {
@@ -219,7 +218,6 @@ module.exports.changePasswordController = (req, res, next) => __awaiter(void 0, 
     try {
         const authEmail = req.decoded.email;
         let result;
-        const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/;
         const { oldPassword, newPassword } = req.body;
         if (!oldPassword || !newPassword)
             throw new apiResponse.Api400Error(`Required old password and new password !`);
@@ -227,8 +225,9 @@ module.exports.changePasswordController = (req, res, next) => __awaiter(void 0, 
             throw new apiResponse.Api400Error("Password should be string !");
         if (newPassword.length < 5 || newPassword.length > 8)
             throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
-        if (!passwordRegex.test(newPassword))
+        if (!isPasswordValid(newPassword))
             throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
+        // find user in user db
         const user = yield User.findOne({ email: authEmail });
         if (!user && typeof user !== "object")
             throw new apiResponse.Api404Error(`User not found!`);
@@ -264,7 +263,11 @@ module.exports.checkUserAuthentication = (req, res, next) => __awaiter(void 0, v
             subject: 'Reset your WooKart Password',
             html: `<p>Your Security Code is <b>${securityCode}</b> and expire in 5 minutes.</p>`
         };
-        const info = yield transporter.sendMail(mailOptions);
+        const info = yield email_service({
+            to: email,
+            subject: 'Reset your WooKart Password',
+            html: `<p>Your Security Code is <b>${securityCode}</b> and expire in 5 minutes.</p>`
+        });
         if (info === null || info === void 0 ? void 0 : info.response) {
             res.cookie("securityCode", securityCode, { httpOnly: true, sameSite: "none", secure: true, maxAge: lifeTime });
             return res.status(200).send({

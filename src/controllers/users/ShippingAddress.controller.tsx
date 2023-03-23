@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 const User = require("../../model/user.model");
-const { findUserByEmail } = require("../../services/common.services");
+const { findUserByEmail } = require("../../services/common.service");
 const apiResponse = require("../../errors/apiResponse");
 
 interface IShippingAddress {

@@ -3,7 +3,7 @@ const { ObjectId } = require("mongodb");
 const ShoppingCart = require("../../model/shoppingCart.model");
 const User = require("../../model/user.model");
 const Product = require("../../model/product.model");
-const { checkProductAvailability } = require("../../services/common.services");
+const { checkProductAvailability } = require("../../services/common.service");
 
 
 module.exports.updateCartProductQuantityController = async (req: Request, res: Response, next: NextFunction) => {

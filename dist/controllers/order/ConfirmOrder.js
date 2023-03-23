@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const Order = require("../../model/order.model");
 const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
-const { update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.services");
+const { update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
 const { transporter } = require("../../services/email.service");
 module.exports = function confirmOrder(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {

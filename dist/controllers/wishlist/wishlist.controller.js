@@ -11,7 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const User = require("../../model/user.model");
 const apiResponse = require("../../errors/apiResponse");
-const { findUserByEmail } = require("../../services/common.services");
+const { findUserByEmail } = require("../../services/common.service");
 module.exports.addToWishlistHandler = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     try {

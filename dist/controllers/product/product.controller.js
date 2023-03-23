@@ -14,7 +14,7 @@ var jwt = require("jsonwebtoken");
 const { ObjectId } = require("mongodb");
 const Product = require("../../model/product.model");
 const ShoppingCart = require("../../model/shoppingCart.model");
-const { findUserByEmail, findUserByUUID, getSellerInformationByID, actualSellingPrice, newPricing, basicProductProject, calculateShippingCost } = require("../../services/common.services");
+const { findUserByEmail, findUserByUUID, getSellerInformationByID, actualSellingPrice, newPricing, basicProductProject, calculateShippingCost } = require("../../services/common.service");
 /**
  * @controller      --> Fetch the single product information in product details page.
  * @required        --> [req.headers.authorization:email, req.query:productID, req.query:variationID, req.params:product slug]
