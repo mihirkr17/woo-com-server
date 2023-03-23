@@ -13,6 +13,20 @@ const saltRounds = 10;
 const { transporter } = require("../../services/email.service");
 const { get_six_digit_random_number } = require("../../services/common.services");
 
+let verifyBtn = {
+   appearance: "button",
+   display: "inline-block",
+   padding: "0.5rem 0.9rem",
+   border: "2px solid pink",
+   backgroundColor: "pink",
+   color: "white",
+   cursor: "pointer",
+   letterSpacing: "1px",
+   fontSize: "1rem",
+   textDecoration: "unset"
+}
+
+
 /**
  * @apiController --> Buyer Registration Controller
  * @apiMethod --> POST
@@ -39,13 +53,14 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
       body["role"] = "BUYER";
       body["authProvider"] = "system";
 
+  
       const info = await transporter.sendMail({
          from: process.env.GMAIL_USER,
          to: body?.email,
          subject: "Verify email address",
          html: `<p>Verify your email address. please click the link below </p> 
          </br> 
-         <a href="${process.env.BACKEND_URL}api/v1/auth/verify-register-user?token=${body?.verifyToken}">
+         <a style=${verifyBtn} href="${process.env.BACKEND_URL}api/v1/auth/verify-register-user?token=${body?.verifyToken}">
             <b>Click Here To Verify</b>
          </a>`
       });
@@ -214,7 +229,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
                subject: "Verify email address",
                html: `<p>Please verify your email address. please click link below </p> 
                </br> 
-               <a href="${process.env.BACKEND_URL}api/v1/auth/verify-register-user?token=${existUser?.verifyToken}">
+               <a style=${verifyBtn} href="${process.env.BACKEND_URL}api/v1/auth/verify-register-user?token=${existUser?.verifyToken}">
                   <b>Click Here To Verify</b>
                </a>`
             });
