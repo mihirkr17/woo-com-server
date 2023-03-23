@@ -17,7 +17,7 @@ module.exports.loginMDL = async (req: Request, res: Response, next: NextFunction
       if (typeof password !== "string")
          throw new apiResponse.Api400Error("Password should be string !");
 
-      if (!isPasswordValid)
+      if (!isPasswordValid(password))
          throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
 
       if (password.length < 5 || password.length > 8)
@@ -69,7 +69,7 @@ module.exports.registrationMDL = async (req: Request, res: Response, next: NextF
          throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
       }
 
-      else if (!isPasswordValid) {
+      else if (!isPasswordValid(password)) {
          throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
       }
 
