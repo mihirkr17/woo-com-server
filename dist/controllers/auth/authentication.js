@@ -71,26 +71,34 @@ module.exports.buyerRegistrationController = (req, res, next) => __awaiter(void 
 module.exports.sellerRegistrationController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         let body = req.body;
-        let existUser = yield User.findOne({ $or: [{ email: body.email }, { phone: body.phone }] });
+        let existUser = yield User.findOne({ $or: [{ email: body === null || body === void 0 ? void 0 : body.email }, { phone: body === null || body === void 0 ? void 0 : body.phone }] });
         if (existUser) {
             throw new apiResponse.Api400Error("User already exists, Please try another phone number or email address !");
         }
+        if (!isPasswordValid)
+            throw new apiResponse.Api400Error("Need a strong password !");
         body['_uuid'] = Math.random().toString(36).toUpperCase().slice(2, 18);
         body['authProvider'] = 'system';
         body['isSeller'] = 'pending';
         body['idFor'] = 'sell';
-        body["seller"] = {};
-        let user = new User(body);
-        const result = yield user.save();
-        if (!result) {
-            throw new apiResponse.Api500Error("Something went wrong !");
-        }
-        return res.status(200).send({
-            success: true,
-            statusCode: 200,
-            message: "Registration success. Please verify your account.",
-            data: { username: result === null || result === void 0 ? void 0 : result.username, verifyToken: result === null || result === void 0 ? void 0 : result.verifyToken, email: result === null || result === void 0 ? void 0 : result.email }
+        body["role"] = "SELLER";
+        body["accountStatus"] = "inactive";
+        body["seller"] = (body === null || body === void 0 ? void 0 : body.seller) || {};
+        const info = yield email_service({
+            to: body === null || body === void 0 ? void 0 : body.email,
+            subject: "Verify email address",
+            html: verify_email_html_template(body === null || body === void 0 ? void 0 : body.verifyToken, body === null || body === void 0 ? void 0 : body._uuid)
         });
+        if (info === null || info === void 0 ? void 0 : info.response) {
+            let user = new User(body);
+            yield user.save();
+            return res.status(200).send({
+                success: true,
+                statusCode: 200,
+                message: "Thanks for your information. Verification email was sent to " + (body === null || body === void 0 ? void 0 : body.email) + ". Please verify your account.",
+            });
+        }
+        throw new apiResponse.Api500Error("Sorry registration failed !");
     }
     catch (error) {
         next(error);
@@ -153,6 +161,24 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
         if (!comparedPassword)
             throw new apiResponse.Api400Error("Password didn't match !");
         let token = setToken(user);
+        if ((user === null || user === void 0 ? void 0 : user.role) && (user === null || user === void 0 ? void 0 : user.role) === "SELLER") {
+            userDataToken = setUserDataToken({
+                _uuid: user === null || user === void 0 ? void 0 : user._uuid,
+                fullName: user === null || user === void 0 ? void 0 : user.fullName,
+                email: user === null || user === void 0 ? void 0 : user.email,
+                phone: user === null || user === void 0 ? void 0 : user.phone,
+                phonePrefixCode: user === null || user === void 0 ? void 0 : user.phonePrefixCode,
+                hasPassword: user === null || user === void 0 ? void 0 : user.hasPassword,
+                role: user === null || user === void 0 ? void 0 : user.role,
+                gender: user === null || user === void 0 ? void 0 : user.gender,
+                dob: user === null || user === void 0 ? void 0 : user.dob,
+                idFor: user === null || user === void 0 ? void 0 : user.idFor,
+                accountStatus: user === null || user === void 0 ? void 0 : user.accountStatus,
+                contactEmail: user === null || user === void 0 ? void 0 : user.contactEmail,
+                seller: user === null || user === void 0 ? void 0 : user.seller,
+                authProvider: user === null || user === void 0 ? void 0 : user.authProvider
+            });
+        }
         if ((user === null || user === void 0 ? void 0 : user.role) && (user === null || user === void 0 ? void 0 : user.role) === "BUYER") {
             user.buyer["defaultShippingAddress"] = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
                 ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0])) || {};

@@ -76,32 +76,40 @@ module.exports.sellerRegistrationController = async (req: Request, res: Response
 
       let body = req.body;
 
-      let existUser = await User.findOne({ $or: [{ email: body.email }, { phone: body.phone }] });
+      let existUser = await User.findOne({ $or: [{ email: body?.email }, { phone: body?.phone }] });
 
       if (existUser) {
          throw new apiResponse.Api400Error("User already exists, Please try another phone number or email address !")
       }
 
+      if (!isPasswordValid) throw new apiResponse.Api400Error("Need a strong password !");
+
       body['_uuid'] = Math.random().toString(36).toUpperCase().slice(2, 18);
       body['authProvider'] = 'system';
       body['isSeller'] = 'pending';
       body['idFor'] = 'sell';
-      body["seller"] = {};
+      body["role"] = "SELLER";
+      body["accountStatus"] = "inactive";
+      body["seller"] = body?.seller || {};
 
-      let user = new User(body);
+      const info = await email_service({
+         to: body?.email,
+         subject: "Verify email address",
+         html: verify_email_html_template(body?.verifyToken, body?._uuid)
+      });
 
-      const result = await user.save();
-
-      if (!result) {
-         throw new apiResponse.Api500Error("Something went wrong !");
+      if (info?.response) {
+         let user = new User(body);
+         await user.save();
+         return res.status(200).send({
+            success: true,
+            statusCode: 200,
+            message: "Thanks for your information. Verification email was sent to " + body?.email + ". Please verify your account.",
+         });
       }
 
-      return res.status(200).send({
-         success: true,
-         statusCode: 200,
-         message: "Registration success. Please verify your account.",
-         data: { username: result?.username, verifyToken: result?.verifyToken, email: result?.email }
-      });
+      throw new apiResponse.Api500Error("Sorry registration failed !");
+
    } catch (error: any) {
       next(error);
    }
@@ -186,6 +194,25 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
       if (!comparedPassword) throw new apiResponse.Api400Error("Password didn't match !");
 
       let token = setToken(user);
+
+      if (user?.role && user?.role === "SELLER") {
+         userDataToken = setUserDataToken({
+            _uuid: user?._uuid,
+            fullName: user?.fullName,
+            email: user?.email,
+            phone: user?.phone,
+            phonePrefixCode: user?.phonePrefixCode,
+            hasPassword: user?.hasPassword,
+            role: user?.role,
+            gender: user?.gender,
+            dob: user?.dob,
+            idFor: user?.idFor,
+            accountStatus: user?.accountStatus,
+            contactEmail: user?.contactEmail,
+            seller: user?.seller,
+            authProvider: user?.authProvider
+         });
+      }
 
       if (user?.role && user?.role === "BUYER") {
 
