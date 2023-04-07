@@ -12,6 +12,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const QueueProduct = require("../../model/queueProduct.model");
 const Product = require("../../model/product.model");
+const User = require("../../model/user.model");
+const email_service = require("../../services/email.service");
+const apiResponse = require("../../errors/apiResponse");
 const { ObjectId } = require('mongodb');
 // Controllers...
 module.exports.getAdminController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
@@ -56,6 +59,38 @@ module.exports.takeThisProductByAdminController = (req, res, next) => __awaiter(
         else {
             return res.status(200).send({ success: false, statusCode: 200, message: "Product not taken !" });
         }
+    }
+    catch (error) {
+        next(error);
+    }
+});
+module.exports.verifySellerAccountByAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { uuid, id } = req.body;
+        if (!uuid || typeof uuid === "undefined")
+            throw new apiResponse.Api400Error("Required user unique id !");
+        if (!id || typeof id === "undefined")
+            throw new apiResponse.Api400Error("Required id !");
+        const result = yield User.findOneAndUpdate({ $and: [{ _id: ObjectId(id) }, { _uuid: uuid }] }, {
+            $set: {
+                accountStatus: "active",
+                isSeller: "fulfilled"
+            }
+        }, {
+            upsert: true
+        });
+        if (result) {
+            yield email_service({
+                to: result === null || result === void 0 ? void 0 : result.email,
+                subject: "Verify email address",
+                html: `
+               <h5>Thanks for with us</h5>
+               <p style="color: 'green'">We have verified your account. Now you can login</p>
+            `
+            });
+            return res.status(200).send({ success: true, statusCode: 200, message: "Permission granted." });
+        }
+        throw new apiResponse.Api400Error("Internal problem !");
     }
     catch (error) {
         next(error);

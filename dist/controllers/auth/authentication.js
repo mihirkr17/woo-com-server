@@ -140,6 +140,8 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
         let user = yield User.findOne({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] });
         if (!user)
             throw new apiResponse.Api400Error(`User with ${emailOrPhone} not found!`);
+        if ((user === null || user === void 0 ? void 0 : user.isSeller) === "pending" && (user === null || user === void 0 ? void 0 : user.role) === "SELLER")
+            throw new apiResponse.Api400Error("Your seller account under processing...");
         if ((user === null || user === void 0 ? void 0 : user.verifyToken) && (user === null || user === void 0 ? void 0 : user.accountStatus) === "inactive") {
             user.verifyToken = generateVerifyToken();
             let newToken = yield user.save();

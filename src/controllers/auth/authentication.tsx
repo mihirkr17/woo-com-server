@@ -98,7 +98,7 @@ module.exports.sellerRegistrationController = async (req: Request, res: Response
          html: verify_email_html_template(body?.verifyToken, body?._uuid)
       });
 
-      
+
       if (info?.response) {
          let user = new User(body);
          await user.save();
@@ -166,6 +166,8 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
       let user = await User.findOne({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] });
 
       if (!user) throw new apiResponse.Api400Error(`User with ${emailOrPhone} not found!`);
+
+      if (user?.isSeller === "pending" && user?.role === "SELLER") throw new apiResponse.Api400Error("Your seller account under processing...");
 
       if (user?.verifyToken && user?.accountStatus === "inactive") {
 

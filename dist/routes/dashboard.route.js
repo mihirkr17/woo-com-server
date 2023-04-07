@@ -20,6 +20,7 @@ try {
     router.put("/admin/take-this-product", verifyJWT, isRoleAdmin, AdminCTRL === null || AdminCTRL === void 0 ? void 0 : AdminCTRL.takeThisProductByAdminController);
     router.post("/store/:storeName/order/order-status-management", verifyJWT, isRoleSeller, ManageOrderCTRL.orderStatusManagement);
     router.post('/seller/store/product/update-product/:paramsType', verifyJWT, isRoleSeller, ManageProductCTRL === null || ManageProductCTRL === void 0 ? void 0 : ManageProductCTRL.updateProductData);
+    router.post("/verify-seller-account", verifyJWT, isRoleAdmin, AdminCTRL === null || AdminCTRL === void 0 ? void 0 : AdminCTRL.verifySellerAccountByAdmin);
     // get controllers
     router.get("/view-products", verifyJWT, isPermitForDashboard, ManageProductCTRL.viewAllProductsInDashboard);
     router.get("/admin/:uuid/provider", verifyJWT, isRoleAdmin, AdminCTRL === null || AdminCTRL === void 0 ? void 0 : AdminCTRL.getAdminController);

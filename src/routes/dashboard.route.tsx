@@ -27,6 +27,8 @@ try {
   router.post('/seller/store/product/update-product/:paramsType', verifyJWT, isRoleSeller, ManageProductCTRL?.updateProductData);
 
 
+  router.post("/verify-seller-account", verifyJWT, isRoleAdmin, AdminCTRL?.verifySellerAccountByAdmin);
+
 
   // get controllers
   router.get("/view-products", verifyJWT, isPermitForDashboard, ManageProductCTRL.viewAllProductsInDashboard);
