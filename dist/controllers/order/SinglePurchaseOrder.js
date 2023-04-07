@@ -50,7 +50,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                             storeName: "$sellerData.storeName"
                         },
                         shipping: 1,
-                        package: 1,
+                        packaged: 1,
                         baseAmount: { $multiply: [actualSellingPrice, parseInt(quantity)] },
                         sellingPrice: actualSellingPrice,
                     }
@@ -85,7 +85,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                     product["shippingCharge"] = 0;
                 }
                 else {
-                    product["shippingCharge"] = calculateShippingCost((_e = product === null || product === void 0 ? void 0 : product.package) === null || _e === void 0 ? void 0 : _e.volumetricWeight, areaType);
+                    product["shippingCharge"] = calculateShippingCost((_e = product === null || product === void 0 ? void 0 : product.packaged) === null || _e === void 0 ? void 0 : _e.volumetricWeight, areaType);
                 }
                 let amountNew = (product === null || product === void 0 ? void 0 : product.baseAmount) + (product === null || product === void 0 ? void 0 : product.shippingCharge);
                 product["baseAmount"] = parseInt(amountNew);

@@ -68,7 +68,7 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
                quantity: 1,
                shipping: 1,
                productID: 1,
-               package: 1,
+               packaged: 1,
                listingID: 1,
                variationID: 1,
                baseAmount: { $multiply: [actualSellingPrice, '$quantity'] }
@@ -93,7 +93,7 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
          if (p?.shipping?.isFree && p?.shipping?.isFree) {
             p["shippingCharge"] = 0;
          } else {
-            p["shippingCharge"] = calculateShippingCost(p?.package?.volumetricWeight, areaType);
+            p["shippingCharge"] = calculateShippingCost(p?.packaged?.volumetricWeight, areaType);
          }
 
          return p;

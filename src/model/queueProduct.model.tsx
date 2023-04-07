@@ -51,7 +51,7 @@ var QueueProductSchema = new Schema({
    sellerData: { type: sellerDataType, required: true },
    save_as: { type: String, required: true, default: "queue" },
    createdAt: { type: Date, default: Date.now },
-   package: { type: Object, required: true },
+   packaged: { type: Object, required: true },
    modifiedAt: { type: Date, required: false, default: "" },
    isVerified: { type: Boolean, default: false },
    pricing: { type: Object, required: true },

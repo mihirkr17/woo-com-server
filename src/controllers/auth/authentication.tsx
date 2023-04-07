@@ -98,6 +98,7 @@ module.exports.sellerRegistrationController = async (req: Request, res: Response
          html: verify_email_html_template(body?.verifyToken, body?._uuid)
       });
 
+      
       if (info?.response) {
          let user = new User(body);
          await user.save();

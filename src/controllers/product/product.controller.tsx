@@ -82,7 +82,7 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
                manufacturer: 1,
                pricing: newPricing,
                isFreeShipping: "$shipping.isFree",
-               volumetricWeight: "$package.volumetricWeight",
+               volumetricWeight: "$packaged.volumetricWeight",
                _lid: 1,
                inCart: {
                   $cond: {
@@ -353,7 +353,7 @@ module.exports.purchaseProductController = async (req: Request, res: Response, n
                slug: 1,
                variations: 1,
                brand: 1,
-               package: 1,
+               packaged: 1,
                image: { $first: "$images" },
                sku: "$variations.sku",
                sellerData: 1,
@@ -381,7 +381,7 @@ module.exports.purchaseProductController = async (req: Request, res: Response, n
          if (product?.shipping?.isFree && product?.shipping?.isFree) {
             product["shippingCharge"] = 0;
          } else {
-            product["shippingCharge"] = calculateShippingCost(product?.package?.volumetricWeight, areaType);
+            product["shippingCharge"] = calculateShippingCost(product?.packaged?.volumetricWeight, areaType);
          }
 
          const baseAmounts = product?.baseAmount && parseInt(product?.baseAmount);

@@ -40,7 +40,7 @@ var ProductSchema = new Schema({
    brand: { type: String, required: true },
    images: { type: Array, required: true },
    manufacturer: { type: manufacturerType, required: true },
-   package: { type: Object, required: true },
+   packaged: { type: Object, required: true },
    shipping: { type: shippingType, required: true },
    paymentInfo: { type: Array, required: true },
    rating: { type: Array, required: true },

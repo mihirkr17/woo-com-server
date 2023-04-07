@@ -49,7 +49,7 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
                _id: 0,
                title: "$variations.vTitle",
                slug: 1,
-               package: 1,
+               packaged: 1,
                listingID: 1,
                productID: 1,
                customerEmail: 1,
@@ -84,7 +84,7 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
             if (p?.shipping?.isFree && p?.shipping?.isFree) {
                p["shippingCharge"] = 0;
             } else {
-               p["shippingCharge"] = calculateShippingCost(p?.package?.volumetricWeight, areaType);
+               p["shippingCharge"] = calculateShippingCost(p?.packaged?.volumetricWeight, areaType);
             }
 
             return p;

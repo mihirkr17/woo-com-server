@@ -82,7 +82,7 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
                     manufacturer: 1,
                     pricing: newPricing,
                     isFreeShipping: "$shipping.isFree",
-                    volumetricWeight: "$package.volumetricWeight",
+                    volumetricWeight: "$packaged.volumetricWeight",
                     _lid: 1,
                     inCart: {
                         $cond: {
@@ -310,7 +310,7 @@ module.exports.purchaseProductController = (req, res, next) => __awaiter(void 0,
                     slug: 1,
                     variations: 1,
                     brand: 1,
-                    package: 1,
+                    packaged: 1,
                     image: { $first: "$images" },
                     sku: "$variations.sku",
                     sellerData: 1,
@@ -337,7 +337,7 @@ module.exports.purchaseProductController = (req, res, next) => __awaiter(void 0,
                 product["shippingCharge"] = 0;
             }
             else {
-                product["shippingCharge"] = calculateShippingCost((_l = product === null || product === void 0 ? void 0 : product.package) === null || _l === void 0 ? void 0 : _l.volumetricWeight, areaType);
+                product["shippingCharge"] = calculateShippingCost((_l = product === null || product === void 0 ? void 0 : product.packaged) === null || _l === void 0 ? void 0 : _l.volumetricWeight, areaType);
             }
             const baseAmounts = (product === null || product === void 0 ? void 0 : product.baseAmount) && parseInt(product === null || product === void 0 ? void 0 : product.baseAmount);
             const totalQuantities = (product === null || product === void 0 ? void 0 : product.quantity) && parseInt(product === null || product === void 0 ? void 0 : product.quantity);

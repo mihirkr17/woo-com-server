@@ -220,7 +220,7 @@ module.exports.viewAllProductsInDashboard = async (
             $project: {
                title: 1, slug: 1, categories: 1, pricing: 1,
                images: 1, variations: 1, brand: 1, _lid: 1,
-               package: 1,
+               packaged: 1,
                save_as: 1,
                shipping: 1,
                bodyInfo: 1,
@@ -248,7 +248,7 @@ module.exports.viewAllProductsInDashboard = async (
             $project: {
                title: 1, slug: 1, categories: 1, pricing: 1,
                images: 1, variations: 1, brand: 1, _lid: 1,
-               package: 1,
+               packaged: 1,
                save_as: 1,
                shipping: 1,
                bodyInfo: 1,
@@ -607,9 +607,9 @@ module.exports.updateProductData = async (req: Request, res: Response, next: Nex
          }
       }
 
-      if (actionType === "PACKAGE-DIMENSION" && urlParams === "package-dimension") {
+      if (actionType === "PACKAGE-DIMENSION" && urlParams === "packaged-dimension") {
 
-         if (!packageInfo) throw new Error("Required package information about product");
+         if (!packageInfo) throw new Error("Required packaged information about product");
 
          const { packageWeight, packageLength, packageWidth, packageHeight, inTheBox } = packageInfo && packageInfo;
 
@@ -630,7 +630,7 @@ module.exports.updateProductData = async (req: Request, res: Response, next: Nex
          }
 
          setFilter = {
-            $set: { package: newPackage }
+            $set: { packaged: newPackage }
          }
       }
 

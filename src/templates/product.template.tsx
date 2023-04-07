@@ -26,7 +26,7 @@ const product_listing_template_engine = (body: any) => {
       sellerName: body?.sellerData?.sellerName || "",
       storeName: body?.sellerData?.storeName || ""
     },
-    package: {
+    packaged: {
       dimension: {
         height: parseFloat(body?.packageHeight),
         length: parseFloat(body?.packageLength),

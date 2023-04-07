@@ -54,7 +54,7 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
                     _id: 0,
                     title: "$variations.vTitle",
                     slug: 1,
-                    package: 1,
+                    packaged: 1,
                     listingID: 1,
                     productID: 1,
                     customerEmail: 1,
@@ -86,7 +86,7 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
                     p["shippingCharge"] = 0;
                 }
                 else {
-                    p["shippingCharge"] = calculateShippingCost((_c = p === null || p === void 0 ? void 0 : p.package) === null || _c === void 0 ? void 0 : _c.volumetricWeight, areaType);
+                    p["shippingCharge"] = calculateShippingCost((_c = p === null || p === void 0 ? void 0 : p.packaged) === null || _c === void 0 ? void 0 : _c.volumetricWeight, areaType);
                 }
                 return p;
             });

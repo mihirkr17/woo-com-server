@@ -64,7 +64,7 @@ module.exports = function confirmOrder(req, res, next) {
                                 image: { $first: "$images" },
                                 sku: "$variations.sku",
                                 shipping: 1,
-                                package: 1,
+                                packaged: 1,
                                 sellerData: {
                                     sellerID: "$sellerData.sellerID",
                                     storeName: "$sellerData.storeName"
@@ -102,7 +102,7 @@ module.exports = function confirmOrder(req, res, next) {
                         product["shippingCharge"] = 0;
                     }
                     else {
-                        product["shippingCharge"] = calculateShippingCost((_c = product === null || product === void 0 ? void 0 : product.package) === null || _c === void 0 ? void 0 : _c.volumetricWeight, areaType);
+                        product["shippingCharge"] = calculateShippingCost((_c = product === null || product === void 0 ? void 0 : product.packaged) === null || _c === void 0 ? void 0 : _c.volumetricWeight, areaType);
                     }
                     let amountNew = (product === null || product === void 0 ? void 0 : product.baseAmount) + (product === null || product === void 0 ? void 0 : product.shippingCharge);
                     product["baseAmount"] = parseInt(amountNew);

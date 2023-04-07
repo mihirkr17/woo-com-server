@@ -47,7 +47,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
                   storeName: "$sellerData.storeName"
                },
                shipping: 1,
-               package: 1,
+               packaged: 1,
                baseAmount: { $multiply: [actualSellingPrice, parseInt(quantity)] },
                sellingPrice: actualSellingPrice,
             }
@@ -86,7 +86,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
          if (product?.shipping?.isFree && product?.shipping?.isFree) {
             product["shippingCharge"] = 0;
          } else {
-            product["shippingCharge"] = calculateShippingCost(product?.package?.volumetricWeight, areaType);
+            product["shippingCharge"] = calculateShippingCost(product?.packaged?.volumetricWeight, areaType);
          }
 
          let amountNew = product?.baseAmount + product?.shippingCharge;

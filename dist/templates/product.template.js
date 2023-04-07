@@ -24,7 +24,7 @@ const product_listing_template_engine = (body) => {
             sellerName: ((_b = body === null || body === void 0 ? void 0 : body.sellerData) === null || _b === void 0 ? void 0 : _b.sellerName) || "",
             storeName: ((_c = body === null || body === void 0 ? void 0 : body.sellerData) === null || _c === void 0 ? void 0 : _c.storeName) || ""
         },
-        package: {
+        packaged: {
             dimension: {
                 height: parseFloat(body === null || body === void 0 ? void 0 : body.packageHeight),
                 length: parseFloat(body === null || body === void 0 ? void 0 : body.packageLength),

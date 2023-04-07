@@ -66,7 +66,7 @@ module.exports = function SetOrder(req, res, next) {
                         quantity: 1,
                         shipping: 1,
                         productID: 1,
-                        package: 1,
+                        packaged: 1,
                         listingID: 1,
                         variationID: 1,
                         baseAmount: { $multiply: [actualSellingPrice, '$quantity'] }
@@ -90,7 +90,7 @@ module.exports = function SetOrder(req, res, next) {
                     p["shippingCharge"] = 0;
                 }
                 else {
-                    p["shippingCharge"] = calculateShippingCost((_c = p === null || p === void 0 ? void 0 : p.package) === null || _c === void 0 ? void 0 : _c.volumetricWeight, areaType);
+                    p["shippingCharge"] = calculateShippingCost((_c = p === null || p === void 0 ? void 0 : p.packaged) === null || _c === void 0 ? void 0 : _c.volumetricWeight, areaType);
                 }
                 return p;
             });

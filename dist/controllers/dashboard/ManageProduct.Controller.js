@@ -181,7 +181,7 @@ module.exports.viewAllProductsInDashboard = (req, res, next) => __awaiter(void 0
                 $project: {
                     title: 1, slug: 1, categories: 1, pricing: 1,
                     images: 1, variations: 1, brand: 1, _lid: 1,
-                    package: 1,
+                    packaged: 1,
                     save_as: 1,
                     shipping: 1,
                     bodyInfo: 1,
@@ -208,7 +208,7 @@ module.exports.viewAllProductsInDashboard = (req, res, next) => __awaiter(void 0
                 $project: {
                     title: 1, slug: 1, categories: 1, pricing: 1,
                     images: 1, variations: 1, brand: 1, _lid: 1,
-                    package: 1,
+                    packaged: 1,
                     save_as: 1,
                     shipping: 1,
                     bodyInfo: 1,
@@ -490,9 +490,9 @@ module.exports.updateProductData = (req, res, next) => __awaiter(void 0, void 0,
                 $set: { shipping: shipping }
             };
         }
-        if (actionType === "PACKAGE-DIMENSION" && urlParams === "package-dimension") {
+        if (actionType === "PACKAGE-DIMENSION" && urlParams === "packaged-dimension") {
             if (!packageInfo)
-                throw new Error("Required package information about product");
+                throw new Error("Required packaged information about product");
             const { packageWeight, packageLength, packageWidth, packageHeight, inTheBox } = packageInfo && packageInfo;
             let volumetricWeight = ((parseFloat(packageHeight) * parseFloat(packageLength) * parseFloat(packageWidth)) / 5000).toFixed(1);
             volumetricWeight = parseFloat(volumetricWeight);
@@ -509,7 +509,7 @@ module.exports.updateProductData = (req, res, next) => __awaiter(void 0, void 0,
                 inTheBox: inTheBox
             };
             setFilter = {
-                $set: { package: newPackage }
+                $set: { packaged: newPackage }
             };
         }
         if (actionType === "MANUFACTURER-INFORMATION" && urlParams === "manufacturer-information") {
