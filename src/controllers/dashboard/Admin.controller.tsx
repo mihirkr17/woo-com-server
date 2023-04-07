@@ -6,6 +6,7 @@ const Product = require("../../model/product.model");
 const User = require("../../model/user.model");
 const email_service = require("../../services/email.service");
 const apiResponse = require("../../errors/apiResponse");
+const Order = require("../../model/order.model");
 
 const { ObjectId } = require('mongodb');
 
@@ -20,7 +21,10 @@ module.exports.getAdminController = async (req: Request, res: Response, next: Ne
 
       let countQueueProducts = await QueueProduct.countDocuments({ isVerified: false, save_as: "queue" });
 
-      let sellers = await User.find({ $and: [{ isSeller: 'pending' }, { role: "SELLER" }] });
+      let newSellers = await User.find({ $and: [{ isSeller: 'pending' }, { role: "SELLER" }] });
+
+      const sellers = await User.find({ $and: [{ isSeller: "fulfilled" }, { role: "SELLER" }] });
+      const buyers = await User.find({ $and: [{ idFor: "buy" }, { role: "BUYER" }] });
 
       if (pages || item) {
          queueProducts = await QueueProduct.find({ isVerified: false }).skip(parseInt(pages) > 0 ? ((pages - 1) * item) : 0).limit(item);
@@ -29,7 +33,7 @@ module.exports.getAdminController = async (req: Request, res: Response, next: Ne
       }
 
 
-      return res.status(200).send({ success: true, statusCode: 200, data: { queueProducts, countQueueProducts, sellers } });
+      return res.status(200).send({ success: true, statusCode: 200, queueProducts, countQueueProducts, newSellers, sellers, buyers });
    } catch (error: any) {
       next(error);
    }
@@ -116,8 +120,57 @@ module.exports.verifySellerAccountByAdmin = async (req: Request, res: Response, 
          return res.status(200).send({ success: true, statusCode: 200, message: "Permission granted." });
       }
 
-      throw new apiResponse.Api400Error("Internal problem !");
+      throw new apiResponse.Api500Error("Internal problem !");
 
+   } catch (error: any) {
+      next(error);
+   }
+}
+
+
+module.exports.deleteSellerAccountRequest = async (req: Request, res: Response, next: NextFunction) => {
+   try {
+
+      const { id, uuid, email } = req.body;
+
+      if (!uuid || typeof uuid === "undefined") throw new apiResponse.Api400Error("Required user unique id !");
+
+      if (!id || typeof id === "undefined") throw new apiResponse.Api400Error("Required id !");
+
+      const result = await User.deleteOne({ $and: [{ _id: ObjectId(id) }, { _uuid: uuid }, { email }] });
+
+      if (result) {
+         return res.status(200).send({ success: true, statusCode: 200, message: "Account deleted successfully." });
+      }
+
+      throw new apiResponse.Api500Error("Internal error !");
+   } catch (error: any) {
+      next(error);
+   }
+}
+
+
+
+
+
+module.exports.getBuyerInfoByAdmin = async (req: Request, res: Response, next: NextFunction) => {
+   try {
+      const { id, email } = req.body;
+
+
+      const order = await Order.findOne({ user_email: email });
+
+      if (order) {
+         let totalOrder = Array.isArray(order?.orders) && order?.orders.length || 0;
+
+         return res.status(200).send({
+            success: true, statusCode: 200, data: {
+               totalOrder
+            }
+         })
+      }
+
+      throw new apiResponse.Api404Error("Data not found !");
    } catch (error: any) {
       next(error);
    }

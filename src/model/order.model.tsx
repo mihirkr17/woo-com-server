@@ -85,8 +85,8 @@ var orderSchemaList = new Schema<IOrder>({
 
 let orderSchema = new Schema({
    user_email: { type: String },
-   orders: { type: orderSchemaList }
+   orders: { type: orderSchemaList}
 });
 
-const Order = model<IOrder>("Order", orderSchema, "orders");
+const Order = model("Order", orderSchema, "orders");
 module.exports = Order;

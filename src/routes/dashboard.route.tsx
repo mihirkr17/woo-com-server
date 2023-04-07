@@ -29,6 +29,10 @@ try {
 
   router.post("/verify-seller-account", verifyJWT, isRoleAdmin, AdminCTRL?.verifySellerAccountByAdmin);
 
+  router.post("/delete-seller-account-request", verifyJWT, isRoleAdmin, AdminCTRL?.deleteSellerAccountRequest);
+
+  router.post("/get-buyer-info", verifyJWT, isRoleAdmin, AdminCTRL?.getBuyerInfoByAdmin);
+
 
   // get controllers
   router.get("/view-products", verifyJWT, isPermitForDashboard, ManageProductCTRL.viewAllProductsInDashboard);
@@ -36,6 +40,10 @@ try {
   router.get("/admin/:uuid/provider", verifyJWT, isRoleAdmin, AdminCTRL?.getAdminController);
 
   router.get("/store/:storeName/manage-orders", verifyJWT, isRoleSeller, ManageOrderCTRL?.manageOrders);
+
+  router.get("/all-sellers", verifyJWT, isRoleAdmin, dashboardCTRL?.allSellers);
+
+  router.get("/all-buyers", verifyJWT, isRoleAdmin, dashboardCTRL?.allBuyers);
 
   /**
 * @requestMethod GET

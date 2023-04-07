@@ -1,8 +1,9 @@
 import { NextFunction, Request, Response } from "express";
 const User = require("../../model/user.model");
 const Product = require("../../model/product.model");
+const Order = require("../../model/order.model");
 
-module.exports.dashboardOverview = async (req: Request, res: Response, next:NextFunction) => {
+module.exports.dashboardOverview = async (req: Request, res: Response, next: NextFunction) => {
    try {
       const authEmail: String = req.decoded.email;
       const role: String = req.decoded.role;
@@ -65,3 +66,22 @@ module.exports.dashboardOverview = async (req: Request, res: Response, next:Next
    }
 };
 
+
+
+module.exports.allSellers = async (req: Request, res: Response, next: NextFunction) => {
+   try {
+      const sellers = await User.find({ $and: [{ isSeller: "fulfilled" }, { role: "SELLER" }] }) || [];
+      return res.status(200).send({ success: true, statusCode: 200, sellers });
+   } catch (error: any) {
+      next(error);
+   }
+}
+
+module.exports.allBuyers = async (req: Request, res: Response, next: NextFunction) => {
+   try {
+      const buyers = await User.find({ $and: [{ idFor: "buy" }, { role: "BUYER" }] }) || [];
+      return res.status(200).send({ success: true, statusCode: 200, buyers });
+   } catch (error: any) {
+      next(error);
+   }
+}

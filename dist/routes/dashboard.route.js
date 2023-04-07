@@ -21,10 +21,14 @@ try {
     router.post("/store/:storeName/order/order-status-management", verifyJWT, isRoleSeller, ManageOrderCTRL.orderStatusManagement);
     router.post('/seller/store/product/update-product/:paramsType', verifyJWT, isRoleSeller, ManageProductCTRL === null || ManageProductCTRL === void 0 ? void 0 : ManageProductCTRL.updateProductData);
     router.post("/verify-seller-account", verifyJWT, isRoleAdmin, AdminCTRL === null || AdminCTRL === void 0 ? void 0 : AdminCTRL.verifySellerAccountByAdmin);
+    router.post("/delete-seller-account-request", verifyJWT, isRoleAdmin, AdminCTRL === null || AdminCTRL === void 0 ? void 0 : AdminCTRL.deleteSellerAccountRequest);
+    router.post("/get-buyer-info", verifyJWT, isRoleAdmin, AdminCTRL === null || AdminCTRL === void 0 ? void 0 : AdminCTRL.getBuyerInfoByAdmin);
     // get controllers
     router.get("/view-products", verifyJWT, isPermitForDashboard, ManageProductCTRL.viewAllProductsInDashboard);
     router.get("/admin/:uuid/provider", verifyJWT, isRoleAdmin, AdminCTRL === null || AdminCTRL === void 0 ? void 0 : AdminCTRL.getAdminController);
     router.get("/store/:storeName/manage-orders", verifyJWT, isRoleSeller, ManageOrderCTRL === null || ManageOrderCTRL === void 0 ? void 0 : ManageOrderCTRL.manageOrders);
+    router.get("/all-sellers", verifyJWT, isRoleAdmin, dashboardCTRL === null || dashboardCTRL === void 0 ? void 0 : dashboardCTRL.allSellers);
+    router.get("/all-buyers", verifyJWT, isRoleAdmin, dashboardCTRL === null || dashboardCTRL === void 0 ? void 0 : dashboardCTRL.allBuyers);
     /**
   * @requestMethod GET
   * @controller fetchSingleProductByPidController

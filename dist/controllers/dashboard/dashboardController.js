@@ -11,6 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const User = require("../../model/user.model");
 const Product = require("../../model/product.model");
+const Order = require("../../model/order.model");
 module.exports.dashboardOverview = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     try {
@@ -58,6 +59,24 @@ module.exports.dashboardOverview = (req, res, next) => __awaiter(void 0, void 0,
             { $limit: 10 }
         ]);
         return res.status(200).send({ success: true, statusCode: 200, data: { topSellers, topSoldProducts } });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+module.exports.allSellers = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const sellers = (yield User.find({ $and: [{ isSeller: "fulfilled" }, { role: "SELLER" }] })) || [];
+        return res.status(200).send({ success: true, statusCode: 200, sellers });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+module.exports.allBuyers = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const buyers = (yield User.find({ $and: [{ idFor: "buy" }, { role: "BUYER" }] })) || [];
+        return res.status(200).send({ success: true, statusCode: 200, buyers });
     }
     catch (error) {
         next(error);
