@@ -175,6 +175,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
                 gender: user === null || user === void 0 ? void 0 : user.gender,
                 dob: user === null || user === void 0 ? void 0 : user.dob,
                 idFor: user === null || user === void 0 ? void 0 : user.idFor,
+                isSeller: user === null || user === void 0 ? void 0 : user.isSeller,
                 accountStatus: user === null || user === void 0 ? void 0 : user.accountStatus,
                 contactEmail: user === null || user === void 0 ? void 0 : user.contactEmail,
                 seller: user === null || user === void 0 ? void 0 : user.seller,

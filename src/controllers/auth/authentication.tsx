@@ -210,6 +210,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
             gender: user?.gender,
             dob: user?.dob,
             idFor: user?.idFor,
+            isSeller: user?.isSeller,
             accountStatus: user?.accountStatus,
             contactEmail: user?.contactEmail,
             seller: user?.seller,

@@ -20,6 +20,8 @@ module.exports.getAdminController = async (req: Request, res: Response, next: Ne
 
       let countQueueProducts = await QueueProduct.countDocuments({ isVerified: false, save_as: "queue" });
 
+      let sellers = await User.find({ $and: [{ isSeller: 'pending' }, { role: "SELLER" }] });
+
       if (pages || item) {
          queueProducts = await QueueProduct.find({ isVerified: false }).skip(parseInt(pages) > 0 ? ((pages - 1) * item) : 0).limit(item);
       } else {
@@ -27,7 +29,7 @@ module.exports.getAdminController = async (req: Request, res: Response, next: Ne
       }
 
 
-      return res.status(200).send({ success: true, statusCode: 200, data: { queueProducts, countQueueProducts } });
+      return res.status(200).send({ success: true, statusCode: 200, data: { queueProducts, countQueueProducts, sellers } });
    } catch (error: any) {
       next(error);
    }
@@ -82,18 +84,19 @@ module.exports.takeThisProductByAdminController = async (req: Request, res: Resp
 module.exports.verifySellerAccountByAdmin = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
-      const { uuid, id } = req.body;
+      const { uuid, id, email } = req.body;
 
       if (!uuid || typeof uuid === "undefined") throw new apiResponse.Api400Error("Required user unique id !");
 
       if (!id || typeof id === "undefined") throw new apiResponse.Api400Error("Required id !");
 
       const result = await User.findOneAndUpdate(
-         { $and: [{ _id: ObjectId(id) }, { _uuid: uuid }] },
+         { $and: [{ _id: ObjectId(id) }, { email }, { _uuid: uuid }, { isSeller: "pending" }] },
          {
             $set: {
                accountStatus: "active",
-               isSeller: "fulfilled"
+               isSeller: "fulfilled",
+               becomeSellerAt: new Date()
             }
          },
          {
@@ -106,8 +109,8 @@ module.exports.verifySellerAccountByAdmin = async (req: Request, res: Response, 
             to: result?.email,
             subject: "Verify email address",
             html: `
-               <h5>Thanks for with us</h5>
-               <p style="color: 'green'">We have verified your account. Now you can login</p>
+               <h5>Thanks for with us !</h5>
+               <p style="color: 'green'">We have verified your seller account. Now you can login your seller id.</p>
             `
          })
          return res.status(200).send({ success: true, statusCode: 200, message: "Permission granted." });

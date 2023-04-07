@@ -19,6 +19,24 @@ module.exports = async function FetchAuthUser(req: Request, res: Response, next:
 
       if (user?.role === 'SELLER' && user?.idFor === 'sell') {
          await productCounter({ storeName: user.seller.storeInfos?.storeName, _uuid: user?._uuid });
+
+         userDataToken = setUserDataToken({
+            _uuid: user?._uuid,
+            fullName: user?.fullName,
+            email: user?.email,
+            phone: user?.phone,
+            phonePrefixCode: user?.phonePrefixCode,
+            hasPassword: user?.hasPassword,
+            role: user?.role,
+            gender: user?.gender,
+            dob: user?.dob,
+            idFor: user?.idFor,
+            isSeller: user?.isSeller,
+            accountStatus: user?.accountStatus,
+            contactEmail: user?.contactEmail,
+            seller: user?.seller,
+            authProvider: user?.authProvider
+         });
       }
 
       if (user?.role === 'BUYER' && user?.idFor === 'buy') {

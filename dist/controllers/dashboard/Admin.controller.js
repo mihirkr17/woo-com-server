@@ -23,13 +23,14 @@ module.exports.getAdminController = (req, res, next) => __awaiter(void 0, void 0
         const item = req.query.items;
         let queueProducts;
         let countQueueProducts = yield QueueProduct.countDocuments({ isVerified: false, save_as: "queue" });
+        let sellers = yield User.find({ $and: [{ isSeller: 'pending' }, { role: "SELLER" }] });
         if (pages || item) {
             queueProducts = yield QueueProduct.find({ isVerified: false }).skip(parseInt(pages) > 0 ? ((pages - 1) * item) : 0).limit(item);
         }
         else {
             queueProducts = yield QueueProduct.find({ isVerified: false });
         }
-        return res.status(200).send({ success: true, statusCode: 200, data: { queueProducts, countQueueProducts } });
+        return res.status(200).send({ success: true, statusCode: 200, data: { queueProducts, countQueueProducts, sellers } });
     }
     catch (error) {
         next(error);
@@ -66,15 +67,16 @@ module.exports.takeThisProductByAdminController = (req, res, next) => __awaiter(
 });
 module.exports.verifySellerAccountByAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { uuid, id } = req.body;
+        const { uuid, id, email } = req.body;
         if (!uuid || typeof uuid === "undefined")
             throw new apiResponse.Api400Error("Required user unique id !");
         if (!id || typeof id === "undefined")
             throw new apiResponse.Api400Error("Required id !");
-        const result = yield User.findOneAndUpdate({ $and: [{ _id: ObjectId(id) }, { _uuid: uuid }] }, {
+        const result = yield User.findOneAndUpdate({ $and: [{ _id: ObjectId(id) }, { email }, { _uuid: uuid }, { isSeller: "pending" }] }, {
             $set: {
                 accountStatus: "active",
-                isSeller: "fulfilled"
+                isSeller: "fulfilled",
+                becomeSellerAt: new Date()
             }
         }, {
             upsert: true
@@ -84,8 +86,8 @@ module.exports.verifySellerAccountByAdmin = (req, res, next) => __awaiter(void 0
                 to: result === null || result === void 0 ? void 0 : result.email,
                 subject: "Verify email address",
                 html: `
-               <h5>Thanks for with us</h5>
-               <p style="color: 'green'">We have verified your account. Now you can login</p>
+               <h5>Thanks for with us !</h5>
+               <p style="color: 'green'">We have verified your seller account. Now you can login your seller id.</p>
             `
             });
             return res.status(200).send({ success: true, statusCode: 200, message: "Permission granted." });

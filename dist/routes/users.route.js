@@ -33,8 +33,6 @@ try {
     router.put("/make-admin/:userId", verifyJWT, isRoleOwnerOrAdmin, userCTRL.makeAdminController);
     router.put("/demote-to-user/:userId", verifyJWT, isRoleOwnerOrAdmin, userCTRL.demoteToUser);
     router.get("/manage-user", userCTRL.manageUsersController);
-    router.put("/make-seller-request", verifyJWT, userCTRL.makeSellerRequest);
-    router.put("/permit-seller-request", verifyJWT, isRoleOwnerOrAdmin, userCTRL.permitSellerRequest);
     router.get("/check-seller-request", userCTRL.checkSellerRequestController);
     // Shipping address route
     router.post("/shipping-address", verifyJWT, shippingAddressController.createShippingAddress);

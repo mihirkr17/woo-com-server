@@ -40,15 +40,6 @@ try {
   );
   router.get("/manage-user", userCTRL.manageUsersController);
 
-  router.put("/make-seller-request", verifyJWT, userCTRL.makeSellerRequest);
-
-  router.put(
-    "/permit-seller-request",
-    verifyJWT,
-    isRoleOwnerOrAdmin,
-    userCTRL.permitSellerRequest
-  );
-
   router.get("/check-seller-request", userCTRL.checkSellerRequestController);
 
 

@@ -25,6 +25,23 @@ module.exports = function FetchAuthUser(req, res, next) {
                 throw new apiResponse.Api404Error("User not found !");
             if ((user === null || user === void 0 ? void 0 : user.role) === 'SELLER' && (user === null || user === void 0 ? void 0 : user.idFor) === 'sell') {
                 yield productCounter({ storeName: (_a = user.seller.storeInfos) === null || _a === void 0 ? void 0 : _a.storeName, _uuid: user === null || user === void 0 ? void 0 : user._uuid });
+                userDataToken = setUserDataToken({
+                    _uuid: user === null || user === void 0 ? void 0 : user._uuid,
+                    fullName: user === null || user === void 0 ? void 0 : user.fullName,
+                    email: user === null || user === void 0 ? void 0 : user.email,
+                    phone: user === null || user === void 0 ? void 0 : user.phone,
+                    phonePrefixCode: user === null || user === void 0 ? void 0 : user.phonePrefixCode,
+                    hasPassword: user === null || user === void 0 ? void 0 : user.hasPassword,
+                    role: user === null || user === void 0 ? void 0 : user.role,
+                    gender: user === null || user === void 0 ? void 0 : user.gender,
+                    dob: user === null || user === void 0 ? void 0 : user.dob,
+                    idFor: user === null || user === void 0 ? void 0 : user.idFor,
+                    isSeller: user === null || user === void 0 ? void 0 : user.isSeller,
+                    accountStatus: user === null || user === void 0 ? void 0 : user.accountStatus,
+                    contactEmail: user === null || user === void 0 ? void 0 : user.contactEmail,
+                    seller: user === null || user === void 0 ? void 0 : user.seller,
+                    authProvider: user === null || user === void 0 ? void 0 : user.authProvider
+                });
             }
             if ((user === null || user === void 0 ? void 0 : user.role) === 'BUYER' && (user === null || user === void 0 ? void 0 : user.idFor) === 'buy') {
                 user.buyer["defaultShippingAddress"] = (Array.isArray((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress) &&
