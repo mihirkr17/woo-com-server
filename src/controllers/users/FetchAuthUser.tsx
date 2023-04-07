@@ -17,6 +17,24 @@ module.exports = async function FetchAuthUser(req: Request, res: Response, next:
 
       if (!user || typeof user !== "object") throw new apiResponse.Api404Error("User not found !");
 
+      if (user?.role && user?.role === "ADMIN") {
+         userDataToken = setUserDataToken({
+            _uuid: user?._uuid,
+            fullName: user?.fullName,
+            email: user?.email,
+            phone: user?.phone,
+            phonePrefixCode: user?.phonePrefixCode,
+            hasPassword: user?.hasPassword,
+            role: user?.role,
+            gender: user?.gender,
+            dob: user?.dob,
+            accountStatus: user?.accountStatus,
+            contactEmail: user?.contactEmail,
+            authProvider: user?.authProvider
+         });
+      }
+
+
       if (user?.role === 'SELLER' && user?.idFor === 'sell') {
          await productCounter({ storeName: user.seller.storeInfos?.storeName, _uuid: user?._uuid });
 

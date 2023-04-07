@@ -163,6 +163,22 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
         if (!comparedPassword)
             throw new apiResponse.Api400Error("Password didn't match !");
         let token = setToken(user);
+        if ((user === null || user === void 0 ? void 0 : user.role) && (user === null || user === void 0 ? void 0 : user.role) === "ADMIN") {
+            userDataToken = setUserDataToken({
+                _uuid: user === null || user === void 0 ? void 0 : user._uuid,
+                fullName: user === null || user === void 0 ? void 0 : user.fullName,
+                email: user === null || user === void 0 ? void 0 : user.email,
+                phone: user === null || user === void 0 ? void 0 : user.phone,
+                phonePrefixCode: user === null || user === void 0 ? void 0 : user.phonePrefixCode,
+                hasPassword: user === null || user === void 0 ? void 0 : user.hasPassword,
+                role: user === null || user === void 0 ? void 0 : user.role,
+                gender: user === null || user === void 0 ? void 0 : user.gender,
+                dob: user === null || user === void 0 ? void 0 : user.dob,
+                accountStatus: user === null || user === void 0 ? void 0 : user.accountStatus,
+                contactEmail: user === null || user === void 0 ? void 0 : user.contactEmail,
+                authProvider: user === null || user === void 0 ? void 0 : user.authProvider
+            });
+        }
         if ((user === null || user === void 0 ? void 0 : user.role) && (user === null || user === void 0 ? void 0 : user.role) === "SELLER") {
             userDataToken = setUserDataToken({
                 _uuid: user === null || user === void 0 ? void 0 : user._uuid,

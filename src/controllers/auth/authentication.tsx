@@ -198,6 +198,23 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 
       let token = setToken(user);
 
+      if (user?.role && user?.role === "ADMIN") {
+         userDataToken = setUserDataToken({
+            _uuid: user?._uuid,
+            fullName: user?.fullName,
+            email: user?.email,
+            phone: user?.phone,
+            phonePrefixCode: user?.phonePrefixCode,
+            hasPassword: user?.hasPassword,
+            role: user?.role,
+            gender: user?.gender,
+            dob: user?.dob,
+            accountStatus: user?.accountStatus,
+            contactEmail: user?.contactEmail,
+            authProvider: user?.authProvider
+         });
+      }
+
       if (user?.role && user?.role === "SELLER") {
          userDataToken = setUserDataToken({
             _uuid: user?._uuid,
