@@ -127,10 +127,11 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
                     return p;
                 }
                 catch (error) {
+                    next(error);
                 }
             });
         }
-        let c = cartData && cartData.map((e) => __awaiter(void 0, void 0, void 0, function* () { return yield getCart(e); }));
+        let c = Array.isArray(cartData) && cartData.map((e) => __awaiter(void 0, void 0, void 0, function* () { return yield getCart(e); }));
         let cart = yield Promise.all(c);
         //  cart = await ShoppingCart.aggregate([
         //    { $match: { customerEmail: authEmail } },

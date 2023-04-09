@@ -78,6 +78,7 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
       async function getCart(e: any) {
          try {
             const { productID, variationID, listingID, quantity } = e;
+
             let p = await Product.aggregate([
                { $match: { $and: [{ _id: ObjectId(productID) }, { _lid: listingID }] } },
                { $unwind: { path: "$variations" } },
@@ -144,13 +145,13 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
             return p;
 
          } catch (error: any) {
-
+            next(error);
          }
       }
 
 
 
-      let c = cartData && cartData.map(async (e: any) => await getCart(e));
+      let c: any = Array.isArray(cartData) && cartData.map(async (e: any) => await getCart(e));
 
       let cart = await Promise.all(c);
 
