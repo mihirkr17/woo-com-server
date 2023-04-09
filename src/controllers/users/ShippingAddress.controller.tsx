@@ -49,18 +49,12 @@ module.exports.createShippingAddress = async (req: Request, res: Response, next:
          { upsert: true }
       );
 
-      if (!result) {
-         return res.status(400).send({
-            success: false,
-            statusCode: 400,
-            message: "Failed to add address in this cart",
-         });
-      }
+      if (!result) throw new apiResponse.Api500Error("Operation failed !");
 
       return res.status(200).send({
          success: true,
          statusCode: 200,
-         message: "Successfully shipping address added in your cart.",
+         message: "Shipping address added successfully.",
       });
    } catch (error: any) {
       next(error);
@@ -113,9 +107,10 @@ module.exports.updateShippingAddress = async (req: Request, res: Response, next:
             statusCode: 200,
             message: "Shipping address updated.",
          });
-      } else {
-         throw new apiResponse.Api500Error("Failed to update shipping address.");
       }
+
+      throw new apiResponse.Api500Error("Failed to update shipping address.");
+
    } catch (error: any) {
       next(error);
    }
@@ -135,7 +130,7 @@ module.exports.selectShippingAddress = async (req: Request, res: Response, next:
       const user = await findUserByEmail(authEmail);
 
       if (!user && typeof user !== "object") {
-         throw new apiResponse.Api403Error('User not found !!!');
+         throw new apiResponse.Api404Error('User not found !');
       }
 
       const shippingAddress = user?.buyer?.shippingAddress || [];

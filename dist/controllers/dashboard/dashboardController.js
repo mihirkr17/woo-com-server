@@ -74,9 +74,37 @@ module.exports.allSellers = (req, res, next) => __awaiter(void 0, void 0, void 0
     }
 });
 module.exports.allBuyers = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _c, _d, _e;
     try {
-        const buyers = (yield User.find({ $and: [{ idFor: "buy" }, { role: "BUYER" }] })) || [];
-        return res.status(200).send({ success: true, statusCode: 200, buyers });
+        const search = (_c = req.query) === null || _c === void 0 ? void 0 : _c.search;
+        let page = (_d = req.query) === null || _d === void 0 ? void 0 : _d.page;
+        let item = (_e = req.query) === null || _e === void 0 ? void 0 : _e.item;
+        let filter = [];
+        item = parseInt(item) || 2;
+        page = parseInt(page) === 1 ? 0 : parseInt(page) - 1;
+        let totalBuyerCount;
+        if (search && search !== "") {
+            filter = [{
+                    $match: {
+                        $and: [{ idFor: "buy" }, { role: "BUYER" }],
+                        $or: [{ email: { $regex: search, $options: 'mi' } }]
+                    }
+                }];
+        }
+        else {
+            filter = [
+                {
+                    $match: {
+                        $and: [{ idFor: "buy" }, { role: "BUYER" }],
+                    }
+                }, { $skip: (page * item) || 0 }, { $limit: item }
+            ];
+            totalBuyerCount = (yield User.countDocuments({
+                $and: [{ idFor: "buy" }, { role: "BUYER" }],
+            })) || 0;
+        }
+        const buyers = (yield User.aggregate(filter)) || [];
+        return res.status(200).send({ success: true, statusCode: 200, buyers, totalBuyerCount });
     }
     catch (error) {
         next(error);

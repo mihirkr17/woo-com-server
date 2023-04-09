@@ -35,17 +35,12 @@ module.exports.createShippingAddress = (req, res, next) => __awaiter(void 0, voi
             default_shipping_address: default_shipping_address || false
         };
         const result = yield User.findOneAndUpdate({ email: userEmail }, { $push: { "buyer.shippingAddress": shippingAddressModel } }, { upsert: true });
-        if (!result) {
-            return res.status(400).send({
-                success: false,
-                statusCode: 400,
-                message: "Failed to add address in this cart",
-            });
-        }
+        if (!result)
+            throw new apiResponse.Api500Error("Operation failed !");
         return res.status(200).send({
             success: true,
             statusCode: 200,
-            message: "Successfully shipping address added in your cart.",
+            message: "Shipping address added successfully.",
         });
     }
     catch (error) {
@@ -88,9 +83,7 @@ module.exports.updateShippingAddress = (req, res, next) => __awaiter(void 0, voi
                 message: "Shipping address updated.",
             });
         }
-        else {
-            throw new apiResponse.Api500Error("Failed to update shipping address.");
-        }
+        throw new apiResponse.Api500Error("Failed to update shipping address.");
     }
     catch (error) {
         next(error);
@@ -106,7 +99,7 @@ module.exports.selectShippingAddress = (req, res, next) => __awaiter(void 0, voi
         default_shipping_address = (default_shipping_address === true) ? false : true;
         const user = yield findUserByEmail(authEmail);
         if (!user && typeof user !== "object") {
-            throw new apiResponse.Api403Error('User not found !!!');
+            throw new apiResponse.Api404Error('User not found !');
         }
         const shippingAddress = ((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) || [];
         if (shippingAddress && shippingAddress.length > 0) {

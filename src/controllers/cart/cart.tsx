@@ -1,6 +1,61 @@
 import { NextFunction, Request, Response } from "express";
 const ShoppingCart = require("../../model/shoppingCart.model");
-const { findUserByEmail, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
+const { findUserByEmail, checkProductAvailability, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
+const apiResponse = require("../../errors/apiResponse");
+const { ObjectId } = require("mongodb");
+const { cartTemplate } = require("../../templates/cart.template");
+
+
+/**
+ * @apiController --> ADD PRODUCT IN CART
+ * @apiMethod --> POST
+ */
+module.exports.addToCartHandler = async (req: Request, res: Response, next: NextFunction) => {
+   try {
+
+      const authEmail: string = req.decoded.email;
+      const body = req.body;
+      let cart: any;
+
+      if (!body || typeof body !== "object")
+         throw new apiResponse.Api400Error("Required body !");
+
+
+      const { productID, variationID, listingID, action } = body;
+
+      if (!productID || !variationID || !listingID)
+         throw new apiResponse.Api400Error("Required product id, listing id, variation id in body !");
+
+
+      const availableProduct = await checkProductAvailability(productID, variationID);
+
+      if (!availableProduct) throw new apiResponse.Api404Error("Product is not available !");
+
+      const cartTemp = cartTemplate(authEmail, productID, listingID, variationID);
+
+      if (action === "toCart") {
+
+         const existsProduct = await ShoppingCart.countDocuments(
+            { $and: [{ customerEmail: authEmail }, { variationID: variationID }] }
+         );
+
+         if (existsProduct >= 1) throw new apiResponse.Api400Error("Product has already in your cart !");
+
+         cart = new ShoppingCart(cartTemp);
+
+         let result = await cart.save();
+
+         if (result?._id) {
+            return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart." });
+         }
+
+         throw new apiResponse.Api500Error("Something wrong !");
+      }
+
+   } catch (error: any) {
+      next(error);
+   }
+};
 
 module.exports.getCartContext = async (req: Request, res: Response, next: NextFunction) => {
    try {
@@ -8,9 +63,7 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
 
       let user = await findUserByEmail(authEmail);
 
-      if (!user) {
-         return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
-      }
+      if (!user) throw new apiResponse.Api500Error("Something wrong !");
 
       let defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
          user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
@@ -115,3 +168,80 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
       next(error);
    }
 }
+
+
+module.exports.updateCartProductQuantityController = async (req: Request, res: Response, next: NextFunction) => {
+   try {
+      const authEmail = req.decoded.email || "";
+
+      const body = req.body;
+
+      const cartType = body?.actionRequestContext?.type;
+
+      const upsertRequest = body?.upsertRequest;
+
+      const cartContext = upsertRequest?.cartContext;
+
+      const { productID, variationID, cartID, quantity } = cartContext;
+
+      if (!productID || !variationID || !cartID) throw new apiResponse.Api400Error("Required product id, variation id, cart id !");
+
+      if (!quantity || typeof quantity === "undefined") throw new apiResponse.Api400Error("Required quantity !");
+
+      if (cartType !== 'toCart') throw new apiResponse.Api404Error("Required cart context !");
+
+      let cartProduct = await ShoppingCart.findOne({ $and: [{ customerEmail: authEmail }, { productID }, { _id: ObjectId(cartID) }] });
+
+      if (!cartProduct) throw new apiResponse.Api404Error("Sorry product not found !");
+
+      const productAvailability = await checkProductAvailability(productID, variationID);
+
+      if (!productAvailability || typeof productAvailability === "undefined" || productAvailability === null)
+         throw new apiResponse.Api400Error("Product is available !");
+
+      if (parseInt(quantity) >= productAvailability?.variations?.available) {
+         return res.status(200).send({ success: false, statusCode: 200, message: "Sorry ! your selected quantity out of range." });
+      }
+
+      cartProduct.quantity = parseInt(quantity);
+
+      await cartProduct.save();
+
+      return res.status(200).send({ success: true, statusCode: 200, message: `Quantity updated to ${quantity}.` });
+
+   } catch (error: any) {
+      next(error);
+   }
+}
+
+
+/**
+ * @apiController --> DELETE PRODUCT FROM CART
+ * @apiMethod --> DELETE
+ * @apiRequired --> product id & variation id
+ */
+module.exports.deleteCartItem = async (req: Request, res: Response, next: NextFunction) => {
+   try {
+      const productID = req.headers.authorization;
+      const variationID = req.query.vr;
+      const authEmail = req.decoded.email;
+      const cart_types = req.params.cartTypes;
+      let updateDocuments;
+
+      if (!variationID || !productID) throw new apiResponse.Api400Error("Required product id & variation id !");
+      if (!ObjectId.isValid(productID)) throw new apiResponse.Api400Error("Product id is not valid !");
+
+      if (cart_types === "toCart") {
+         updateDocuments = await ShoppingCart.deleteOne({ $and: [{ customerEmail: authEmail }, { productID }, { variationID }] })
+      }
+
+      if (updateDocuments) {
+         return res.status(200).send({ success: true, statusCode: 200, message: "Item removed successfully from your cart." });
+      }
+
+      throw new apiResponse.Api500Error("Failed to delete product from cart !");
+
+   } catch (error: any) {
+      next(error);
+   }
+};

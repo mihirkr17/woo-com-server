@@ -12,25 +12,26 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const { ObjectId } = require("mongodb");
 const ShoppingCart = require("../../model/shoppingCart.model");
 const User = require("../../model/user.model");
-const Product = require("../../model/product.model");
+const apiResponse = require("../../errors/apiResponse");
 const { checkProductAvailability } = require("../../services/common.service");
 module.exports.updateCartProductQuantityController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     try {
-        let cartProduct;
-        let result;
         const authEmail = req.decoded.email || "";
         const body = req.body;
         const cartType = (_a = body === null || body === void 0 ? void 0 : body.actionRequestContext) === null || _a === void 0 ? void 0 : _a.type;
         const upsertRequest = body === null || body === void 0 ? void 0 : body.upsertRequest;
         const cartContext = upsertRequest === null || upsertRequest === void 0 ? void 0 : upsertRequest.cartContext;
         const { productID, variationID, cartID, quantity } = cartContext;
-        if (cartType === 'toCart') {
-            cartProduct = yield ShoppingCart.findOne({ $and: [{ customerEmail: authEmail }, { productID }, { _id: ObjectId(cartID) }] });
-            if (!cartProduct) {
-                return res.status(404).send({ success: false, statusCode: 404, error: 'product not found !!!' });
-            }
-        }
+        if (!productID || !variationID || !cartID)
+            throw new apiResponse.Api400Error("Required product id, variation id, cart id !");
+        if (!quantity || typeof quantity === "undefined")
+            throw new apiResponse.Api400Error("Required quantity !");
+        if (cartType !== 'toCart')
+            throw new apiResponse.Api404Error("Required cart context !");
+        let cartProduct = yield ShoppingCart.findOne({ $and: [{ customerEmail: authEmail }, { productID }, { _id: ObjectId(cartID) }] });
+        if (!cartProduct)
+            throw new apiResponse.Api404Error("Sorry product not found !");
         const productAvailability = yield checkProductAvailability(productID, variationID);
         if (!productAvailability || typeof productAvailability === "undefined" || productAvailability === null) {
             return res.status(400).send({ success: false, statusCode: 400, error: "Product not available" });
@@ -38,61 +39,11 @@ module.exports.updateCartProductQuantityController = (req, res, next) => __await
         if (parseInt(quantity) >= ((_b = productAvailability === null || productAvailability === void 0 ? void 0 : productAvailability.variations) === null || _b === void 0 ? void 0 : _b.available)) {
             return res.status(200).send({ success: false, statusCode: 200, message: "Sorry ! your selected quantity out of range." });
         }
-        if (cartType === 'toCart') {
-            result = yield ShoppingCart.updateOne({
-                $and: [{ customerEmail: authEmail }, { productID }, { _id: ObjectId(cartID) }]
-            }, {
-                $set: {
-                    quantity,
-                }
-            }, {
-                upsert: true,
-            });
-        }
-        if (cartType === "buy") {
-            result = yield User.updateOne({
-                email: authEmail
-            }, {
-                $set: {
-                    "buyer.buyProduct.quantity": quantity,
-                }
-            }, {
-                upsert: true,
-            });
-        }
-        if (result) {
-            return res.status(200).send({ success: true, statusCode: 200, message: `Quantity updated to ${quantity}.` });
-        }
+        cartProduct.quantity = parseInt(quantity);
+        yield cartProduct.save();
+        return res.status(200).send({ success: true, statusCode: 200, message: `Quantity updated to ${quantity}.` });
     }
     catch (error) {
         next(error);
-    }
-});
-module.exports.updateCartAddress = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const userEmail = req.decoded.email;
-        const body = req.body;
-        const result = yield User.findOneAndUpdate({ email: userEmail }, {
-            $set: {
-                "shippingAddress.$[i]": body,
-            },
-        }, { arrayFilters: [{ "i.addressId": body === null || body === void 0 ? void 0 : body.addressId }] });
-        if (result) {
-            return res.status(200).send({
-                success: true,
-                statusCode: 200,
-                message: "Shipping address updated.",
-            });
-        }
-        else {
-            return res.status(400).send({
-                success: false,
-                statusCode: 400,
-                error: "Failed to update shipping address.",
-            });
-        }
-    }
-    catch (error) {
-        res.status(500).send({ message: error === null || error === void 0 ? void 0 : error.message });
     }
 });

@@ -79,8 +79,42 @@ module.exports.allSellers = async (req: Request, res: Response, next: NextFuncti
 
 module.exports.allBuyers = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const buyers = await User.find({ $and: [{ idFor: "buy" }, { role: "BUYER" }] }) || [];
-      return res.status(200).send({ success: true, statusCode: 200, buyers });
+      const search = req.query?.search;
+      let page: any = req.query?.page;
+      let item: any = req.query?.item;
+      let filter: any = [];
+
+      item = parseInt(item) || 2;
+
+      page = parseInt(page) === 1 ? 0 : parseInt(page) - 1;
+      
+      let totalBuyerCount: any;
+
+      if (search && search !== "") {
+         filter = [{
+            $match: {
+               $and: [{ idFor: "buy" }, { role: "BUYER" }],
+               $or: [{ email: { $regex: search, $options: 'mi' } }]
+            }
+         }];
+
+      } else {
+         filter = [
+            {
+               $match: {
+                  $and: [{ idFor: "buy" }, { role: "BUYER" }],
+               }
+            }, { $skip: (page * item) || 0 }, { $limit: item }
+         ];
+
+         totalBuyerCount = await User.countDocuments({
+            $and: [{ idFor: "buy" }, { role: "BUYER" }],
+         }) || 0;
+      }
+
+      const buyers: any = await User.aggregate(filter) || [];
+
+      return res.status(200).send({ success: true, statusCode: 200, buyers, totalBuyerCount });
    } catch (error: any) {
       next(error);
    }

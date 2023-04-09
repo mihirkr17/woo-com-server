@@ -102,7 +102,6 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
             timestamp: timestamp
          }
 
-
          let result = await Order.findOneAndUpdate(
             { user_email: authEmail },
             { $push: { orders: product } },
