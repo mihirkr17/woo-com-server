@@ -4,6 +4,7 @@ const { findUserByEmail, checkProductAvailability, actualSellingPrice, calculate
 const apiResponse = require("../../errors/apiResponse");
 const { ObjectId } = require("mongodb");
 const { cartTemplate } = require("../../templates/cart.template");
+const Product = require("../../model/product.model");
 
 
 /**
@@ -61,6 +62,10 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
    try {
       const authEmail = req.decoded.email;
 
+      const { cart_data } = req.cookies;
+
+      let cartData = cart_data && JSON.parse(cart_data);
+
       let user = await findUserByEmail(authEmail);
 
       if (!user) throw new apiResponse.Api500Error("Something wrong !");
@@ -70,69 +75,60 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
 
       let areaType = defaultShippingAddress?.area_type || "";
 
-      const cart = await ShoppingCart.aggregate([
-         { $match: { customerEmail: authEmail } },
-         {
-            $lookup: {
-               from: 'products',
-               localField: 'listingID',
-               foreignField: "_lid",
-               as: "main_product"
-            }
-         },
-         { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } } },
-         { $project: { main_product: 0 } },
-         { $unwind: { path: "$variations" } },
-         {
-            $match: {
-               $expr: {
-                  $and: [
-                     { $eq: ['$variations._vrid', '$variationID'] },
-                     { $eq: ["$variations.stock", "in"] },
-                     { $eq: ["$variations.status", "active"] },
-                     { $eq: ["$save_as", "fulfilled"] }
-                  ]
+      async function getCart(e: any) {
+         try {
+            const { productID, variationID, listingID, quantity } = e;
+            let p = await Product.aggregate([
+               { $match: { $and: [{ _id: ObjectId(productID) }, { _lid: listingID }] } },
+               { $unwind: { path: "$variations" } },
+               {
+                  $match: {
+                     $expr: {
+                        $and: [
+                           { $eq: ['$variations._vrid', variationID] },
+                           { $eq: ["$variations.stock", "in"] },
+                           { $eq: ["$variations.status", "active"] },
+                           { $eq: ["$save_as", "fulfilled"] }
+                        ]
+                     }
+                  }
+               },
+               {
+                  $project: {
+                     _id: 0,
+                     title: "$variations.vTitle",
+                     slug: 1,
+                     packaged: 1,
+                     shipping: 1,
+                     brand: 1,
+                     image: { $first: "$images" },
+                     sku: "$variations.sku",
+                     sellerData: 1,
+                     quantity: 1,
+                     savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPrice] }, parseInt(quantity)] },
+                     baseAmount: { $multiply: [actualSellingPrice, parseInt(quantity)] },
+                     paymentInfo: 1,
+                     sellingPrice: actualSellingPrice,
+                     variant: "$variations.variant",
+                     available: "$variations.available",
+                     stock: "$variations.stock"
+                  }
+               },
+               {
+                  $set: {
+                     listingID,
+                     productID,
+                     customerEmail: authEmail,
+                     variationID,
+                     quantity: parseInt(quantity),
+                  }
+               },
+               {
+                  $unset: ["variations"]
                }
-            }
-         },
-         {
-            $project: {
-               cartID: "$_id",
-               dim: 1,
-               _id: 0,
-               title: "$variations.vTitle",
-               slug: 1,
-               packaged: 1,
-               listingID: 1,
-               productID: 1,
-               customerEmail: 1,
-               variationID: 1,
-               variations: 1,
-               shipping: 1,
-               brand: 1,
-               image: { $first: "$images" },
-               sku: "$variations.sku",
-               sellerData: 1,
-               quantity: 1,
-               savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPrice] }, '$quantity'] },
-               baseAmount: { $multiply: [actualSellingPrice, '$quantity'] },
-               paymentInfo: 1,
-               sellingPrice: actualSellingPrice,
-               variant: "$variations.variant",
-               available: "$variations.available",
-               stock: "$variations.stock"
-            }
-         },
-         {
-            $unset: ["variations"]
-         }
-      ]);
+            ]);
 
-
-
-      if (typeof cart === "object") {
-
-         cart && cart.map((p: any) => {
+            p = p[0];
 
             if (p?.shipping?.isFree && p?.shipping?.isFree) {
                p["shippingCharge"] = 0;
@@ -140,8 +136,96 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
                p["shippingCharge"] = calculateShippingCost(p?.packaged?.volumetricWeight, areaType);
             }
 
+            let amountNew = p?.baseAmount + p?.shippingCharge;
+
+            p["baseAmount"] = parseInt(amountNew);
+
+
             return p;
-         });
+
+         } catch (error: any) {
+
+         }
+      }
+
+
+
+      let c = cartData && cartData.map(async (e: any) => await getCart(e));
+
+      let cart = await Promise.all(c);
+
+      //  cart = await ShoppingCart.aggregate([
+      //    { $match: { customerEmail: authEmail } },
+      //    {
+      //       $lookup: {
+      //          from: 'products',
+      //          localField: 'listingID',
+      //          foreignField: "_lid",
+      //          as: "main_product"
+      //       }
+      //    },
+      //    { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } } },
+      //    { $project: { main_product: 0 } },
+      //    { $unwind: { path: "$variations" } },
+      //    {
+      //       $match: {
+      //          $expr: {
+      //             $and: [
+      //                { $eq: ['$variations._vrid', '$variationID'] },
+      //                { $eq: ["$variations.stock", "in"] },
+      //                { $eq: ["$variations.status", "active"] },
+      //                { $eq: ["$save_as", "fulfilled"] }
+      //             ]
+      //          }
+      //       }
+      //    },
+      //    {
+      //       $project: {
+      //          cartID: "$_id",
+      //          dim: 1,
+      //          _id: 0,
+      //          title: "$variations.vTitle",
+      //          slug: 1,
+      //          packaged: 1,
+      //          listingID: 1,
+      //          productID: 1,
+      //          customerEmail: 1,
+      //          variationID: 1,
+      //          variations: 1,
+      //          shipping: 1,
+      //          brand: 1,
+      //          image: { $first: "$images" },
+      //          sku: "$variations.sku",
+      //          sellerData: 1,
+      //          quantity: 1,
+      //          savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPrice] }, '$quantity'] },
+      //          baseAmount: { $multiply: [actualSellingPrice, '$quantity'] },
+      //          paymentInfo: 1,
+      //          sellingPrice: actualSellingPrice,
+      //          variant: "$variations.variant",
+      //          available: "$variations.available",
+      //          stock: "$variations.stock"
+      //       }
+      //    },
+      //    {
+      //       $unset: ["variations"]
+      //    }
+      // ]);
+
+
+
+      if (typeof cart === "object") {
+
+         // cart && cart.map((p: any) => {
+
+         //    if (p?.shipping?.isFree && p?.shipping?.isFree) {
+         //       p["shippingCharge"] = 0;
+         //    } else {
+         //       p["shippingCharge"] = calculateShippingCost(p?.packaged?.volumetricWeight, areaType);
+         //    }
+
+         //    return p;
+         // });
 
          const baseAmounts = cart && cart.map((tAmount: any) => (parseInt(tAmount?.baseAmount))).reduce((p: any, c: any) => p + c, 0);
          const totalQuantities = cart && cart.map((tQuant: any) => (parseInt(tQuant?.quantity))).reduce((p: any, c: any) => p + c, 0);

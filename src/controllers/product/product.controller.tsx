@@ -23,13 +23,21 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
 
       let uuid: any = req.cookies["_uuid"] || null;
 
+      let { cart_data } = req.cookies;
+
+      let cartData = cart_data && JSON.parse(cart_data);
+
+      if (Array.isArray(cartData)) {
+         existProductInCart = cartData.some((e: any) => (e?.variationID === variationID && e?.productID === productID));
+      }
+
       // If user email address exists
       if (uuid && typeof uuid === 'string') {
 
          let user = await findUserByUUID(uuid);
 
          if (user && typeof user === "object") {
-            existProductInCart = await ShoppingCart.findOne({ $and: [{ customerEmail: user?.email }, { variationID: variationID }] });
+            // existProductInCart = await ShoppingCart.findOne({ $and: [{ customerEmail: user?.email }, { variationID: variationID }] });
 
             let defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
                user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);

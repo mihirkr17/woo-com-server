@@ -14,6 +14,7 @@ const { findUserByEmail, checkProductAvailability, actualSellingPrice, calculate
 const apiResponse = require("../../errors/apiResponse");
 const { ObjectId } = require("mongodb");
 const { cartTemplate } = require("../../templates/cart.template");
+const Product = require("../../model/product.model");
 /**
  * @apiController --> ADD PRODUCT IN CART
  * @apiMethod --> POST
@@ -52,80 +53,151 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
     var _a, _b;
     try {
         const authEmail = req.decoded.email;
+        const { cart_data } = req.cookies;
+        let cartData = cart_data && JSON.parse(cart_data);
         let user = yield findUserByEmail(authEmail);
         if (!user)
             throw new apiResponse.Api500Error("Something wrong !");
         let defaultShippingAddress = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
             ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
         let areaType = (defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type) || "";
-        const cart = yield ShoppingCart.aggregate([
-            { $match: { customerEmail: authEmail } },
-            {
-                $lookup: {
-                    from: 'products',
-                    localField: 'listingID',
-                    foreignField: "_lid",
-                    as: "main_product"
-                }
-            },
-            { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } } },
-            { $project: { main_product: 0 } },
-            { $unwind: { path: "$variations" } },
-            {
-                $match: {
-                    $expr: {
-                        $and: [
-                            { $eq: ['$variations._vrid', '$variationID'] },
-                            { $eq: ["$variations.stock", "in"] },
-                            { $eq: ["$variations.status", "active"] },
-                            { $eq: ["$save_as", "fulfilled"] }
-                        ]
+        function getCart(e) {
+            var _a, _b, _c;
+            return __awaiter(this, void 0, void 0, function* () {
+                try {
+                    const { productID, variationID, listingID, quantity } = e;
+                    let p = yield Product.aggregate([
+                        { $match: { $and: [{ _id: ObjectId(productID) }, { _lid: listingID }] } },
+                        { $unwind: { path: "$variations" } },
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: ['$variations._vrid', variationID] },
+                                        { $eq: ["$variations.stock", "in"] },
+                                        { $eq: ["$variations.status", "active"] },
+                                        { $eq: ["$save_as", "fulfilled"] }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            $project: {
+                                _id: 0,
+                                title: "$variations.vTitle",
+                                slug: 1,
+                                packaged: 1,
+                                shipping: 1,
+                                brand: 1,
+                                image: { $first: "$images" },
+                                sku: "$variations.sku",
+                                sellerData: 1,
+                                quantity: 1,
+                                savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPrice] }, parseInt(quantity)] },
+                                baseAmount: { $multiply: [actualSellingPrice, parseInt(quantity)] },
+                                paymentInfo: 1,
+                                sellingPrice: actualSellingPrice,
+                                variant: "$variations.variant",
+                                available: "$variations.available",
+                                stock: "$variations.stock"
+                            }
+                        },
+                        {
+                            $set: {
+                                listingID,
+                                productID,
+                                customerEmail: authEmail,
+                                variationID,
+                                quantity: parseInt(quantity),
+                            }
+                        },
+                        {
+                            $unset: ["variations"]
+                        }
+                    ]);
+                    p = p[0];
+                    if (((_a = p === null || p === void 0 ? void 0 : p.shipping) === null || _a === void 0 ? void 0 : _a.isFree) && ((_b = p === null || p === void 0 ? void 0 : p.shipping) === null || _b === void 0 ? void 0 : _b.isFree)) {
+                        p["shippingCharge"] = 0;
                     }
+                    else {
+                        p["shippingCharge"] = calculateShippingCost((_c = p === null || p === void 0 ? void 0 : p.packaged) === null || _c === void 0 ? void 0 : _c.volumetricWeight, areaType);
+                    }
+                    let amountNew = (p === null || p === void 0 ? void 0 : p.baseAmount) + (p === null || p === void 0 ? void 0 : p.shippingCharge);
+                    p["baseAmount"] = parseInt(amountNew);
+                    return p;
                 }
-            },
-            {
-                $project: {
-                    cartID: "$_id",
-                    dim: 1,
-                    _id: 0,
-                    title: "$variations.vTitle",
-                    slug: 1,
-                    packaged: 1,
-                    listingID: 1,
-                    productID: 1,
-                    customerEmail: 1,
-                    variationID: 1,
-                    variations: 1,
-                    shipping: 1,
-                    brand: 1,
-                    image: { $first: "$images" },
-                    sku: "$variations.sku",
-                    sellerData: 1,
-                    quantity: 1,
-                    savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPrice] }, '$quantity'] },
-                    baseAmount: { $multiply: [actualSellingPrice, '$quantity'] },
-                    paymentInfo: 1,
-                    sellingPrice: actualSellingPrice,
-                    variant: "$variations.variant",
-                    available: "$variations.available",
-                    stock: "$variations.stock"
+                catch (error) {
                 }
-            },
-            {
-                $unset: ["variations"]
-            }
-        ]);
-        if (typeof cart === "object") {
-            cart && cart.map((p) => {
-                var _a, _b, _c;
-                if (((_a = p === null || p === void 0 ? void 0 : p.shipping) === null || _a === void 0 ? void 0 : _a.isFree) && ((_b = p === null || p === void 0 ? void 0 : p.shipping) === null || _b === void 0 ? void 0 : _b.isFree)) {
-                    p["shippingCharge"] = 0;
-                }
-                else {
-                    p["shippingCharge"] = calculateShippingCost((_c = p === null || p === void 0 ? void 0 : p.packaged) === null || _c === void 0 ? void 0 : _c.volumetricWeight, areaType);
-                }
-                return p;
             });
+        }
+        let c = cartData && cartData.map((e) => __awaiter(void 0, void 0, void 0, function* () { return yield getCart(e); }));
+        let cart = yield Promise.all(c);
+        //  cart = await ShoppingCart.aggregate([
+        //    { $match: { customerEmail: authEmail } },
+        //    {
+        //       $lookup: {
+        //          from: 'products',
+        //          localField: 'listingID',
+        //          foreignField: "_lid",
+        //          as: "main_product"
+        //       }
+        //    },
+        //    { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } } },
+        //    { $project: { main_product: 0 } },
+        //    { $unwind: { path: "$variations" } },
+        //    {
+        //       $match: {
+        //          $expr: {
+        //             $and: [
+        //                { $eq: ['$variations._vrid', '$variationID'] },
+        //                { $eq: ["$variations.stock", "in"] },
+        //                { $eq: ["$variations.status", "active"] },
+        //                { $eq: ["$save_as", "fulfilled"] }
+        //             ]
+        //          }
+        //       }
+        //    },
+        //    {
+        //       $project: {
+        //          cartID: "$_id",
+        //          dim: 1,
+        //          _id: 0,
+        //          title: "$variations.vTitle",
+        //          slug: 1,
+        //          packaged: 1,
+        //          listingID: 1,
+        //          productID: 1,
+        //          customerEmail: 1,
+        //          variationID: 1,
+        //          variations: 1,
+        //          shipping: 1,
+        //          brand: 1,
+        //          image: { $first: "$images" },
+        //          sku: "$variations.sku",
+        //          sellerData: 1,
+        //          quantity: 1,
+        //          savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPrice] }, '$quantity'] },
+        //          baseAmount: { $multiply: [actualSellingPrice, '$quantity'] },
+        //          paymentInfo: 1,
+        //          sellingPrice: actualSellingPrice,
+        //          variant: "$variations.variant",
+        //          available: "$variations.available",
+        //          stock: "$variations.stock"
+        //       }
+        //    },
+        //    {
+        //       $unset: ["variations"]
+        //    }
+        // ]);
+        if (typeof cart === "object") {
+            // cart && cart.map((p: any) => {
+            //    if (p?.shipping?.isFree && p?.shipping?.isFree) {
+            //       p["shippingCharge"] = 0;
+            //    } else {
+            //       p["shippingCharge"] = calculateShippingCost(p?.packaged?.volumetricWeight, areaType);
+            //    }
+            //    return p;
+            // });
             const baseAmounts = cart && cart.map((tAmount) => (parseInt(tAmount === null || tAmount === void 0 ? void 0 : tAmount.baseAmount))).reduce((p, c) => p + c, 0);
             const totalQuantities = cart && cart.map((tQuant) => (parseInt(tQuant === null || tQuant === void 0 ? void 0 : tQuant.quantity))).reduce((p, c) => p + c, 0);
             const shippingFees = cart && cart.map((p) => parseInt(p === null || p === void 0 ? void 0 : p.shippingCharge)).reduce((p, c) => p + c, 0);

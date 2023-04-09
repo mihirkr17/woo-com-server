@@ -28,11 +28,16 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
         let existProductInCart = null;
         let areaType;
         let uuid = req.cookies["_uuid"] || null;
+        let { cart_data } = req.cookies;
+        let cartData = cart_data && JSON.parse(cart_data);
+        if (Array.isArray(cartData)) {
+            existProductInCart = cartData.some((e) => ((e === null || e === void 0 ? void 0 : e.variationID) === variationID && (e === null || e === void 0 ? void 0 : e.productID) === productID));
+        }
         // If user email address exists
         if (uuid && typeof uuid === 'string') {
             let user = yield findUserByUUID(uuid);
             if (user && typeof user === "object") {
-                existProductInCart = yield ShoppingCart.findOne({ $and: [{ customerEmail: user === null || user === void 0 ? void 0 : user.email }, { variationID: variationID }] });
+                // existProductInCart = await ShoppingCart.findOne({ $and: [{ customerEmail: user?.email }, { variationID: variationID }] });
                 let defaultShippingAddress = (Array.isArray((_c = user === null || user === void 0 ? void 0 : user.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress) &&
                     ((_d = user === null || user === void 0 ? void 0 : user.buyer) === null || _d === void 0 ? void 0 : _d.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
                 areaType = (defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type) || "";
