@@ -62,9 +62,11 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
    try {
       const authEmail = req.decoded.email;
 
-      const { cart_data } = req.cookies;
+      const body = req.body;
 
-      let cartData = cart_data && JSON.parse(cart_data);
+      // const { cart_data } = req.cookies;
+
+      // let cartData = cart_data && JSON.parse(cart_data);
 
       let user = await findUserByEmail(authEmail);
 
@@ -151,7 +153,7 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
 
 
 
-      let c: any = Array.isArray(cartData) && cartData.map(async (e: any) => await getCart(e));
+      let c: any = Array.isArray(body) && body.map(async (e: any) => await getCart(e));
 
       let cart = await Promise.all(c);
 

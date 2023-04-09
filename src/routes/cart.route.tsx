@@ -6,7 +6,7 @@ const cartContext = require("../controllers/cart/cart");
 try {
   router.post("/add-to-cart", verifyJWT, cartContext.addToCartHandler);
 
-  router.get("/cart-context", verifyJWT, cartContext?.getCartContext);
+  router.post("/cart-context", verifyJWT, cartContext?.getCartContext);
 
   router.put('/update-cart-product-quantity', verifyJWT, cartContext.updateCartProductQuantityController);
 

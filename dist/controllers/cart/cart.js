@@ -53,8 +53,9 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
     var _a, _b;
     try {
         const authEmail = req.decoded.email;
-        const { cart_data } = req.cookies;
-        let cartData = cart_data && JSON.parse(cart_data);
+        const body = req.body;
+        // const { cart_data } = req.cookies;
+        // let cartData = cart_data && JSON.parse(cart_data);
         let user = yield findUserByEmail(authEmail);
         if (!user)
             throw new apiResponse.Api500Error("Something wrong !");
@@ -131,7 +132,7 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
                 }
             });
         }
-        let c = Array.isArray(cartData) && cartData.map((e) => __awaiter(void 0, void 0, void 0, function* () { return yield getCart(e); }));
+        let c = Array.isArray(body) && body.map((e) => __awaiter(void 0, void 0, void 0, function* () { return yield getCart(e); }));
         let cart = yield Promise.all(c);
         //  cart = await ShoppingCart.aggregate([
         //    { $match: { customerEmail: authEmail } },
