@@ -31,7 +31,10 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
         let { cart_data } = req.cookies;
         let cartData = cart_data && JSON.parse(cart_data);
         if (Array.isArray(cartData)) {
-            existProductInCart = cartData.some((e) => ((e === null || e === void 0 ? void 0 : e.variationID) === variationID && (e === null || e === void 0 ? void 0 : e.productID) === productID));
+            existProductInCart = cartData.some((e) => ((e === null || e === void 0 ? void 0 : e.variationID) === variationID)) || null;
+        }
+        else {
+            existProductInCart = null;
         }
         // If user email address exists
         if (uuid && typeof uuid === 'string') {

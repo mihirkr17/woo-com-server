@@ -28,7 +28,9 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
       let cartData = cart_data && JSON.parse(cart_data);
 
       if (Array.isArray(cartData)) {
-         existProductInCart = cartData.some((e: any) => (e?.variationID === variationID && e?.productID === productID));
+         existProductInCart = cartData.some((e: any) => (e?.variationID === variationID)) || null;
+      } else {
+         existProductInCart = null;
       }
 
       // If user email address exists
