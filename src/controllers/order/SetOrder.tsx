@@ -37,6 +37,7 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
 
       const orderItems = await ShoppingCart.aggregate([
          { $match: { customerEmail: authEmail } },
+         { $unwind: { path: "$items" } },
          {
             $lookup: {
                from: 'products',
@@ -52,10 +53,10 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
             $match: {
                $expr: {
                   $and: [
-                     { $eq: ['$variations._vrid', '$variationID'] },
+                     { $eq: ['$variations._vrid', '$items.variationID'] },
                      { $eq: ["$variations.stock", "in"] },
                      { $eq: ["$variations.status", "active"] },
-                     { $gt: ["$variations.available", "$quantity"] }
+                     { $gt: ["$variations.available", "$items.quantity"] }
                   ]
 
                }
@@ -65,13 +66,13 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
             $project: {
                _id: 0,
                variations: 1,
-               quantity: 1,
+               quantity: "$items.quantity",
                shipping: 1,
-               productID: 1,
+               productID: "$items.productID",
                packaged: 1,
-               listingID: 1,
-               variationID: 1,
-               baseAmount: { $multiply: [actualSellingPrice, '$quantity'] }
+               listingID: "$items.listingID",
+               variationID: "$items.variationID",
+               baseAmount: { $multiply: [actualSellingPrice, '$items.quantity'] }
             }
          },
          {

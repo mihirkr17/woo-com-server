@@ -36,6 +36,7 @@ module.exports = function SetOrder(req, res, next) {
             let areaType = defaultAddress === null || defaultAddress === void 0 ? void 0 : defaultAddress.area_type;
             const orderItems = yield ShoppingCart.aggregate([
                 { $match: { customerEmail: authEmail } },
+                { $unwind: { path: "$items" } },
                 {
                     $lookup: {
                         from: 'products',
@@ -51,10 +52,10 @@ module.exports = function SetOrder(req, res, next) {
                     $match: {
                         $expr: {
                             $and: [
-                                { $eq: ['$variations._vrid', '$variationID'] },
+                                { $eq: ['$variations._vrid', '$items.variationID'] },
                                 { $eq: ["$variations.stock", "in"] },
                                 { $eq: ["$variations.status", "active"] },
-                                { $gt: ["$variations.available", "$quantity"] }
+                                { $gt: ["$variations.available", "$items.quantity"] }
                             ]
                         }
                     }
@@ -63,13 +64,13 @@ module.exports = function SetOrder(req, res, next) {
                     $project: {
                         _id: 0,
                         variations: 1,
-                        quantity: 1,
+                        quantity: "$items.quantity",
                         shipping: 1,
-                        productID: 1,
+                        productID: "$items.productID",
                         packaged: 1,
-                        listingID: 1,
-                        variationID: 1,
-                        baseAmount: { $multiply: [actualSellingPrice, '$quantity'] }
+                        listingID: "$items.listingID",
+                        variationID: "$items.variationID",
+                        baseAmount: { $multiply: [actualSellingPrice, '$items.quantity'] }
                     }
                 },
                 {
