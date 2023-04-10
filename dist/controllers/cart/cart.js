@@ -23,7 +23,6 @@ module.exports.addToCartHandler = (req, res, next) => __awaiter(void 0, void 0, 
     try {
         const authEmail = req.decoded.email;
         const body = req.body;
-        let cart;
         if (!body || typeof body !== "object")
             throw new apiResponse.Api400Error("Required body !");
         const { productID, variationID, listingID, action } = body;
@@ -32,17 +31,26 @@ module.exports.addToCartHandler = (req, res, next) => __awaiter(void 0, void 0, 
         const availableProduct = yield checkProductAvailability(productID, variationID);
         if (!availableProduct)
             throw new apiResponse.Api404Error("Product is not available !");
-        const cartTemp = cartTemplate(authEmail, productID, listingID, variationID);
+        const cartTemp = cartTemplate(productID, listingID, variationID);
         if (action === "toCart") {
-            const existsProduct = yield ShoppingCart.countDocuments({ $and: [{ customerEmail: authEmail }, { variationID: variationID }] });
-            if (existsProduct >= 1)
-                throw new apiResponse.Api400Error("Product has already in your cart !");
-            cart = new ShoppingCart(cartTemp);
-            let result = yield cart.save();
-            if (result === null || result === void 0 ? void 0 : result._id) {
+            let existsProduct = yield ShoppingCart.findOne({ customerEmail: authEmail });
+            if (existsProduct) {
+                let items = (Array.isArray(existsProduct.items) && existsProduct.items) || [];
+                let isExist = items.some((e) => e.variationID === variationID);
+                if (isExist)
+                    throw new apiResponse.Api400Error("Product has already in your cart !");
+                existsProduct.items = [...items, cartTemp];
+                yield existsProduct.save();
                 return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart." });
             }
-            throw new apiResponse.Api500Error("Something wrong !");
+            else {
+                let shop = new ShoppingCart({
+                    customerEmail: authEmail,
+                    items: [cartTemp]
+                });
+                yield shop.save();
+                return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart." });
+            }
         }
     }
     catch (error) {
@@ -53,153 +61,79 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
     var _a, _b;
     try {
         const authEmail = req.decoded.email;
-        const body = req.body;
-        // const { cart_data } = req.cookies;
-        // let cartData = cart_data && JSON.parse(cart_data);
         let user = yield findUserByEmail(authEmail);
         if (!user)
             throw new apiResponse.Api500Error("Something wrong !");
         let defaultShippingAddress = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
             ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
         let areaType = (defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type) || "";
-        function getCart(e) {
-            var _a, _b, _c;
-            return __awaiter(this, void 0, void 0, function* () {
-                try {
-                    const { productID, variationID, listingID, quantity } = e;
-                    let p = yield Product.aggregate([
-                        { $match: { $and: [{ _id: ObjectId(productID) }, { _lid: listingID }] } },
-                        { $unwind: { path: "$variations" } },
-                        {
-                            $match: {
-                                $expr: {
-                                    $and: [
-                                        { $eq: ['$variations._vrid', variationID] },
-                                        { $eq: ["$variations.stock", "in"] },
-                                        { $eq: ["$variations.status", "active"] },
-                                        { $eq: ["$save_as", "fulfilled"] }
-                                    ]
-                                }
-                            }
-                        },
-                        {
-                            $project: {
-                                _id: 0,
-                                title: "$variations.vTitle",
-                                slug: 1,
-                                packaged: 1,
-                                shipping: 1,
-                                brand: 1,
-                                image: { $first: "$images" },
-                                sku: "$variations.sku",
-                                sellerData: 1,
-                                quantity: 1,
-                                savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPrice] }, parseInt(quantity)] },
-                                baseAmount: { $multiply: [actualSellingPrice, parseInt(quantity)] },
-                                paymentInfo: 1,
-                                sellingPrice: actualSellingPrice,
-                                variant: "$variations.variant",
-                                available: "$variations.available",
-                                stock: "$variations.stock"
-                            }
-                        },
-                        {
-                            $set: {
-                                listingID,
-                                productID,
-                                customerEmail: authEmail,
-                                variationID,
-                                quantity: parseInt(quantity),
-                            }
-                        },
-                        {
-                            $unset: ["variations"]
-                        }
-                    ]);
-                    p = p[0];
-                    if (((_a = p === null || p === void 0 ? void 0 : p.shipping) === null || _a === void 0 ? void 0 : _a.isFree) && ((_b = p === null || p === void 0 ? void 0 : p.shipping) === null || _b === void 0 ? void 0 : _b.isFree)) {
-                        p["shippingCharge"] = 0;
-                    }
-                    else {
-                        p["shippingCharge"] = calculateShippingCost((_c = p === null || p === void 0 ? void 0 : p.packaged) === null || _c === void 0 ? void 0 : _c.volumetricWeight, areaType);
-                    }
-                    let amountNew = (p === null || p === void 0 ? void 0 : p.baseAmount) + (p === null || p === void 0 ? void 0 : p.shippingCharge);
-                    p["baseAmount"] = parseInt(amountNew);
-                    return p;
+        let cart = yield ShoppingCart.aggregate([
+            { $match: { customerEmail: authEmail } },
+            { $unwind: { path: "$items" } },
+            {
+                $lookup: {
+                    from: 'products',
+                    localField: "items.listingID",
+                    foreignField: "_lid",
+                    as: "main_product"
                 }
-                catch (error) {
-                    next(error);
+            },
+            { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } } },
+            { $project: { main_product: 0 } },
+            { $unwind: { path: "$variations" } },
+            {
+                $match: {
+                    $expr: {
+                        $and: [
+                            { $eq: ['$variations._vrid', '$items.variationID'] },
+                            { $eq: ["$variations.stock", "in"] },
+                            { $eq: ["$variations.status", "active"] },
+                            { $eq: ["$save_as", "fulfilled"] }
+                        ]
+                    }
                 }
-            });
-        }
-        let c = Array.isArray(body) && body.map((e) => __awaiter(void 0, void 0, void 0, function* () { return yield getCart(e); }));
-        let cart = yield Promise.all(c);
-        //  cart = await ShoppingCart.aggregate([
-        //    { $match: { customerEmail: authEmail } },
-        //    {
-        //       $lookup: {
-        //          from: 'products',
-        //          localField: 'listingID',
-        //          foreignField: "_lid",
-        //          as: "main_product"
-        //       }
-        //    },
-        //    { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } } },
-        //    { $project: { main_product: 0 } },
-        //    { $unwind: { path: "$variations" } },
-        //    {
-        //       $match: {
-        //          $expr: {
-        //             $and: [
-        //                { $eq: ['$variations._vrid', '$variationID'] },
-        //                { $eq: ["$variations.stock", "in"] },
-        //                { $eq: ["$variations.status", "active"] },
-        //                { $eq: ["$save_as", "fulfilled"] }
-        //             ]
-        //          }
-        //       }
-        //    },
-        //    {
-        //       $project: {
-        //          cartID: "$_id",
-        //          dim: 1,
-        //          _id: 0,
-        //          title: "$variations.vTitle",
-        //          slug: 1,
-        //          packaged: 1,
-        //          listingID: 1,
-        //          productID: 1,
-        //          customerEmail: 1,
-        //          variationID: 1,
-        //          variations: 1,
-        //          shipping: 1,
-        //          brand: 1,
-        //          image: { $first: "$images" },
-        //          sku: "$variations.sku",
-        //          sellerData: 1,
-        //          quantity: 1,
-        //          savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPrice] }, '$quantity'] },
-        //          baseAmount: { $multiply: [actualSellingPrice, '$quantity'] },
-        //          paymentInfo: 1,
-        //          sellingPrice: actualSellingPrice,
-        //          variant: "$variations.variant",
-        //          available: "$variations.available",
-        //          stock: "$variations.stock"
-        //       }
-        //    },
-        //    {
-        //       $unset: ["variations"]
-        //    }
-        // ]);
+            },
+            {
+                $project: {
+                    cartID: "$_id",
+                    _id: 0,
+                    title: "$variations.vTitle",
+                    slug: 1,
+                    packaged: 1,
+                    listingID: "$items.listingID",
+                    productID: "$items.productID",
+                    customerEmail: 1,
+                    variationID: "$items.variationID",
+                    shipping: 1,
+                    brand: 1,
+                    image: { $first: "$images" },
+                    sku: "$variations.sku",
+                    sellerData: 1,
+                    quantity: "$items.quantity",
+                    savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPrice] }, '$items.quantity'] },
+                    baseAmount: { $multiply: [actualSellingPrice, '$items.quantity'] },
+                    paymentInfo: 1,
+                    sellingPrice: actualSellingPrice,
+                    variant: "$variations.variant",
+                    available: "$variations.available",
+                    stock: "$variations.stock"
+                }
+            },
+            {
+                $unset: ["variations", "items"]
+            }
+        ]);
         if (typeof cart === "object") {
-            // cart && cart.map((p: any) => {
-            //    if (p?.shipping?.isFree && p?.shipping?.isFree) {
-            //       p["shippingCharge"] = 0;
-            //    } else {
-            //       p["shippingCharge"] = calculateShippingCost(p?.packaged?.volumetricWeight, areaType);
-            //    }
-            //    return p;
-            // });
+            cart && cart.map((p) => {
+                var _a, _b, _c;
+                if (((_a = p === null || p === void 0 ? void 0 : p.shipping) === null || _a === void 0 ? void 0 : _a.isFree) && ((_b = p === null || p === void 0 ? void 0 : p.shipping) === null || _b === void 0 ? void 0 : _b.isFree)) {
+                    p["shippingCharge"] = 0;
+                }
+                else {
+                    p["shippingCharge"] = calculateShippingCost((_c = p === null || p === void 0 ? void 0 : p.packaged) === null || _c === void 0 ? void 0 : _c.volumetricWeight, areaType);
+                }
+                return p;
+            });
             const baseAmounts = cart && cart.map((tAmount) => (parseInt(tAmount === null || tAmount === void 0 ? void 0 : tAmount.baseAmount))).reduce((p, c) => p + c, 0);
             const totalQuantities = cart && cart.map((tQuant) => (parseInt(tQuant === null || tQuant === void 0 ? void 0 : tQuant.quantity))).reduce((p, c) => p + c, 0);
             const shippingFees = cart && cart.map((p) => parseInt(p === null || p === void 0 ? void 0 : p.shippingCharge)).reduce((p, c) => p + c, 0);
@@ -238,19 +172,18 @@ module.exports.updateCartProductQuantityController = (req, res, next) => __await
         if (!quantity || typeof quantity === "undefined")
             throw new apiResponse.Api400Error("Required quantity !");
         if (cartType !== 'toCart')
-            throw new apiResponse.Api404Error("Required cart context !");
-        let cartProduct = yield ShoppingCart.findOne({ $and: [{ customerEmail: authEmail }, { productID }, { _id: ObjectId(cartID) }] });
-        if (!cartProduct)
-            throw new apiResponse.Api404Error("Sorry product not found !");
+            throw new apiResponse.Api404Error("Invalid cart context !");
         const productAvailability = yield checkProductAvailability(productID, variationID);
         if (!productAvailability || typeof productAvailability === "undefined" || productAvailability === null)
             throw new apiResponse.Api400Error("Product is available !");
         if (parseInt(quantity) >= ((_d = productAvailability === null || productAvailability === void 0 ? void 0 : productAvailability.variations) === null || _d === void 0 ? void 0 : _d.available)) {
             return res.status(200).send({ success: false, statusCode: 200, message: "Sorry ! your selected quantity out of range." });
         }
-        cartProduct.quantity = parseInt(quantity);
-        yield cartProduct.save();
-        return res.status(200).send({ success: true, statusCode: 200, message: `Quantity updated to ${quantity}.` });
+        const result = yield ShoppingCart.findOneAndUpdate({ $and: [{ customerEmail: authEmail }, { _id: ObjectId(cartID) }] }, {
+            $set: { "items.$[i].quantity": parseInt(quantity) }
+        }, { arrayFilters: [{ "i.variationID": variationID }], upsert: true });
+        throw result ? res.status(200).send({ success: true, statusCode: 200, message: `Quantity updated to ${quantity}.` }) :
+            new apiResponse.Api500Error("Failed to update quantity !");
     }
     catch (error) {
         next(error);
@@ -267,18 +200,17 @@ module.exports.deleteCartItem = (req, res, next) => __awaiter(void 0, void 0, vo
         const variationID = req.query.vr;
         const authEmail = req.decoded.email;
         const cart_types = req.params.cartTypes;
-        let updateDocuments;
         if (!variationID || !productID)
             throw new apiResponse.Api400Error("Required product id & variation id !");
         if (!ObjectId.isValid(productID))
             throw new apiResponse.Api400Error("Product id is not valid !");
-        if (cart_types === "toCart") {
-            updateDocuments = yield ShoppingCart.deleteOne({ $and: [{ customerEmail: authEmail }, { productID }, { variationID }] });
-        }
-        if (updateDocuments) {
-            return res.status(200).send({ success: true, statusCode: 200, message: "Item removed successfully from your cart." });
-        }
-        throw new apiResponse.Api500Error("Failed to delete product from cart !");
+        if (cart_types !== "toCart")
+            throw new apiResponse.Api500Error("Invalid cart type !");
+        let updateDocuments = yield ShoppingCart.findOneAndUpdate({ customerEmail: authEmail }, {
+            $pull: { items: { $and: [{ variationID }, { productID }] } }
+        });
+        throw updateDocuments ? res.status(200).send({ success: true, statusCode: 200, message: "Item removed successfully from your cart." }) :
+            new apiResponse.Api500Error("Failed to delete product from cart !");
     }
     catch (error) {
         next(error);

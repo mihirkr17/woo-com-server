@@ -1,6 +1,5 @@
-module.exports.cartTemplate = (email: String, productID: String, listingID: String, variationID: String) => {
+module.exports.cartTemplate = (productID: String, listingID: String, variationID: String) => {
    return {
-      customerEmail: email,
       productID,
       variationID,
       listingID,
