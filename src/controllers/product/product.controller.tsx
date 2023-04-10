@@ -2,11 +2,9 @@
 // product.controller.tsx
 
 import { NextFunction, Request, Response } from "express";
-var jwt = require("jsonwebtoken");
 const { ObjectId } = require("mongodb");
 const Product = require("../../model/product.model");
-const ShoppingCart = require("../../model/shoppingCart.model");
-const { findUserByEmail, findUserByUUID, getSellerInformationByID, actualSellingPrice, newPricing, basicProductProject, calculateShippingCost } = require("../../services/common.service");
+const { findUserByEmail, getSellerInformationByID, actualSellingPrice, newPricing, basicProductProject, calculateShippingCost } = require("../../services/common.service");
 
 /**
  * @controller      --> Fetch the single product information in product details page.
@@ -18,35 +16,6 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
 
       const productID = req.query?.pId;
       const variationID = req.query?.vId;
-      let existProductInCart: any = null;
-      let areaType: any;
-
-      let uuid: any = req.cookies["_uuid"] || null;
-
-      let { cart_data } = req.cookies;
-
-      let cartData = cart_data && JSON.parse(cart_data);
-
-      if (Array.isArray(cartData)) {
-         existProductInCart = cartData.some((e: any) => (e?.variationID === variationID)) || null;
-      } else {
-         existProductInCart = null;
-      }
-
-      // If user email address exists
-      if (uuid && typeof uuid === 'string') {
-
-         let user = await findUserByUUID(uuid);
-
-         if (user && typeof user === "object") {
-            // existProductInCart = await ShoppingCart.findOne({ $and: [{ customerEmail: user?.email }, { variationID: variationID }] });
-
-            let defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
-               user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
-
-            areaType = defaultShippingAddress?.area_type || "";
-         }
-      }
 
       // Product Details
       let productDetail = await Product.aggregate([
@@ -93,24 +62,12 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
                pricing: newPricing,
                isFreeShipping: "$shipping.isFree",
                volumetricWeight: "$packaged.volumetricWeight",
-               _lid: 1,
-               inCart: {
-                  $cond: {
-                     if: { $eq: [existProductInCart, null] }, then: false, else: true
-                  }
-               }
+               _lid: 1
             }
          }
       ]);
 
-
       productDetail = productDetail[0];
-
-      if (productDetail?.isFreeShipping && productDetail?.isFreeShipping) {
-         productDetail["shippingCharge"] = 0;
-      } else {
-         productDetail["shippingCharge"] = calculateShippingCost(productDetail?.volumetricWeight, areaType);
-      }
 
       if (productDetail?.sellerData?.sellerID) {
          productDetail["sellerInfo"] = await getSellerInformationByID(productDetail?.sellerData?.sellerID);
