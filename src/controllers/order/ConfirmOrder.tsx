@@ -1,8 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 const Order = require("../../model/order.model");
-const Product = require("../../model/product.model");
-const { ObjectId } = require("mongodb");
-const { update_variation_stock_available, getSellerInformationByID, calculateShippingCost } = require("../../services/common.service");
+const { update_variation_stock_available, calculateShippingCost } = require("../../services/common.service");
 const email_service = require("../../services/email.service");
 
 
@@ -74,16 +72,12 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
          );
 
          if (result) {
-
-            let seller = await getSellerInformationByID(product?.sellerData?.sellerID);
             await update_variation_stock_available("dec", { productID, listingID, variationID, quantity });
 
-
-            if (seller) {
-               await email_service({
-                  to: seller?.email,
-                  subject: "New order",
-                  html: `<div>
+            await email_service({
+               to: product?.sellerData?.sellerEmail,
+               subject: "New order",
+               html: `<div>
                      <h3>You have new order from ${product?.customerEmail}</h3>
                      <p>
                         <pre>
@@ -97,8 +91,8 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
                      <span>Order ID: <b>${product?.orderID}</b></span> <br />
                      <i>Order At ${product?.orderAT?.time}, ${product?.orderAT?.date}</i>
                   </div>`
-               });
-            }
+            });
+
 
             return {
                orderConfirmSuccess: true,

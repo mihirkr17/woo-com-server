@@ -14,8 +14,9 @@ const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
 const apiResponse = require("../../errors/apiResponse");
 const { findUserByEmail, update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
+const email_service = require("../../services/email.service");
 module.exports = function SinglePurchaseOrder(req, res, next) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const authEmail = req.decoded.email;
@@ -46,6 +47,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                         image: { $first: "$images" },
                         sku: "$variations.sku",
                         sellerData: {
+                            sellerEmail: '$sellerData.sellerEmail',
                             sellerID: "$sellerData.sellerID",
                             storeName: "$sellerData.storeName"
                         },
@@ -57,6 +59,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                 },
                 {
                     $set: {
+                        customerEmail: customerEmail,
                         paymentMode: "card",
                         state: state,
                         shippingAddress: defaultShippingAddress,
@@ -78,7 +81,6 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
             ]);
             if (product && typeof product !== 'undefined') {
                 product = product[0];
-                product["customerEmail"] = customerEmail;
                 product["orderID"] = "oi_" + (Math.floor(10000000 + Math.random() * 999999999999)).toString();
                 product["trackingID"] = "tri_" + (Math.round(Math.random() * 9999999) + Math.round(Math.random() * 8888)).toString();
                 if (((_c = product === null || product === void 0 ? void 0 : product.shipping) === null || _c === void 0 ? void 0 : _c.isFree) && ((_d = product === null || product === void 0 ? void 0 : product.shipping) === null || _d === void 0 ? void 0 : _d.isFree)) {
@@ -99,6 +101,35 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                 let result = yield Order.findOneAndUpdate({ user_email: authEmail }, { $push: { orders: product } }, { upsert: true });
                 if (result) {
                     yield update_variation_stock_available("dec", { variationID, productID, quantity, listingID });
+                    yield email_service({
+                        to: authEmail,
+                        subject: "Order confirmed",
+                        html: `<div>
+                  <ul>
+                     <li>${product === null || product === void 0 ? void 0 : product.title}</li>
+                  </ul>
+                  <br />
+                  <b>Total amount: ${product === null || product === void 0 ? void 0 : product.baseAmount} usd</b>
+               </div>`
+                    });
+                    yield email_service({
+                        to: (_f = product === null || product === void 0 ? void 0 : product.sellerData) === null || _f === void 0 ? void 0 : _f.sellerEmail,
+                        subject: "New order",
+                        html: `<div>
+                     <h3>You have new order from ${product === null || product === void 0 ? void 0 : product.customerEmail}</h3>
+                     <p>
+                        <pre>
+                           Item Name     : ${product === null || product === void 0 ? void 0 : product.title} <br />
+                           Item SKU      : ${product === null || product === void 0 ? void 0 : product.sku} <br />
+                           Item Quantity : ${product === null || product === void 0 ? void 0 : product.quantity} <br />
+                           Item Price    : ${product === null || product === void 0 ? void 0 : product.baseAmount} usd
+                        </pre>
+                     </p>
+                     <br />
+                     <span>Order ID: <b>${product === null || product === void 0 ? void 0 : product.orderID}</b></span> <br />
+                     <i>Order At ${(_g = product === null || product === void 0 ? void 0 : product.orderAT) === null || _g === void 0 ? void 0 : _g.time}, ${(_h = product === null || product === void 0 ? void 0 : product.orderAT) === null || _h === void 0 ? void 0 : _h.date}</i>
+                  </div>`
+                    });
                     return res.status(200).send({ success: true, statusCode: 200, message: "Order Success." });
                 }
             }

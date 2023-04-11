@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = require("mongoose");
 const sellerDataType = new mongoose_1.Schema({
     storeName: { type: String, required: true },
+    sellerEmail: { type: String, required: true },
     sellerID: { type: String, required: true },
     sellerName: { type: String, required: true }
 }, { _id: false });

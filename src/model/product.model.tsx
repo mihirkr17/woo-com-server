@@ -2,6 +2,7 @@ import { Schema, model } from "mongoose";
 
 const sellerDataType = new Schema({
    storeName: { type: String, required: true },
+   sellerEmail: { type: String, required: true },
    sellerID: { type: String, required: true },
    sellerName: { type: String, required: true }
 }, { _id: false });

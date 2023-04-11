@@ -311,6 +311,7 @@ module.exports.productListingController = (req, res, next) => __awaiter(void 0, 
         if (formTypes === "update" && lId) {
             model = product_listing_template_engine(body);
             model['modifiedAt'] = new Date(Date.now());
+            model.sellerData.sellerEmail = authEmail;
             model.sellerData.sellerID = user === null || user === void 0 ? void 0 : user._uuid;
             model.sellerData.sellerName = user === null || user === void 0 ? void 0 : user.fullName;
             model.sellerData.storeName = (_y = (_x = user === null || user === void 0 ? void 0 : user.seller) === null || _x === void 0 ? void 0 : _x.storeInfos) === null || _y === void 0 ? void 0 : _y.storeName;
@@ -332,6 +333,7 @@ module.exports.productListingController = (req, res, next) => __awaiter(void 0, 
         }
         if (formTypes === 'create') {
             model = product_listing_template_engine(body);
+            model.sellerData.sellerEmail = authEmail;
             model.sellerData.sellerID = user === null || user === void 0 ? void 0 : user._uuid;
             model.sellerData.sellerName = user === null || user === void 0 ? void 0 : user.fullName;
             model.sellerData.storeName = (_0 = (_z = user === null || user === void 0 ? void 0 : user.seller) === null || _z === void 0 ? void 0 : _z.storeInfos) === null || _0 === void 0 ? void 0 : _0.storeName;

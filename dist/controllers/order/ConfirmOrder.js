@@ -10,9 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const Order = require("../../model/order.model");
-const Product = require("../../model/product.model");
-const { ObjectId } = require("mongodb");
-const { update_variation_stock_available, getSellerInformationByID, calculateShippingCost } = require("../../services/common.service");
+const { update_variation_stock_available, calculateShippingCost } = require("../../services/common.service");
 const email_service = require("../../services/email.service");
 module.exports = function confirmOrder(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -62,13 +60,11 @@ module.exports = function confirmOrder(req, res, next) {
                     };
                     let result = yield Order.findOneAndUpdate({ user_email: email }, { $push: { orders: product } }, { upsert: true });
                     if (result) {
-                        let seller = yield getSellerInformationByID((_d = product === null || product === void 0 ? void 0 : product.sellerData) === null || _d === void 0 ? void 0 : _d.sellerID);
                         yield update_variation_stock_available("dec", { productID, listingID, variationID, quantity });
-                        if (seller) {
-                            yield email_service({
-                                to: seller === null || seller === void 0 ? void 0 : seller.email,
-                                subject: "New order",
-                                html: `<div>
+                        yield email_service({
+                            to: (_d = product === null || product === void 0 ? void 0 : product.sellerData) === null || _d === void 0 ? void 0 : _d.sellerEmail,
+                            subject: "New order",
+                            html: `<div>
                      <h3>You have new order from ${product === null || product === void 0 ? void 0 : product.customerEmail}</h3>
                      <p>
                         <pre>
@@ -82,8 +78,7 @@ module.exports = function confirmOrder(req, res, next) {
                      <span>Order ID: <b>${product === null || product === void 0 ? void 0 : product.orderID}</b></span> <br />
                      <i>Order At ${(_e = product === null || product === void 0 ? void 0 : product.orderAT) === null || _e === void 0 ? void 0 : _e.time}, ${(_f = product === null || product === void 0 ? void 0 : product.orderAT) === null || _f === void 0 ? void 0 : _f.date}</i>
                   </div>`
-                            });
-                        }
+                        });
                         return {
                             orderConfirmSuccess: true,
                             message: "Order success for " + (product === null || product === void 0 ? void 0 : product.title),

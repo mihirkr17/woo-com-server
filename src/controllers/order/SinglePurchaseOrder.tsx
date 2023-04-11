@@ -4,6 +4,7 @@ const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
 const apiResponse = require("../../errors/apiResponse");
 const { findUserByEmail, update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
+const email_service = require("../../services/email.service");
 
 
 module.exports = async function SinglePurchaseOrder(req: Request, res: Response, next: NextFunction) {
@@ -43,6 +44,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
                image: { $first: "$images" },
                sku: "$variations.sku",
                sellerData: {
+                  sellerEmail: '$sellerData.sellerEmail',
                   sellerID: "$sellerData.sellerID",
                   storeName: "$sellerData.storeName"
                },
@@ -54,6 +56,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
          },
          {
             $set: {
+               customerEmail: customerEmail,
                paymentMode: "card",
                state: state,
                shippingAddress: defaultShippingAddress,
@@ -77,7 +80,6 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
 
       if (product && typeof product !== 'undefined') {
          product = product[0];
-         product["customerEmail"] = customerEmail;
 
          product["orderID"] = "oi_" + (Math.floor(10000000 + Math.random() * 999999999999)).toString();
 
@@ -110,6 +112,37 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
 
          if (result) {
             await update_variation_stock_available("dec", { variationID, productID, quantity, listingID });
+
+            await email_service({
+               to: authEmail,
+               subject: "Order confirmed",
+               html: `<div>
+                  <ul>
+                     <li>${product?.title}</li>
+                  </ul>
+                  <br />
+                  <b>Total amount: ${product?.baseAmount} usd</b>
+               </div>`
+            });
+
+            await email_service({
+               to: product?.sellerData?.sellerEmail,
+               subject: "New order",
+               html: `<div>
+                     <h3>You have new order from ${product?.customerEmail}</h3>
+                     <p>
+                        <pre>
+                           Item Name     : ${product?.title} <br />
+                           Item SKU      : ${product?.sku} <br />
+                           Item Quantity : ${product?.quantity} <br />
+                           Item Price    : ${product?.baseAmount} usd
+                        </pre>
+                     </p>
+                     <br />
+                     <span>Order ID: <b>${product?.orderID}</b></span> <br />
+                     <i>Order At ${product?.orderAT?.time}, ${product?.orderAT?.date}</i>
+                  </div>`
+            });
 
             return res.status(200).send({ success: true, statusCode: 200, message: "Order Success." });
          }

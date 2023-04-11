@@ -367,6 +367,7 @@ module.exports.productListingController = async (
       if (formTypes === "update" && lId) {
          model = product_listing_template_engine(body);
          model['modifiedAt'] = new Date(Date.now());
+         model.sellerData.sellerEmail = authEmail;
          model.sellerData.sellerID = user?._uuid;
          model.sellerData.sellerName = user?.fullName;
          model.sellerData.storeName = user?.seller?.storeInfos?.storeName;
@@ -394,6 +395,7 @@ module.exports.productListingController = async (
 
       if (formTypes === 'create') {
          model = product_listing_template_engine(body);
+         model.sellerData.sellerEmail = authEmail;
          model.sellerData.sellerID = user?._uuid;
          model.sellerData.sellerName = user?.fullName;
          model.sellerData.storeName = user?.seller?.storeInfos?.storeName;
