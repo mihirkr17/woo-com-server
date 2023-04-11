@@ -98,12 +98,13 @@ module.exports = function confirmOrder(req, res, next) {
             let totalAmount = Array.isArray(upRes) &&
                 upRes.map((item) => (parseFloat(item === null || item === void 0 ? void 0 : item.baseAmount) + parseFloat(item === null || item === void 0 ? void 0 : item.shippingCharge))).reduce((p, n) => p + n, 0).toFixed(2);
             totalAmount = parseFloat(totalAmount);
+            let ind = 1;
             yield email_service({
                 to: email,
                 subject: "Order confirmed",
                 html: `<div>
             <table style="padding: '5px 2px'">
-               <caption style="padding: '4px'">Order Details:</caption>
+               <caption style="padding: '4px'; background-color: 'black'; color: 'white'">Order Details:</caption>
                   <thead>
                      <tr>
                         <th>No.</th>
@@ -113,10 +114,9 @@ module.exports = function confirmOrder(req, res, next) {
                      </tr>
                   </thead>
                   <tbody>
-                  ${Array.isArray(upRes) && upRes.map((item, i) => {
-                    i = 1;
+                  ${Array.isArray(upRes) && upRes.map((item) => {
                     return (`<tr>
-                           <td>${i++}</td>
+                           <td>${ind++}</td>
                            <td>${item === null || item === void 0 ? void 0 : item.title}</td>
                            <td>${item === null || item === void 0 ? void 0 : item.baseAmount}</td>
                            <td>${item === null || item === void 0 ? void 0 : item.quantity}</td>
@@ -125,7 +125,7 @@ module.exports = function confirmOrder(req, res, next) {
                   </tbody>
                   <tfoot>
                      <tr>
-                        <th colspan= "100%"><b style="width: '100%'; text-align: 'center'">Total amount: ${totalAmount} usd</b></th>
+                        <th colspan= "100%"><b style="width: '100%'; text-align: 'center'; background-color: 'black'; color: 'white'">Total amount: ${totalAmount} USD</b></th>
                      </tr>
                 </tfoot>
             </table>

@@ -117,12 +117,13 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
 
       totalAmount = parseFloat(totalAmount);
 
+      let ind = 1;
       await email_service({
          to: email,
          subject: "Order confirmed",
          html: `<div>
             <table style="padding: '5px 2px'">
-               <caption style="padding: '4px'">Order Details:</caption>
+               <caption style="padding: '4px'; background-color: 'black'; color: 'white'">Order Details:</caption>
                   <thead>
                      <tr>
                         <th>No.</th>
@@ -132,11 +133,10 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
                      </tr>
                   </thead>
                   <tbody>
-                  ${Array.isArray(upRes) && upRes.map((item: any, i) => {
-                  i = 1;
+                  ${Array.isArray(upRes) && upRes.map((item: any) => {
             return (
                `<tr>
-                           <td>${i++}</td>
+                           <td>${ind++}</td>
                            <td>${item?.title}</td>
                            <td>${item?.baseAmount}</td>
                            <td>${item?.quantity}</td>
@@ -146,7 +146,7 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
                   </tbody>
                   <tfoot>
                      <tr>
-                        <th colspan= "100%"><b style="width: '100%'; text-align: 'center'">Total amount: ${totalAmount} usd</b></th>
+                        <th colspan= "100%"><b style="width: '100%'; text-align: 'center'; background-color: 'black'; color: 'white'">Total amount: ${totalAmount} USD</b></th>
                      </tr>
                 </tfoot>
             </table>

@@ -106,7 +106,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                         subject: "Order confirmed",
                         html: `<div>
                   <table style="padding: '5px 2px'">
-                     <caption style="padding: '4px'">Order Details:</caption>
+                     <caption style="padding: '4px'; background-color: 'black'; color: 'white'">Order Details:</caption>
                      <thead>
                         <tr>
                            <th>No.</th>
@@ -125,7 +125,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                      </tbody>
                      <tfoot>
                         <tr>
-                           <th colspan= "100%"><b style="width: '100%'; text-align: 'center'">Total amount: ${product === null || product === void 0 ? void 0 : product.baseAmount} usd</b></th>
+                           <th colspan= "100%"><b style="width: '100%'; text-align: 'center'; background-color: 'black'; color: 'white'">Total amount: ${product === null || product === void 0 ? void 0 : product.baseAmount} USD</b></th>
                         </tr>
                      </tfoot>
                   </table>

@@ -118,7 +118,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
                subject: "Order confirmed",
                html: `<div>
                   <table style="padding: '5px 2px'">
-                     <caption style="padding: '4px'">Order Details:</caption>
+                     <caption style="padding: '4px'; background-color: 'black'; color: 'white'">Order Details:</caption>
                      <thead>
                         <tr>
                            <th>No.</th>
@@ -137,7 +137,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
                      </tbody>
                      <tfoot>
                         <tr>
-                           <th colspan= "100%"><b style="width: '100%'; text-align: 'center'">Total amount: ${product?.baseAmount} usd</b></th>
+                           <th colspan= "100%"><b style="width: '100%'; text-align: 'center'; background-color: 'black'; color: 'white'">Total amount: ${product?.baseAmount} USD</b></th>
                         </tr>
                      </tfoot>
                   </table>
