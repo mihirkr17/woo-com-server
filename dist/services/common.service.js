@@ -166,6 +166,7 @@ module.exports.getSellerInformationByID = (uuid) => __awaiter(void 0, void 0, vo
             { $match: { _uuid: uuid } },
             {
                 $project: {
+                    email: 1,
                     fullName: 1,
                     contactEmail: 1,
                     dob: 1,

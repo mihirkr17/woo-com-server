@@ -187,6 +187,7 @@ module.exports.getSellerInformationByID = async (uuid: string) => {
          { $match: { _uuid: uuid } },
          {
             $project: {
+               email: 1,
                fullName: 1,
                contactEmail: 1,
                dob: 1,

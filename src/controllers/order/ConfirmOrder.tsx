@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from "express";
 const Order = require("../../model/order.model");
 const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
-const { update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
+const { update_variation_stock_available, getSellerInformationByID, calculateShippingCost } = require("../../services/common.service");
 const email_service = require("../../services/email.service");
 
 
@@ -26,84 +26,28 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
          return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
       }
 
-      async function confirmOrderHandler(item: any) {
+      async function confirmOrderHandler(product: any) {
 
 
-         if (!item) {
+         if (!product) {
             return;
          }
 
-         const { productID, variationID, listingID, quantity, areaType } = item;
+         const { productID, variationID, listingID, quantity, areaType } = product;
 
          if (areaType !== "local" && areaType !== "zonal") {
             return;
          }
 
-         let product;
-
-         let newProduct = await Product.aggregate([
-            { $match: { $and: [{ _lid: listingID }, { _id: ObjectId(productID) }] } },
-            { $unwind: { path: "$variations" } },
-            {
-               $match: {
-                  $expr: {
-                     $and: [
-                        { $eq: ['$variations._vrid', variationID] },
-                        { $eq: ["$variations.stock", "in"] },
-                        { $eq: ["$variations.status", "active"] },
-                        { $gte: ["$variations.available", parseInt(quantity)] }
-                     ]
-                  }
-               }
-            },
-            {
-               $project: {
-                  _id: 0,
-                  title: "$variations.vTitle",
-                  slug: 1,
-                  variations: 1,
-                  brand: 1,
-                  image: { $first: "$images" },
-                  sku: "$variations.sku",
-                  shipping: 1,
-                  packaged: 1,
-                  sellerData: {
-                     sellerID: "$sellerData.sellerID",
-                     storeName: "$sellerData.storeName"
-                  },
-                  baseAmount: { $multiply: [actualSellingPrice, parseInt(quantity)] },
-                  sellingPrice: actualSellingPrice
-               }
-            },
-            {
-               $set: {
-                  paymentMode: "card",
-                  state: item?.state,
-                  shippingAddress: item?.shippingAddress,
-                  paymentStatus: "success",
-                  customerID: _uuid,
-                  customerEmail: email,
-                  orderStatus: "pending",
-                  paymentIntentID: paymentIntentID,
-                  paymentMethodID: paymentMethodID,
-                  orderPaymentID: orderPaymentID,
-                  productID: productID,
-                  listingID: listingID,
-                  variationID: variationID,
-                  quantity: quantity
-               }
-            },
-            {
-               $unset: ["variations"]
-            }
-         ]);
-
-         product = newProduct[0];
-
          product["orderID"] = "oi_" + (Math.floor(10000000 + Math.random() * 999999999999)).toString();
 
          product["trackingID"] = "tri_" + (Math.round(Math.random() * 9999999) + Math.round(Math.random() * 8888)).toString();
 
+         product["orderPaymentID"] = orderPaymentID;
+         product["paymentIntentID"] = paymentIntentID;
+         product["paymentMethodID"] = paymentMethodID;
+         product["paymentStatus"] = "success";
+         product["paymentMode"] = "card";
 
          if (product?.shipping?.isFree && product?.shipping?.isFree) {
             product["shippingCharge"] = 0;
@@ -132,13 +76,29 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
          );
 
          if (result) {
+
+            let seller = await getSellerInformationByID(product?.sellerData?.sellerID);
             await update_variation_stock_available("dec", { productID, listingID, variationID, quantity });
+
+
+            if (seller) {
+               let mail = await email_service({
+                  to: seller?.email,
+                  subject: "New order",
+                  html: `<div>
+                     <h4>You have new order from ${product?.customerEmail}</h4>
+                     <p>items: ${product?.title}</p>
+                  </div>`
+               });
+
+               console.log(mail, product?.customerEmail);
+            }
 
             return {
                orderConfirmSuccess: true,
                message: "Order success for " + product?.title,
                orderID: product?.orderID,
-               baseAmount: item?.baseAmount,
+               baseAmount: product?.baseAmount,
                title: product?.title
             };
          }

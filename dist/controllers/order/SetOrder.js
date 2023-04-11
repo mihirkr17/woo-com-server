@@ -13,13 +13,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const apiResponse = require("../../errors/apiResponse");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const ShoppingCart = require("../../model/shoppingCart.model");
-const { findUserByEmail, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
+const { findUserByEmail, actualSellingPrice, calculateShippingCost, update_variation_stock_available } = require("../../services/common.service");
+const Order = require("../../model/order.model");
+const email_service = require("../../services/email.service");
 module.exports = function SetOrder(req, res, next) {
     var _a, _b, _c;
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const userEmail = req.headers.authorization || "";
-            const { email: authEmail } = req.decoded;
+            const { email: authEmail, _uuid } = req.decoded;
             if (userEmail !== authEmail) {
                 throw new apiResponse.Api401Error("Unauthorized access !");
             }
@@ -40,7 +42,7 @@ module.exports = function SetOrder(req, res, next) {
                 {
                     $lookup: {
                         from: 'products',
-                        localField: 'listingID',
+                        localField: 'items.listingID',
                         foreignField: "_lid",
                         as: "main_product"
                     }
@@ -55,7 +57,7 @@ module.exports = function SetOrder(req, res, next) {
                                 { $eq: ['$variations._vrid', '$items.variationID'] },
                                 { $eq: ["$variations.stock", "in"] },
                                 { $eq: ["$variations.status", "active"] },
-                                { $gt: ["$variations.available", "$items.quantity"] }
+                                { $gte: ["$variations.available", "$items.quantity"] }
                             ]
                         }
                     }
@@ -70,17 +72,30 @@ module.exports = function SetOrder(req, res, next) {
                         packaged: 1,
                         listingID: "$items.listingID",
                         variationID: "$items.variationID",
-                        baseAmount: { $multiply: [actualSellingPrice, '$items.quantity'] }
+                        image: { $first: "$images" },
+                        title: "$variations.vTitle",
+                        slug: 1,
+                        brand: 1,
+                        sellerData: {
+                            sellerEmail: '$sellerData.sellerEmail',
+                            sellerID: "$sellerData.sellerID",
+                            storeName: "$sellerData.storeName"
+                        },
+                        sku: "$variations.sku",
+                        baseAmount: { $multiply: [actualSellingPrice, '$items.quantity'] },
+                        sellingPrice: actualSellingPrice
                     }
                 },
                 {
                     $set: {
+                        customerEmail: authEmail,
+                        customerID: _uuid,
                         shippingAddress: defaultAddress,
                         areaType: areaType,
                         state: state
                     }
                 },
-                { $unset: ["variations"] }
+                { $unset: ["variations", "items"] }
             ]);
             if (!orderItems || orderItems.length <= 0) {
                 throw new apiResponse.Api400Error("Nothing for purchase ! Please add product in your cart.");
@@ -118,6 +133,7 @@ module.exports = function SetOrder(req, res, next) {
                 statusCode: 200,
                 orderItems,
                 totalAmount: totalAmount,
+                message: "Order confirming soon..",
                 clientSecret: paymentIntent === null || paymentIntent === void 0 ? void 0 : paymentIntent.client_secret,
                 orderPaymentID: (_c = paymentIntent === null || paymentIntent === void 0 ? void 0 : paymentIntent.metadata) === null || _c === void 0 ? void 0 : _c.order_id
             });

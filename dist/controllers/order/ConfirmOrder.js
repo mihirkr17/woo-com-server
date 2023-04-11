@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const Order = require("../../model/order.model");
 const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
-const { update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
+const { update_variation_stock_available, getSellerInformationByID, calculateShippingCost } = require("../../services/common.service");
 const email_service = require("../../services/email.service");
 module.exports = function confirmOrder(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -28,76 +28,23 @@ module.exports = function confirmOrder(req, res, next) {
             if (!orderItems || !Array.isArray(orderItems) || orderItems.length <= 0) {
                 return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
             }
-            function confirmOrderHandler(item) {
-                var _a, _b, _c;
+            function confirmOrderHandler(product) {
+                var _a, _b, _c, _d;
                 return __awaiter(this, void 0, void 0, function* () {
-                    if (!item) {
+                    if (!product) {
                         return;
                     }
-                    const { productID, variationID, listingID, quantity, areaType } = item;
+                    const { productID, variationID, listingID, quantity, areaType } = product;
                     if (areaType !== "local" && areaType !== "zonal") {
                         return;
                     }
-                    let product;
-                    let newProduct = yield Product.aggregate([
-                        { $match: { $and: [{ _lid: listingID }, { _id: ObjectId(productID) }] } },
-                        { $unwind: { path: "$variations" } },
-                        {
-                            $match: {
-                                $expr: {
-                                    $and: [
-                                        { $eq: ['$variations._vrid', variationID] },
-                                        { $eq: ["$variations.stock", "in"] },
-                                        { $eq: ["$variations.status", "active"] },
-                                        { $gte: ["$variations.available", parseInt(quantity)] }
-                                    ]
-                                }
-                            }
-                        },
-                        {
-                            $project: {
-                                _id: 0,
-                                title: "$variations.vTitle",
-                                slug: 1,
-                                variations: 1,
-                                brand: 1,
-                                image: { $first: "$images" },
-                                sku: "$variations.sku",
-                                shipping: 1,
-                                packaged: 1,
-                                sellerData: {
-                                    sellerID: "$sellerData.sellerID",
-                                    storeName: "$sellerData.storeName"
-                                },
-                                baseAmount: { $multiply: [actualSellingPrice, parseInt(quantity)] },
-                                sellingPrice: actualSellingPrice
-                            }
-                        },
-                        {
-                            $set: {
-                                paymentMode: "card",
-                                state: item === null || item === void 0 ? void 0 : item.state,
-                                shippingAddress: item === null || item === void 0 ? void 0 : item.shippingAddress,
-                                paymentStatus: "success",
-                                customerID: _uuid,
-                                customerEmail: email,
-                                orderStatus: "pending",
-                                paymentIntentID: paymentIntentID,
-                                paymentMethodID: paymentMethodID,
-                                orderPaymentID: orderPaymentID,
-                                productID: productID,
-                                listingID: listingID,
-                                variationID: variationID,
-                                quantity: quantity
-                            }
-                        },
-                        {
-                            $unset: ["variations"]
-                        }
-                    ]);
-                    product = newProduct[0];
                     product["orderID"] = "oi_" + (Math.floor(10000000 + Math.random() * 999999999999)).toString();
                     product["trackingID"] = "tri_" + (Math.round(Math.random() * 9999999) + Math.round(Math.random() * 8888)).toString();
+                    product["orderPaymentID"] = orderPaymentID;
+                    product["paymentIntentID"] = paymentIntentID;
+                    product["paymentMethodID"] = paymentMethodID;
+                    product["paymentStatus"] = "success";
+                    product["paymentMode"] = "card";
                     if (((_a = product === null || product === void 0 ? void 0 : product.shipping) === null || _a === void 0 ? void 0 : _a.isFree) && ((_b = product === null || product === void 0 ? void 0 : product.shipping) === null || _b === void 0 ? void 0 : _b.isFree)) {
                         product["shippingCharge"] = 0;
                     }
@@ -115,12 +62,24 @@ module.exports = function confirmOrder(req, res, next) {
                     };
                     let result = yield Order.findOneAndUpdate({ user_email: email }, { $push: { orders: product } }, { upsert: true });
                     if (result) {
+                        let seller = yield getSellerInformationByID((_d = product === null || product === void 0 ? void 0 : product.sellerData) === null || _d === void 0 ? void 0 : _d.sellerID);
                         yield update_variation_stock_available("dec", { productID, listingID, variationID, quantity });
+                        if (seller) {
+                            let mail = yield email_service({
+                                to: seller === null || seller === void 0 ? void 0 : seller.email,
+                                subject: "New order",
+                                html: `<div>
+                     <h4>You have new order from ${product === null || product === void 0 ? void 0 : product.customerEmail}</h4>
+                     <p>items: ${product === null || product === void 0 ? void 0 : product.title}</p>
+                  </div>`
+                            });
+                            console.log(mail, product === null || product === void 0 ? void 0 : product.customerEmail);
+                        }
                         return {
                             orderConfirmSuccess: true,
                             message: "Order success for " + (product === null || product === void 0 ? void 0 : product.title),
                             orderID: product === null || product === void 0 ? void 0 : product.orderID,
-                            baseAmount: item === null || item === void 0 ? void 0 : item.baseAmount,
+                            baseAmount: product === null || product === void 0 ? void 0 : product.baseAmount,
                             title: product === null || product === void 0 ? void 0 : product.title
                         };
                     }
