@@ -131,8 +131,8 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
                         <tr>
                               <td>1</td>
                               <td>${product?.title}</td>
-                              <td>${product?.baseAmount}</td>
-                              <td>${product?.quantity}</td>
+                              <td>$ ${product?.baseAmount}</td>
+                              <td>${product?.quantity} Pcs</td>
                         </tr>
                      </tbody>
                      <tfoot>

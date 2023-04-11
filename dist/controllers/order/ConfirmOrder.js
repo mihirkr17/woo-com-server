@@ -118,14 +118,18 @@ module.exports = function confirmOrder(req, res, next) {
                     return (`<tr>
                            <td>${ind++}</td>
                            <td>${item === null || item === void 0 ? void 0 : item.title}</td>
-                           <td>${item === null || item === void 0 ? void 0 : item.baseAmount}</td>
-                           <td>${item === null || item === void 0 ? void 0 : item.quantity}</td>
+                           <td>$ ${item === null || item === void 0 ? void 0 : item.baseAmount}</td>
+                           <td>${item === null || item === void 0 ? void 0 : item.quantity} Pcs</td>
                         </tr>`);
                 })}
                   </tbody>
                   <tfoot>
                      <tr>
-                        <th colspan= "100%"><b style="width: '100%'; text-align: 'center'; background-color: 'black'; color: 'white'">Total amount: ${totalAmount} USD</b></th>
+                        <th colspan= "100%">
+                           <b style="width: '100%'; text-align: 'center'; background-color: 'black'; color: 'white'">
+                              Total amount: ${totalAmount} USD
+                           </b>
+                        </th>
                      </tr>
                 </tfoot>
             </table>

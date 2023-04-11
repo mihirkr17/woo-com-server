@@ -138,15 +138,19 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
                `<tr>
                            <td>${ind++}</td>
                            <td>${item?.title}</td>
-                           <td>${item?.baseAmount}</td>
-                           <td>${item?.quantity}</td>
+                           <td>$ ${item?.baseAmount}</td>
+                           <td>${item?.quantity} Pcs</td>
                         </tr>`
             )
          })}
                   </tbody>
                   <tfoot>
                      <tr>
-                        <th colspan= "100%"><b style="width: '100%'; text-align: 'center'; background-color: 'black'; color: 'white'">Total amount: ${totalAmount} USD</b></th>
+                        <th colspan= "100%">
+                           <b style="width: '100%'; text-align: 'center'; background-color: 'black'; color: 'white'">
+                              Total amount: ${totalAmount} USD
+                           </b>
+                        </th>
                      </tr>
                 </tfoot>
             </table>

@@ -119,8 +119,8 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                         <tr>
                               <td>1</td>
                               <td>${product === null || product === void 0 ? void 0 : product.title}</td>
-                              <td>${product === null || product === void 0 ? void 0 : product.baseAmount}</td>
-                              <td>${product === null || product === void 0 ? void 0 : product.quantity}</td>
+                              <td>$ ${product === null || product === void 0 ? void 0 : product.baseAmount}</td>
+                              <td>${product === null || product === void 0 ? void 0 : product.quantity} Pcs</td>
                         </tr>
                      </tbody>
                      <tfoot>
