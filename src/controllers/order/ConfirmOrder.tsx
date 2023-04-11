@@ -121,7 +121,7 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
          to: email,
          subject: "Order confirmed",
          html: `<div>
-            <table style="padding: '5px'">
+            <table style="padding: '5px 2px'">
                <caption style="padding: '4px'">Order Details:</caption>
                   <thead>
                      <tr>
@@ -133,13 +133,13 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
                   </thead>
                   <tbody>
                   ${Array.isArray(upRes) && upRes.map((item: any, i) => {
-
+                  i = 1;
             return (
                `<tr>
                            <td>${i++}</td>
                            <td>${item?.title}</td>
-                           <td>${item?.quantity}</td>
                            <td>${item?.baseAmount}</td>
+                           <td>${item?.quantity}</td>
                         </tr>`
             )
          })}

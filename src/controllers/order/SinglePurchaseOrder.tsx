@@ -117,7 +117,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
                to: authEmail,
                subject: "Order confirmed",
                html: `<div>
-                  <table style="padding: '5px'">
+                  <table style="padding: '5px 2px'">
                      <caption style="padding: '4px'">Order Details:</caption>
                      <thead>
                         <tr>
@@ -131,8 +131,8 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
                         <tr>
                               <td>1</td>
                               <td>${product?.title}</td>
-                              <td>${product?.quantity}</td>
                               <td>${product?.baseAmount}</td>
+                              <td>${product?.quantity}</td>
                         </tr>
                      </tbody>
                      <tfoot>

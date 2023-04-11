@@ -105,7 +105,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                         to: authEmail,
                         subject: "Order confirmed",
                         html: `<div>
-                  <table style="padding: '5px'">
+                  <table style="padding: '5px 2px'">
                      <caption style="padding: '4px'">Order Details:</caption>
                      <thead>
                         <tr>
@@ -119,8 +119,8 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                         <tr>
                               <td>1</td>
                               <td>${product === null || product === void 0 ? void 0 : product.title}</td>
-                              <td>${product === null || product === void 0 ? void 0 : product.quantity}</td>
                               <td>${product === null || product === void 0 ? void 0 : product.baseAmount}</td>
+                              <td>${product === null || product === void 0 ? void 0 : product.quantity}</td>
                         </tr>
                      </tbody>
                      <tfoot>

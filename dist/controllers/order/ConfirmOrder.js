@@ -102,7 +102,7 @@ module.exports = function confirmOrder(req, res, next) {
                 to: email,
                 subject: "Order confirmed",
                 html: `<div>
-            <table style="padding: '5px'">
+            <table style="padding: '5px 2px'">
                <caption style="padding: '4px'">Order Details:</caption>
                   <thead>
                      <tr>
@@ -114,11 +114,12 @@ module.exports = function confirmOrder(req, res, next) {
                   </thead>
                   <tbody>
                   ${Array.isArray(upRes) && upRes.map((item, i) => {
+                    i = 1;
                     return (`<tr>
                            <td>${i++}</td>
                            <td>${item === null || item === void 0 ? void 0 : item.title}</td>
-                           <td>${item === null || item === void 0 ? void 0 : item.quantity}</td>
                            <td>${item === null || item === void 0 ? void 0 : item.baseAmount}</td>
+                           <td>${item === null || item === void 0 ? void 0 : item.quantity}</td>
                         </tr>`);
                 })}
                   </tbody>
