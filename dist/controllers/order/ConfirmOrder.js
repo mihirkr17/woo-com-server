@@ -98,7 +98,6 @@ module.exports = function confirmOrder(req, res, next) {
             let totalAmount = Array.isArray(upRes) &&
                 upRes.map((item) => (parseFloat(item === null || item === void 0 ? void 0 : item.baseAmount) + parseFloat(item === null || item === void 0 ? void 0 : item.shippingCharge))).reduce((p, n) => p + n, 0).toFixed(2);
             totalAmount = parseFloat(totalAmount);
-            let ind = 1;
             yield email_service({
                 to: email,
                 subject: "Order confirmed",
@@ -116,7 +115,7 @@ module.exports = function confirmOrder(req, res, next) {
                   <tbody>
                   ${Array.isArray(upRes) && upRes.map((item, i) => {
                     return (`<tr>
-                           <td>${ind++}</td>
+                           <td>${i++}</td>
                            <td>${item === null || item === void 0 ? void 0 : item.title}</td>
                            <td>${item === null || item === void 0 ? void 0 : item.quantity}</td>
                            <td>${item === null || item === void 0 ? void 0 : item.baseAmount}</td>

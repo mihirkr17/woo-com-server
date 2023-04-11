@@ -116,7 +116,7 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
          upRes.map((item: any) => (parseFloat(item?.baseAmount) + parseFloat(item?.shippingCharge))).reduce((p: any, n: any) => p + n, 0).toFixed(2);
 
       totalAmount = parseFloat(totalAmount);
-      let ind = 1;
+
       await email_service({
          to: email,
          subject: "Order confirmed",
@@ -136,7 +136,7 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
 
             return (
                `<tr>
-                           <td>${ind++}</td>
+                           <td>${i++}</td>
                            <td>${item?.title}</td>
                            <td>${item?.quantity}</td>
                            <td>${item?.baseAmount}</td>
