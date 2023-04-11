@@ -29,7 +29,7 @@ module.exports = function confirmOrder(req, res, next) {
                 return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
             }
             function confirmOrderHandler(product) {
-                var _a, _b, _c, _d;
+                var _a, _b, _c, _d, _e, _f;
                 return __awaiter(this, void 0, void 0, function* () {
                     if (!product) {
                         return;
@@ -65,15 +65,24 @@ module.exports = function confirmOrder(req, res, next) {
                         let seller = yield getSellerInformationByID((_d = product === null || product === void 0 ? void 0 : product.sellerData) === null || _d === void 0 ? void 0 : _d.sellerID);
                         yield update_variation_stock_available("dec", { productID, listingID, variationID, quantity });
                         if (seller) {
-                            let mail = yield email_service({
+                            yield email_service({
                                 to: seller === null || seller === void 0 ? void 0 : seller.email,
                                 subject: "New order",
                                 html: `<div>
-                     <h4>You have new order from ${product === null || product === void 0 ? void 0 : product.customerEmail}</h4>
-                     <p>items: ${product === null || product === void 0 ? void 0 : product.title}</p>
+                     <h3>You have new order from ${product === null || product === void 0 ? void 0 : product.customerEmail}</h3>
+                     <p>
+                        <pre>
+                           Item Name     : ${product === null || product === void 0 ? void 0 : product.title} <br />
+                           Item SKU      : ${product === null || product === void 0 ? void 0 : product.sku} <br />
+                           Item Quantity : ${product === null || product === void 0 ? void 0 : product.quantity} <br />
+                           Item Price    : ${product === null || product === void 0 ? void 0 : product.baseAmount} usd
+                        </pre>
+                     </p>
+                     <br />
+                     <span>Order ID: <b>${product === null || product === void 0 ? void 0 : product.orderID}</b></span> <br />
+                     <i>Order At ${(_e = product === null || product === void 0 ? void 0 : product.orderAT) === null || _e === void 0 ? void 0 : _e.time}, ${(_f = product === null || product === void 0 ? void 0 : product.orderAT) === null || _f === void 0 ? void 0 : _f.date}</i>
                   </div>`
                             });
-                            console.log(mail, product === null || product === void 0 ? void 0 : product.customerEmail);
                         }
                         return {
                             orderConfirmSuccess: true,
@@ -89,16 +98,17 @@ module.exports = function confirmOrder(req, res, next) {
             let upRes = yield Promise.all(promises);
             let totalAmount = Array.isArray(upRes) &&
                 upRes.map((item) => (parseFloat(item === null || item === void 0 ? void 0 : item.baseAmount) + (item === null || item === void 0 ? void 0 : item.shippingCharge))).reduce((p, n) => p + n, 0).toFixed(2);
-            const mail = yield email_service({
+            yield email_service({
                 to: email,
-                subject: "Order confirm",
+                subject: "Order confirmed",
                 html: `<div>
             <ul>
-            ${upRes && upRes.map((e) => {
+                  ${upRes && upRes.map((e) => {
                     return `<li>${e === null || e === void 0 ? void 0 : e.title}</li>`;
                 })}
             </ul>
-            <b>Total amount = ${totalAmount && totalAmount} $</b>
+            <br />
+            <b>Total amount: ${totalAmount && totalAmount} usd</b>
          </div>`
             });
             if (upRes) {

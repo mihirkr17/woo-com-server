@@ -27,8 +27,6 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
       }
 
       async function confirmOrderHandler(product: any) {
-
-
          if (!product) {
             return;
          }
@@ -82,16 +80,24 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
 
 
             if (seller) {
-               let mail = await email_service({
+               await email_service({
                   to: seller?.email,
                   subject: "New order",
                   html: `<div>
-                     <h4>You have new order from ${product?.customerEmail}</h4>
-                     <p>items: ${product?.title}</p>
+                     <h3>You have new order from ${product?.customerEmail}</h3>
+                     <p>
+                        <pre>
+                           Item Name     : ${product?.title} <br />
+                           Item SKU      : ${product?.sku} <br />
+                           Item Quantity : ${product?.quantity} <br />
+                           Item Price    : ${product?.baseAmount} usd
+                        </pre>
+                     </p>
+                     <br />
+                     <span>Order ID: <b>${product?.orderID}</b></span> <br />
+                     <i>Order At ${product?.orderAT?.time}, ${product?.orderAT?.date}</i>
                   </div>`
                });
-
-               console.log(mail, product?.customerEmail);
             }
 
             return {
@@ -111,16 +117,17 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
       let totalAmount = Array.isArray(upRes) &&
          upRes.map((item: any) => (parseFloat(item?.baseAmount) + item?.shippingCharge)).reduce((p: any, n: any) => p + n, 0).toFixed(2);
 
-      const mail = await email_service({
+      await email_service({
          to: email,
-         subject: "Order confirm",
+         subject: "Order confirmed",
          html: `<div>
             <ul>
-            ${upRes && upRes.map((e: any) => {
+                  ${upRes && upRes.map((e: any) => {
             return `<li>${e?.title}</li>`
          })}
             </ul>
-            <b>Total amount = ${totalAmount && totalAmount} $</b>
+            <br />
+            <b>Total amount: ${totalAmount && totalAmount} usd</b>
          </div>`
       });
 
