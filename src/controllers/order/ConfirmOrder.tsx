@@ -7,7 +7,7 @@ const email_service = require("../../services/email.service");
 module.exports = async function confirmOrder(req: Request, res: Response, next: NextFunction) {
    try {
 
-      const { email, _uuid } = req.decoded;
+      const { email } = req.decoded;
 
       if (!req.body || typeof req.body !== "object") {
          return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
@@ -74,24 +74,27 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
          if (result) {
             await update_variation_stock_available("dec", { productID, listingID, variationID, quantity });
 
-            await email_service({
-               to: product?.sellerData?.sellerEmail,
-               subject: "New order",
-               html: `<div>
-                     <h3>You have new order from ${product?.customerEmail}</h3>
-                     <p>
-                        <pre>
-                           Item Name     : ${product?.title} <br />
-                           Item SKU      : ${product?.sku} <br />
-                           Item Quantity : ${product?.quantity} <br />
-                           Item Price    : ${product?.baseAmount} usd
-                        </pre>
-                     </p>
-                     <br />
-                     <span>Order ID: <b>${product?.orderID}</b></span> <br />
-                     <i>Order At ${product?.orderAT?.time}, ${product?.orderAT?.date}</i>
-                  </div>`
-            });
+console.log(product?.sellerData?.sellerEmail);
+            if (product?.sellerData?.sellerEmail && product?.sellerData?.sellerEmail) {
+               await email_service({
+                  to: product?.sellerData?.sellerEmail,
+                  subject: "New order",
+                  html: `<div>
+                        <h3>You have new order from ${product?.customerEmail}</h3>
+                        <p>
+                           <pre>
+                              Item Name     : ${product?.title} <br />
+                              Item SKU      : ${product?.sku} <br />
+                              Item Quantity : ${product?.quantity} <br />
+                              Item Price    : ${product?.baseAmount} usd
+                           </pre>
+                        </p>
+                        <br />
+                        <span>Order ID: <b>${product?.orderID}</b></span> <br />
+                        <i>Order At ${product?.orderAT?.time}, ${product?.orderAT?.date}</i>
+                     </div>`
+               });
+            }
 
 
             return {
@@ -108,8 +111,10 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
 
       let upRes: any = await Promise.all(promises);
 
-      let totalAmount = Array.isArray(upRes) &&
-         upRes.map((item: any) => (parseFloat(item?.baseAmount) + item?.shippingCharge)).reduce((p: any, n: any) => p + n, 0).toFixed(2);
+      let totalAmount: any = Array.isArray(upRes) &&
+         upRes.map((item: any) => (parseFloat(item?.baseAmount) + parseFloat(item?.shippingCharge))).reduce((p: any, n: any) => p + n, 0).toFixed(2);
+
+      totalAmount = parseFloat(totalAmount);
 
       await email_service({
          to: email,

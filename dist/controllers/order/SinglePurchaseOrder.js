@@ -16,7 +16,7 @@ const apiResponse = require("../../errors/apiResponse");
 const { findUserByEmail, update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
 const email_service = require("../../services/email.service");
 module.exports = function SinglePurchaseOrder(req, res, next) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const authEmail = req.decoded.email;
@@ -109,11 +109,11 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                      <li>${product === null || product === void 0 ? void 0 : product.title}</li>
                   </ul>
                   <br />
-                  <b>Total amount: ${product === null || product === void 0 ? void 0 : product.baseAmount} usd</b>
+                  <b>Total amount: ${parseFloat(product === null || product === void 0 ? void 0 : product.baseAmount)} usd</b>
                </div>`
                     });
-                    yield email_service({
-                        to: (_f = product === null || product === void 0 ? void 0 : product.sellerData) === null || _f === void 0 ? void 0 : _f.sellerEmail,
+                    ((_f = product === null || product === void 0 ? void 0 : product.sellerData) === null || _f === void 0 ? void 0 : _f.sellerEmail) && (yield email_service({
+                        to: (_g = product === null || product === void 0 ? void 0 : product.sellerData) === null || _g === void 0 ? void 0 : _g.sellerEmail,
                         subject: "New order",
                         html: `<div>
                      <h3>You have new order from ${product === null || product === void 0 ? void 0 : product.customerEmail}</h3>
@@ -127,9 +127,9 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                      </p>
                      <br />
                      <span>Order ID: <b>${product === null || product === void 0 ? void 0 : product.orderID}</b></span> <br />
-                     <i>Order At ${(_g = product === null || product === void 0 ? void 0 : product.orderAT) === null || _g === void 0 ? void 0 : _g.time}, ${(_h = product === null || product === void 0 ? void 0 : product.orderAT) === null || _h === void 0 ? void 0 : _h.date}</i>
+                     <i>Order At ${(_h = product === null || product === void 0 ? void 0 : product.orderAT) === null || _h === void 0 ? void 0 : _h.time}, ${(_j = product === null || product === void 0 ? void 0 : product.orderAT) === null || _j === void 0 ? void 0 : _j.date}</i>
                   </div>`
-                    });
+                    }));
                     return res.status(200).send({ success: true, statusCode: 200, message: "Order Success." });
                 }
             }

@@ -15,7 +15,7 @@ const email_service = require("../../services/email.service");
 module.exports = function confirmOrder(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { email, _uuid } = req.decoded;
+            const { email } = req.decoded;
             if (!req.body || typeof req.body !== "object") {
                 return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
             }
@@ -27,7 +27,7 @@ module.exports = function confirmOrder(req, res, next) {
                 return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
             }
             function confirmOrderHandler(product) {
-                var _a, _b, _c, _d, _e, _f;
+                var _a, _b, _c, _d, _e, _f, _g, _h, _j;
                 return __awaiter(this, void 0, void 0, function* () {
                     if (!product) {
                         return;
@@ -61,24 +61,27 @@ module.exports = function confirmOrder(req, res, next) {
                     let result = yield Order.findOneAndUpdate({ user_email: email }, { $push: { orders: product } }, { upsert: true });
                     if (result) {
                         yield update_variation_stock_available("dec", { productID, listingID, variationID, quantity });
-                        yield email_service({
-                            to: (_d = product === null || product === void 0 ? void 0 : product.sellerData) === null || _d === void 0 ? void 0 : _d.sellerEmail,
-                            subject: "New order",
-                            html: `<div>
-                     <h3>You have new order from ${product === null || product === void 0 ? void 0 : product.customerEmail}</h3>
-                     <p>
-                        <pre>
-                           Item Name     : ${product === null || product === void 0 ? void 0 : product.title} <br />
-                           Item SKU      : ${product === null || product === void 0 ? void 0 : product.sku} <br />
-                           Item Quantity : ${product === null || product === void 0 ? void 0 : product.quantity} <br />
-                           Item Price    : ${product === null || product === void 0 ? void 0 : product.baseAmount} usd
-                        </pre>
-                     </p>
-                     <br />
-                     <span>Order ID: <b>${product === null || product === void 0 ? void 0 : product.orderID}</b></span> <br />
-                     <i>Order At ${(_e = product === null || product === void 0 ? void 0 : product.orderAT) === null || _e === void 0 ? void 0 : _e.time}, ${(_f = product === null || product === void 0 ? void 0 : product.orderAT) === null || _f === void 0 ? void 0 : _f.date}</i>
-                  </div>`
-                        });
+                        console.log((_d = product === null || product === void 0 ? void 0 : product.sellerData) === null || _d === void 0 ? void 0 : _d.sellerEmail);
+                        if (((_e = product === null || product === void 0 ? void 0 : product.sellerData) === null || _e === void 0 ? void 0 : _e.sellerEmail) && ((_f = product === null || product === void 0 ? void 0 : product.sellerData) === null || _f === void 0 ? void 0 : _f.sellerEmail)) {
+                            yield email_service({
+                                to: (_g = product === null || product === void 0 ? void 0 : product.sellerData) === null || _g === void 0 ? void 0 : _g.sellerEmail,
+                                subject: "New order",
+                                html: `<div>
+                        <h3>You have new order from ${product === null || product === void 0 ? void 0 : product.customerEmail}</h3>
+                        <p>
+                           <pre>
+                              Item Name     : ${product === null || product === void 0 ? void 0 : product.title} <br />
+                              Item SKU      : ${product === null || product === void 0 ? void 0 : product.sku} <br />
+                              Item Quantity : ${product === null || product === void 0 ? void 0 : product.quantity} <br />
+                              Item Price    : ${product === null || product === void 0 ? void 0 : product.baseAmount} usd
+                           </pre>
+                        </p>
+                        <br />
+                        <span>Order ID: <b>${product === null || product === void 0 ? void 0 : product.orderID}</b></span> <br />
+                        <i>Order At ${(_h = product === null || product === void 0 ? void 0 : product.orderAT) === null || _h === void 0 ? void 0 : _h.time}, ${(_j = product === null || product === void 0 ? void 0 : product.orderAT) === null || _j === void 0 ? void 0 : _j.date}</i>
+                     </div>`
+                            });
+                        }
                         return {
                             orderConfirmSuccess: true,
                             message: "Order success for " + (product === null || product === void 0 ? void 0 : product.title),
@@ -92,7 +95,8 @@ module.exports = function confirmOrder(req, res, next) {
             const promises = Array.isArray(orderItems) && orderItems.map((orderItem) => __awaiter(this, void 0, void 0, function* () { return yield confirmOrderHandler(orderItem); }));
             let upRes = yield Promise.all(promises);
             let totalAmount = Array.isArray(upRes) &&
-                upRes.map((item) => (parseFloat(item === null || item === void 0 ? void 0 : item.baseAmount) + (item === null || item === void 0 ? void 0 : item.shippingCharge))).reduce((p, n) => p + n, 0).toFixed(2);
+                upRes.map((item) => (parseFloat(item === null || item === void 0 ? void 0 : item.baseAmount) + parseFloat(item === null || item === void 0 ? void 0 : item.shippingCharge))).reduce((p, n) => p + n, 0).toFixed(2);
+            totalAmount = parseFloat(totalAmount);
             yield email_service({
                 to: email,
                 subject: "Order confirmed",

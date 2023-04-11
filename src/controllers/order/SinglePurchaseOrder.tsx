@@ -121,11 +121,11 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
                      <li>${product?.title}</li>
                   </ul>
                   <br />
-                  <b>Total amount: ${product?.baseAmount} usd</b>
+                  <b>Total amount: ${parseFloat(product?.baseAmount)} usd</b>
                </div>`
             });
 
-            await email_service({
+            product?.sellerData?.sellerEmail && await email_service({
                to: product?.sellerData?.sellerEmail,
                subject: "New order",
                html: `<div>
