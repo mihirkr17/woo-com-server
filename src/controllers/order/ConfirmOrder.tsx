@@ -74,7 +74,6 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
          if (result) {
             await update_variation_stock_available("dec", { productID, listingID, variationID, quantity });
 
-console.log(product?.sellerData?.sellerEmail);
             if (product?.sellerData?.sellerEmail && product?.sellerData?.sellerEmail) {
                await email_service({
                   to: product?.sellerData?.sellerEmail,
@@ -102,6 +101,8 @@ console.log(product?.sellerData?.sellerEmail);
                message: "Order success for " + product?.title,
                orderID: product?.orderID,
                baseAmount: product?.baseAmount,
+               shippingCharge: product?.shippingCharge,
+               quantity: product?.quantity,
                title: product?.title
             };
          }
@@ -115,18 +116,41 @@ console.log(product?.sellerData?.sellerEmail);
          upRes.map((item: any) => (parseFloat(item?.baseAmount) + parseFloat(item?.shippingCharge))).reduce((p: any, n: any) => p + n, 0).toFixed(2);
 
       totalAmount = parseFloat(totalAmount);
-
+      let ind = 1;
       await email_service({
          to: email,
          subject: "Order confirmed",
          html: `<div>
-            <ul>
-                  ${upRes && upRes.map((e: any) => {
-            return `<li>${e?.title}</li>`
+            <table style="padding: '5px'">
+               <caption style="padding: '4px'">Order Details:</caption>
+                  <thead>
+                     <tr>
+                        <th>No.</th>
+                        <th>Product</th>
+                        <th>Price</th>
+                        <th>Quantity</th>
+                     </tr>
+                  </thead>
+                  <tbody>
+                  ${Array.isArray(upRes) && upRes.map((item: any, i) => {
+
+            return (
+               `<tr>
+                           <td>${ind++}</td>
+                           <td>${item?.title}</td>
+                           <td>${item?.quantity}</td>
+                           <td>${item?.baseAmount}</td>
+                        </tr>`
+            )
          })}
-            </ul>
-            <br />
-            <b>Total amount: ${totalAmount && totalAmount} usd</b>
+                  </tbody>
+                  <tfoot>
+                     <tr>
+                        <th colspan= "100%"><b style="width: '100%'; text-align: 'center'">Total amount: ${totalAmount} usd</b></th>
+                     </tr>
+                </tfoot>
+            </table>
+            <br/>
          </div>`
       });
 

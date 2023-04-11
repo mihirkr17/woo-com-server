@@ -113,15 +113,35 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
          if (result) {
             await update_variation_stock_available("dec", { variationID, productID, quantity, listingID });
 
-            await email_service({
+            authEmail && await email_service({
                to: authEmail,
                subject: "Order confirmed",
                html: `<div>
-                  <ul>
-                     <li>${product?.title}</li>
-                  </ul>
+                  <table style="padding: '5px'">
+                     <caption style="padding: '4px'">Order Details:</caption>
+                     <thead>
+                        <tr>
+                           <th>No.</th>
+                           <th>Product</th>
+                           <th>Price</th>
+                           <th>Quantity</th>
+                        </tr>
+                     </thead>
+                     <tbody>
+                        <tr>
+                              <td>1</td>
+                              <td>${product?.title}</td>
+                              <td>${product?.quantity}</td>
+                              <td>${product?.baseAmount}</td>
+                        </tr>
+                     </tbody>
+                     <tfoot>
+                        <tr>
+                           <th colspan= "100%"><b style="width: '100%'; text-align: 'center'">Total amount: ${product?.baseAmount} usd</b></th>
+                        </tr>
+                     </tfoot>
+                  </table>
                   <br />
-                  <b>Total amount: ${parseFloat(product?.baseAmount)} usd</b>
                </div>`
             });
 

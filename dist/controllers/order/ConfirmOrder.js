@@ -27,7 +27,7 @@ module.exports = function confirmOrder(req, res, next) {
                 return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
             }
             function confirmOrderHandler(product) {
-                var _a, _b, _c, _d, _e, _f, _g, _h, _j;
+                var _a, _b, _c, _d, _e, _f, _g, _h;
                 return __awaiter(this, void 0, void 0, function* () {
                     if (!product) {
                         return;
@@ -61,10 +61,9 @@ module.exports = function confirmOrder(req, res, next) {
                     let result = yield Order.findOneAndUpdate({ user_email: email }, { $push: { orders: product } }, { upsert: true });
                     if (result) {
                         yield update_variation_stock_available("dec", { productID, listingID, variationID, quantity });
-                        console.log((_d = product === null || product === void 0 ? void 0 : product.sellerData) === null || _d === void 0 ? void 0 : _d.sellerEmail);
-                        if (((_e = product === null || product === void 0 ? void 0 : product.sellerData) === null || _e === void 0 ? void 0 : _e.sellerEmail) && ((_f = product === null || product === void 0 ? void 0 : product.sellerData) === null || _f === void 0 ? void 0 : _f.sellerEmail)) {
+                        if (((_d = product === null || product === void 0 ? void 0 : product.sellerData) === null || _d === void 0 ? void 0 : _d.sellerEmail) && ((_e = product === null || product === void 0 ? void 0 : product.sellerData) === null || _e === void 0 ? void 0 : _e.sellerEmail)) {
                             yield email_service({
-                                to: (_g = product === null || product === void 0 ? void 0 : product.sellerData) === null || _g === void 0 ? void 0 : _g.sellerEmail,
+                                to: (_f = product === null || product === void 0 ? void 0 : product.sellerData) === null || _f === void 0 ? void 0 : _f.sellerEmail,
                                 subject: "New order",
                                 html: `<div>
                         <h3>You have new order from ${product === null || product === void 0 ? void 0 : product.customerEmail}</h3>
@@ -78,7 +77,7 @@ module.exports = function confirmOrder(req, res, next) {
                         </p>
                         <br />
                         <span>Order ID: <b>${product === null || product === void 0 ? void 0 : product.orderID}</b></span> <br />
-                        <i>Order At ${(_h = product === null || product === void 0 ? void 0 : product.orderAT) === null || _h === void 0 ? void 0 : _h.time}, ${(_j = product === null || product === void 0 ? void 0 : product.orderAT) === null || _j === void 0 ? void 0 : _j.date}</i>
+                        <i>Order At ${(_g = product === null || product === void 0 ? void 0 : product.orderAT) === null || _g === void 0 ? void 0 : _g.time}, ${(_h = product === null || product === void 0 ? void 0 : product.orderAT) === null || _h === void 0 ? void 0 : _h.date}</i>
                      </div>`
                             });
                         }
@@ -87,6 +86,8 @@ module.exports = function confirmOrder(req, res, next) {
                             message: "Order success for " + (product === null || product === void 0 ? void 0 : product.title),
                             orderID: product === null || product === void 0 ? void 0 : product.orderID,
                             baseAmount: product === null || product === void 0 ? void 0 : product.baseAmount,
+                            shippingCharge: product === null || product === void 0 ? void 0 : product.shippingCharge,
+                            quantity: product === null || product === void 0 ? void 0 : product.quantity,
                             title: product === null || product === void 0 ? void 0 : product.title
                         };
                     }
@@ -97,17 +98,38 @@ module.exports = function confirmOrder(req, res, next) {
             let totalAmount = Array.isArray(upRes) &&
                 upRes.map((item) => (parseFloat(item === null || item === void 0 ? void 0 : item.baseAmount) + parseFloat(item === null || item === void 0 ? void 0 : item.shippingCharge))).reduce((p, n) => p + n, 0).toFixed(2);
             totalAmount = parseFloat(totalAmount);
+            let ind = 1;
             yield email_service({
                 to: email,
                 subject: "Order confirmed",
                 html: `<div>
-            <ul>
-                  ${upRes && upRes.map((e) => {
-                    return `<li>${e === null || e === void 0 ? void 0 : e.title}</li>`;
+            <table style="padding: '5px'">
+               <caption style="padding: '4px'">Order Details:</caption>
+                  <thead>
+                     <tr>
+                        <th>No.</th>
+                        <th>Product</th>
+                        <th>Price</th>
+                        <th>Quantity</th>
+                     </tr>
+                  </thead>
+                  <tbody>
+                  ${Array.isArray(upRes) && upRes.map((item, i) => {
+                    return (`<tr>
+                           <td>${ind++}</td>
+                           <td>${item === null || item === void 0 ? void 0 : item.title}</td>
+                           <td>${item === null || item === void 0 ? void 0 : item.quantity}</td>
+                           <td>${item === null || item === void 0 ? void 0 : item.baseAmount}</td>
+                        </tr>`);
                 })}
-            </ul>
-            <br />
-            <b>Total amount: ${totalAmount && totalAmount} usd</b>
+                  </tbody>
+                  <tfoot>
+                     <tr>
+                        <th colspan= "100%"><b style="width: '100%'; text-align: 'center'">Total amount: ${totalAmount} usd</b></th>
+                     </tr>
+                </tfoot>
+            </table>
+            <br/>
          </div>`
             });
             if (upRes) {

@@ -101,17 +101,37 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                 let result = yield Order.findOneAndUpdate({ user_email: authEmail }, { $push: { orders: product } }, { upsert: true });
                 if (result) {
                     yield update_variation_stock_available("dec", { variationID, productID, quantity, listingID });
-                    yield email_service({
+                    authEmail && (yield email_service({
                         to: authEmail,
                         subject: "Order confirmed",
                         html: `<div>
-                  <ul>
-                     <li>${product === null || product === void 0 ? void 0 : product.title}</li>
-                  </ul>
+                  <table style="padding: '5px'">
+                     <caption style="padding: '4px'">Order Details:</caption>
+                     <thead>
+                        <tr>
+                           <th>No.</th>
+                           <th>Product</th>
+                           <th>Price</th>
+                           <th>Quantity</th>
+                        </tr>
+                     </thead>
+                     <tbody>
+                        <tr>
+                              <td>1</td>
+                              <td>${product === null || product === void 0 ? void 0 : product.title}</td>
+                              <td>${product === null || product === void 0 ? void 0 : product.quantity}</td>
+                              <td>${product === null || product === void 0 ? void 0 : product.baseAmount}</td>
+                        </tr>
+                     </tbody>
+                     <tfoot>
+                        <tr>
+                           <th colspan= "100%"><b style="width: '100%'; text-align: 'center'">Total amount: ${product === null || product === void 0 ? void 0 : product.baseAmount} usd</b></th>
+                        </tr>
+                     </tfoot>
+                  </table>
                   <br />
-                  <b>Total amount: ${parseFloat(product === null || product === void 0 ? void 0 : product.baseAmount)} usd</b>
                </div>`
-                    });
+                    }));
                     ((_f = product === null || product === void 0 ? void 0 : product.sellerData) === null || _f === void 0 ? void 0 : _f.sellerEmail) && (yield email_service({
                         to: (_g = product === null || product === void 0 ? void 0 : product.sellerData) === null || _g === void 0 ? void 0 : _g.sellerEmail,
                         subject: "New order",
