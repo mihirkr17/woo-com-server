@@ -2,14 +2,14 @@
 module.exports.buyer_order_email_template = (data, totalAmount) => {
     let ind = 1;
     return (`<div>
-            <table style="padding: '5px 2px'">
-               <caption style="padding: '4px'; background-color: 'black'; color: 'white'">Order Details:</caption>
+            <table style="padding: 5px 2px; border: 1px solid #777; width: 100%">
+               <caption style="padding: 4px; background-color: black; color: white">Order Details:</caption>
                   <thead>
                      <tr>
-                        <th>No.</th>
-                        <th>Product</th>
-                        <th>Price</th>
-                        <th>Quantity</th>
+                        <th style="border: '1px solid #777';">No.</th>
+                        <th style="border: '1px solid #777';">Product</th>
+                        <th style="border: '1px solid #777';">Price</th>
+                        <th style="border: '1px solid #777';">Quantity</th>
                      </tr>
                   </thead>
                   <tbody>
@@ -21,16 +21,16 @@ module.exports.buyer_order_email_template = (data, totalAmount) => {
                            <td>${item === null || item === void 0 ? void 0 : item.quantity} Pcs</td>
                         </tr>`);
     }) : `<tr>
-                  <td>${ind}</td>
-                  <td>${data === null || data === void 0 ? void 0 : data.title}</td>
-                  <td>$ ${data === null || data === void 0 ? void 0 : data.baseAmount}</td>
-                  <td>${data === null || data === void 0 ? void 0 : data.quantity} Pcs</td>
+                  <td style="border: 1px solid #777;">${ind}</td>
+                  <td style="border: 1px solid #777;">${data === null || data === void 0 ? void 0 : data.title}</td>
+                  <td style="border: 1px solid #777;">$ ${data === null || data === void 0 ? void 0 : data.baseAmount}</td>
+                  <td style="border: 1px solid #777;">${data === null || data === void 0 ? void 0 : data.quantity} Pcs</td>
             </tr>`}
                   </tbody>
                   <tfoot>
                      <tr>
                         <th colspan= "100%">
-                           <b style="width: '100%'; text-align: 'center'; background-color: 'black'; color: 'white'">
+                           <b style="width: 100%; text-align: center; background-color: black; color: white">
                               Total amount: ${totalAmount} USD
                            </b>
                         </th>
@@ -43,28 +43,28 @@ module.exports.buyer_order_email_template = (data, totalAmount) => {
 module.exports.seller_order_email_template = (product) => {
     var _a, _b;
     return (`<div>
-         <h3 style="text-align: "center">You have new order from ${product === null || product === void 0 ? void 0 : product.customerEmail}</h3>
+         <h3 style="text-align: center">You have new order from ${product === null || product === void 0 ? void 0 : product.customerEmail}</h3>
 
-         <table>
-          <caption style="padding: '4px'; background-color: 'black'; color: 'white'">Order Details:</caption>
+         <table style="border: 1px solid #777; width: 100%">
+          <caption style="padding: 4px; background-color: black; color: white">Order Details:</caption>
             <thead>
                <tr>
-                  <th>Product</th>
-                  <th>Quantity</th>
-                  <th>SKU</th>
+                  <th style="border: 1px solid #777">Product</th>
+                  <th style="border: 1px solid #777">Quantity</th>
+                  <th style="border: 1px solid #777">SKU</th>
                </tr>
             </thead>
             <tbody>
                <tr>
-                  <td>${product === null || product === void 0 ? void 0 : product.title}</td>
-                  <td>${product === null || product === void 0 ? void 0 : product.quantity}</td>
-                  <td>${product === null || product === void 0 ? void 0 : product.sku}</td>
+                  <td style="border: 1px solid #777">${product === null || product === void 0 ? void 0 : product.title}</td>
+                  <td style="border: 1px solid #777">${product === null || product === void 0 ? void 0 : product.quantity}</td>
+                  <td style="border: 1px solid #777">${product === null || product === void 0 ? void 0 : product.sku}</td>
                </tr>
             </tbody>
             <tfoot>
                <tr>
                   <th colspan= "100%" align="center">
-                     <p style="width: '100%'; text-align: 'center'; background-color: 'black'; color: 'white'">
+                     <p style="width: 100%; text-align: center; background-color: black; color: white">
                         Order ID: <b>${product === null || product === void 0 ? void 0 : product.orderID}</b> <br />
                         Tracking ID: <b>${product === null || product === void 0 ? void 0 : product.trackingID}</b> <br />
                         <i>Order At ${(_a = product === null || product === void 0 ? void 0 : product.orderAT) === null || _a === void 0 ? void 0 : _a.time}, ${(_b = product === null || product === void 0 ? void 0 : product.orderAT) === null || _b === void 0 ? void 0 : _b.date}</i>
