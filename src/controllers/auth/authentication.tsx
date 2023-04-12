@@ -7,7 +7,6 @@ const apiResponse = require("../../errors/apiResponse");
 const setToken = require("../../utils/setToken");
 const comparePassword = require("../../utils/comparePassword");
 const setUserDataToken = require("../../utils/setUserDataToken");
-const ShoppingCart = require("../../model/shoppingCart.model");
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
 const email_service = require("../../services/email.service");
@@ -239,8 +238,6 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 
          user.buyer["defaultShippingAddress"] = (Array.isArray(user?.buyer?.shippingAddress) &&
             user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]) || {};
-
-         user.buyer["shoppingCartItems"] = await ShoppingCart.countDocuments({ customerEmail: user?.email }) || 0;
 
          userDataToken = setUserDataToken({
             _uuid: user?._uuid,

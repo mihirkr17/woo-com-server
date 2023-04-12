@@ -16,7 +16,6 @@ const apiResponse = require("../../errors/apiResponse");
 const setToken = require("../../utils/setToken");
 const comparePassword = require("../../utils/comparePassword");
 const setUserDataToken = require("../../utils/setUserDataToken");
-const ShoppingCart = require("../../model/shoppingCart.model");
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
 const email_service = require("../../services/email.service");
@@ -201,7 +200,6 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
         if ((user === null || user === void 0 ? void 0 : user.role) && (user === null || user === void 0 ? void 0 : user.role) === "BUYER") {
             user.buyer["defaultShippingAddress"] = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
                 ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0])) || {};
-            user.buyer["shoppingCartItems"] = (yield ShoppingCart.countDocuments({ customerEmail: user === null || user === void 0 ? void 0 : user.email })) || 0;
             userDataToken = setUserDataToken({
                 _uuid: user === null || user === void 0 ? void 0 : user._uuid,
                 fullName: user === null || user === void 0 ? void 0 : user.fullName,

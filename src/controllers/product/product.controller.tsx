@@ -312,7 +312,7 @@ module.exports.purchaseProductController = async (req: Request, res: Response, n
       let product = await Product.aggregate([
          { $match: { _lid: body?.listingID } },
          { $unwind: { path: "$variations" } },
-         { $match: { $and: [{ 'variations._vrid': body?.variationID }] } },
+         { $match: { $and: [{ 'variations._vrid': body?.variationID }, { 'variations.stock': "in" }, { 'variations.status': "active" }] } },
          {
             $project: {
                _id: 0,

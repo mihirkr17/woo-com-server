@@ -276,7 +276,7 @@ module.exports.purchaseProductController = (req, res, next) => __awaiter(void 0,
         let product = yield Product.aggregate([
             { $match: { _lid: body === null || body === void 0 ? void 0 : body.listingID } },
             { $unwind: { path: "$variations" } },
-            { $match: { $and: [{ 'variations._vrid': body === null || body === void 0 ? void 0 : body.variationID }] } },
+            { $match: { $and: [{ 'variations._vrid': body === null || body === void 0 ? void 0 : body.variationID }, { 'variations.stock': "in" }, { 'variations.status': "active" }] } },
             {
                 $project: {
                     _id: 0,

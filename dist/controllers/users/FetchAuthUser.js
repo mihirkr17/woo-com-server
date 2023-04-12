@@ -10,7 +10,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const { productCounter, findUserByEmail } = require("../../services/common.service");
-const ShoppingCart = require("../../model/shoppingCart.model");
 const apiResponse = require("../../errors/apiResponse");
 const setUserDataToken = require("../../utils/setUserDataToken");
 module.exports = function FetchAuthUser(req, res, next) {
@@ -62,7 +61,6 @@ module.exports = function FetchAuthUser(req, res, next) {
             if ((user === null || user === void 0 ? void 0 : user.role) === 'BUYER' && (user === null || user === void 0 ? void 0 : user.idFor) === 'buy') {
                 user.buyer["defaultShippingAddress"] = (Array.isArray((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress) &&
                     ((_c = user === null || user === void 0 ? void 0 : user.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0])) || {};
-                user.buyer["shoppingCartItems"] = (yield ShoppingCart.countDocuments({ customerEmail: user === null || user === void 0 ? void 0 : user.email })) || 0;
                 userDataToken = setUserDataToken({
                     _uuid: user === null || user === void 0 ? void 0 : user._uuid,
                     fullName: user === null || user === void 0 ? void 0 : user.fullName,

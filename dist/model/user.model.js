@@ -7,7 +7,6 @@ const saltRounds = 10;
 const buyerType = new mongoose_1.Schema({
     taxId: { type: String },
     defaultShippingAddress: { type: Object },
-    shoppingCartItems: { type: Number },
     wishlist: { type: Array },
     shippingAddress: [
         {
