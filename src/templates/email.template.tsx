@@ -7,7 +7,7 @@ module.exports.buyer_order_email_template = (data: any, totalAmount: number) => 
             <table style="padding: 5px 2px; border: 1px solid #777; width: 100%">
                <caption style="padding: 4px;">Order Details:</caption>
                   <thead>
-                     <tr style="line-height: 34px; text-align: center; font-weight: bold; letter-spacing: 0.4px; background: cyan;">
+                     <tr style="line-height: 34px; text-align: center; font-weight: bold; letter-spacing: 0.4px; background: cyan; color: black">
                         <th style="border: '1px solid #777';">No.</th>
                         <th style="border: '1px solid #777';">Product</th>
                         <th style="border: '1px solid #777';">Price</th>
@@ -34,10 +34,10 @@ module.exports.buyer_order_email_template = (data: any, totalAmount: number) => 
                   </tbody>
                   <tfoot>
                      <tr>
-                        <th colspan= "100%">
-                           <b style="width: 100%; text-align: center; background-color: #777; color: white; padding: 12px 0;">
-                              Total amount: ${totalAmount} USD
-                           </b>
+                        <th colspan= "100%" align="center">
+                           <p style="width: 100%; text-align: center; padding: 12px 0;">
+                              Total amount: <b>${totalAmount} USD</b>
+                           </p>
                         </th>
                      </tr>
                 </tfoot>
@@ -57,7 +57,7 @@ module.exports.seller_order_email_template = (product: any) => {
          <table style="border: 1px solid #777; width: 100%">
           <caption style="padding: 4px;">Order Details:</caption>
             <thead>
-               <tr style="line-height: 34px; text-align: center; font-weight: bold; letter-spacing: 0.4px; background: cyan;">
+               <tr style="line-height: 34px; text-align: center; font-weight: bold; letter-spacing: 0.4px; background: cyan; color: black">
                   <th style="border: 1px solid #777">Product</th>
                   <th style="border: 1px solid #777">Quantity</th>
                   <th style="border: 1px solid #777">SKU</th>
@@ -73,7 +73,7 @@ module.exports.seller_order_email_template = (product: any) => {
             <tfoot>
                <tr>
                   <th colspan= "100%" align="center">
-                     <p style="width: 100%; text-align: center; background-color: #777; padding: 12px 0; color: white">
+                     <p style="width: 100%; text-align: center; padding: 12px 0;">
                         Order ID: <b>${product?.orderID}</b> <br />
                         Tracking ID: <b>${product?.trackingID}</b> <br />
                         <i>Order At ${product?.orderAT?.time}, ${product?.orderAT?.date}</i>
