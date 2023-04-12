@@ -52,18 +52,36 @@ module.exports.buyer_order_email_template = (data: any, totalAmount: number) => 
 module.exports.seller_order_email_template = (product: any) => {
    return (
       `<div>
-         <h3>You have new order from ${product?.customerEmail}</h3>
-         <p>
-            <pre>
-               Item Name     : ${product?.title} <br />
-               Item SKU      : ${product?.sku} <br />
-               Item Quantity : ${product?.quantity} <br />
-               Item Price    : ${product?.baseAmount} usd
-            </pre>
-         </p>
-         <br />
-         <span>Order ID: <b>${product?.orderID}</b></span> <br />
-         <i>Order At ${product?.orderAT?.time}, ${product?.orderAT?.date}</i>
+         <h3 style="text-align: "center">You have new order from ${product?.customerEmail}</h3>
+
+         <table>
+          <caption style="padding: '4px'; background-color: 'black'; color: 'white'">Order Details:</caption>
+            <thead>
+               <tr>
+                  <th>Product</th>
+                  <th>Quantity</th>
+                  <th>SKU</th>
+               </tr>
+            </thead>
+            <tbody>
+               <tr>
+                  <td>${product?.title}</td>
+                  <td>${product?.quantity}</td>
+                  <td>${product?.sku}</td>
+               </tr>
+            </tbody>
+            <tfoot>
+               <tr>
+                  <th colspan= "100%" align="center">
+                     <p style="width: '100%'; text-align: 'center'; background-color: 'black'; color: 'white'">
+                        Order ID: <b>${product?.orderID}</b> <br />
+                        Tracking ID: <b>${product?.trackingID}</b> <br />
+                        <i>Order At ${product?.orderAT?.time}, ${product?.orderAT?.date}</i>
+                     </p>
+                  </th>
+               </tr>
+            </tfoot>
+         </table>
       </div>`
    )
 }
