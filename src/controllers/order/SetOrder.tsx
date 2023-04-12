@@ -117,9 +117,9 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
 
 
       let totalAmount = Array.isArray(orderItems) &&
-         orderItems.map((item: any) => (parseFloat(item?.baseAmount) + item?.shippingCharge)).reduce((p: any, n: any) => p + n, 0).toFixed(2);
+         orderItems.map((item: any) => (parseInt(item?.baseAmount + item?.shippingCharge))).reduce((p: any, n: any) => p + n, 0);
 
-      totalAmount = parseFloat(totalAmount);
+      totalAmount = parseInt(totalAmount);
 
       if (!totalAmount) {
          return res.status(402).send();
@@ -131,7 +131,7 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
          currency: 'usd',
          payment_method_types: ['card'],
          metadata: {
-            order_id: "opi_" + (Math.round(Math.random() * 99999999) + parseInt(totalAmount)).toString()
+            order_id: "opi_" + (Math.round(Math.random() * 99999999) + totalAmount).toString()
          }
       });
 

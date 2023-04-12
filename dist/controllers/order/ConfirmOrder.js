@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const Order = require("../../model/order.model");
 const { update_variation_stock_available, calculateShippingCost } = require("../../services/common.service");
 const email_service = require("../../services/email.service");
+const { buyer_order_email_template, seller_order_email_template } = require("../../templates/email.template");
 module.exports = function confirmOrder(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -27,7 +28,7 @@ module.exports = function confirmOrder(req, res, next) {
                 return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
             }
             function confirmOrderHandler(product) {
-                var _a, _b, _c, _d, _e, _f, _g, _h;
+                var _a, _b, _c, _d, _e, _f;
                 return __awaiter(this, void 0, void 0, function* () {
                     if (!product) {
                         return;
@@ -65,20 +66,7 @@ module.exports = function confirmOrder(req, res, next) {
                             yield email_service({
                                 to: (_f = product === null || product === void 0 ? void 0 : product.sellerData) === null || _f === void 0 ? void 0 : _f.sellerEmail,
                                 subject: "New order",
-                                html: `<div>
-                        <h3>You have new order from ${product === null || product === void 0 ? void 0 : product.customerEmail}</h3>
-                        <p>
-                           <pre>
-                              Item Name     : ${product === null || product === void 0 ? void 0 : product.title} <br />
-                              Item SKU      : ${product === null || product === void 0 ? void 0 : product.sku} <br />
-                              Item Quantity : ${product === null || product === void 0 ? void 0 : product.quantity} <br />
-                              Item Price    : ${product === null || product === void 0 ? void 0 : product.baseAmount} usd
-                           </pre>
-                        </p>
-                        <br />
-                        <span>Order ID: <b>${product === null || product === void 0 ? void 0 : product.orderID}</b></span> <br />
-                        <i>Order At ${(_g = product === null || product === void 0 ? void 0 : product.orderAT) === null || _g === void 0 ? void 0 : _g.time}, ${(_h = product === null || product === void 0 ? void 0 : product.orderAT) === null || _h === void 0 ? void 0 : _h.date}</i>
-                     </div>`
+                                html: seller_order_email_template(product)
                             });
                         }
                         return {
@@ -96,49 +84,14 @@ module.exports = function confirmOrder(req, res, next) {
             const promises = Array.isArray(orderItems) && orderItems.map((orderItem) => __awaiter(this, void 0, void 0, function* () { return yield confirmOrderHandler(orderItem); }));
             let upRes = yield Promise.all(promises);
             let totalAmount = Array.isArray(upRes) &&
-                upRes.map((item) => (parseFloat(item === null || item === void 0 ? void 0 : item.baseAmount) + parseFloat(item === null || item === void 0 ? void 0 : item.shippingCharge))).reduce((p, n) => p + n, 0).toFixed(2);
-            totalAmount = parseFloat(totalAmount);
-            let ind = 1;
+                upRes.map((item) => (parseInt((item === null || item === void 0 ? void 0 : item.baseAmount) + (item === null || item === void 0 ? void 0 : item.shippingCharge)))).reduce((p, n) => p + n, 0);
+            totalAmount = parseInt(totalAmount);
             yield email_service({
                 to: email,
                 subject: "Order confirmed",
-                html: `<div>
-            <table style="padding: '5px 2px'">
-               <caption style="padding: '4px'; background-color: 'black'; color: 'white'">Order Details:</caption>
-                  <thead>
-                     <tr>
-                        <th>No.</th>
-                        <th>Product</th>
-                        <th>Price</th>
-                        <th>Quantity</th>
-                     </tr>
-                  </thead>
-                  <tbody>
-                  ${Array.isArray(upRes) && upRes.map((item) => {
-                    return (`<tr>
-                           <td>${ind++}</td>
-                           <td>${item === null || item === void 0 ? void 0 : item.title}</td>
-                           <td>$ ${item === null || item === void 0 ? void 0 : item.baseAmount}</td>
-                           <td>${item === null || item === void 0 ? void 0 : item.quantity} Pcs</td>
-                        </tr>`);
-                })}
-                  </tbody>
-                  <tfoot>
-                     <tr>
-                        <th colspan= "100%">
-                           <b style="width: '100%'; text-align: 'center'; background-color: 'black'; color: 'white'">
-                              Total amount: ${totalAmount} USD
-                           </b>
-                        </th>
-                     </tr>
-                </tfoot>
-            </table>
-            <br/>
-         </div>`
+                html: buyer_order_email_template(upRes, totalAmount)
             });
-            if (upRes) {
-                return res.status(200).send({ message: "order success", statusCode: 200, success: true, data: upRes });
-            }
+            return res.status(200).send({ message: "order success", statusCode: 200, success: true, data: upRes });
         }
         catch (error) {
             next(error);

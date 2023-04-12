@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 const Order = require("../../model/order.model");
 const { update_variation_stock_available, calculateShippingCost } = require("../../services/common.service");
 const email_service = require("../../services/email.service");
+const { buyer_order_email_template, seller_order_email_template } = require("../../templates/email.template");
 
 
 module.exports = async function confirmOrder(req: Request, res: Response, next: NextFunction) {
@@ -78,20 +79,7 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
                await email_service({
                   to: product?.sellerData?.sellerEmail,
                   subject: "New order",
-                  html: `<div>
-                        <h3>You have new order from ${product?.customerEmail}</h3>
-                        <p>
-                           <pre>
-                              Item Name     : ${product?.title} <br />
-                              Item SKU      : ${product?.sku} <br />
-                              Item Quantity : ${product?.quantity} <br />
-                              Item Price    : ${product?.baseAmount} usd
-                           </pre>
-                        </p>
-                        <br />
-                        <span>Order ID: <b>${product?.orderID}</b></span> <br />
-                        <i>Order At ${product?.orderAT?.time}, ${product?.orderAT?.date}</i>
-                     </div>`
+                  html: seller_order_email_template(product)
                });
             }
 
@@ -113,55 +101,17 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
       let upRes: any = await Promise.all(promises);
 
       let totalAmount: any = Array.isArray(upRes) &&
-         upRes.map((item: any) => (parseFloat(item?.baseAmount) + parseFloat(item?.shippingCharge))).reduce((p: any, n: any) => p + n, 0).toFixed(2);
+         upRes.map((item: any) => (parseInt(item?.baseAmount + item?.shippingCharge))).reduce((p: any, n: any) => p + n, 0);
 
-      totalAmount = parseFloat(totalAmount);
+      totalAmount = parseInt(totalAmount);
 
-      let ind = 1;
       await email_service({
          to: email,
          subject: "Order confirmed",
-         html: `<div>
-            <table style="padding: '5px 2px'">
-               <caption style="padding: '4px'; background-color: 'black'; color: 'white'">Order Details:</caption>
-                  <thead>
-                     <tr>
-                        <th>No.</th>
-                        <th>Product</th>
-                        <th>Price</th>
-                        <th>Quantity</th>
-                     </tr>
-                  </thead>
-                  <tbody>
-                  ${Array.isArray(upRes) && upRes.map((item: any) => {
-            return (
-               `<tr>
-                           <td>${ind++}</td>
-                           <td>${item?.title}</td>
-                           <td>$ ${item?.baseAmount}</td>
-                           <td>${item?.quantity} Pcs</td>
-                        </tr>`
-            )
-         })}
-                  </tbody>
-                  <tfoot>
-                     <tr>
-                        <th colspan= "100%">
-                           <b style="width: '100%'; text-align: 'center'; background-color: 'black'; color: 'white'">
-                              Total amount: ${totalAmount} USD
-                           </b>
-                        </th>
-                     </tr>
-                </tfoot>
-            </table>
-            <br/>
-         </div>`
+         html: buyer_order_email_template(upRes, totalAmount)
       });
 
-
-      if (upRes) {
-         return res.status(200).send({ message: "order success", statusCode: 200, success: true, data: upRes });
-      }
+      return res.status(200).send({ message: "order success", statusCode: 200, success: true, data: upRes });
 
    } catch (error: any) {
       next(error);

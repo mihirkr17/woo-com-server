@@ -111,8 +111,8 @@ module.exports = function SetOrder(req, res, next) {
                 return p;
             });
             let totalAmount = Array.isArray(orderItems) &&
-                orderItems.map((item) => (parseFloat(item === null || item === void 0 ? void 0 : item.baseAmount) + (item === null || item === void 0 ? void 0 : item.shippingCharge))).reduce((p, n) => p + n, 0).toFixed(2);
-            totalAmount = parseFloat(totalAmount);
+                orderItems.map((item) => (parseInt((item === null || item === void 0 ? void 0 : item.baseAmount) + (item === null || item === void 0 ? void 0 : item.shippingCharge)))).reduce((p, n) => p + n, 0);
+            totalAmount = parseInt(totalAmount);
             if (!totalAmount) {
                 return res.status(402).send();
             }
@@ -122,7 +122,7 @@ module.exports = function SetOrder(req, res, next) {
                 currency: 'usd',
                 payment_method_types: ['card'],
                 metadata: {
-                    order_id: "opi_" + (Math.round(Math.random() * 99999999) + parseInt(totalAmount)).toString()
+                    order_id: "opi_" + (Math.round(Math.random() * 99999999) + totalAmount).toString()
                 }
             });
             if (!(paymentIntent === null || paymentIntent === void 0 ? void 0 : paymentIntent.client_secret)) {
