@@ -211,7 +211,7 @@ module.exports.homeStoreController = (req, res, next) => __awaiter(void 0, void 
                         $slice: [{
                                 $filter: {
                                     input: "$variations",
-                                    cond: { $and: [{ $eq: ["$$v.status", 'active'] }, { $eq: ["$$v.stock", "in"] }] },
+                                    cond: { $eq: ["$$v.status", 'active'] },
                                     as: "v"
                                 }
                             }, 1]

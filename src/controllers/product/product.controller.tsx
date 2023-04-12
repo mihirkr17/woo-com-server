@@ -229,7 +229,7 @@ module.exports.homeStoreController = async (req: Request, res: Response, next: N
                   $slice: [{
                      $filter: {
                         input: "$variations",
-                        cond: { $and: [{ $eq: ["$$v.status", 'active'] }, { $eq: ["$$v.stock", "in"] }] },
+                        cond: { $eq: ["$$v.status", 'active'] },
                         as: "v"
                      }
                   }, 1]
