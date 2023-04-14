@@ -91,7 +91,7 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
 
       // calculating total amount of order items
       const totalAmount: number = Array.isArray(result) ?
-         result.reduce((p: number, n: any) => p + parseInt(n?.baseAmount + n?.shippingCharge), 0) : 0;
+         result.reduce((p: number, n: any) => p + parseInt(n?.baseAmount), 0) : 0;
 
 
       // after calculating total amount and order succeed then email sent to the buyer

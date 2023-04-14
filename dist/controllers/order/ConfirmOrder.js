@@ -67,7 +67,7 @@ module.exports = function confirmOrder(req, res, next) {
             const result = yield Promise.all(orderPromises);
             // calculating total amount of order items
             const totalAmount = Array.isArray(result) ?
-                result.reduce((p, n) => p + parseInt((n === null || n === void 0 ? void 0 : n.baseAmount) + (n === null || n === void 0 ? void 0 : n.shippingCharge)), 0) : 0;
+                result.reduce((p, n) => p + parseInt(n === null || n === void 0 ? void 0 : n.baseAmount), 0) : 0;
             // after calculating total amount and order succeed then email sent to the buyer
             yield email_service({
                 to: email,

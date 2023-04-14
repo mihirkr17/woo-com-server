@@ -20,7 +20,7 @@ module.exports.buyer_order_email_template = (data: any, totalAmount: number) => 
             `<tr style="line-height: 30px; text-align: center; font-weight: bold; letter-spacing: 0.4px">
                            <td style="border: 1px solid #777">${ind++}</td>
                            <td style="border: 1px solid #777">${item?.title}</td>
-                           <td style="border: 1px solid #777">$ ${parseInt(item?.baseAmount + item?.shippingCharge)}</td>
+                           <td style="border: 1px solid #777">$ ${item?.baseAmount}</td>
                            <td style="border: 1px solid #777">${item?.quantity} Pcs</td>
                         </tr>`
          )
