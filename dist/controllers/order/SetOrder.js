@@ -13,9 +13,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const apiResponse = require("../../errors/apiResponse");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const ShoppingCart = require("../../model/shoppingCart.model");
-const { findUserByEmail, actualSellingPrice, calculateShippingCost, update_variation_stock_available } = require("../../services/common.service");
-const Order = require("../../model/order.model");
-const email_service = require("../../services/email.service");
+const { findUserByEmail, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
 module.exports = function SetOrder(req, res, next) {
     var _a, _b, _c;
     return __awaiter(this, void 0, void 0, function* () {
@@ -29,13 +27,13 @@ module.exports = function SetOrder(req, res, next) {
                 throw new apiResponse.Api400Error("Required body !");
             }
             const { state } = req.body;
-            let user = yield findUserByEmail(authEmail);
-            let defaultAddress = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
+            const user = yield findUserByEmail(authEmail);
+            const defaultAddress = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
                 ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
             if (!defaultAddress) {
                 throw new apiResponse.Api400Error("Required shipping address !");
             }
-            let areaType = defaultAddress === null || defaultAddress === void 0 ? void 0 : defaultAddress.area_type;
+            const areaType = defaultAddress === null || defaultAddress === void 0 ? void 0 : defaultAddress.area_type;
             const orderItems = yield ShoppingCart.aggregate([
                 { $match: { customerEmail: authEmail } },
                 { $unwind: { path: "$items" } },
@@ -100,19 +98,14 @@ module.exports = function SetOrder(req, res, next) {
             if (!orderItems || orderItems.length <= 0) {
                 throw new apiResponse.Api400Error("Nothing for purchase ! Please add product in your cart.");
             }
-            orderItems && orderItems.map((p) => {
-                var _a, _b, _c;
-                if (((_a = p === null || p === void 0 ? void 0 : p.shipping) === null || _a === void 0 ? void 0 : _a.isFree) && ((_b = p === null || p === void 0 ? void 0 : p.shipping) === null || _b === void 0 ? void 0 : _b.isFree)) {
-                    p["shippingCharge"] = 0;
-                }
-                else {
-                    p["shippingCharge"] = calculateShippingCost((_c = p === null || p === void 0 ? void 0 : p.packaged) === null || _c === void 0 ? void 0 : _c.volumetricWeight, areaType);
-                }
+            Array.isArray(orderItems) && orderItems.map((p) => {
+                var _a, _b;
+                p["shippingCharge"] = ((_a = p === null || p === void 0 ? void 0 : p.shipping) === null || _a === void 0 ? void 0 : _a.isFree) ? 0 : calculateShippingCost((_b = p === null || p === void 0 ? void 0 : p.packaged) === null || _b === void 0 ? void 0 : _b.volumetricWeight, areaType);
                 return p;
             });
-            let totalAmount = Array.isArray(orderItems) &&
-                orderItems.map((item) => (parseInt((item === null || item === void 0 ? void 0 : item.baseAmount) + (item === null || item === void 0 ? void 0 : item.shippingCharge)))).reduce((p, n) => p + n, 0);
-            totalAmount = parseInt(totalAmount);
+            // calculating total amount of order items
+            const totalAmount = Array.isArray(orderItems) ?
+                orderItems.reduce((p, n) => p + parseInt((n === null || n === void 0 ? void 0 : n.baseAmount) + (n === null || n === void 0 ? void 0 : n.shippingCharge)), 0) : 0;
             if (!totalAmount) {
                 return res.status(402).send();
             }

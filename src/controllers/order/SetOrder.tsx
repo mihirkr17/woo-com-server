@@ -5,9 +5,7 @@ import { NextFunction, Request, Response } from "express";
 const apiResponse = require("../../errors/apiResponse");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const ShoppingCart = require("../../model/shoppingCart.model");
-const { findUserByEmail, actualSellingPrice, calculateShippingCost, update_variation_stock_available } = require("../../services/common.service");
-const Order = require("../../model/order.model");
-const email_service = require("../../services/email.service");
+const { findUserByEmail, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
 
 
 module.exports = async function SetOrder(req: Request, res: Response, next: NextFunction) {
@@ -26,16 +24,16 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
 
       const { state } = req.body;
 
-      let user = await findUserByEmail(authEmail);
+      const user = await findUserByEmail(authEmail);
 
-      let defaultAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
+      const defaultAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
          user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
 
       if (!defaultAddress) {
          throw new apiResponse.Api400Error("Required shipping address !");
       }
 
-      let areaType = defaultAddress?.area_type;
+      const areaType = defaultAddress?.area_type;
 
       const orderItems = await ShoppingCart.aggregate([
          { $match: { customerEmail: authEmail } },
@@ -104,22 +102,15 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
          throw new apiResponse.Api400Error("Nothing for purchase ! Please add product in your cart.");
       }
 
-      orderItems && orderItems.map((p: any) => {
-
-         if (p?.shipping?.isFree && p?.shipping?.isFree) {
-            p["shippingCharge"] = 0;
-         } else {
-            p["shippingCharge"] = calculateShippingCost(p?.packaged?.volumetricWeight, areaType);
-         }
+      Array.isArray(orderItems) && orderItems.map((p: any) => {
+         p["shippingCharge"] = p?.shipping?.isFree ? 0 : calculateShippingCost(p?.packaged?.volumetricWeight, areaType);
 
          return p;
       });
 
-
-      let totalAmount = Array.isArray(orderItems) &&
-         orderItems.map((item: any) => (parseInt(item?.baseAmount + item?.shippingCharge))).reduce((p: any, n: any) => p + n, 0);
-
-      totalAmount = parseInt(totalAmount);
+      // calculating total amount of order items
+      const totalAmount: number = Array.isArray(orderItems) ?
+         orderItems.reduce((p: number, n: any) => p + parseInt(n?.baseAmount + n?.shippingCharge), 0) : 0;
 
       if (!totalAmount) {
          return res.status(402).send();

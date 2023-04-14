@@ -20,7 +20,7 @@ try {
       * @controller productsByCategoryController
       * @required categories [Optional -> filters query]
       */
-    router.get("/product-by-category", productCTRL.productsByCategoryController);
+    router.post("/product-by-category", productCTRL.productsByCategoryController);
     router.get("/fetch-top-selling-product", productCTRL.fetchTopSellingProduct);
 }
 catch (error) {

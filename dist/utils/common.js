@@ -1,27 +1,3 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const { ObjectId } = require("mongodb");
-const Product = require("../model/product.model");
-module.exports.updateProductStock = (productID, variationID, restAvailable) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        let stock = restAvailable <= 1 ? "out" : "in";
-        return yield Product.findOneAndUpdate({ _id: ObjectId(productID) }, {
-            $set: {
-                "variations.$[i].available": restAvailable,
-                "variations.$[i].stock": stock
-            }
-        }, { arrayFilters: [{ "i._vrid": variationID }] });
-    }
-    catch (error) {
-        return error;
-    }
-});
+module.exports.generateOrderID = () => ("oi_" + (Math.floor(10000000 + Math.random() * 999999999999)).toString());
+module.exports.generateTrackingID = () => ("tri_" + (Math.round(Math.random() * 9999999) + Math.round(Math.random() * 8888)).toString());

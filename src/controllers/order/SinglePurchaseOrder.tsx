@@ -6,6 +6,7 @@ const apiResponse = require("../../errors/apiResponse");
 const { findUserByEmail, update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
 const email_service = require("../../services/email.service");
 const { buyer_order_email_template, seller_order_email_template } = require("../../templates/email.template");
+const { generateOrderID, generateTrackingID } = require("../../utils/common");
 
 
 
@@ -13,6 +14,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
    try {
       const authEmail = req.decoded.email;
       const uuid = req.decoded._uuid;
+      const timestamp: any = Date.now();
 
       if (!req.body) {
          return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
@@ -23,16 +25,16 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
       if (!variationID || !productID || !quantity || !listingID || !paymentIntentID || !state || !paymentMethodID || !orderPaymentID || !customerEmail)
          throw new apiResponse.Api400Error("Required variationID, productID, quantity, listingID, paymentIntentID, state, paymentMethodID, orderPaymentID, customerEmail");
 
-      let user = await findUserByEmail(authEmail);
+      const user = await findUserByEmail(authEmail);
 
       if (!user) {
          return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
       }
 
-      let defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
+      const defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
          user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
 
-      let areaType = defaultShippingAddress?.area_type;
+      const areaType = defaultShippingAddress?.area_type;
 
       let product = await Product.aggregate([
          { $match: { $and: [{ _lid: listingID }, { _id: ObjectId(productID) }] } },
@@ -82,25 +84,13 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
 
       ]);
 
-      if (product && typeof product !== 'undefined') {
+      if (typeof product !== 'undefined') {
          product = product[0];
 
-         product["orderID"] = "oi_" + (Math.floor(10000000 + Math.random() * 999999999999)).toString();
-
-         product["trackingID"] = "tri_" + (Math.round(Math.random() * 9999999) + Math.round(Math.random() * 8888)).toString();
-
-         if (product?.shipping?.isFree && product?.shipping?.isFree) {
-            product["shippingCharge"] = 0;
-         } else {
-            product["shippingCharge"] = calculateShippingCost(product?.packaged?.volumetricWeight, areaType);
-         }
-
-         let amountNew = product?.baseAmount + product?.shippingCharge;
-
-         product["baseAmount"] = parseInt(amountNew);
-
-         const timestamp: any = Date.now();
-
+         product["orderID"] = generateOrderID();
+         product["trackingID"] = generateTrackingID();
+         product["shippingCharge"] = product?.shipping?.isFree ? 0 : calculateShippingCost(product?.packaged?.volumetricWeight, areaType);
+         product["baseAmount"] = parseInt(product?.baseAmount + product?.shippingCharge);
          product["orderAT"] = {
             iso: new Date(timestamp),
             time: new Date(timestamp).toLocaleTimeString(),
@@ -108,7 +98,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
             timestamp: timestamp
          }
 
-         let result = await Order.findOneAndUpdate(
+         const result = await Order.findOneAndUpdate(
             { user_email: authEmail },
             { $push: { orders: product } },
             { upsert: true }
@@ -125,8 +115,8 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
 
             product?.sellerData?.sellerEmail && await email_service({
                to: product?.sellerData?.sellerEmail,
-               subject: "New order",
-               html: seller_order_email_template(product)
+               subject: "New order confirmed",
+               html: seller_order_email_template([product])
             });
 
             return res.status(200).send({ success: true, statusCode: 200, message: "Order Success." });

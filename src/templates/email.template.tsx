@@ -18,10 +18,10 @@ module.exports.buyer_order_email_template = (data: any, totalAmount: number) => 
                   ${Array.isArray(data) ? data.map((item: any) => {
          return (
             `<tr style="line-height: 30px; text-align: center; font-weight: bold; letter-spacing: 0.4px">
-                           <td>${ind++}</td>
-                           <td>${item?.title}</td>
-                           <td>$ ${parseInt(item?.baseAmount + item?.shippingCharge)}</td>
-                           <td>${item?.quantity} Pcs</td>
+                           <td style="border: 1px solid #777">${ind++}</td>
+                           <td style="border: 1px solid #777">${item?.title}</td>
+                           <td style="border: 1px solid #777">$ ${parseInt(item?.baseAmount + item?.shippingCharge)}</td>
+                           <td style="border: 1px solid #777">${item?.quantity} Pcs</td>
                         </tr>`
          )
       }) : `<tr style="line-height: 30px; text-align: center; font-weight: bold; letter-spacing: 0.4px"">
@@ -50,33 +50,45 @@ module.exports.buyer_order_email_template = (data: any, totalAmount: number) => 
 
 
 module.exports.seller_order_email_template = (product: any) => {
+   const timestamp = Date.now();
+   const time = new Date(timestamp).toLocaleTimeString();
+   const date = new Date(timestamp).toDateString();
    return (
       `<div>
-         <h3 style="text-align: center">You have new order from ${product?.customerEmail}</h3>
+         <h3 style="text-align: center">You have new order At ${time}, ${date}</h3>
 
          <table style="border: 1px solid #777; width: 100%">
           <caption style="padding: 4px;">Order Details:</caption>
             <thead>
                <tr style="line-height: 34px; text-align: center; font-weight: bold; letter-spacing: 0.4px; background: cyan; color: black">
+                  <th style="border: 1px solid #777">OrderID</th>
+                  <th style="border: 1px solid #777">From</th>
                   <th style="border: 1px solid #777">Product</th>
-                  <th style="border: 1px solid #777">Quantity</th>
+                  <th style="border: 1px solid #777">Qty</th>
                   <th style="border: 1px solid #777">SKU</th>
+                  <th style="border: 1px solid #777">Amount</th>
                </tr>
             </thead>
-            <tbody>
-               <tr style="line-height: 30px; text-align: center; font-weight: bold; letter-spacing: 0.4px">
-                  <td style="border: 1px solid #777">${product?.title}</td>
-                  <td style="border: 1px solid #777">${product?.quantity}</td>
-                  <td style="border: 1px solid #777">${product?.sku}</td>
-               </tr>
+            <tbody>${Array.isArray(product) && product.map((item: any) => {
+         return (
+            `<tr style="line-height: 30px; text-align: center; font-weight: bold; letter-spacing: 0.4px">
+                  <td style="border: 1px solid #777">${item?.orderID}</td>
+                  <td style="border: 1px solid #777">${item?.customerEmail}</td>
+                  <td style="border: 1px solid #777">${item?.title}</td>
+                  <td style="border: 1px solid #777">${item?.quantity} Pcs</td>
+                  <td style="border: 1px solid #777">${item?.sku}</td>
+                  <td style="border: 1px solid #777">$ ${item?.baseAmount}</td>
+            </tr>`
+         )
+      })
+
+      }
             </tbody>
             <tfoot>
                <tr>
                   <th colspan= "100%" align="center">
                      <p style="width: 100%; text-align: center; padding: 12px 0;">
-                        Order ID: <b>${product?.orderID}</b> <br />
-                        Tracking ID: <b>${product?.trackingID}</b> <br />
-                        <i>Order At ${product?.orderAT?.time}, ${product?.orderAT?.date}</i>
+                        WooKart Seller
                      </p>
                   </th>
                </tr>
@@ -117,3 +129,11 @@ module.exports.verify_email_html_template = (verifyToken: string, uuid: string) 
    </tr>
 </table>`)
 }
+
+
+
+{/* <tr style="line-height: 30px; text-align: center; font-weight: bold; letter-spacing: 0.4px">
+<td style="border: 1px solid #777">${product?.title}</td>
+<td style="border: 1px solid #777">${product?.quantity}</td>
+<td style="border: 1px solid #777">${product?.sku}</td>
+</tr> */}

@@ -3,6 +3,7 @@ const Order = require("../../model/order.model");
 const { update_variation_stock_available, calculateShippingCost } = require("../../services/common.service");
 const email_service = require("../../services/email.service");
 const { buyer_order_email_template, seller_order_email_template } = require("../../templates/email.template");
+const { generateOrderID, generateTrackingID } = require("../../utils/common");
 
 
 module.exports = async function confirmOrder(req: Request, res: Response, next: NextFunction) {
@@ -14,50 +15,57 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
          return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
       }
 
-      const { paymentIntentID, paymentMethodID, orderPaymentID, orderItems } = req.body;
+      const { paymentIntentID, paymentMethodID, orderPaymentID, orderItems } = req.body as {
+         paymentIntentID: string;
+         paymentMethodID: string;
+         orderPaymentID: string;
+         orderItems: any[];
+      };
 
 
-      if (!paymentIntentID || !paymentMethodID) {
+      if (!req.body || typeof req.body !== "object" || !paymentIntentID || !paymentMethodID || !orderItems || !Array.isArray(orderItems) || orderItems.length <= 0) {
          return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
       }
 
-      if (!orderItems || !Array.isArray(orderItems) || orderItems.length <= 0) {
-         return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
+      function separateOrdersBySeller(upRes: any[]) {
+         let newOrder: any = {};
+
+         for (const orderItem of upRes) {
+            const sellerEmail = orderItem?.sellerData?.sellerEmail;
+
+            if (!newOrder[sellerEmail]) {
+               newOrder[sellerEmail] = [];
+            }
+
+            newOrder[sellerEmail].push(orderItem);
+         }
+
+         return newOrder;
       }
 
       async function confirmOrderHandler(product: any) {
-         if (!product) {
-            return;
-         }
 
-         const { productID, variationID, listingID, quantity, areaType } = product;
+         const { productID,
+            variationID,
+            listingID,
+            quantity,
+            areaType,
+            shipping,
+            packaged,
+            baseAmount,
+         } = product;
 
-         if (areaType !== "local" && areaType !== "zonal") {
-            return;
-         }
+         const timestamp: any = Date.now();
 
-         product["orderID"] = "oi_" + (Math.floor(10000000 + Math.random() * 999999999999)).toString();
-
-         product["trackingID"] = "tri_" + (Math.round(Math.random() * 9999999) + Math.round(Math.random() * 8888)).toString();
-
+         product["orderID"] = generateOrderID();
+         product["trackingID"] = generateTrackingID();
          product["orderPaymentID"] = orderPaymentID;
          product["paymentIntentID"] = paymentIntentID;
          product["paymentMethodID"] = paymentMethodID;
          product["paymentStatus"] = "success";
          product["paymentMode"] = "card";
-
-         if (product?.shipping?.isFree && product?.shipping?.isFree) {
-            product["shippingCharge"] = 0;
-         } else {
-            product["shippingCharge"] = calculateShippingCost(product?.packaged?.volumetricWeight, areaType);
-         }
-
-         let amountNew = product?.baseAmount + product?.shippingCharge;
-
-         product["baseAmount"] = parseInt(amountNew);
-
-         const timestamp: any = Date.now();
-
+         product["shippingCharge"] = shipping?.isFree ? 0 : calculateShippingCost(packaged?.volumetricWeight, areaType);
+         product["baseAmount"] = parseInt(baseAmount + product?.shippingCharge);
          product["orderAT"] = {
             iso: new Date(timestamp),
             time: new Date(timestamp).toLocaleTimeString(),
@@ -65,8 +73,7 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
             timestamp: timestamp
          }
 
-
-         let result = await Order.findOneAndUpdate(
+         const result = await Order.findOneAndUpdate(
             { user_email: email },
             { $push: { orders: product } },
             { upsert: true }
@@ -74,44 +81,43 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
 
          if (result) {
             await update_variation_stock_available("dec", { productID, listingID, variationID, quantity });
-
-            if (product?.sellerData?.sellerEmail && product?.sellerData?.sellerEmail) {
-               await email_service({
-                  to: product?.sellerData?.sellerEmail,
-                  subject: "New order",
-                  html: seller_order_email_template(product)
-               });
-            }
-
-
-            return {
-               orderConfirmSuccess: true,
-               message: "Order success for " + product?.title,
-               orderID: product?.orderID,
-               baseAmount: product?.baseAmount,
-               shippingCharge: product?.shippingCharge,
-               quantity: product?.quantity,
-               title: product?.title
-            };
+            return product;
          }
       }
 
-      const promises: any = Array.isArray(orderItems) && orderItems.map(async (orderItem: any) => await confirmOrderHandler(orderItem));
+      const orderPromises: any = Array.isArray(orderItems) && orderItems.map(async (orderItem: any) => await confirmOrderHandler(orderItem));
 
-      let upRes: any = await Promise.all(promises);
+      const result: any = await Promise.all(orderPromises);
 
-      let totalAmount: any = Array.isArray(upRes) &&
-         upRes.map((item: any) => (parseInt(item?.baseAmount + item?.shippingCharge))).reduce((p: any, n: any) => p + n, 0);
+      // calculating total amount of order items
+      const totalAmount: number = Array.isArray(result) ?
+         result.reduce((p: number, n: any) => p + parseInt(n?.baseAmount + n?.shippingCharge), 0) : 0;
 
-      totalAmount = parseInt(totalAmount);
 
+      // after calculating total amount and order succeed then email sent to the buyer
       await email_service({
          to: email,
          subject: "Order confirmed",
-         html: buyer_order_email_template(upRes, totalAmount)
+         html: buyer_order_email_template(result, totalAmount)
       });
 
-      return res.status(200).send({ message: "order success", statusCode: 200, success: true, data: upRes });
+
+      // after order succeed then group the order item by seller email and send email to the seller
+      const orderBySeller: any = (Array.isArray(result) && result.length >= 1) ? separateOrdersBySeller(result) : {};
+
+      // after successfully got order by seller as a object then loop it and trigger send email function inside for in loop
+      for (const sellerEmail in orderBySeller) {
+         const items = orderBySeller[sellerEmail];
+
+         await email_service({
+            to: sellerEmail,
+            subject: "New order confirmed",
+            html: seller_order_email_template(items)
+         });
+      }
+
+      // after order confirmed then return response to the client
+      return res.status(200).send({ message: "Order completed.", statusCode: 200, success: true });
 
    } catch (error: any) {
       next(error);

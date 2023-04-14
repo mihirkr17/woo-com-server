@@ -13,6 +13,7 @@ const Order = require("../../model/order.model");
 const { update_variation_stock_available, calculateShippingCost } = require("../../services/common.service");
 const email_service = require("../../services/email.service");
 const { buyer_order_email_template, seller_order_email_template } = require("../../templates/email.template");
+const { generateOrderID, generateTrackingID } = require("../../utils/common");
 module.exports = function confirmOrder(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -21,77 +22,71 @@ module.exports = function confirmOrder(req, res, next) {
                 return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
             }
             const { paymentIntentID, paymentMethodID, orderPaymentID, orderItems } = req.body;
-            if (!paymentIntentID || !paymentMethodID) {
+            if (!req.body || typeof req.body !== "object" || !paymentIntentID || !paymentMethodID || !orderItems || !Array.isArray(orderItems) || orderItems.length <= 0) {
                 return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
             }
-            if (!orderItems || !Array.isArray(orderItems) || orderItems.length <= 0) {
-                return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
+            function separateOrdersBySeller(upRes) {
+                var _a;
+                let newOrder = {};
+                for (const orderItem of upRes) {
+                    const sellerEmail = (_a = orderItem === null || orderItem === void 0 ? void 0 : orderItem.sellerData) === null || _a === void 0 ? void 0 : _a.sellerEmail;
+                    if (!newOrder[sellerEmail]) {
+                        newOrder[sellerEmail] = [];
+                    }
+                    newOrder[sellerEmail].push(orderItem);
+                }
+                return newOrder;
             }
             function confirmOrderHandler(product) {
-                var _a, _b, _c, _d, _e, _f;
                 return __awaiter(this, void 0, void 0, function* () {
-                    if (!product) {
-                        return;
-                    }
-                    const { productID, variationID, listingID, quantity, areaType } = product;
-                    if (areaType !== "local" && areaType !== "zonal") {
-                        return;
-                    }
-                    product["orderID"] = "oi_" + (Math.floor(10000000 + Math.random() * 999999999999)).toString();
-                    product["trackingID"] = "tri_" + (Math.round(Math.random() * 9999999) + Math.round(Math.random() * 8888)).toString();
+                    const { productID, variationID, listingID, quantity, areaType, shipping, packaged, baseAmount, } = product;
+                    const timestamp = Date.now();
+                    product["orderID"] = generateOrderID();
+                    product["trackingID"] = generateTrackingID();
                     product["orderPaymentID"] = orderPaymentID;
                     product["paymentIntentID"] = paymentIntentID;
                     product["paymentMethodID"] = paymentMethodID;
                     product["paymentStatus"] = "success";
                     product["paymentMode"] = "card";
-                    if (((_a = product === null || product === void 0 ? void 0 : product.shipping) === null || _a === void 0 ? void 0 : _a.isFree) && ((_b = product === null || product === void 0 ? void 0 : product.shipping) === null || _b === void 0 ? void 0 : _b.isFree)) {
-                        product["shippingCharge"] = 0;
-                    }
-                    else {
-                        product["shippingCharge"] = calculateShippingCost((_c = product === null || product === void 0 ? void 0 : product.packaged) === null || _c === void 0 ? void 0 : _c.volumetricWeight, areaType);
-                    }
-                    let amountNew = (product === null || product === void 0 ? void 0 : product.baseAmount) + (product === null || product === void 0 ? void 0 : product.shippingCharge);
-                    product["baseAmount"] = parseInt(amountNew);
-                    const timestamp = Date.now();
+                    product["shippingCharge"] = (shipping === null || shipping === void 0 ? void 0 : shipping.isFree) ? 0 : calculateShippingCost(packaged === null || packaged === void 0 ? void 0 : packaged.volumetricWeight, areaType);
+                    product["baseAmount"] = parseInt(baseAmount + (product === null || product === void 0 ? void 0 : product.shippingCharge));
                     product["orderAT"] = {
                         iso: new Date(timestamp),
                         time: new Date(timestamp).toLocaleTimeString(),
                         date: new Date(timestamp).toDateString(),
                         timestamp: timestamp
                     };
-                    let result = yield Order.findOneAndUpdate({ user_email: email }, { $push: { orders: product } }, { upsert: true });
+                    const result = yield Order.findOneAndUpdate({ user_email: email }, { $push: { orders: product } }, { upsert: true });
                     if (result) {
                         yield update_variation_stock_available("dec", { productID, listingID, variationID, quantity });
-                        if (((_d = product === null || product === void 0 ? void 0 : product.sellerData) === null || _d === void 0 ? void 0 : _d.sellerEmail) && ((_e = product === null || product === void 0 ? void 0 : product.sellerData) === null || _e === void 0 ? void 0 : _e.sellerEmail)) {
-                            yield email_service({
-                                to: (_f = product === null || product === void 0 ? void 0 : product.sellerData) === null || _f === void 0 ? void 0 : _f.sellerEmail,
-                                subject: "New order",
-                                html: seller_order_email_template(product)
-                            });
-                        }
-                        return {
-                            orderConfirmSuccess: true,
-                            message: "Order success for " + (product === null || product === void 0 ? void 0 : product.title),
-                            orderID: product === null || product === void 0 ? void 0 : product.orderID,
-                            baseAmount: product === null || product === void 0 ? void 0 : product.baseAmount,
-                            shippingCharge: product === null || product === void 0 ? void 0 : product.shippingCharge,
-                            quantity: product === null || product === void 0 ? void 0 : product.quantity,
-                            title: product === null || product === void 0 ? void 0 : product.title
-                        };
+                        return product;
                     }
                 });
             }
-            const promises = Array.isArray(orderItems) && orderItems.map((orderItem) => __awaiter(this, void 0, void 0, function* () { return yield confirmOrderHandler(orderItem); }));
-            let upRes = yield Promise.all(promises);
-            let totalAmount = Array.isArray(upRes) &&
-                upRes.map((item) => (parseInt((item === null || item === void 0 ? void 0 : item.baseAmount) + (item === null || item === void 0 ? void 0 : item.shippingCharge)))).reduce((p, n) => p + n, 0);
-            totalAmount = parseInt(totalAmount);
+            const orderPromises = Array.isArray(orderItems) && orderItems.map((orderItem) => __awaiter(this, void 0, void 0, function* () { return yield confirmOrderHandler(orderItem); }));
+            const result = yield Promise.all(orderPromises);
+            // calculating total amount of order items
+            const totalAmount = Array.isArray(result) ?
+                result.reduce((p, n) => p + parseInt((n === null || n === void 0 ? void 0 : n.baseAmount) + (n === null || n === void 0 ? void 0 : n.shippingCharge)), 0) : 0;
+            // after calculating total amount and order succeed then email sent to the buyer
             yield email_service({
                 to: email,
                 subject: "Order confirmed",
-                html: buyer_order_email_template(upRes, totalAmount)
+                html: buyer_order_email_template(result, totalAmount)
             });
-            return res.status(200).send({ message: "order success", statusCode: 200, success: true, data: upRes });
+            // after order succeed then group the order item by seller email and send email to the seller
+            const orderBySeller = (Array.isArray(result) && result.length >= 1) ? separateOrdersBySeller(result) : {};
+            // after successfully got order by seller as a object then loop it and trigger send email function inside for in loop
+            for (const sellerEmail in orderBySeller) {
+                const items = orderBySeller[sellerEmail];
+                yield email_service({
+                    to: sellerEmail,
+                    subject: "New order confirmed",
+                    html: seller_order_email_template(items)
+                });
+            }
+            // after order confirmed then return response to the client
+            return res.status(200).send({ message: "Order completed.", statusCode: 200, success: true });
         }
         catch (error) {
             next(error);

@@ -16,25 +16,27 @@ const apiResponse = require("../../errors/apiResponse");
 const { findUserByEmail, update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
 const email_service = require("../../services/email.service");
 const { buyer_order_email_template, seller_order_email_template } = require("../../templates/email.template");
+const { generateOrderID, generateTrackingID } = require("../../utils/common");
 module.exports = function SinglePurchaseOrder(req, res, next) {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f;
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const authEmail = req.decoded.email;
             const uuid = req.decoded._uuid;
+            const timestamp = Date.now();
             if (!req.body) {
                 return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
             }
             const { variationID, productID, quantity, listingID, paymentIntentID, state, paymentMethodID, orderPaymentID, customerEmail } = req.body;
             if (!variationID || !productID || !quantity || !listingID || !paymentIntentID || !state || !paymentMethodID || !orderPaymentID || !customerEmail)
                 throw new apiResponse.Api400Error("Required variationID, productID, quantity, listingID, paymentIntentID, state, paymentMethodID, orderPaymentID, customerEmail");
-            let user = yield findUserByEmail(authEmail);
+            const user = yield findUserByEmail(authEmail);
             if (!user) {
                 return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
             }
-            let defaultShippingAddress = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
+            const defaultShippingAddress = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
                 ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
-            let areaType = defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type;
+            const areaType = defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type;
             let product = yield Product.aggregate([
                 { $match: { $and: [{ _lid: listingID }, { _id: ObjectId(productID) }] } },
                 { $unwind: { path: "$variations" } },
@@ -81,26 +83,19 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                     $unset: ["variations"]
                 }
             ]);
-            if (product && typeof product !== 'undefined') {
+            if (typeof product !== 'undefined') {
                 product = product[0];
-                product["orderID"] = "oi_" + (Math.floor(10000000 + Math.random() * 999999999999)).toString();
-                product["trackingID"] = "tri_" + (Math.round(Math.random() * 9999999) + Math.round(Math.random() * 8888)).toString();
-                if (((_c = product === null || product === void 0 ? void 0 : product.shipping) === null || _c === void 0 ? void 0 : _c.isFree) && ((_d = product === null || product === void 0 ? void 0 : product.shipping) === null || _d === void 0 ? void 0 : _d.isFree)) {
-                    product["shippingCharge"] = 0;
-                }
-                else {
-                    product["shippingCharge"] = calculateShippingCost((_e = product === null || product === void 0 ? void 0 : product.packaged) === null || _e === void 0 ? void 0 : _e.volumetricWeight, areaType);
-                }
-                let amountNew = (product === null || product === void 0 ? void 0 : product.baseAmount) + (product === null || product === void 0 ? void 0 : product.shippingCharge);
-                product["baseAmount"] = parseInt(amountNew);
-                const timestamp = Date.now();
+                product["orderID"] = generateOrderID();
+                product["trackingID"] = generateTrackingID();
+                product["shippingCharge"] = ((_c = product === null || product === void 0 ? void 0 : product.shipping) === null || _c === void 0 ? void 0 : _c.isFree) ? 0 : calculateShippingCost((_d = product === null || product === void 0 ? void 0 : product.packaged) === null || _d === void 0 ? void 0 : _d.volumetricWeight, areaType);
+                product["baseAmount"] = parseInt((product === null || product === void 0 ? void 0 : product.baseAmount) + (product === null || product === void 0 ? void 0 : product.shippingCharge));
                 product["orderAT"] = {
                     iso: new Date(timestamp),
                     time: new Date(timestamp).toLocaleTimeString(),
                     date: new Date(timestamp).toDateString(),
                     timestamp: timestamp
                 };
-                let result = yield Order.findOneAndUpdate({ user_email: authEmail }, { $push: { orders: product } }, { upsert: true });
+                const result = yield Order.findOneAndUpdate({ user_email: authEmail }, { $push: { orders: product } }, { upsert: true });
                 if (result) {
                     yield update_variation_stock_available("dec", { variationID, productID, quantity, listingID });
                     authEmail && (yield email_service({
@@ -108,10 +103,10 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                         subject: "Order confirmed",
                         html: buyer_order_email_template(product, product === null || product === void 0 ? void 0 : product.baseAmount)
                     }));
-                    ((_f = product === null || product === void 0 ? void 0 : product.sellerData) === null || _f === void 0 ? void 0 : _f.sellerEmail) && (yield email_service({
-                        to: (_g = product === null || product === void 0 ? void 0 : product.sellerData) === null || _g === void 0 ? void 0 : _g.sellerEmail,
-                        subject: "New order",
-                        html: seller_order_email_template(product)
+                    ((_e = product === null || product === void 0 ? void 0 : product.sellerData) === null || _e === void 0 ? void 0 : _e.sellerEmail) && (yield email_service({
+                        to: (_f = product === null || product === void 0 ? void 0 : product.sellerData) === null || _f === void 0 ? void 0 : _f.sellerEmail,
+                        subject: "New order confirmed",
+                        html: seller_order_email_template([product])
                     }));
                     return res.status(200).send({ success: true, statusCode: 200, message: "Order Success." });
                 }

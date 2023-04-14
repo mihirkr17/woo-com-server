@@ -107,19 +107,52 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
  */
 module.exports.productsByCategoryController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { categories, filters } = req.query;
+        const { categories } = req.query;
+        const { brand, sorted, price_range } = req.body;
+        let newBrand = brand && brand.split("~");
         let category = (categories && categories.toString().split(",")) || [];
         let sorting = {};
-        if (filters && filters === "lowest") {
-            sorting = { $sort: { "variations.pricing.sellingPrice": 1 } };
+        if (sorted === "lowest") {
+            sorting = { $sort: { "pricing.sellingPrice": 1 } };
         }
-        else if (filters && filters === "highest") {
-            sorting = { $sort: { "variations.pricing.sellingPrice": -1 } };
+        else if (sorted === "highest") {
+            sorting = { $sort: { "pricing.sellingPrice": -1 } };
         }
         else {
             sorting = { $sort: { "variations.modifiedAt": 1 } };
         }
-        const products = yield Product.aggregate([
+        let filterByBrand = newBrand ? { brand: { $in: newBrand } } : {};
+        let filterByPriceRange = price_range ? {
+            "pricing.sellingPrice": { $lte: parseInt(price_range) }
+        } : {};
+        const filterData = (yield Product.aggregate([
+            {
+                $match: { categories: { $all: category } }
+            },
+            {
+                $addFields: {
+                    variations: {
+                        $slice: [{
+                                $filter: {
+                                    input: "$variations",
+                                    cond: { $and: [{ $eq: ["$$v.status", 'active'] }, { $eq: ["$$v.stock", "in"] }] },
+                                    as: "v"
+                                }
+                            }, 1]
+                    },
+                },
+            },
+            { $unwind: { path: "$variations" } },
+            {
+                $project: {
+                    _id: 0,
+                    brand: 1,
+                    variant: "$variations.variant"
+                }
+            }
+        ])) || [];
+        const products = (yield Product.aggregate([
+            { $match: { categories: { $all: category } } },
             {
                 $addFields: {
                     variations: {
@@ -134,25 +167,16 @@ module.exports.productsByCategoryController = (req, res, next) => __awaiter(void
                 }
             },
             { $unwind: { path: '$variations' } },
-            {
-                $match: {
-                    $and: [
-                        { categories: { $all: category } },
-                        { 'variations.status': "active" }
-                    ]
-                }
-            },
-            {
-                $project: basicProductProject
-            },
+            { $match: filterByBrand },
+            { $project: basicProductProject },
+            { $match: filterByPriceRange },
             sorting
-        ]);
-        return products
-            ? res.status(200).send(products)
+        ])) || [];
+        return products ? res.status(200).send({ products, filterData })
             : res.status(404).send({
                 success: false,
                 statusCode: 404,
-                error: "Products not available.",
+                message: "Products not available.",
             });
     }
     catch (error) {
