@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 const Order = require("../../model/order.model");
-const { update_variation_stock_available, calculateShippingCost } = require("../../services/common.service");
+const { update_variation_stock_available, calculateShippingCost, clearCart } = require("../../services/common.service");
 const email_service = require("../../services/email.service");
 const { buyer_order_email_template, seller_order_email_template } = require("../../templates/email.template");
 const { generateOrderID, generateTrackingID } = require("../../utils/common");
@@ -117,6 +117,7 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
       }
 
       // after order confirmed then return response to the client
+      await clearCart(email);
       return res.status(200).send({ message: "Order completed.", statusCode: 200, success: true });
 
    } catch (error: any) {

@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const Order = require("../../model/order.model");
-const { update_variation_stock_available, calculateShippingCost } = require("../../services/common.service");
+const { update_variation_stock_available, calculateShippingCost, clearCart } = require("../../services/common.service");
 const email_service = require("../../services/email.service");
 const { buyer_order_email_template, seller_order_email_template } = require("../../templates/email.template");
 const { generateOrderID, generateTrackingID } = require("../../utils/common");
@@ -86,6 +86,7 @@ module.exports = function confirmOrder(req, res, next) {
                 });
             }
             // after order confirmed then return response to the client
+            yield clearCart(email);
             return res.status(200).send({ message: "Order completed.", statusCode: 200, success: true });
         }
         catch (error) {

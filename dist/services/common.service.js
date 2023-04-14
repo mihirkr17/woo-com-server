@@ -13,6 +13,7 @@ const mdb = require("mongodb");
 const Product = require("../model/product.model");
 const UserModel = require("../model/user.model");
 const OrderModel = require("../model/order.model");
+const ShoppingCartModel = require("../model/shoppingCart.model");
 const cryptos = require("crypto");
 module.exports.findUserByEmail = (email) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -325,3 +326,13 @@ module.exports.get_six_digit_random_number = () => {
 module.exports.isPasswordValid = (password) => {
     return (/^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/).test(password);
 };
+module.exports.clearCart = (email) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        return yield ShoppingCartModel.findOneAndUpdate({ customerEmail: email }, {
+            $set: { items: [] }
+        });
+    }
+    catch (error) {
+        return error;
+    }
+});

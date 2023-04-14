@@ -3,6 +3,7 @@ const mdb = require("mongodb");
 const Product = require("../model/product.model");
 const UserModel = require("../model/user.model");
 const OrderModel = require("../model/order.model");
+const ShoppingCartModel = require("../model/shoppingCart.model");
 const cryptos = require("crypto");
 
 
@@ -375,4 +376,16 @@ module.exports.get_six_digit_random_number = () => {
 
 module.exports.isPasswordValid = (password: string) => {
    return (/^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/).test(password);
+}
+
+
+
+module.exports.clearCart = async (email: string) => {
+   try {
+      return await ShoppingCartModel.findOneAndUpdate({ customerEmail: email }, {
+         $set: { items: [] }
+      })
+   } catch (error: any) {
+      return error;
+   }
 }
