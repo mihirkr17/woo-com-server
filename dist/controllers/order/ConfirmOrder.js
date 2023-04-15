@@ -14,6 +14,7 @@ const { update_variation_stock_available, calculateShippingCost, clearCart } = r
 const email_service = require("../../services/email.service");
 const { buyer_order_email_template, seller_order_email_template } = require("../../templates/email.template");
 const { generateOrderID, generateTrackingID } = require("../../utils/common");
+const apiResponse = require("../../errors/apiResponse");
 module.exports = function confirmOrder(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -23,7 +24,7 @@ module.exports = function confirmOrder(req, res, next) {
             }
             const { paymentIntentID, paymentMethodID, orderPaymentID, orderItems } = req.body;
             if (!req.body || typeof req.body !== "object" || !paymentIntentID || !paymentMethodID || !orderItems || !Array.isArray(orderItems) || orderItems.length <= 0) {
-                return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
+                throw new apiResponse.Api503Error("Service unavailable !");
             }
             function separateOrdersBySeller(upRes) {
                 var _a;
@@ -75,10 +76,10 @@ module.exports = function confirmOrder(req, res, next) {
                 html: buyer_order_email_template(result, totalAmount)
             });
             // after order succeed then group the order item by seller email and send email to the seller
-            const orderBySeller = (Array.isArray(result) && result.length >= 1) ? separateOrdersBySeller(result) : {};
+            const orderBySellers = (Array.isArray(result) && result.length >= 1) ? separateOrdersBySeller(result) : {};
             // after successfully got order by seller as a object then loop it and trigger send email function inside for in loop
-            for (const sellerEmail in orderBySeller) {
-                const items = orderBySeller[sellerEmail];
+            for (const sellerEmail in orderBySellers) {
+                const items = orderBySellers[sellerEmail];
                 yield email_service({
                     to: sellerEmail,
                     subject: "New order confirmed",

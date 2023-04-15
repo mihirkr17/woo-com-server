@@ -34,4 +34,10 @@ class Api500Error extends BaseErrors {
    }
 }
 
-module.exports = { Api400Error, Api401Error, Api403Error, Api404Error, Api500Error }
+class Api503Error extends BaseErrors {
+   constructor(message: string, name: string = "ServiceUnavailable", statusCode = httpStatusCode?.SERVICE_UNAVAILABLE, success = false) {
+      super(message, name, statusCode, success);
+   }
+}
+
+module.exports = { Api400Error, Api401Error, Api403Error, Api404Error, Api500Error, Api503Error }

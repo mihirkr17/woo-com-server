@@ -14,13 +14,13 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
 
       const { email: authEmail, _uuid } = req.decoded;
 
-      if (userEmail !== authEmail) {
+      if (userEmail !== authEmail)
          throw new apiResponse.Api401Error("Unauthorized access !");
-      }
 
-      if (!req.body || typeof req.body === "undefined") {
+
+      if (!req.body || typeof req.body === "undefined")
          throw new apiResponse.Api400Error("Required body !");
-      }
+
 
       const { state } = req.body;
 
@@ -29,9 +29,9 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
       const defaultAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
          user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
 
-      if (!defaultAddress) {
+      if (!defaultAddress)
          throw new apiResponse.Api400Error("Required shipping address !");
-      }
+
 
       const areaType = defaultAddress?.area_type;
 
@@ -98,9 +98,9 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
          { $unset: ["variations", "items"] }
       ]);
 
-      if (!orderItems || orderItems.length <= 0) {
+      if (!orderItems || orderItems.length <= 0)
          throw new apiResponse.Api400Error("Nothing for purchase ! Please add product in your cart.");
-      }
+
 
       Array.isArray(orderItems) && orderItems.map((p: any) => {
          p["shippingCharge"] = p?.shipping?.isFree ? 0 : calculateShippingCost(p?.packaged?.volumetricWeight, areaType);
@@ -112,9 +112,7 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
       const totalAmount: number = Array.isArray(orderItems) ?
          orderItems.reduce((p: number, n: any) => p + parseInt(n?.baseAmount + n?.shippingCharge), 0) : 0;
 
-      if (!totalAmount) {
-         return res.status(402).send();
-      }
+      if (!totalAmount) throw new apiResponse.Api503Error("Service unavailable !");
 
       // Creating payment intent after getting total amount of order items. 
       const paymentIntent = await stripe.paymentIntents.create({
@@ -126,9 +124,9 @@ module.exports = async function SetOrder(req: Request, res: Response, next: Next
          }
       });
 
-      if (!paymentIntent?.client_secret) {
-         throw new apiResponse.Api400Error("Payment failed.");
-      }
+      if (!paymentIntent?.client_secret)
+         throw new apiResponse.Api400Error("The payment failed. Please try again later or contact support if the problem persists.");
+
 
       return res.status(200).send({
          success: true,

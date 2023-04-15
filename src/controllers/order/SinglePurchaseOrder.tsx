@@ -16,9 +16,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
       const uuid = req.decoded._uuid;
       const timestamp: any = Date.now();
 
-      if (!req.body) {
-         return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
-      }
+      if (!req.body) throw new apiResponse.Api503Error("Service unavailable !");
 
       const { variationID, productID, quantity, listingID, paymentIntentID, state, paymentMethodID, orderPaymentID, customerEmail } = req.body;
 
@@ -81,48 +79,48 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
          {
             $unset: ["variations"]
          }
-
       ]);
 
-      if (typeof product !== 'undefined') {
-         product = product[0];
+      if (typeof product !== 'undefined' || !Array.isArray(product))
+         throw new apiResponse.Api503Error("Service unavailable !");
 
-         product["orderID"] = generateOrderID();
-         product["trackingID"] = generateTrackingID();
-         product["shippingCharge"] = product?.shipping?.isFree ? 0 : calculateShippingCost(product?.packaged?.volumetricWeight, areaType);
-         product["baseAmount"] = parseInt(product?.baseAmount + product?.shippingCharge);
-         product["orderAT"] = {
-            iso: new Date(timestamp),
-            time: new Date(timestamp).toLocaleTimeString(),
-            date: new Date(timestamp).toDateString(),
-            timestamp: timestamp
-         }
+      product = product[0];
 
-         const result = await Order.findOneAndUpdate(
-            { user_email: authEmail },
-            { $push: { orders: product } },
-            { upsert: true }
-         );
-
-         if (result) {
-            await update_variation_stock_available("dec", { variationID, productID, quantity, listingID });
-
-            authEmail && await email_service({
-               to: authEmail,
-               subject: "Order confirmed",
-               html: buyer_order_email_template(product, product?.baseAmount)
-            });
-
-            product?.sellerData?.sellerEmail && await email_service({
-               to: product?.sellerData?.sellerEmail,
-               subject: "New order confirmed",
-               html: seller_order_email_template([product])
-            });
-
-            return res.status(200).send({ success: true, statusCode: 200, message: "Order Success." });
-         }
-
+      product["orderID"] = generateOrderID();
+      product["trackingID"] = generateTrackingID();
+      product["shippingCharge"] = product?.shipping?.isFree ? 0 : calculateShippingCost(product?.packaged?.volumetricWeight, areaType);
+      product["baseAmount"] = parseInt(product?.baseAmount + product?.shippingCharge);
+      product["orderAT"] = {
+         iso: new Date(timestamp),
+         time: new Date(timestamp).toLocaleTimeString(),
+         date: new Date(timestamp).toDateString(),
+         timestamp: timestamp
       }
+
+      const result = await Order.findOneAndUpdate(
+         { user_email: authEmail },
+         { $push: { orders: product } },
+         { upsert: true }
+      );
+
+      if (!result) throw new apiResponse.Api503Error("Service unavailable !");
+
+      await update_variation_stock_available("dec", { variationID, productID, quantity, listingID });
+
+      authEmail && await email_service({
+         to: authEmail,
+         subject: "Order confirmed",
+         html: buyer_order_email_template(product, product?.baseAmount)
+      });
+
+      product?.sellerData?.sellerEmail && await email_service({
+         to: product?.sellerData?.sellerEmail,
+         subject: "New order confirmed",
+         html: seller_order_email_template([product])
+      });
+
+      return res.status(200).send({ success: true, statusCode: 200, message: "Order Success." });
+
    } catch (error: any) {
       next(error)
    }

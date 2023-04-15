@@ -24,9 +24,8 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
             const authEmail = req.decoded.email;
             const uuid = req.decoded._uuid;
             const timestamp = Date.now();
-            if (!req.body) {
-                return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
-            }
+            if (!req.body)
+                throw new apiResponse.Api503Error("Service unavailable !");
             const { variationID, productID, quantity, listingID, paymentIntentID, state, paymentMethodID, orderPaymentID, customerEmail } = req.body;
             if (!variationID || !productID || !quantity || !listingID || !paymentIntentID || !state || !paymentMethodID || !orderPaymentID || !customerEmail)
                 throw new apiResponse.Api400Error("Required variationID, productID, quantity, listingID, paymentIntentID, state, paymentMethodID, orderPaymentID, customerEmail");
@@ -83,34 +82,34 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                     $unset: ["variations"]
                 }
             ]);
-            if (typeof product !== 'undefined') {
-                product = product[0];
-                product["orderID"] = generateOrderID();
-                product["trackingID"] = generateTrackingID();
-                product["shippingCharge"] = ((_c = product === null || product === void 0 ? void 0 : product.shipping) === null || _c === void 0 ? void 0 : _c.isFree) ? 0 : calculateShippingCost((_d = product === null || product === void 0 ? void 0 : product.packaged) === null || _d === void 0 ? void 0 : _d.volumetricWeight, areaType);
-                product["baseAmount"] = parseInt((product === null || product === void 0 ? void 0 : product.baseAmount) + (product === null || product === void 0 ? void 0 : product.shippingCharge));
-                product["orderAT"] = {
-                    iso: new Date(timestamp),
-                    time: new Date(timestamp).toLocaleTimeString(),
-                    date: new Date(timestamp).toDateString(),
-                    timestamp: timestamp
-                };
-                const result = yield Order.findOneAndUpdate({ user_email: authEmail }, { $push: { orders: product } }, { upsert: true });
-                if (result) {
-                    yield update_variation_stock_available("dec", { variationID, productID, quantity, listingID });
-                    authEmail && (yield email_service({
-                        to: authEmail,
-                        subject: "Order confirmed",
-                        html: buyer_order_email_template(product, product === null || product === void 0 ? void 0 : product.baseAmount)
-                    }));
-                    ((_e = product === null || product === void 0 ? void 0 : product.sellerData) === null || _e === void 0 ? void 0 : _e.sellerEmail) && (yield email_service({
-                        to: (_f = product === null || product === void 0 ? void 0 : product.sellerData) === null || _f === void 0 ? void 0 : _f.sellerEmail,
-                        subject: "New order confirmed",
-                        html: seller_order_email_template([product])
-                    }));
-                    return res.status(200).send({ success: true, statusCode: 200, message: "Order Success." });
-                }
-            }
+            if (typeof product !== 'undefined' || !Array.isArray(product))
+                throw new apiResponse.Api503Error("Service unavailable !");
+            product = product[0];
+            product["orderID"] = generateOrderID();
+            product["trackingID"] = generateTrackingID();
+            product["shippingCharge"] = ((_c = product === null || product === void 0 ? void 0 : product.shipping) === null || _c === void 0 ? void 0 : _c.isFree) ? 0 : calculateShippingCost((_d = product === null || product === void 0 ? void 0 : product.packaged) === null || _d === void 0 ? void 0 : _d.volumetricWeight, areaType);
+            product["baseAmount"] = parseInt((product === null || product === void 0 ? void 0 : product.baseAmount) + (product === null || product === void 0 ? void 0 : product.shippingCharge));
+            product["orderAT"] = {
+                iso: new Date(timestamp),
+                time: new Date(timestamp).toLocaleTimeString(),
+                date: new Date(timestamp).toDateString(),
+                timestamp: timestamp
+            };
+            const result = yield Order.findOneAndUpdate({ user_email: authEmail }, { $push: { orders: product } }, { upsert: true });
+            if (!result)
+                throw new apiResponse.Api503Error("Service unavailable !");
+            yield update_variation_stock_available("dec", { variationID, productID, quantity, listingID });
+            authEmail && (yield email_service({
+                to: authEmail,
+                subject: "Order confirmed",
+                html: buyer_order_email_template(product, product === null || product === void 0 ? void 0 : product.baseAmount)
+            }));
+            ((_e = product === null || product === void 0 ? void 0 : product.sellerData) === null || _e === void 0 ? void 0 : _e.sellerEmail) && (yield email_service({
+                to: (_f = product === null || product === void 0 ? void 0 : product.sellerData) === null || _f === void 0 ? void 0 : _f.sellerEmail,
+                subject: "New order confirmed",
+                html: seller_order_email_template([product])
+            }));
+            return res.status(200).send({ success: true, statusCode: 200, message: "Order Success." });
         }
         catch (error) {
             next(error);

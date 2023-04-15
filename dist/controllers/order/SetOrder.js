@@ -20,19 +20,16 @@ module.exports = function SetOrder(req, res, next) {
         try {
             const userEmail = req.headers.authorization || "";
             const { email: authEmail, _uuid } = req.decoded;
-            if (userEmail !== authEmail) {
+            if (userEmail !== authEmail)
                 throw new apiResponse.Api401Error("Unauthorized access !");
-            }
-            if (!req.body || typeof req.body === "undefined") {
+            if (!req.body || typeof req.body === "undefined")
                 throw new apiResponse.Api400Error("Required body !");
-            }
             const { state } = req.body;
             const user = yield findUserByEmail(authEmail);
             const defaultAddress = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
                 ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
-            if (!defaultAddress) {
+            if (!defaultAddress)
                 throw new apiResponse.Api400Error("Required shipping address !");
-            }
             const areaType = defaultAddress === null || defaultAddress === void 0 ? void 0 : defaultAddress.area_type;
             const orderItems = yield ShoppingCart.aggregate([
                 { $match: { customerEmail: authEmail } },
@@ -95,9 +92,8 @@ module.exports = function SetOrder(req, res, next) {
                 },
                 { $unset: ["variations", "items"] }
             ]);
-            if (!orderItems || orderItems.length <= 0) {
+            if (!orderItems || orderItems.length <= 0)
                 throw new apiResponse.Api400Error("Nothing for purchase ! Please add product in your cart.");
-            }
             Array.isArray(orderItems) && orderItems.map((p) => {
                 var _a, _b;
                 p["shippingCharge"] = ((_a = p === null || p === void 0 ? void 0 : p.shipping) === null || _a === void 0 ? void 0 : _a.isFree) ? 0 : calculateShippingCost((_b = p === null || p === void 0 ? void 0 : p.packaged) === null || _b === void 0 ? void 0 : _b.volumetricWeight, areaType);
@@ -106,9 +102,8 @@ module.exports = function SetOrder(req, res, next) {
             // calculating total amount of order items
             const totalAmount = Array.isArray(orderItems) ?
                 orderItems.reduce((p, n) => p + parseInt((n === null || n === void 0 ? void 0 : n.baseAmount) + (n === null || n === void 0 ? void 0 : n.shippingCharge)), 0) : 0;
-            if (!totalAmount) {
-                return res.status(402).send();
-            }
+            if (!totalAmount)
+                throw new apiResponse.Api503Error("Service unavailable !");
             // Creating payment intent after getting total amount of order items. 
             const paymentIntent = yield stripe.paymentIntents.create({
                 amount: (totalAmount * 100),
@@ -118,9 +113,8 @@ module.exports = function SetOrder(req, res, next) {
                     order_id: "opi_" + (Math.round(Math.random() * 99999999) + totalAmount).toString()
                 }
             });
-            if (!(paymentIntent === null || paymentIntent === void 0 ? void 0 : paymentIntent.client_secret)) {
-                throw new apiResponse.Api400Error("Payment failed.");
-            }
+            if (!(paymentIntent === null || paymentIntent === void 0 ? void 0 : paymentIntent.client_secret))
+                throw new apiResponse.Api400Error("The payment failed. Please try again later or contact support if the problem persists.");
             return res.status(200).send({
                 success: true,
                 statusCode: 200,
