@@ -12,10 +12,6 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
 
       const { email } = req.decoded;
 
-      if (!req.body || typeof req.body !== "object") {
-         return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
-      }
-
       const { paymentIntentID, paymentMethodID, orderPaymentID, orderItems } = req.body as {
          paymentIntentID: string;
          paymentMethodID: string;

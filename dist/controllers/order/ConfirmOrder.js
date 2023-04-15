@@ -19,9 +19,6 @@ module.exports = function confirmOrder(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const { email } = req.decoded;
-            if (!req.body || typeof req.body !== "object") {
-                return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
-            }
             const { paymentIntentID, paymentMethodID, orderPaymentID, orderItems } = req.body;
             if (!req.body || typeof req.body !== "object" || !paymentIntentID || !paymentMethodID || !orderItems || !Array.isArray(orderItems) || orderItems.length <= 0) {
                 throw new apiResponse.Api503Error("Service unavailable !");
