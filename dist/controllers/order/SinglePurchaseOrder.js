@@ -30,9 +30,8 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
             if (!variationID || !productID || !quantity || !listingID || !paymentIntentID || !state || !paymentMethodID || !orderPaymentID || !customerEmail)
                 throw new apiResponse.Api400Error("Required variationID, productID, quantity, listingID, paymentIntentID, state, paymentMethodID, orderPaymentID, customerEmail");
             const user = yield findUserByEmail(authEmail);
-            if (!user) {
-                return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
-            }
+            if (!user)
+                throw new apiResponse.Api503Error("Service unavailable !");
             const defaultShippingAddress = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
                 ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
             const areaType = defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type;
@@ -82,7 +81,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                     $unset: ["variations"]
                 }
             ]);
-            if (typeof product !== 'undefined' || !Array.isArray(product))
+            if (typeof product === 'undefined' || !Array.isArray(product))
                 throw new apiResponse.Api503Error("Service unavailable !");
             product = product[0];
             product["orderID"] = generateOrderID();

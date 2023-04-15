@@ -25,9 +25,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
 
       const user = await findUserByEmail(authEmail);
 
-      if (!user) {
-         return res.status(503).send({ success: false, statusCode: 503, message: "Service unavailable !" });
-      }
+      if (!user) throw new apiResponse.Api503Error("Service unavailable !")
 
       const defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
          user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
@@ -81,7 +79,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
          }
       ]);
 
-      if (typeof product !== 'undefined' || !Array.isArray(product))
+      if (typeof product === 'undefined' || !Array.isArray(product))
          throw new apiResponse.Api503Error("Service unavailable !");
 
       product = product[0];
