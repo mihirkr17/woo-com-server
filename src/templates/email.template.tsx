@@ -21,7 +21,7 @@ module.exports.buyer_order_email_template = (data: any, totalAmount: number) => 
                            <td style="border: 1px solid #777">${ind++}</td>
                            <td style="border: 1px solid #777">${item?.title}</td>
                            <td style="border: 1px solid #777">$ ${item?.baseAmount}</td>
-                           <td style="border: 1px solid #777">${item?.quantity} Pcs</td>
+                           <td style="border: 1px solid #777">${item?.quantity}</td>
                         </tr>`
          )
       }) : `<tr style="line-height: 30px; text-align: center; font-weight: bold; letter-spacing: 0.4px"">
@@ -49,20 +49,20 @@ module.exports.buyer_order_email_template = (data: any, totalAmount: number) => 
 
 
 
-module.exports.seller_order_email_template = (product: any) => {
+module.exports.seller_order_email_template = (product: any, customerEmail: string, orderID: string) => {
    const timestamp = Date.now();
    const time = new Date(timestamp).toLocaleTimeString();
    const date = new Date(timestamp).toDateString();
    return (
       `<div>
-         <h3 style="text-align: center">You have new order At ${time}, ${date}</h3>
+         <h3 style="text-align: center">You have new order From ${customerEmail} At ${time}, ${date}</h3>
+         <p>Order ID: ${orderID}</p>
 
          <table style="border: 1px solid #777; width: 100%">
           <caption style="padding: 4px;">Order Details:</caption>
             <thead>
                <tr style="line-height: 34px; text-align: center; font-weight: bold; letter-spacing: 0.4px; background: cyan; color: black">
-                  <th style="border: 1px solid #777">OrderID</th>
-                  <th style="border: 1px solid #777">From</th>
+                  <th style="border: 1px solid #777">Item ID</th>
                   <th style="border: 1px solid #777">Product</th>
                   <th style="border: 1px solid #777">Qty</th>
                   <th style="border: 1px solid #777">SKU</th>
@@ -72,10 +72,9 @@ module.exports.seller_order_email_template = (product: any) => {
             <tbody>${Array.isArray(product) && product.map((item: any) => {
          return (
             `<tr style="line-height: 30px; text-align: center; font-weight: bold; letter-spacing: 0.4px">
-                  <td style="border: 1px solid #777">${item?.orderID}</td>
-                  <td style="border: 1px solid #777">${item?.customerEmail}</td>
+                  <td style="border: 1px solid #777">${item?.itemID}</td>
                   <td style="border: 1px solid #777">${item?.title}</td>
-                  <td style="border: 1px solid #777">${item?.quantity} Pcs</td>
+                  <td style="border: 1px solid #777">${item?.quantity}</td>
                   <td style="border: 1px solid #777">${item?.sku}</td>
                   <td style="border: 1px solid #777">$ ${item?.baseAmount}</td>
             </tr>`

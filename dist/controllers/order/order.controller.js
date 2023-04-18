@@ -11,6 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const Product = require("../../model/product.model");
 const Order = require("../../model/order.model");
+const OrderTableModel = require("../../model/orderTable.model");
 const { order_status_updater, update_variation_stock_available } = require("../../services/common.service");
 module.exports.myOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -19,10 +20,27 @@ module.exports.myOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, f
         if (email !== authEmail) {
             return res.status(401).send();
         }
-        let result = yield Order.aggregate([
-            { $match: { $and: [{ user_email: email }] } },
-            { $unwind: { path: "$orders" } },
-            { $replaceRoot: { newRoot: "$orders" } }
+        let result = yield OrderTableModel.aggregate([
+            { $match: { $and: [{ customerEmail: email }] } },
+            { $unwind: { path: "$items" } },
+            {
+                $group: {
+                    _id: "$orderPaymentID",
+                    totalAmount: { $sum: "$items.baseAmount" },
+                    paymentIntentID: { $first: "$paymentIntentID" },
+                    customerEmail: { $first: "$customerEmail" },
+                    paymentMethodID: { $first: "$paymentMethodID" },
+                    paymentStatus: { $first: "$paymentStatus" },
+                    orderStatus: { $first: "$orderStatus" },
+                    paymentMode: { $first: "$paymentMode" },
+                    orderAT: { $first: "$orderAT" },
+                    items: {
+                        $push: "$items"
+                    }
+                }
+            },
+            // { $unwind: { path: "$orders" } },
+            // { $replaceRoot: { newRoot: "$orders" } }
         ]);
         res.status(200).send({ success: true, statusCode: 200, data: { module: { orders: result } } });
     }

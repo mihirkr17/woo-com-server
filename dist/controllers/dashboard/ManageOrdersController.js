@@ -12,13 +12,37 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const Order = require("../../model/order.model");
 const { order_status_updater, update_variation_stock_available } = require("../../services/common.service");
 const Product = require("../../model/product.model");
+const OrderTableModel = require("../../model/orderTable.model");
 module.exports.manageOrders = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
         const view = ((_a = req.query) === null || _a === void 0 ? void 0 : _a.view) || "";
         const storeName = req.params.storeName;
         const uuid = req.decoded._uuid;
+        const email = req.decoded.email;
         let result;
+        const orders = yield OrderTableModel.aggregate([
+            { $unwind: { path: "$items" } },
+            { $match: { $and: [{ "items.sellerData.storeName": storeName }, { "items.sellerData.sellerEmail": email }] } },
+            {
+                $group: {
+                    _id: "$_id",
+                    orderPaymentID: { $first: "$orderPaymentID" },
+                    clientSecret: { $first: "$clientSecret" },
+                    customerEmail: { $first: "$customerEmail" },
+                    customerID: { $first: "$customerID" },
+                    totalAmount: { $sum: "$items.baseAmount" },
+                    shippingAddress: { $first: "$shippingAddress" },
+                    paymentIntentID: { $first: "$paymentIntentID" },
+                    paymentMethodID: { $first: "$paymentMethodID" },
+                    paymentStatus: { $first: "$paymentStatus" },
+                    paymentMode: { $first: "$paymentMode" },
+                    orderAT: { $first: "$orderAT" },
+                    state: { $first: "$state" },
+                    items: { $push: "$items" }
+                }
+            }
+        ]);
         if (storeName) {
             if (view === "group") {
                 result = yield Order.aggregate([
@@ -91,7 +115,7 @@ module.exports.manageOrders = (req, res, next) => __awaiter(void 0, void 0, void
         ;
         let newOrderCount = result && result.filter((o) => (o === null || o === void 0 ? void 0 : o.orderStatus) === "pending").length;
         let totalOrderCount = result && result.length;
-        return res.status(200).send({ success: true, statusCode: 200, data: { module: result, newOrderCount, totalOrderCount } });
+        return res.status(200).send({ success: true, statusCode: 200, data: { module: result, newOrderCount, totalOrderCount, orders } });
     }
     catch (error) {
         next(error);

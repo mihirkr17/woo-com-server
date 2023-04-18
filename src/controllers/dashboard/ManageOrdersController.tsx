@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 const Order = require("../../model/order.model");
 const { order_status_updater, update_variation_stock_available } = require("../../services/common.service");
 const Product = require("../../model/product.model");
+const OrderTableModel = require("../../model/orderTable.model");
 
 module.exports.manageOrders = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -9,7 +10,31 @@ module.exports.manageOrders = async (req: Request, res: Response, next: NextFunc
     const view: any = req.query?.view || "";
     const storeName = req.params.storeName;
     const uuid = req.decoded._uuid;
+    const email = req.decoded.email;
     let result: any;
+
+    const orders = await OrderTableModel.aggregate([
+      { $unwind: { path: "$items" } },
+      { $match: { $and: [{ "items.sellerData.storeName": storeName }, { "items.sellerData.sellerEmail": email }] } },
+      {
+        $group: {
+          _id: "$_id",
+          orderPaymentID: { $first: "$orderPaymentID" },
+          clientSecret: { $first: "$clientSecret" },
+          customerEmail: { $first: "$customerEmail" },
+          customerID: { $first: "$customerID" },
+          totalAmount: { $sum: "$items.baseAmount" },
+          shippingAddress: { $first: "$shippingAddress" },
+          paymentIntentID: { $first: "$paymentIntentID" },
+          paymentMethodID: { $first: "$paymentMethodID" },
+          paymentStatus: { $first: "$paymentStatus" },
+          paymentMode: { $first: "$paymentMode" },
+          orderAT: { $first: "$orderAT" },
+          state: { $first: "$state" },
+          items: { $push: "$items" }
+        }
+      }
+    ]);
 
 
     if (storeName) {
@@ -85,7 +110,7 @@ module.exports.manageOrders = async (req: Request, res: Response, next: NextFunc
     let newOrderCount = result && result.filter((o: any) => o?.orderStatus === "pending").length;
     let totalOrderCount = result && result.length;
 
-    return res.status(200).send({ success: true, statusCode: 200, data: { module: result, newOrderCount, totalOrderCount } });
+    return res.status(200).send({ success: true, statusCode: 200, data: { module: result, newOrderCount, totalOrderCount, orders } });
   } catch (error: any) {
     next(error);
   }

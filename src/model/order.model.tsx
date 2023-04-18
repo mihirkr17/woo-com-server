@@ -40,6 +40,7 @@ interface IOrder {
    paymentMethodID?: string;
    paymentStatus?: string;
    refund?: object;
+   clientSecret?: string;
 };
 
 var orderSchemaList = new Schema<IOrder>({
@@ -64,28 +65,29 @@ var orderSchemaList = new Schema<IOrder>({
    sellingPrice: Number,
    state: String,
    trackingID: String,
-   isRated: { type: Boolean, required: false },
-   orderAT: Object,
-   orderPlacedAT: { type: Date, required: false },
-   orderShippedAT: { type: Date, required: false },
-   isShipped: Boolean,
    orderStatus: { type: String, enum: ["pending", "placed", "shipped", "canceled", "dispatch", "refunded", "completed"], default: "pending" },
    cancelReason: String,
-   orderCanceledAT: Object,
-   isCanceled: Boolean,
-   orderDispatchAT: Object,
-   isDispatch: { type: Boolean, required: false },
-   orderCompletedAT: { type: Date, required: false },
-   isCompleted: Boolean,
    paymentIntentID: { type: String, required: false },
    paymentMethodID: { type: String, required: false },
    paymentStatus: { type: String, required: false, enum: ["success", "failed", "pending"] },
-   refund: { type: Object, required: false }
+   refund: { type: Object, required: false },
+   clientSecret: { type: String, required: false, default: undefined },
+   orderAT: Object,
+   orderPlacedAT: { type: Date, required: false },
+   orderShippedAT: { type: Date, required: false },
+   orderCompletedAT: { type: Date, required: false },
+   orderCanceledAT: Object,
+   orderDispatchAT: Object,
+   isRated: { type: Boolean, required: false },
+   isCanceled: Boolean,
+   isCompleted: Boolean,
+   isShipped: Boolean,
+   isDispatch: { type: Boolean, required: false },
 }, { _id: false });
 
 let orderSchema = new Schema({
    user_email: { type: String },
-   orders: { type: orderSchemaList}
+   orders: { type: orderSchemaList }
 });
 
 const Order = model("Order", orderSchema, "orders");
