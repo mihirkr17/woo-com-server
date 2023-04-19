@@ -6,9 +6,10 @@ const apiResponse = require("../../errors/apiResponse");
 const { findUserByEmail, update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
 const email_service = require("../../services/email.service");
 const { buyer_order_email_template, seller_order_email_template } = require("../../templates/email.template");
-const { generateItemID, generateTrackingID } = require("../../utils/common");
+const { generateItemID, generateOrderID } = require("../../utils/common");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const OrderTableModel = require("../../model/orderTable.model");
+
 
 
 module.exports = async function SinglePurchaseOrder(req: Request, res: Response, next: NextFunction) {
@@ -82,10 +83,20 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
 
       const itemID = generateItemID();
       let itemNumber = 1;
+      let sellerEmail = "";
+      const productInfos: any[] = [];
+
       product.forEach((p: any) => {
          p["shippingCharge"] = p?.shipping?.isFree ? 0 : calculateShippingCost(p?.packaged?.volumetricWeight, areaType);
          p["itemID"] = "item" + (itemID + (itemNumber++)).toString();
          p["baseAmount"] = parseInt(p?.baseAmount + p?.shippingCharge);
+         sellerEmail = p?.sellerData?.sellerEmail;
+         productInfos.push({
+            productID: p?.productID,
+            listingID: p?.listingID,
+            variationID: p?.variationID,
+            quantity: p?.quantity
+         })
          return p;
       });
 
@@ -105,10 +116,12 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
       if (!client_secret) throw new apiResponse.Api400Error("Payment intent creation failed !");
 
       const orderTable = new OrderTableModel({
+         orderID: generateOrderID(),
          orderPaymentID: metadata?.order_id,
          clientSecret: client_secret,
          customerEmail: email,
          customerID: _uuid,
+         sellerEmail,
          totalAmount,
          paymentIntentID: id,
          paymentStatus: "pending",
@@ -128,43 +141,18 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
 
       const result = await orderTable.save();
 
+      await email_service({
+         to: sellerEmail,
+         subject: "New order confirmed",
+         html: seller_order_email_template(product, email, result?._id)
+      });
+
       // after calculating total amount and order succeed then email sent to the buyer
       await email_service({
          to: email,
          subject: "Order confirmed",
          html: buyer_order_email_template(product, totalAmount)
       });
-
-      function separateOrdersBySeller(upRes: any[]) {
-         let newOrder: any = {};
-
-         for (const orderItem of upRes) {
-            const sellerEmail = orderItem?.sellerData?.sellerEmail;
-
-            if (!newOrder[sellerEmail]) {
-               newOrder[sellerEmail] = [];
-            }
-
-            newOrder[sellerEmail].push(orderItem);
-         }
-
-         return newOrder;
-      }
-
-
-      // after order succeed then group the order item by seller email and send email to the seller
-      const orderBySellers: any = (Array.isArray(product) && product.length >= 1) ? separateOrdersBySeller(product) : {};
-
-      // after successfully got order by seller as a object then loop it and trigger send email function inside for in loop
-      for (const sellerEmail in orderBySellers) {
-         const items = orderBySellers[sellerEmail];
-
-         await email_service({
-            to: sellerEmail,
-            subject: "New order confirmed",
-            html: seller_order_email_template(items, email, result?._id)
-         });
-      }
 
       return res.status(200).send({
          success: true,
@@ -173,7 +161,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
          totalAmount: totalAmount,
          clientSecret: client_secret,
          orderPaymentID: metadata?.order_id,
-         orderDocID: result?._id
+         productInfos
       });
 
 

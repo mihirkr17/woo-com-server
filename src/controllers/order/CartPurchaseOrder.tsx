@@ -40,8 +40,6 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
 
       const areaType = defaultAddress?.area_type;
 
-
-
       const orderItems = await ShoppingCart.aggregate([
          { $match: { customerEmail: authEmail } },
          { $unwind: { path: "$items" } },
@@ -86,7 +84,8 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
                sellerData: {
                   sellerEmail: '$sellerData.sellerEmail',
                   sellerID: "$sellerData.sellerID",
-                  storeName: "$sellerData.storeName"
+                  storeName: "$sellerData.storeName",
+                  stripeID: "$sellerData.stripeID"
                },
                sku: "$variations.sku",
                baseAmount: { $multiply: [actualSellingPrice, '$items.quantity'] },
@@ -108,7 +107,6 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
 
       let totalAmount: number = 0;
       const orderBySellers: any = {};
-      const sellers: any[] = [];
 
       orderItems.forEach((item: any) => {
          item["shippingCharge"] = item?.shipping?.isFree ? 0 : calculateShippingCost(item?.packaged?.volumetricWeight, areaType);
@@ -124,14 +122,13 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
             quantity: item?.quantity
          });
 
-         sellers.push(item?.sellerData?.sellerEmail);
-
          let sellerEmail = item?.sellerData?.sellerEmail;
 
          if (!orderBySellers[sellerEmail]) {
             orderBySellers[sellerEmail] = [];
          }
 
+         // orderBySellers[sellerEmail] = { items: [item], sellerStripeID: item?.sellerData?.stripeID };
          orderBySellers[sellerEmail].push(item);
 
          return item;
@@ -145,27 +142,29 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
          currency: 'usd',
          payment_method_types: ['card'],
          metadata: {
-            order_id: "opi_" + (Math.round(Math.random() * 99999999) + totalAmount).toString(),
-            sellers: sellers.join(",")
+            order_id: "opi_" + (Math.round(Math.random() * 99999999) + totalAmount).toString()
          }
       });
 
       if (!client_secret)
-         throw new apiResponse.Api400Error("The payment failed. Please try again later or contact support if the problem persists.");
+         throw new apiResponse.Api400Error("The payment intents failed. Please try again later or contact support if the problem persists.");
 
       // after order succeed then group the order item by seller email and send email to the seller
-      const order = [];
+      const orders: any[] = [];
 
       // after successfully got order by seller as a object then loop it and trigger send email function inside for in loop
       for (const sellerEmail in orderBySellers) {
 
          const items = orderBySellers[sellerEmail];
 
+         // calculate total amount of orders by seller;
          const totalAmount: number = items.reduce((p: number, n: any) => p + parseInt(n?.baseAmount), 0) || 0;
 
+         // generate random order ids;
          const orderID = generateOrderID();
 
-         order.push({
+         // then pushing them to orders variable;
+         orders.push({
             orderID,
             orderPaymentID: metadata?.order_id,
             clientSecret: client_secret,
@@ -190,7 +189,6 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
          });
 
 
-
          await email_service({
             to: sellerEmail,
             subject: "New order confirmed",
@@ -198,7 +196,9 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
          });
       }
 
-      await OrderTableModel.insertMany(order);
+
+      // finally insert orders to the database;
+      await OrderTableModel.insertMany(orders);
 
       // after calculating total amount and order succeed then email sent to the buyer
       await email_service({
@@ -214,7 +214,7 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
          totalAmount,
          clientSecret: client_secret,
          orderPaymentID: metadata?.order_id,
-         productInfos,
+         productInfos
       });
 
    } catch (error: any) {

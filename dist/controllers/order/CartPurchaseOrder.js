@@ -79,7 +79,8 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                         sellerData: {
                             sellerEmail: '$sellerData.sellerEmail',
                             sellerID: "$sellerData.sellerID",
-                            storeName: "$sellerData.storeName"
+                            storeName: "$sellerData.storeName",
+                            stripeID: "$sellerData.stripeID"
                         },
                         sku: "$variations.sku",
                         baseAmount: { $multiply: [actualSellingPrice, '$items.quantity'] },
@@ -96,9 +97,8 @@ module.exports = function CartPurchaseOrder(req, res, next) {
             const productInfos = [];
             let totalAmount = 0;
             const orderBySellers = {};
-            const sellers = [];
             orderItems.forEach((item) => {
-                var _a, _b, _c, _d;
+                var _a, _b, _c;
                 item["shippingCharge"] = ((_a = item === null || item === void 0 ? void 0 : item.shipping) === null || _a === void 0 ? void 0 : _a.isFree) ? 0 : calculateShippingCost((_b = item === null || item === void 0 ? void 0 : item.packaged) === null || _b === void 0 ? void 0 : _b.volumetricWeight, areaType);
                 item["itemID"] = "item" + (itmID + (itmNumber++)).toString();
                 item["baseAmount"] = parseInt((item === null || item === void 0 ? void 0 : item.baseAmount) + (item === null || item === void 0 ? void 0 : item.shippingCharge));
@@ -109,11 +109,11 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                     variationID: item === null || item === void 0 ? void 0 : item.variationID,
                     quantity: item === null || item === void 0 ? void 0 : item.quantity
                 });
-                sellers.push((_c = item === null || item === void 0 ? void 0 : item.sellerData) === null || _c === void 0 ? void 0 : _c.sellerEmail);
-                let sellerEmail = (_d = item === null || item === void 0 ? void 0 : item.sellerData) === null || _d === void 0 ? void 0 : _d.sellerEmail;
+                let sellerEmail = (_c = item === null || item === void 0 ? void 0 : item.sellerData) === null || _c === void 0 ? void 0 : _c.sellerEmail;
                 if (!orderBySellers[sellerEmail]) {
                     orderBySellers[sellerEmail] = [];
                 }
+                // orderBySellers[sellerEmail] = { items: [item], sellerStripeID: item?.sellerData?.stripeID };
                 orderBySellers[sellerEmail].push(item);
                 return item;
             });
@@ -125,20 +125,22 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                 currency: 'usd',
                 payment_method_types: ['card'],
                 metadata: {
-                    order_id: "opi_" + (Math.round(Math.random() * 99999999) + totalAmount).toString(),
-                    sellers: sellers.join(",")
+                    order_id: "opi_" + (Math.round(Math.random() * 99999999) + totalAmount).toString()
                 }
             });
             if (!client_secret)
-                throw new apiResponse.Api400Error("The payment failed. Please try again later or contact support if the problem persists.");
+                throw new apiResponse.Api400Error("The payment intents failed. Please try again later or contact support if the problem persists.");
             // after order succeed then group the order item by seller email and send email to the seller
-            const order = [];
+            const orders = [];
             // after successfully got order by seller as a object then loop it and trigger send email function inside for in loop
             for (const sellerEmail in orderBySellers) {
                 const items = orderBySellers[sellerEmail];
+                // calculate total amount of orders by seller;
                 const totalAmount = items.reduce((p, n) => p + parseInt(n === null || n === void 0 ? void 0 : n.baseAmount), 0) || 0;
+                // generate random order ids;
                 const orderID = generateOrderID();
-                order.push({
+                // then pushing them to orders variable;
+                orders.push({
                     orderID,
                     orderPaymentID: metadata === null || metadata === void 0 ? void 0 : metadata.order_id,
                     clientSecret: client_secret,
@@ -167,7 +169,8 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                     html: seller_order_email_template(items, authEmail, orderID)
                 });
             }
-            yield OrderTableModel.insertMany(order);
+            // finally insert orders to the database;
+            yield OrderTableModel.insertMany(orders);
             // after calculating total amount and order succeed then email sent to the buyer
             yield email_service({
                 to: authEmail,
@@ -181,7 +184,7 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                 totalAmount,
                 clientSecret: client_secret,
                 orderPaymentID: metadata === null || metadata === void 0 ? void 0 : metadata.order_id,
-                productInfos,
+                productInfos
             });
         }
         catch (error) {

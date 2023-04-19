@@ -16,7 +16,7 @@ const apiResponse = require("../../errors/apiResponse");
 const { findUserByEmail, update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
 const email_service = require("../../services/email.service");
 const { buyer_order_email_template, seller_order_email_template } = require("../../templates/email.template");
-const { generateItemID, generateTrackingID } = require("../../utils/common");
+const { generateItemID, generateOrderID } = require("../../utils/common");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const OrderTableModel = require("../../model/orderTable.model");
 module.exports = function SinglePurchaseOrder(req, res, next) {
@@ -83,11 +83,20 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                 throw new apiResponse.Api503Error("Service unavailable !");
             const itemID = generateItemID();
             let itemNumber = 1;
+            let sellerEmail = "";
+            const productInfos = [];
             product.forEach((p) => {
-                var _a, _b;
+                var _a, _b, _c;
                 p["shippingCharge"] = ((_a = p === null || p === void 0 ? void 0 : p.shipping) === null || _a === void 0 ? void 0 : _a.isFree) ? 0 : calculateShippingCost((_b = p === null || p === void 0 ? void 0 : p.packaged) === null || _b === void 0 ? void 0 : _b.volumetricWeight, areaType);
                 p["itemID"] = "item" + (itemID + (itemNumber++)).toString();
                 p["baseAmount"] = parseInt((p === null || p === void 0 ? void 0 : p.baseAmount) + (p === null || p === void 0 ? void 0 : p.shippingCharge));
+                sellerEmail = (_c = p === null || p === void 0 ? void 0 : p.sellerData) === null || _c === void 0 ? void 0 : _c.sellerEmail;
+                productInfos.push({
+                    productID: p === null || p === void 0 ? void 0 : p.productID,
+                    listingID: p === null || p === void 0 ? void 0 : p.listingID,
+                    variationID: p === null || p === void 0 ? void 0 : p.variationID,
+                    quantity: p === null || p === void 0 ? void 0 : p.quantity
+                });
                 return p;
             });
             const totalAmount = product.reduce((p, n) => p + parseInt(n === null || n === void 0 ? void 0 : n.baseAmount), 0) || 0;
@@ -103,10 +112,12 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
             if (!client_secret)
                 throw new apiResponse.Api400Error("Payment intent creation failed !");
             const orderTable = new OrderTableModel({
+                orderID: generateOrderID(),
                 orderPaymentID: metadata === null || metadata === void 0 ? void 0 : metadata.order_id,
                 clientSecret: client_secret,
                 customerEmail: email,
                 customerID: _uuid,
+                sellerEmail,
                 totalAmount,
                 paymentIntentID: id,
                 paymentStatus: "pending",
@@ -124,35 +135,17 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                 items: product,
             });
             const result = yield orderTable.save();
+            yield email_service({
+                to: sellerEmail,
+                subject: "New order confirmed",
+                html: seller_order_email_template(product, email, result === null || result === void 0 ? void 0 : result._id)
+            });
             // after calculating total amount and order succeed then email sent to the buyer
             yield email_service({
                 to: email,
                 subject: "Order confirmed",
                 html: buyer_order_email_template(product, totalAmount)
             });
-            function separateOrdersBySeller(upRes) {
-                var _a;
-                let newOrder = {};
-                for (const orderItem of upRes) {
-                    const sellerEmail = (_a = orderItem === null || orderItem === void 0 ? void 0 : orderItem.sellerData) === null || _a === void 0 ? void 0 : _a.sellerEmail;
-                    if (!newOrder[sellerEmail]) {
-                        newOrder[sellerEmail] = [];
-                    }
-                    newOrder[sellerEmail].push(orderItem);
-                }
-                return newOrder;
-            }
-            // after order succeed then group the order item by seller email and send email to the seller
-            const orderBySellers = (Array.isArray(product) && product.length >= 1) ? separateOrdersBySeller(product) : {};
-            // after successfully got order by seller as a object then loop it and trigger send email function inside for in loop
-            for (const sellerEmail in orderBySellers) {
-                const items = orderBySellers[sellerEmail];
-                yield email_service({
-                    to: sellerEmail,
-                    subject: "New order confirmed",
-                    html: seller_order_email_template(items, email, result === null || result === void 0 ? void 0 : result._id)
-                });
-            }
             return res.status(200).send({
                 success: true,
                 statusCode: 200,
@@ -160,7 +153,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                 totalAmount: totalAmount,
                 clientSecret: client_secret,
                 orderPaymentID: metadata === null || metadata === void 0 ? void 0 : metadata.order_id,
-                orderDocID: result === null || result === void 0 ? void 0 : result._id
+                productInfos
             });
             // product = product[0];
             // product["orderID"] = generateItemID();

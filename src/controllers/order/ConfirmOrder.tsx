@@ -3,6 +3,7 @@ import { NextFunction, Request, Response } from "express";
 const { update_variation_stock_available, clearCart } = require("../../services/common.service");
 const apiResponse = require("../../errors/apiResponse");
 const OrderTableModel = require("../../model/orderTable.model");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 
 module.exports = async function confirmOrder(req: Request, res: Response, next: NextFunction) {
@@ -10,10 +11,11 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
 
       const { email } = req.decoded;
 
-      const { paymentMethodID, orderPaymentID, productInfos } = req.body as {
+      const { paymentMethodID, orderPaymentID, productInfos, orderState } = req.body as {
          paymentMethodID: any;
          orderPaymentID: string;
          productInfos: any[];
+         orderState:string;
       };
 
       if (!req.body || typeof req.body !== "object" || !orderPaymentID || !productInfos)
@@ -38,7 +40,7 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
       await Promise.all(orderPromises);
 
       // after order confirmed then return response to the client
-      await clearCart(email);
+      orderState === "byCart" && await clearCart(email);
       return res.status(200).send({ message: "Order completed.", statusCode: 200, success: true });
 
    } catch (error: any) {
