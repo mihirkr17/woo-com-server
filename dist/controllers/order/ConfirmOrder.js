@@ -9,11 +9,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-// const Order = require("../../model/order.model");
 const { update_variation_stock_available, clearCart } = require("../../services/common.service");
 const apiResponse = require("../../errors/apiResponse");
 const OrderTableModel = require("../../model/orderTable.model");
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 module.exports = function confirmOrder(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {

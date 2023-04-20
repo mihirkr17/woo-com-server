@@ -1,9 +1,7 @@
 import { NextFunction, Request, Response } from "express";
-// const Order = require("../../model/order.model");
 const { update_variation_stock_available, clearCart } = require("../../services/common.service");
 const apiResponse = require("../../errors/apiResponse");
 const OrderTableModel = require("../../model/orderTable.model");
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 
 module.exports = async function confirmOrder(req: Request, res: Response, next: NextFunction) {
@@ -15,7 +13,7 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
          paymentMethodID: any;
          orderPaymentID: string;
          productInfos: any[];
-         orderState:string;
+         orderState: string;
       };
 
       if (!req.body || typeof req.body !== "object" || !orderPaymentID || !productInfos)
@@ -29,6 +27,7 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
             }
          }, {
       });
+      
 
       const orderPromises: any = paymentMethodID && productInfos.map(async (item: any) => await update_variation_stock_available("dec", {
          productID: item?.productID,
@@ -47,9 +46,6 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
       next(error);
    }
 }
-
-
-
 
 
 

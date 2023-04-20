@@ -15,7 +15,7 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const ShoppingCart = require("../../model/shoppingCart.model");
 const { findUserByEmail, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
 const OrderTableModel = require("../../model/orderTable.model");
-const { generateItemID, generateTrackingID, generateOrderID } = require("../../utils/common");
+const { generateItemID, generateOrderID } = require("../../utils/common");
 const email_service = require("../../services/email.service");
 const { buyer_order_email_template, seller_order_email_template } = require("../../templates/email.template");
 module.exports = function CartPurchaseOrder(req, res, next) {
@@ -24,19 +24,25 @@ module.exports = function CartPurchaseOrder(req, res, next) {
         try {
             const userEmail = req.headers.authorization || "";
             const { email: authEmail, _uuid } = req.decoded;
+            // initialized current time stamp
             const timestamp = Date.now();
             if (userEmail !== authEmail)
                 throw new apiResponse.Api401Error("Unauthorized access !");
             if (!req.body || typeof req.body === "undefined")
                 throw new apiResponse.Api400Error("Required body !");
+            // get state by body
             const { state } = req.body;
+            // finding user by email;
             const user = yield findUserByEmail(authEmail);
+            if (!user)
+                throw new apiResponse.Api400Error(`Sorry, User not found with this ${authEmail}`);
+            // getting default shipping address from user data;
             const defaultAddress = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
-                ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
+                ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.find((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)));
             if (!defaultAddress)
                 throw new apiResponse.Api400Error("Required shipping address !");
             const areaType = defaultAddress === null || defaultAddress === void 0 ? void 0 : defaultAddress.area_type;
-            const orderItems = yield ShoppingCart.aggregate([
+            const cartItems = yield ShoppingCart.aggregate([
                 { $match: { customerEmail: authEmail } },
                 { $unwind: { path: "$items" } },
                 {
@@ -89,7 +95,7 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                 },
                 { $unset: ["variations", "items"] }
             ]);
-            if (!orderItems || orderItems.length <= 0 || !Array.isArray(orderItems))
+            if (!cartItems || cartItems.length <= 0 || !Array.isArray(cartItems))
                 throw new apiResponse.Api400Error("Nothing for purchase ! Please add product in your cart.");
             // adding order id tracking id in individual order items
             let itmID = generateItemID();
@@ -97,7 +103,7 @@ module.exports = function CartPurchaseOrder(req, res, next) {
             const productInfos = [];
             let totalAmount = 0;
             const orderBySellers = {};
-            orderItems.forEach((item) => {
+            cartItems.forEach((item) => {
                 var _a, _b, _c;
                 item["shippingCharge"] = ((_a = item === null || item === void 0 ? void 0 : item.shipping) === null || _a === void 0 ? void 0 : _a.isFree) ? 0 : calculateShippingCost((_b = item === null || item === void 0 ? void 0 : item.packaged) === null || _b === void 0 ? void 0 : _b.volumetricWeight, areaType);
                 item["itemID"] = "item" + (itmID + (itmNumber++)).toString();
@@ -113,7 +119,6 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                 if (!orderBySellers[sellerEmail]) {
                     orderBySellers[sellerEmail] = [];
                 }
-                // orderBySellers[sellerEmail] = { items: [item], sellerStripeID: item?.sellerData?.stripeID };
                 orderBySellers[sellerEmail].push(item);
                 return item;
             });
@@ -170,12 +175,14 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                 });
             }
             // finally insert orders to the database;
-            yield OrderTableModel.insertMany(orders);
+            const result = yield OrderTableModel.insertMany(orders);
+            if (!result || result.length <= 0)
+                throw new apiResponse.Api400Error("Sorry order processing failed !");
             // after calculating total amount and order succeed then email sent to the buyer
             yield email_service({
                 to: authEmail,
                 subject: "Order confirmed",
-                html: buyer_order_email_template(orderItems, totalAmount)
+                html: buyer_order_email_template(cartItems, totalAmount)
             });
             return res.status(200).send({
                 success: true,
@@ -207,7 +214,7 @@ module.exports = function CartPurchaseOrder(req, res, next) {
 //       if (!defaultAddress)
 //          throw new apiResponse.Api400Error("Required shipping address !");
 //       const areaType = defaultAddress?.area_type;
-//       const orderItems = await ShoppingCart.aggregate([
+//       const cartItems = await ShoppingCart.aggregate([
 //          { $match: { customerEmail: authEmail } },
 //          { $unwind: { path: "$items" } },
 //          {
@@ -268,14 +275,14 @@ module.exports = function CartPurchaseOrder(req, res, next) {
 //          },
 //          { $unset: ["variations", "items"] }
 //       ]);
-//       if (!orderItems || orderItems.length <= 0 || !Array.isArray(orderItems))
+//       if (!cartItems || cartItems.length <= 0 || !Array.isArray(cartItems))
 //          throw new apiResponse.Api400Error("Nothing for purchase ! Please add product in your cart.");
-//       orderItems.forEach((p: any) => {
+//       cartItems.forEach((p: any) => {
 //          p["shippingCharge"] = p?.shipping?.isFree ? 0 : calculateShippingCost(p?.packaged?.volumetricWeight, areaType);
 //          return p;
 //       });
 //       // calculating total amount of order items
-//       const totalAmount: number = orderItems.reduce((p: number, n: any) => p + parseInt(n?.baseAmount + n?.shippingCharge), 0) || 0;
+//       const totalAmount: number = cartItems.reduce((p: number, n: any) => p + parseInt(n?.baseAmount + n?.shippingCharge), 0) || 0;
 //       if (!totalAmount) throw new apiResponse.Api503Error("Service unavailable !");
 //       // Creating payment intent after getting total amount of order items. 
 //       const { client_secret, metadata } = await stripe.paymentIntents.create({
@@ -291,7 +298,7 @@ module.exports = function CartPurchaseOrder(req, res, next) {
 //       return res.status(200).send({
 //          success: true,
 //          statusCode: 200,
-//          orderItems,
+//          cartItems,
 //          totalAmount: totalAmount,
 //          message: "Order confirming soon..",
 //          clientSecret: client_secret,
