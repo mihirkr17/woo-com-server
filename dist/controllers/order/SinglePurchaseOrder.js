@@ -62,13 +62,6 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                 },
                 {
                     $set: {
-                        customerEmail: customerEmail,
-                        paymentMode: "card",
-                        state: state,
-                        shippingAddress: defaultShippingAddress,
-                        paymentStatus: "pending",
-                        customerID: _uuid,
-                        orderStatus: "pending",
                         productID: productID,
                         listingID: listingID,
                         variationID: variationID,
@@ -81,16 +74,17 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
             ]);
             if (typeof product === 'undefined' || !Array.isArray(product))
                 throw new apiResponse.Api503Error("Service unavailable !");
-            const itemID = generateItemID();
             let itemNumber = 1;
             let sellerEmail = "";
+            let sellerStore = "";
             const productInfos = [];
             product.forEach((p) => {
-                var _a, _b, _c;
+                var _a, _b, _c, _d;
                 p["shippingCharge"] = ((_a = p === null || p === void 0 ? void 0 : p.shipping) === null || _a === void 0 ? void 0 : _a.isFree) ? 0 : calculateShippingCost((_b = p === null || p === void 0 ? void 0 : p.packaged) === null || _b === void 0 ? void 0 : _b.volumetricWeight, areaType);
-                p["itemID"] = "item" + (itemID + (itemNumber++)).toString();
+                p["itemID"] = "item" + (generateItemID() + (itemNumber++)).toString();
                 p["baseAmount"] = parseInt((p === null || p === void 0 ? void 0 : p.baseAmount) + (p === null || p === void 0 ? void 0 : p.shippingCharge));
                 sellerEmail = (_c = p === null || p === void 0 ? void 0 : p.sellerData) === null || _c === void 0 ? void 0 : _c.sellerEmail;
+                sellerStore = (_d = p === null || p === void 0 ? void 0 : p.sellerData) === null || _d === void 0 ? void 0 : _d.storeName;
                 productInfos.push({
                     productID: p === null || p === void 0 ? void 0 : p.productID,
                     listingID: p === null || p === void 0 ? void 0 : p.listingID,
@@ -118,6 +112,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                 customerEmail: email,
                 customerID: _uuid,
                 sellerEmail,
+                sellerStore,
                 totalAmount,
                 paymentIntentID: id,
                 paymentStatus: "pending",
@@ -138,7 +133,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
             yield email_service({
                 to: sellerEmail,
                 subject: "New order confirmed",
-                html: seller_order_email_template(product, email, result === null || result === void 0 ? void 0 : result._id)
+                html: seller_order_email_template(product, email, result === null || result === void 0 ? void 0 : result.orderID)
             });
             // after calculating total amount and order succeed then email sent to the buyer
             yield email_service({
@@ -150,7 +145,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                 success: true,
                 statusCode: 200,
                 message: "Order confirming soon..",
-                totalAmount: totalAmount,
+                totalAmount,
                 clientSecret: client_secret,
                 orderPaymentID: metadata === null || metadata === void 0 ? void 0 : metadata.order_id,
                 productInfos

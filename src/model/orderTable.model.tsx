@@ -1,11 +1,44 @@
 import { Schema, model } from "mongoose";
 
+interface IOrderTable {
+   orderID: string;
+   orderPaymentID: string;
+   customerEmail: string;
+   customerID: string;
+   sellerEmail: string;
+   storeName: string;
+   shippingAddress: object;
+   state: string;
+   areaType: string;
+   totalAmount: number;
+   paymentMode: string;
+   paymentIntentID: string;
+   paymentMethodID: string;
+   clientSecret: string;
+   orderStatus: string;
+   paymentStatus: string;
+   orderAT: object;
+   items: any;
+   isCompleted?: boolean;
+   isDispatch?: boolean;
+   isCanceled?: boolean;
+   isShipped?: boolean;
+   orderDispatchAT?: boolean;
+   orderCanceledAT?: object;
+   cancelReason?: string;
+   orderShippedAT?: object;
+   orderPlacedAT?: object;
+   orderCompletedAT?: object;
+   refund?: object;
+}
+
 const orderTab = new Schema({
    orderID: { type: String, required: true },
    orderPaymentID: String,
    customerEmail: { type: String, required: true },
    customerID: { type: String, required: true },
    sellerEmail: { type: String, required: true },
+   sellerStore: { type: String, required: true },
    shippingAddress: { type: Object, required: true },
    state: { type: String, enum: ["byCart", "byPurchase"], required: true },
    areaType: { type: String, required: true },
@@ -31,9 +64,9 @@ const orderTab = new Schema({
    isCanceled: { type: Boolean, required: false },
    orderCanceledAT: { type: Object, required: false },
    orderDispatchAT: { type: Object, required: false },
-   orderCompletedAT: { type: Date, required: false },
-   orderPlacedAT: { type: Date, required: false },
-   orderShippedAT: { type: Date, required: false },
+   orderCompletedAT: { type: Object, required: false },
+   orderPlacedAT: { type: Object, required: false },
+   orderShippedAT: { type: Object, required: false },
    cancelReason: { type: String, required: false },
    refund: { type: Object, required: false },
    items: [

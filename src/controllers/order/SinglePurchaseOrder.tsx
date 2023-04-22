@@ -60,13 +60,6 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
          },
          {
             $set: {
-               customerEmail: customerEmail,
-               paymentMode: "card",
-               state: state,
-               shippingAddress: defaultShippingAddress,
-               paymentStatus: "pending",
-               customerID: _uuid,
-               orderStatus: "pending",
                productID: productID,
                listingID: listingID,
                variationID: variationID,
@@ -81,16 +74,17 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
       if (typeof product === 'undefined' || !Array.isArray(product))
          throw new apiResponse.Api503Error("Service unavailable !");
 
-      const itemID = generateItemID();
       let itemNumber = 1;
       let sellerEmail = "";
+      let sellerStore = "";
       const productInfos: any[] = [];
 
       product.forEach((p: any) => {
          p["shippingCharge"] = p?.shipping?.isFree ? 0 : calculateShippingCost(p?.packaged?.volumetricWeight, areaType);
-         p["itemID"] = "item" + (itemID + (itemNumber++)).toString();
+         p["itemID"] = "item" + (generateItemID() + (itemNumber++)).toString();
          p["baseAmount"] = parseInt(p?.baseAmount + p?.shippingCharge);
          sellerEmail = p?.sellerData?.sellerEmail;
+         sellerStore = p?.sellerData?.storeName;
          productInfos.push({
             productID: p?.productID,
             listingID: p?.listingID,
@@ -122,6 +116,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
          customerEmail: email,
          customerID: _uuid,
          sellerEmail,
+         sellerStore,
          totalAmount,
          paymentIntentID: id,
          paymentStatus: "pending",
@@ -144,7 +139,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
       await email_service({
          to: sellerEmail,
          subject: "New order confirmed",
-         html: seller_order_email_template(product, email, result?._id)
+         html: seller_order_email_template(product, email, result?.orderID)
       });
 
       // after calculating total amount and order succeed then email sent to the buyer
@@ -158,7 +153,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
          success: true,
          statusCode: 200,
          message: "Order confirming soon..",
-         totalAmount: totalAmount,
+         totalAmount,
          clientSecret: client_secret,
          orderPaymentID: metadata?.order_id,
          productInfos

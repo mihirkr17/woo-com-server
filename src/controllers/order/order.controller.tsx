@@ -1,8 +1,9 @@
 import { NextFunction, Request, Response } from "express";
-const Product = require("../../model/product.model");
-const Order = require("../../model/order.model");
 const OrderTableModel = require("../../model/orderTable.model");
-const { order_status_updater, update_variation_stock_available } = require("../../services/common.service");
+const { update_variation_stock_available } = require("../../services/common.service");
+const apiResponse = require("../../errors/apiResponse");
+const email_service = require("../../services/email.service");
+
 
 
 module.exports.myOrder = async (req: Request, res: Response, next: NextFunction) => {
@@ -14,32 +15,9 @@ module.exports.myOrder = async (req: Request, res: Response, next: NextFunction)
       return res.status(401).send();
     }
 
-    let result = await OrderTableModel.aggregate([
-      { $match: { $and: [{ customerEmail: email }] } },
-      // { $unwind: { path: "$items" } },
-      // {
-      //   $group: {
-      //     _id: "$orderPaymentID",
-      //     orderID: {$first: "$orderID"},
-      //     totalAmount: { $sum: "$items.baseAmount" },
-      //     paymentIntentID: { $first: "$paymentIntentID" },
-      //     customerEmail: { $first: "$customerEmail" },
-      //     paymentMethodID: { $first: "$paymentMethodID" },
-      //     paymentStatus: { $first: "$paymentStatus" },
-      //     orderStatus: { $first: "$orderStatus" },
-      //     paymentMode: { $first: "$paymentMode" },
-      //     orderAT: { $first: "$orderAT" },
-      //     items: {
-      //       $push: "$items"
-      //     }
-      //   }
-      // },
-      // { $unwind: { path: "$orders" } },
-      // { $replaceRoot: { newRoot: "$orders" } },
-      { $sort: { _id: -1 } }
-    ]);
+    const orders = await OrderTableModel.find({ customerEmail: email }).sort({ _id: -1 });
 
-    res.status(200).send({ success: true, statusCode: 200, data: { module: { orders: result } } });
+    return res.status(200).send({ success: true, statusCode: 200, data: { module: { orders } } });
   } catch (error: any) {
     next(error);
   }
@@ -48,15 +26,14 @@ module.exports.myOrder = async (req: Request, res: Response, next: NextFunction)
 module.exports.removeOrder = async (req: Request, res: Response, next: any) => {
   try {
 
-    const orderUserEmail = req.params.email;
-    const id = parseInt(req.params.orderId);
+    const { email, orderID } = req.params;
 
-    const result = await Order.findOneAndUpdate(
-      { user_email: orderUserEmail },
-      { $pull: { orders: { orderId: id } } }
-    );
+    const result = await OrderTableModel.findOneAndDelete({ $and: [{ orderID }, { customerEmail: email }] });
 
-    res.status(200).send({ result, message: "Order Removed successfully" });
+    if (!result) throw new apiResponse.Api400Error("Order removed failed !");
+
+    return res.status(200).send({ success: true, statusCode: 200, message: "Order Removed successfully" });
+
   } catch (error: any) {
     next(error);
   }
@@ -64,33 +41,60 @@ module.exports.removeOrder = async (req: Request, res: Response, next: any) => {
 
 module.exports.cancelMyOrder = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userEmail = req.params.userEmail;
+    const email = req.params.email;
 
-    const body = req.body;
+    const { cancelReason, orderID, orderItems } = req?.body;
 
-    const { cancelReason, orderID } = body;
+    if (!orderID || typeof orderID !== "string") throw new apiResponse.Api400Error("Required order ID !");
 
-    if (!orderID) throw new Error("Required order ID !");
+    if (!cancelReason || typeof cancelReason !== "string") throw new apiResponse.Api400Error("Required cancel reason !");
 
-    if (!cancelReason) throw new Error("Required cancel reason !");
+    if (!orderItems || !Array.isArray(orderItems)) throw new apiResponse.Api400Error("Required order items information !");
 
-    let existOrder = await Order.aggregate([
-      { $match: { user_email: userEmail } },
-      { $unwind: { path: "$orders" } },
-      {
-        $replaceRoot: { newRoot: "$orders" }
-      },
-      {
-        $match: { $and: [{ orderID: orderID }] }
+    const timestamp = Date.now();
+
+    let timePlan = {
+      iso: new Date(timestamp),
+      time: new Date(timestamp).toLocaleTimeString(),
+      date: new Date(timestamp).toDateString(),
+      timestamp: timestamp
+    };
+
+    const updateOrderStatusResult = await OrderTableModel.findOneAndUpdate({ $and: [{ orderID }, { customerEmail: email }] }, {
+      $set: {
+        orderStatus: "canceled",
+        cancelReason: cancelReason,
+        orderCanceledAT: timePlan,
+        isCanceled: true
       }
-    ]);
+    });
 
-    existOrder = existOrder[0];
+    if (!updateOrderStatusResult) throw new apiResponse.Api400Error("Order canceled request failed !");
 
-    if (existOrder) {
-      await order_status_updater({ type: "canceled", cancelReason, customerEmail: existOrder?.customerEmail, trackingID: existOrder?.trackingID });
-      await update_variation_stock_available("inc", existOrder);
-    }
+    await Promise.all(orderItems.map(async (item: any) => await update_variation_stock_available("inc", item)));
+
+    await email_service({
+      to: email,
+      subject: "Order canceled confirm",
+      html: `
+        <h3>
+          Order canceled with ID : ${orderID}
+        </h3>
+        <br />
+        <p>Cancel Reason: ${cancelReason.replace(/[_+]/gi, " ")}</p>
+        <br />
+        <ul style="padding: 10px;">
+          ${orderItems?.map((item: any) => {
+        return (
+          `<li style="margin: 5px;">
+            Title: ${item?.title}. <br />
+            Price: ${item?.baseAmount} USD. <br />
+            Qty: ${item?.quantity} pcs.
+          </li>`
+        )
+      })}
+        </ul>`
+    });
 
     return res.status(200).send({ success: true, statusCode: 200, message: "Order canceled successfully" });
   } catch (error: any) {

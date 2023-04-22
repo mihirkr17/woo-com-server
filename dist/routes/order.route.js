@@ -19,8 +19,8 @@ try {
     router.post("/confirm-order", verifyJWT, isRoleBuyer, ConfirmOrder);
     // router.post("/confirm-single-purchase-order", verifyJWT, isRoleBuyer, SinglePurchaseOrderConfirm);
     router.get("/my-order/:email", verifyJWT, isRoleBuyer, myOrder);
-    router.delete("/remove-order/:email/:orderId", verifyJWT, isRoleBuyer, removeOrder);
-    router.put("/cancel-my-order/:userEmail", verifyJWT, isRoleBuyer, cancelMyOrder);
+    router.delete("/remove-order/:email/:orderID", verifyJWT, isRoleBuyer, removeOrder);
+    router.put("/cancel-my-order/:email", verifyJWT, isRoleBuyer, cancelMyOrder);
 }
 catch (error) {
     console.log(error === null || error === void 0 ? void 0 : error.message);

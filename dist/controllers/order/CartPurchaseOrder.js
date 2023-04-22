@@ -98,15 +98,14 @@ module.exports = function CartPurchaseOrder(req, res, next) {
             if (!cartItems || cartItems.length <= 0 || !Array.isArray(cartItems))
                 throw new apiResponse.Api400Error("Nothing for purchase ! Please add product in your cart.");
             // adding order id tracking id in individual order items
-            let itmID = generateItemID();
-            let itmNumber = 1;
+            let itemNumber = 1;
             const productInfos = [];
             let totalAmount = 0;
-            const orderBySellers = {};
+            const groupOrdersBySeller = {};
             cartItems.forEach((item) => {
-                var _a, _b, _c;
+                var _a, _b, _c, _d, _e, _f, _g;
                 item["shippingCharge"] = ((_a = item === null || item === void 0 ? void 0 : item.shipping) === null || _a === void 0 ? void 0 : _a.isFree) ? 0 : calculateShippingCost((_b = item === null || item === void 0 ? void 0 : item.packaged) === null || _b === void 0 ? void 0 : _b.volumetricWeight, areaType);
-                item["itemID"] = "item" + (itmID + (itmNumber++)).toString();
+                item["itemID"] = "item" + (generateItemID() + (itemNumber++)).toString();
                 item["baseAmount"] = parseInt((item === null || item === void 0 ? void 0 : item.baseAmount) + (item === null || item === void 0 ? void 0 : item.shippingCharge));
                 totalAmount += item === null || item === void 0 ? void 0 : item.baseAmount;
                 productInfos.push({
@@ -115,11 +114,11 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                     variationID: item === null || item === void 0 ? void 0 : item.variationID,
                     quantity: item === null || item === void 0 ? void 0 : item.quantity
                 });
-                let sellerEmail = (_c = item === null || item === void 0 ? void 0 : item.sellerData) === null || _c === void 0 ? void 0 : _c.sellerEmail;
-                if (!orderBySellers[sellerEmail]) {
-                    orderBySellers[sellerEmail] = [];
+                if (!groupOrdersBySeller[(_c = item === null || item === void 0 ? void 0 : item.sellerData) === null || _c === void 0 ? void 0 : _c.sellerEmail]) {
+                    groupOrdersBySeller[(_d = item === null || item === void 0 ? void 0 : item.sellerData) === null || _d === void 0 ? void 0 : _d.sellerEmail] = { items: [], sellerStore: "" };
                 }
-                orderBySellers[sellerEmail].push(item);
+                groupOrdersBySeller[(_e = item === null || item === void 0 ? void 0 : item.sellerData) === null || _e === void 0 ? void 0 : _e.sellerEmail].sellerStore = (_f = item === null || item === void 0 ? void 0 : item.sellerData) === null || _f === void 0 ? void 0 : _f.storeName;
+                groupOrdersBySeller[(_g = item === null || item === void 0 ? void 0 : item.sellerData) === null || _g === void 0 ? void 0 : _g.sellerEmail].items.push(item);
                 return item;
             });
             if (!totalAmount)
@@ -138,8 +137,8 @@ module.exports = function CartPurchaseOrder(req, res, next) {
             // after order succeed then group the order item by seller email and send email to the seller
             const orders = [];
             // after successfully got order by seller as a object then loop it and trigger send email function inside for in loop
-            for (const sellerEmail in orderBySellers) {
-                const items = orderBySellers[sellerEmail];
+            for (const sellerEmail in groupOrdersBySeller) {
+                const { items, sellerStore } = groupOrdersBySeller[sellerEmail];
                 // calculate total amount of orders by seller;
                 const totalAmount = items.reduce((p, n) => p + parseInt(n === null || n === void 0 ? void 0 : n.baseAmount), 0) || 0;
                 // generate random order ids;
@@ -152,6 +151,7 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                     customerEmail: authEmail,
                     customerID: _uuid,
                     sellerEmail,
+                    sellerStore,
                     totalAmount,
                     paymentIntentID: id,
                     paymentStatus: "pending",

@@ -103,17 +103,16 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
          throw new apiResponse.Api400Error("Nothing for purchase ! Please add product in your cart.");
 
       // adding order id tracking id in individual order items
-      let itmID = generateItemID();
-      let itmNumber = 1;
+      let itemNumber = 1;
 
       const productInfos: any[] = [];
 
       let totalAmount: number = 0;
-      const orderBySellers: any = {};
+      const groupOrdersBySeller: any = {};
 
       cartItems.forEach((item: any) => {
          item["shippingCharge"] = item?.shipping?.isFree ? 0 : calculateShippingCost(item?.packaged?.volumetricWeight, areaType);
-         item["itemID"] = "item" + (itmID + (itmNumber++)).toString();
+         item["itemID"] = "item" + (generateItemID() + (itemNumber++)).toString();
          item["baseAmount"] = parseInt(item?.baseAmount + item?.shippingCharge);
 
          totalAmount += item?.baseAmount;
@@ -125,13 +124,13 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
             quantity: item?.quantity
          });
 
-         let sellerEmail = item?.sellerData?.sellerEmail;
 
-         if (!orderBySellers[sellerEmail]) {
-            orderBySellers[sellerEmail] = [];
+         if (!groupOrdersBySeller[item?.sellerData?.sellerEmail]) {
+            groupOrdersBySeller[item?.sellerData?.sellerEmail] = { items: [], sellerStore: "" };
          }
 
-         orderBySellers[sellerEmail].push(item);
+         groupOrdersBySeller[item?.sellerData?.sellerEmail].sellerStore = item?.sellerData?.storeName;
+         groupOrdersBySeller[item?.sellerData?.sellerEmail].items.push(item);
 
          return item;
       });
@@ -155,9 +154,9 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
       const orders: any[] = [];
 
       // after successfully got order by seller as a object then loop it and trigger send email function inside for in loop
-      for (const sellerEmail in orderBySellers) {
+      for (const sellerEmail in groupOrdersBySeller) {
 
-         const items = orderBySellers[sellerEmail];
+         const { items, sellerStore } = groupOrdersBySeller[sellerEmail]
 
          // calculate total amount of orders by seller;
          const totalAmount: number = items.reduce((p: number, n: any) => p + parseInt(n?.baseAmount), 0) || 0;
@@ -173,6 +172,7 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
             customerEmail: authEmail,
             customerID: _uuid,
             sellerEmail,
+            sellerStore,
             totalAmount,
             paymentIntentID: id,
             paymentStatus: "pending",
