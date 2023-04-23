@@ -2,7 +2,6 @@
 
 import { NextFunction, Request, Response } from "express";
 const User = require("../../model/user.model");
-const generateVerifyToken = require("../../utils/generateVerifyToken");
 const apiResponse = require("../../errors/apiResponse");
 const setToken = require("../../utils/setToken");
 const comparePassword = require("../../utils/comparePassword");
@@ -12,6 +11,7 @@ const saltRounds = 10;
 const email_service = require("../../services/email.service");
 const { get_six_digit_random_number, isPasswordValid } = require("../../services/common.service");
 const { verify_email_html_template } = require("../../templates/email.template");
+const { generateUUID, generateVerifyToken } = require("../../utils/common");
 
 /**
  * @apiController --> Buyer Registration Controller
@@ -28,7 +28,7 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
       if (existUser)
          throw new apiResponse.Api400Error("User already exists, Please try another phone number or email address !");
 
-      body['_uuid'] = Math.random().toString(36).toUpperCase().slice(2, 18);
+      body['_uuid'] = "b" + generateUUID();
       body['verifyToken'] = generateVerifyToken();
       body["buyer"] = {};
       body["password"] = await bcrypt.hash(body?.password, saltRounds);
@@ -83,7 +83,7 @@ module.exports.sellerRegistrationController = async (req: Request, res: Response
 
       if (!isPasswordValid) throw new apiResponse.Api400Error("Need a strong password !");
 
-      body['_uuid'] = Math.random().toString(36).toUpperCase().slice(2, 18);
+      body['_uuid'] = "s" + generateUUID();
       body['authProvider'] = 'system';
       body['isSeller'] = 'pending';
       body['idFor'] = 'sell';
@@ -237,7 +237,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
       if (user?.role && user?.role === "BUYER") {
 
          user.buyer["defaultShippingAddress"] = (Array.isArray(user?.buyer?.shippingAddress) &&
-            user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]) || {};
+            user?.buyer?.shippingAddress.find((adr: any) => adr?.default_shipping_address === true)) || {};
 
          userDataToken = setUserDataToken({
             _uuid: user?._uuid,
@@ -267,7 +267,8 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
          });
 
          // if all operation success then return the response
-         return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: user?._uuid, u_data: userDataToken });
+
+         return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: user?._uuid, u_data: userDataToken, token2: token });
       }
    } catch (error: any) {
       return next(error);

@@ -77,6 +77,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
       let itemNumber = 1;
       let sellerEmail = "";
       let sellerStore = "";
+      let sellerID = "";
       const productInfos: any[] = [];
 
       product.forEach((p: any) => {
@@ -85,6 +86,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
          p["baseAmount"] = parseInt(p?.baseAmount + p?.shippingCharge);
          sellerEmail = p?.sellerData?.sellerEmail;
          sellerStore = p?.sellerData?.storeName;
+         sellerID = p?.sellerData?.sellerID;
          productInfos.push({
             productID: p?.productID,
             listingID: p?.listingID,
@@ -99,7 +101,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
       // creating payment intents here
       const { client_secret, metadata, id } = await stripe.paymentIntents.create({
          amount: (totalAmount * 100),
-         currency: 'usd',
+         currency: 'bdt',
          payment_method_types: ['card'],
          metadata: {
             order_id: "opi_" + (Math.round(Math.random() * 99999999) + totalAmount).toString()
@@ -110,7 +112,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
       if (!client_secret) throw new apiResponse.Api400Error("Payment intent creation failed !");
 
       const orderTable = new OrderTableModel({
-         orderID: generateOrderID(),
+         orderID: generateOrderID(sellerID),
          orderPaymentID: metadata?.order_id,
          clientSecret: client_secret,
          customerEmail: email,

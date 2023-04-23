@@ -103,7 +103,7 @@ module.exports = function CartPurchaseOrder(req, res, next) {
             let totalAmount = 0;
             const groupOrdersBySeller = {};
             cartItems.forEach((item) => {
-                var _a, _b, _c, _d, _e, _f, _g;
+                var _a, _b, _c, _d, _e, _f, _g, _h, _j;
                 item["shippingCharge"] = ((_a = item === null || item === void 0 ? void 0 : item.shipping) === null || _a === void 0 ? void 0 : _a.isFree) ? 0 : calculateShippingCost((_b = item === null || item === void 0 ? void 0 : item.packaged) === null || _b === void 0 ? void 0 : _b.volumetricWeight, areaType);
                 item["itemID"] = "item" + (generateItemID() + (itemNumber++)).toString();
                 item["baseAmount"] = parseInt((item === null || item === void 0 ? void 0 : item.baseAmount) + (item === null || item === void 0 ? void 0 : item.shippingCharge));
@@ -115,10 +115,11 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                     quantity: item === null || item === void 0 ? void 0 : item.quantity
                 });
                 if (!groupOrdersBySeller[(_c = item === null || item === void 0 ? void 0 : item.sellerData) === null || _c === void 0 ? void 0 : _c.sellerEmail]) {
-                    groupOrdersBySeller[(_d = item === null || item === void 0 ? void 0 : item.sellerData) === null || _d === void 0 ? void 0 : _d.sellerEmail] = { items: [], sellerStore: "" };
+                    groupOrdersBySeller[(_d = item === null || item === void 0 ? void 0 : item.sellerData) === null || _d === void 0 ? void 0 : _d.sellerEmail] = { items: [], sellerStore: "", sellerID: "" };
                 }
                 groupOrdersBySeller[(_e = item === null || item === void 0 ? void 0 : item.sellerData) === null || _e === void 0 ? void 0 : _e.sellerEmail].sellerStore = (_f = item === null || item === void 0 ? void 0 : item.sellerData) === null || _f === void 0 ? void 0 : _f.storeName;
-                groupOrdersBySeller[(_g = item === null || item === void 0 ? void 0 : item.sellerData) === null || _g === void 0 ? void 0 : _g.sellerEmail].items.push(item);
+                groupOrdersBySeller[(_g = item === null || item === void 0 ? void 0 : item.sellerData) === null || _g === void 0 ? void 0 : _g.sellerEmail].sellerID = (_h = item === null || item === void 0 ? void 0 : item.sellerData) === null || _h === void 0 ? void 0 : _h.sellerID;
+                groupOrdersBySeller[(_j = item === null || item === void 0 ? void 0 : item.sellerData) === null || _j === void 0 ? void 0 : _j.sellerEmail].items.push(item);
                 return item;
             });
             if (!totalAmount)
@@ -126,7 +127,7 @@ module.exports = function CartPurchaseOrder(req, res, next) {
             // Creating payment intent after getting total amount of order items. 
             const { client_secret, metadata, id } = yield stripe.paymentIntents.create({
                 amount: (totalAmount * 100),
-                currency: 'usd',
+                currency: 'bdt',
                 payment_method_types: ['card'],
                 metadata: {
                     order_id: "opi_" + (Math.round(Math.random() * 99999999) + totalAmount).toString()
@@ -138,11 +139,11 @@ module.exports = function CartPurchaseOrder(req, res, next) {
             const orders = [];
             // after successfully got order by seller as a object then loop it and trigger send email function inside for in loop
             for (const sellerEmail in groupOrdersBySeller) {
-                const { items, sellerStore } = groupOrdersBySeller[sellerEmail];
+                const { items, sellerStore, sellerID } = groupOrdersBySeller[sellerEmail];
                 // calculate total amount of orders by seller;
                 const totalAmount = items.reduce((p, n) => p + parseInt(n === null || n === void 0 ? void 0 : n.baseAmount), 0) || 0;
                 // generate random order ids;
-                const orderID = generateOrderID();
+                const orderID = generateOrderID(sellerID);
                 // then pushing them to orders variable;
                 orders.push({
                     orderID,

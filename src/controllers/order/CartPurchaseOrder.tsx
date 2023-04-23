@@ -126,10 +126,11 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
 
 
          if (!groupOrdersBySeller[item?.sellerData?.sellerEmail]) {
-            groupOrdersBySeller[item?.sellerData?.sellerEmail] = { items: [], sellerStore: "" };
+            groupOrdersBySeller[item?.sellerData?.sellerEmail] = { items: [], sellerStore: "", sellerID: "" };
          }
 
          groupOrdersBySeller[item?.sellerData?.sellerEmail].sellerStore = item?.sellerData?.storeName;
+         groupOrdersBySeller[item?.sellerData?.sellerEmail].sellerID = item?.sellerData?.sellerID;
          groupOrdersBySeller[item?.sellerData?.sellerEmail].items.push(item);
 
          return item;
@@ -140,7 +141,7 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
       // Creating payment intent after getting total amount of order items. 
       const { client_secret, metadata, id } = await stripe.paymentIntents.create({
          amount: (totalAmount * 100),
-         currency: 'usd',
+         currency: 'bdt',
          payment_method_types: ['card'],
          metadata: {
             order_id: "opi_" + (Math.round(Math.random() * 99999999) + totalAmount).toString()
@@ -156,13 +157,13 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
       // after successfully got order by seller as a object then loop it and trigger send email function inside for in loop
       for (const sellerEmail in groupOrdersBySeller) {
 
-         const { items, sellerStore } = groupOrdersBySeller[sellerEmail]
+         const { items, sellerStore, sellerID } = groupOrdersBySeller[sellerEmail]
 
          // calculate total amount of orders by seller;
          const totalAmount: number = items.reduce((p: number, n: any) => p + parseInt(n?.baseAmount), 0) || 0;
 
          // generate random order ids;
-         const orderID = generateOrderID();
+         const orderID = generateOrderID(sellerID);
 
          // then pushing them to orders variable;
          orders.push({

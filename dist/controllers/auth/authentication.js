@@ -11,7 +11,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const User = require("../../model/user.model");
-const generateVerifyToken = require("../../utils/generateVerifyToken");
 const apiResponse = require("../../errors/apiResponse");
 const setToken = require("../../utils/setToken");
 const comparePassword = require("../../utils/comparePassword");
@@ -21,6 +20,7 @@ const saltRounds = 10;
 const email_service = require("../../services/email.service");
 const { get_six_digit_random_number, isPasswordValid } = require("../../services/common.service");
 const { verify_email_html_template } = require("../../templates/email.template");
+const { generateUUID, generateVerifyToken } = require("../../utils/common");
 /**
  * @apiController --> Buyer Registration Controller
  * @apiMethod --> POST
@@ -32,7 +32,7 @@ module.exports.buyerRegistrationController = (req, res, next) => __awaiter(void 
         let existUser = yield User.findOne({ $or: [{ phone: body === null || body === void 0 ? void 0 : body.phone }, { email: body.email }] });
         if (existUser)
             throw new apiResponse.Api400Error("User already exists, Please try another phone number or email address !");
-        body['_uuid'] = Math.random().toString(36).toUpperCase().slice(2, 18);
+        body['_uuid'] = "b" + generateUUID();
         body['verifyToken'] = generateVerifyToken();
         body["buyer"] = {};
         body["password"] = yield bcrypt.hash(body === null || body === void 0 ? void 0 : body.password, saltRounds);
@@ -76,7 +76,7 @@ module.exports.sellerRegistrationController = (req, res, next) => __awaiter(void
         }
         if (!isPasswordValid)
             throw new apiResponse.Api400Error("Need a strong password !");
-        body['_uuid'] = Math.random().toString(36).toUpperCase().slice(2, 18);
+        body['_uuid'] = "s" + generateUUID();
         body['authProvider'] = 'system';
         body['isSeller'] = 'pending';
         body['idFor'] = 'sell';
@@ -199,7 +199,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
         }
         if ((user === null || user === void 0 ? void 0 : user.role) && (user === null || user === void 0 ? void 0 : user.role) === "BUYER") {
             user.buyer["defaultShippingAddress"] = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
-                ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0])) || {};
+                ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.find((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true))) || {};
             userDataToken = setUserDataToken({
                 _uuid: user === null || user === void 0 ? void 0 : user._uuid,
                 fullName: user === null || user === void 0 ? void 0 : user.fullName,
@@ -226,7 +226,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
                 httpOnly: true
             });
             // if all operation success then return the response
-            return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: user === null || user === void 0 ? void 0 : user._uuid, u_data: userDataToken });
+            return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: user === null || user === void 0 ? void 0 : user._uuid, u_data: userDataToken, token2: token });
         }
     }
     catch (error) {

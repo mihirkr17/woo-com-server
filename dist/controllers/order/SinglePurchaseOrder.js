@@ -77,14 +77,16 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
             let itemNumber = 1;
             let sellerEmail = "";
             let sellerStore = "";
+            let sellerID = "";
             const productInfos = [];
             product.forEach((p) => {
-                var _a, _b, _c, _d;
+                var _a, _b, _c, _d, _e;
                 p["shippingCharge"] = ((_a = p === null || p === void 0 ? void 0 : p.shipping) === null || _a === void 0 ? void 0 : _a.isFree) ? 0 : calculateShippingCost((_b = p === null || p === void 0 ? void 0 : p.packaged) === null || _b === void 0 ? void 0 : _b.volumetricWeight, areaType);
                 p["itemID"] = "item" + (generateItemID() + (itemNumber++)).toString();
                 p["baseAmount"] = parseInt((p === null || p === void 0 ? void 0 : p.baseAmount) + (p === null || p === void 0 ? void 0 : p.shippingCharge));
                 sellerEmail = (_c = p === null || p === void 0 ? void 0 : p.sellerData) === null || _c === void 0 ? void 0 : _c.sellerEmail;
                 sellerStore = (_d = p === null || p === void 0 ? void 0 : p.sellerData) === null || _d === void 0 ? void 0 : _d.storeName;
+                sellerID = (_e = p === null || p === void 0 ? void 0 : p.sellerData) === null || _e === void 0 ? void 0 : _e.sellerID;
                 productInfos.push({
                     productID: p === null || p === void 0 ? void 0 : p.productID,
                     listingID: p === null || p === void 0 ? void 0 : p.listingID,
@@ -97,7 +99,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
             // creating payment intents here
             const { client_secret, metadata, id } = yield stripe.paymentIntents.create({
                 amount: (totalAmount * 100),
-                currency: 'usd',
+                currency: 'bdt',
                 payment_method_types: ['card'],
                 metadata: {
                     order_id: "opi_" + (Math.round(Math.random() * 99999999) + totalAmount).toString()
@@ -106,7 +108,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
             if (!client_secret)
                 throw new apiResponse.Api400Error("Payment intent creation failed !");
             const orderTable = new OrderTableModel({
-                orderID: generateOrderID(),
+                orderID: generateOrderID(sellerID),
                 orderPaymentID: metadata === null || metadata === void 0 ? void 0 : metadata.order_id,
                 clientSecret: client_secret,
                 customerEmail: email,

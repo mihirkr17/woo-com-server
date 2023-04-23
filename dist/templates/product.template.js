@@ -1,6 +1,5 @@
 "use strict";
-const product_listing_template_engine = (body) => {
-    var _a, _b, _c;
+const product_listing_template_engine = (body, sellerData) => {
     let price = parseFloat(body === null || body === void 0 ? void 0 : body.price);
     let sellingPrice = parseFloat(body === null || body === void 0 ? void 0 : body.sellingPrice);
     let discount = ((price - sellingPrice) / price);
@@ -19,11 +18,7 @@ const product_listing_template_engine = (body) => {
             discount,
             currency: 'us'
         },
-        sellerData: {
-            sellerID: ((_a = body === null || body === void 0 ? void 0 : body.sellerData) === null || _a === void 0 ? void 0 : _a.sellerID) || "",
-            sellerName: ((_b = body === null || body === void 0 ? void 0 : body.sellerData) === null || _b === void 0 ? void 0 : _b.sellerName) || "",
-            storeName: ((_c = body === null || body === void 0 ? void 0 : body.sellerData) === null || _c === void 0 ? void 0 : _c.storeName) || ""
-        },
+        sellerData,
         packaged: {
             dimension: {
                 height: parseFloat(body === null || body === void 0 ? void 0 : body.packageHeight),
@@ -72,6 +67,7 @@ const product_variation_template_engine = (body) => {
         sku: body === null || body === void 0 ? void 0 : body.sku,
         variant: (body === null || body === void 0 ? void 0 : body.variant) || {},
         attrs: (body === null || body === void 0 ? void 0 : body.attrs) || {},
+        highlights: (body === null || body === void 0 ? void 0 : body.highlight) || [],
         priceModifier,
         stock,
         available: parseInt(body === null || body === void 0 ? void 0 : body.available),

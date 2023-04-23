@@ -11,7 +11,7 @@ const ConfirmOrder = require("../controllers/order/ConfirmOrder");
 
 // single order controller
 const SinglePurchaseOrder = require("../controllers/order/SinglePurchaseOrder");
-const SinglePurchaseOrderConfirm = require("../controllers/order/SinglePurchaseOrderConfirm");
+// const SinglePurchaseOrderConfirm = require("../controllers/order/SinglePurchaseOrderConfirm");
 
 
 try {

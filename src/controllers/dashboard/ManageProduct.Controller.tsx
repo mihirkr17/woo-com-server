@@ -7,6 +7,7 @@ const User = require("../../model/user.model");
 const QueueProduct = require("../../model/queueProduct.model");
 const Product = require("../../model/product.model");
 const { product_variation_template_engine } = require("../../templates/product.template");
+const apiResponse = require("../../errors/apiResponse");
 
 
 
@@ -62,28 +63,27 @@ module.exports.updateStockController = async (req: Request, res: Response, next:
 // product variation controller
 module.exports.variationController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const formTypes = req.query.formType || "";
-      const requestFor = req.query.requestFor;
+      const { formType, requestFor } = req.query;
+
       let result: any;
-      const body = req.body;
 
-      if (!formTypes || formTypes === "") throw new Error("Required form type !");
-      if (!body) throw new Error("Required body !");
+      if (!formType || formType === "") throw new apiResponse.Api400Error("Required form type !");
 
-      const { request } = body;
+      const { request } = req.body;
 
-      if (!request?.productID) throw new Error("Required product id !");
-
-      if (!request) throw new Error("Required body !");
+      if (!req.body || !request?.productID) throw new apiResponse.Api400Error("Required product id !");
 
       let model = product_variation_template_engine(request?.variations);
       const productID: string = request?.productID;
       const variationID: string = request?.variationID || "";
 
       // Update variation
-      if (formTypes === 'update-variation' && requestFor === 'product_variations') {
+      if (formType === 'update-variation' && requestFor === 'product_variations') {
+
          model['_vrid'] = variationID;
+
          if (variationID && variationID !== "") {
+
             result = await Product.findOneAndUpdate(
                { _id: ObjectId(productID) },
                { $set: { 'variations.$[i]': model } },
@@ -93,9 +93,11 @@ module.exports.variationController = async (req: Request, res: Response, next: N
       }
 
       // create new variation
-      if (formTypes === 'new-variation') {
+      if (formType === 'new-variation') {
          let newVariationID = "vi_" + Math.random().toString(36).toLowerCase().slice(2, 18);
+
          model['_vrid'] = newVariationID;
+
          result = await Product.findOneAndUpdate(
             { _id: ObjectId(productID) },
             { $push: { variations: model } },
@@ -365,40 +367,39 @@ module.exports.productListingController = async (
       }
 
       if (formTypes === "update" && lId) {
-         model = product_listing_template_engine(body);
-         model['modifiedAt'] = new Date(Date.now());
-         model.sellerData.sellerEmail = authEmail;
-         model.sellerData.sellerID = user?._uuid;
-         model.sellerData.sellerName = user?.fullName;
-         model.sellerData.storeName = user?.seller?.storeInfos?.storeName;
 
-         let result = await Product.findOneAndUpdate(
+         model = product_listing_template_engine(body, {
+            sellerEmail: authEmail,
+            sellerID: user?._uuid,
+            sellerName: user?.fullName,
+            storeName: user?.seller?.storeInfos?.storeName
+         });
+
+         model['modifiedAt'] = new Date(Date.now());
+
+         const result = await Product.findOneAndUpdate(
             { _lid: lId },
             { $set: model },
             { upsert: true }
          );
 
-         if (result) {
-            return res.status(200).send({
-               success: true,
-               statusCode: 200,
-               message: "Product updated successfully.",
-            })
-         } else {
-            return res.status(400).send({
-               success: false,
-               statusCode: 400,
-               error: "Operation failed!!!",
-            });
-         }
+         if (!result) throw new apiResponse.Api400Error("Sorry, Product not found !");
+
+         return res.status(200).send({
+            success: true,
+            statusCode: 200,
+            message: "Product updated successfully.",
+         })
+
       }
 
       if (formTypes === 'create') {
-         model = product_listing_template_engine(body);
-         model.sellerData.sellerEmail = authEmail;
-         model.sellerData.sellerID = user?._uuid;
-         model.sellerData.sellerName = user?.fullName;
-         model.sellerData.storeName = user?.seller?.storeInfos?.storeName;
+         model = product_listing_template_engine(body, {
+            sellerEmail: authEmail,
+            sellerID: user?._uuid,
+            sellerName: user?.fullName,
+            storeName: user?.seller?.storeInfos?.storeName
+         });
 
          model["rating"] = [
             { weight: 5, count: 0 },
@@ -407,6 +408,7 @@ module.exports.productListingController = async (
             { weight: 2, count: 0 },
             { weight: 1, count: 0 },
          ];
+
          model["ratingAverage"] = 0;
          model['reviews'] = [];
          model['save_as'] = 'queue';
@@ -557,29 +559,25 @@ module.exports.productFlashSaleController = async (req: Request, res: Response, 
 
 module.exports.updateProductData = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const body = req.body;
       const urlParams = req.params.paramsType;
       let setFilter: any;
 
-      if (!body) throw new Error("Required body !");
+      const { listingID, productID, actionType, pricing, shipping, packageInfo, manufacturer } = req.body;
 
-      const { listingID, productID, actionType, pricing, shipping, packageInfo, manufacturer } = body;
+      if (!productID) throw new apiResponse.Api400Error("Required product ID !");
 
-      if (!productID) throw new Error("Required product ID !");
+      if (!listingID) throw new apiResponse.Api400Error("Required listing ID !");
 
-      if (!listingID) throw new Error("Required listing ID !");
-
-      if (!actionType) throw new Error("Required actionType !");
+      if (!actionType) throw new apiResponse.Api400Error("Required actionType !");
 
       if (actionType === "PRICING" && urlParams === "pricing") {
 
-         if (!pricing) throw new Error("Required pricing !");
+         if (!pricing) throw new apiResponse.Api400Error("Required pricing !");
 
          const { price, sellingPrice } = pricing;
          let discount: any = 0;
 
-
-         if (!price && price === "") throw new Error("Required price identifier !");
+         if (!price && price === "") throw new apiResponse.Api400Error("Required price identifier !");
 
          if (!sellingPrice && sellingPrice === "") throw new Error("Required selling price identifier !");
 

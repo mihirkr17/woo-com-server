@@ -21,10 +21,22 @@ const cors = require("cors");
 const app: Express = express();
 
 // middleware
+const allowedOrigins = ['http://localhost:3000', 'https://wookart.vercel.app'];
+
 app.use(
   cors({
-    origin: true,
+    origin: function (origin: any, callback: any) {
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.indexOf(origin) === -1) {
+        const msg = 'The CORS policy for this site does not allow access from the specified origin.';
+        return callback(new Error(msg), false);
+      }
+
+      return callback(null, true);
+    },
     methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
+    allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   })
 );
@@ -39,7 +51,7 @@ mongoose.connect(mongoUri, {
   useUnifiedTopology: true,
   // serverApi: ServerApiVersion.v1,
 }).then(() => console.log("Connection Successful..."))
-.catch((err:any) => console.log(err));
+  .catch((err: any) => console.log(err));
 
 app.get("/", (req: Request, res: Response) => {
   res.status(200).send("WooKart Server is running");

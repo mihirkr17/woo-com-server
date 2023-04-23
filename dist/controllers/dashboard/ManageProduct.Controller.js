@@ -16,6 +16,7 @@ const User = require("../../model/user.model");
 const QueueProduct = require("../../model/queueProduct.model");
 const Product = require("../../model/product.model");
 const { product_variation_template_engine } = require("../../templates/product.template");
+const apiResponse = require("../../errors/apiResponse");
 // Controllers
 module.exports.updateStockController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d, _e;
@@ -58,31 +59,25 @@ module.exports.updateStockController = (req, res, next) => __awaiter(void 0, voi
 // product variation controller
 module.exports.variationController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const formTypes = req.query.formType || "";
-        const requestFor = req.query.requestFor;
+        const { formType, requestFor } = req.query;
         let result;
-        const body = req.body;
-        if (!formTypes || formTypes === "")
-            throw new Error("Required form type !");
-        if (!body)
-            throw new Error("Required body !");
-        const { request } = body;
-        if (!(request === null || request === void 0 ? void 0 : request.productID))
-            throw new Error("Required product id !");
-        if (!request)
-            throw new Error("Required body !");
+        if (!formType || formType === "")
+            throw new apiResponse.Api400Error("Required form type !");
+        const { request } = req.body;
+        if (!req.body || !(request === null || request === void 0 ? void 0 : request.productID))
+            throw new apiResponse.Api400Error("Required product id !");
         let model = product_variation_template_engine(request === null || request === void 0 ? void 0 : request.variations);
         const productID = request === null || request === void 0 ? void 0 : request.productID;
         const variationID = (request === null || request === void 0 ? void 0 : request.variationID) || "";
         // Update variation
-        if (formTypes === 'update-variation' && requestFor === 'product_variations') {
+        if (formType === 'update-variation' && requestFor === 'product_variations') {
             model['_vrid'] = variationID;
             if (variationID && variationID !== "") {
                 result = yield Product.findOneAndUpdate({ _id: ObjectId(productID) }, { $set: { 'variations.$[i]': model } }, { arrayFilters: [{ "i._vrid": variationID }] });
             }
         }
         // create new variation
-        if (formTypes === 'new-variation') {
+        if (formType === 'new-variation') {
             let newVariationID = "vi_" + Math.random().toString(36).toLowerCase().slice(2, 18);
             model['_vrid'] = newVariationID;
             result = yield Product.findOneAndUpdate({ _id: ObjectId(productID) }, { $push: { variations: model } }, { upsert: true });
@@ -309,34 +304,29 @@ module.exports.productListingController = (req, res, next) => __awaiter(void 0, 
                 .send({ success: false, statusCode: 401, error: "Unauthorized" });
         }
         if (formTypes === "update" && lId) {
-            model = product_listing_template_engine(body);
+            model = product_listing_template_engine(body, {
+                sellerEmail: authEmail,
+                sellerID: user === null || user === void 0 ? void 0 : user._uuid,
+                sellerName: user === null || user === void 0 ? void 0 : user.fullName,
+                storeName: (_y = (_x = user === null || user === void 0 ? void 0 : user.seller) === null || _x === void 0 ? void 0 : _x.storeInfos) === null || _y === void 0 ? void 0 : _y.storeName
+            });
             model['modifiedAt'] = new Date(Date.now());
-            model.sellerData.sellerEmail = authEmail;
-            model.sellerData.sellerID = user === null || user === void 0 ? void 0 : user._uuid;
-            model.sellerData.sellerName = user === null || user === void 0 ? void 0 : user.fullName;
-            model.sellerData.storeName = (_y = (_x = user === null || user === void 0 ? void 0 : user.seller) === null || _x === void 0 ? void 0 : _x.storeInfos) === null || _y === void 0 ? void 0 : _y.storeName;
-            let result = yield Product.findOneAndUpdate({ _lid: lId }, { $set: model }, { upsert: true });
-            if (result) {
-                return res.status(200).send({
-                    success: true,
-                    statusCode: 200,
-                    message: "Product updated successfully.",
-                });
-            }
-            else {
-                return res.status(400).send({
-                    success: false,
-                    statusCode: 400,
-                    error: "Operation failed!!!",
-                });
-            }
+            const result = yield Product.findOneAndUpdate({ _lid: lId }, { $set: model }, { upsert: true });
+            if (!result)
+                throw new apiResponse.Api400Error("Sorry, Product not found !");
+            return res.status(200).send({
+                success: true,
+                statusCode: 200,
+                message: "Product updated successfully.",
+            });
         }
         if (formTypes === 'create') {
-            model = product_listing_template_engine(body);
-            model.sellerData.sellerEmail = authEmail;
-            model.sellerData.sellerID = user === null || user === void 0 ? void 0 : user._uuid;
-            model.sellerData.sellerName = user === null || user === void 0 ? void 0 : user.fullName;
-            model.sellerData.storeName = (_0 = (_z = user === null || user === void 0 ? void 0 : user.seller) === null || _z === void 0 ? void 0 : _z.storeInfos) === null || _0 === void 0 ? void 0 : _0.storeName;
+            model = product_listing_template_engine(body, {
+                sellerEmail: authEmail,
+                sellerID: user === null || user === void 0 ? void 0 : user._uuid,
+                sellerName: user === null || user === void 0 ? void 0 : user.fullName,
+                storeName: (_0 = (_z = user === null || user === void 0 ? void 0 : user.seller) === null || _z === void 0 ? void 0 : _z.storeInfos) === null || _0 === void 0 ? void 0 : _0.storeName
+            });
             model["rating"] = [
                 { weight: 5, count: 0 },
                 { weight: 4, count: 0 },
@@ -450,25 +440,22 @@ module.exports.productFlashSaleController = (req, res, next) => __awaiter(void 0
 });
 module.exports.updateProductData = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const body = req.body;
         const urlParams = req.params.paramsType;
         let setFilter;
-        if (!body)
-            throw new Error("Required body !");
-        const { listingID, productID, actionType, pricing, shipping, packageInfo, manufacturer } = body;
+        const { listingID, productID, actionType, pricing, shipping, packageInfo, manufacturer } = req.body;
         if (!productID)
-            throw new Error("Required product ID !");
+            throw new apiResponse.Api400Error("Required product ID !");
         if (!listingID)
-            throw new Error("Required listing ID !");
+            throw new apiResponse.Api400Error("Required listing ID !");
         if (!actionType)
-            throw new Error("Required actionType !");
+            throw new apiResponse.Api400Error("Required actionType !");
         if (actionType === "PRICING" && urlParams === "pricing") {
             if (!pricing)
-                throw new Error("Required pricing !");
+                throw new apiResponse.Api400Error("Required pricing !");
             const { price, sellingPrice } = pricing;
             let discount = 0;
             if (!price && price === "")
-                throw new Error("Required price identifier !");
+                throw new apiResponse.Api400Error("Required price identifier !");
             if (!sellingPrice && sellingPrice === "")
                 throw new Error("Required selling price identifier !");
             discount = (parseInt(price) - parseInt(sellingPrice)) / parseInt(price);

@@ -1,4 +1,4 @@
-const product_listing_template_engine = (body: any) => {
+const product_listing_template_engine = (body: any, sellerData: any) => {
 
   let price = parseFloat(body?.price);
   let sellingPrice = parseFloat(body?.sellingPrice);
@@ -13,19 +13,20 @@ const product_listing_template_engine = (body: any) => {
     title: body?.title,
     slug: body?.slug,
     categories: [body?.category, body?.subCategory, body?.postCategory] || [],
+
     brand: body?.brand,
+
     images: body?.images,
+
     pricing: {
       price,
       sellingPrice,
       discount,
       currency: 'us'
     },
-    sellerData: {
-      sellerID: body?.sellerData?.sellerID || "",
-      sellerName: body?.sellerData?.sellerName || "",
-      storeName: body?.sellerData?.storeName || ""
-    },
+
+    sellerData,
+
     packaged: {
       dimension: {
         height: parseFloat(body?.packageHeight),
@@ -38,6 +39,7 @@ const product_listing_template_engine = (body: any) => {
       volumetricWeight,
       inTheBox: body?.inTheBox
     },
+
     shipping: {
       fulfilledBy: body?.fulfilledBy,
       procurementType: body?.procurementType,
@@ -45,17 +47,23 @@ const product_listing_template_engine = (body: any) => {
       provider: body?.shippingProvider,
       isFree: body?.isFree
     },
+
     tax: {
       hsn: body?.taxHsn,
       code: body?.taxCode
     },
+
     manufacturer: {
       origin: body?.manufacturerOrigin,
       details: body?.manufacturerDetails,
     },
+
     warranty: body?.warranty,
+
     bodyInfo: body?.bodyInfo || {},
+
     specification: body?.specification || {},
+
     description: body?.description || ""
   }
 }
@@ -77,6 +85,7 @@ const product_variation_template_engine = (body: any) => {
     sku: body?.sku,
     variant: body?.variant || {},
     attrs: body?.attrs || {},
+    highlights: body?.highlight || [],
     priceModifier,
     stock,
     available: parseInt(body?.available),
