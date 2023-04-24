@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const router = express_1.default.Router();
-const { verifyJWT, isRoleBuyer, } = require("../middleware/Auth.middleware");
+const { verifyJWT, loadWithJWT, isRoleBuyer, } = require("../middleware/Auth.middleware");
 const { myOrder, removeOrder, cancelMyOrder } = require("../controllers/order/order.controller");
 // set order controller
 const CartPurchaseOrder = require("../controllers/order/CartPurchaseOrder");

@@ -1,4 +1,4 @@
 "use strict";
-function isValidString(str) {
-    return /^[a-zA-Z0-9_]+$/.test(str);
-}
+module.exports.isValidString = (str) => {
+    return (/^(?:\d+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|(?=.*[a-z])(?=.*[A-Z]).+)$/).test(str);
+};

@@ -12,6 +12,7 @@ const email_service = require("../../services/email.service");
 const { get_six_digit_random_number, isPasswordValid } = require("../../services/common.service");
 const { verify_email_html_template } = require("../../templates/email.template");
 const { generateUUID, generateVerifyToken } = require("../../utils/common");
+const { isValidString } = require("../../utils/validate");
 
 /**
  * @apiController --> Buyer Registration Controller
@@ -160,6 +161,8 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 
       const { emailOrPhone, password } = req.body;
 
+      if (!isValidString(emailOrPhone)) throw new apiResponse.Api400Error("Invalid string type !"); 
+
       let userDataToken: any;
 
       let user = await User.findOne({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] });
@@ -268,7 +271,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 
          // if all operation success then return the response
 
-         return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: user?._uuid, u_data: userDataToken, token2: token });
+         return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: user?._uuid, u_data: userDataToken, token });
       }
    } catch (error: any) {
       return next(error);

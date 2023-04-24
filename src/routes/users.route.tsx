@@ -38,6 +38,7 @@ try {
     isRoleOwnerOrAdmin,
     userCTRL.demoteToUser
   );
+  
   router.get("/manage-user", userCTRL.manageUsersController);
 
   router.get("/check-seller-request", userCTRL.checkSellerRequestController);

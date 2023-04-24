@@ -182,8 +182,9 @@ module.exports.updateCartProductQuantityController = (req, res, next) => __await
         const result = yield ShoppingCart.findOneAndUpdate({ $and: [{ customerEmail: authEmail }, { _id: ObjectId(cartID) }] }, {
             $set: { "items.$[i].quantity": parseInt(quantity) }
         }, { arrayFilters: [{ "i.variationID": variationID }], upsert: true });
-        throw result ? res.status(200).send({ success: true, statusCode: 200, message: `Quantity updated to ${quantity}.` }) :
-            new apiResponse.Api500Error("Failed to update quantity !");
+        if (result)
+            return res.status(200).send({ success: true, statusCode: 200, message: `Quantity updated to ${quantity}.` });
+        throw new apiResponse.Api500Error("Failed to update quantity !");
     }
     catch (error) {
         next(error);
@@ -196,7 +197,7 @@ module.exports.updateCartProductQuantityController = (req, res, next) => __await
  */
 module.exports.deleteCartItem = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const productID = req.headers.authorization;
+        const productID = req.params.productID;
         const variationID = req.query.vr;
         const authEmail = req.decoded.email;
         const cart_types = req.params.cartTypes;
@@ -209,8 +210,9 @@ module.exports.deleteCartItem = (req, res, next) => __awaiter(void 0, void 0, vo
         let updateDocuments = yield ShoppingCart.findOneAndUpdate({ customerEmail: authEmail }, {
             $pull: { items: { $and: [{ variationID }, { productID }] } }
         });
-        throw updateDocuments ? res.status(200).send({ success: true, statusCode: 200, message: "Item removed successfully from your cart." }) :
-            new apiResponse.Api500Error("Failed to delete product from cart !");
+        if (updateDocuments)
+            return res.status(200).send({ success: true, statusCode: 200, message: "Item removed successfully from your cart." });
+        throw new apiResponse.Api500Error("Failed to delete product from cart !");
     }
     catch (error) {
         next(error);

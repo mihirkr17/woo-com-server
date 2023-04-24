@@ -31,7 +31,6 @@ var QueueProductSchema = new mongoose_1.Schema({
     reviews: { type: Array, required: false, default: [] },
     ratingAverage: { type: Number, required: false, default: 0 },
     bodyInfo: {
-        keyFeatures: { type: Array, required: true },
         searchKeywords: { type: Array, required: true },
         metaDescription: { type: String, required: true }
     },

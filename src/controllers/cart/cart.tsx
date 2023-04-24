@@ -211,8 +211,9 @@ module.exports.updateCartProductQuantityController = async (req: Request, res: R
          $set: { "items.$[i].quantity": parseInt(quantity) }
       }, { arrayFilters: [{ "i.variationID": variationID }], upsert: true });
 
-      throw result ? res.status(200).send({ success: true, statusCode: 200, message: `Quantity updated to ${quantity}.` }) :
-         new apiResponse.Api500Error("Failed to update quantity !");
+      if (result) return res.status(200).send({ success: true, statusCode: 200, message: `Quantity updated to ${quantity}.` });
+
+      throw new apiResponse.Api500Error("Failed to update quantity !");
 
    } catch (error: any) {
       next(error);
@@ -227,10 +228,11 @@ module.exports.updateCartProductQuantityController = async (req: Request, res: R
  */
 module.exports.deleteCartItem = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const productID = req.headers.authorization;
+      const productID = req.params.productID;
       const variationID = req.query.vr;
       const authEmail = req.decoded.email;
       const cart_types = req.params.cartTypes;
+
 
       if (!variationID || !productID) throw new apiResponse.Api400Error("Required product id & variation id !");
       if (!ObjectId.isValid(productID)) throw new apiResponse.Api400Error("Product id is not valid !");
@@ -241,8 +243,9 @@ module.exports.deleteCartItem = async (req: Request, res: Response, next: NextFu
          $pull: { items: { $and: [{ variationID }, { productID }] } }
       });
 
-      throw updateDocuments ? res.status(200).send({ success: true, statusCode: 200, message: "Item removed successfully from your cart." }) :
-         new apiResponse.Api500Error("Failed to delete product from cart !");
+      if (updateDocuments) return res.status(200).send({ success: true, statusCode: 200, message: "Item removed successfully from your cart." });
+      
+      throw new apiResponse.Api500Error("Failed to delete product from cart !");
 
    } catch (error: any) {
       next(error);

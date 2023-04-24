@@ -68,7 +68,6 @@ const product_listing_template_engine = (body: any, sellerData: any) => {
   }
 }
 
-
 const product_variation_template_engine = (body: any) => {
   let available = parseInt(body?.available) || 0;
   let priceModifier = parseInt(body?.priceModifier) || 0

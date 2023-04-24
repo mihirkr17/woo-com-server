@@ -37,7 +37,6 @@ var ProductSchema = new Schema({
    ratingAverage: { type: Number, required: true, default: 0 },
 
    bodyInfo: {
-      keyFeatures: { type: Array, required: true },
       searchKeywords: { type: Array, required: true },
       metaDescription: { type: String, required: true }
    },

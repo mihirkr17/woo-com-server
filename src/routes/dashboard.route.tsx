@@ -1,7 +1,7 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
 const { variationOne } = require("../middleware/Product.middleware");
-const { verifyJWT, isPermitForDashboard, isRoleSeller, isRoleAdmin } = require("../middleware/Auth.middleware");
+const { verifyJWT, loadWithJWT, isPermitForDashboard, isRoleSeller, isRoleAdmin } = require("../middleware/Auth.middleware");
 const dashboardCTRL = require("../controllers/dashboard/dashboardController");
 const ManageProductCTRL = require("../controllers/dashboard/ManageProduct.Controller");
 const AdminCTRL = require("../controllers/dashboard/Admin.controller");
@@ -9,7 +9,7 @@ const ManageOrderCTRL = require("../controllers/dashboard/ManageOrdersController
 
 try {
 
-  router.get("/overview", verifyJWT, isPermitForDashboard, dashboardCTRL?.dashboardOverview);
+  router.get("/overview", loadWithJWT, isPermitForDashboard, dashboardCTRL?.dashboardOverview);
 
   router.put("/seller/:storeName/product-control", verifyJWT, isRoleSeller, ManageProductCTRL?.productControlController);
 
@@ -35,15 +35,15 @@ try {
 
 
   // get controllers
-  router.get("/view-products", verifyJWT, isPermitForDashboard, ManageProductCTRL.viewAllProductsInDashboard);
+  router.get("/view-products", loadWithJWT, isPermitForDashboard, ManageProductCTRL.viewAllProductsInDashboard);
 
-  router.get("/admin/:uuid/provider", verifyJWT, isRoleAdmin, AdminCTRL?.getAdminController);
+  router.get("/admin/:uuid/provider", loadWithJWT, isRoleAdmin, AdminCTRL?.getAdminController);
 
-  router.get("/store/:storeName/manage-orders", verifyJWT, isRoleSeller, ManageOrderCTRL?.manageOrders);
+  router.get("/store/:storeName/manage-orders", loadWithJWT, isRoleSeller, ManageOrderCTRL?.manageOrders);
 
-  router.get("/all-sellers", verifyJWT, isRoleAdmin, dashboardCTRL?.allSellers);
+  router.get("/all-sellers", loadWithJWT, isRoleAdmin, dashboardCTRL?.allSellers);
 
-  router.get("/all-buyers", verifyJWT, isRoleAdmin, dashboardCTRL?.allBuyers);
+  router.get("/all-buyers", loadWithJWT, isRoleAdmin, dashboardCTRL?.allBuyers);
 
   /**
 * @requestMethod GET
@@ -51,7 +51,7 @@ try {
 * @desc --> Fetch Single Product By Product ID
 * @required [pid -> query, ]
 */
-  router.get("/get-one-product-in-seller-dsb", verifyJWT, isRoleSeller, ManageProductCTRL.getProductForSellerDSBController);
+  router.get("/get-one-product-in-seller-dsb", loadWithJWT, isRoleSeller, ManageProductCTRL.getProductForSellerDSBController);
 
 
   // post controllers
