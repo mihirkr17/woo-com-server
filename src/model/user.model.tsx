@@ -1,48 +1,11 @@
-import { Schema, model } from "mongoose";
-const bcrypt = require("bcrypt");
+// import { Schema, model } from "mongoose";
+const mongoose = require("mongoose");
+mongoose.set('maxTimeMS', 30000);
+let { Schema, model } = mongoose;
+
 const validator = require("validator");
-const saltRounds = 10;
 
-const buyerType = new Schema({
-  taxId: { type: String },
-  defaultShippingAddress: { type: Object },
-  wishlist: { type: Array },
-  shippingAddress: [
-    {
-      _id: false,
-      addrsID: { type: String },
-      name: { type: String, default: "" },
-      division: { type: String, default: "" },
-      city: { type: String, default: "" },
-      area: { type: String, default: "" },
-      area_type: { type: String, default: "" },
-      landmark: { type: String, default: "" },
-      phone_number: { type: String, default: "" },
-      postal_code: { type: String, default: "" },
-      default_shipping_address: { type: Boolean }
-    }
-  ],
-}, { _id: false });
 
-const sellerType = new Schema({
-  taxId: { type: String },
-  address: {
-    country: { type: String },
-    division: { type: String },
-    city: { type: String },
-    area: { type: String },
-    landmark: { type: String, default: "" },
-    postal_code: { type: String }
-  },
-  storeInfos: {
-    storeName: { type: String },
-    storeLicense: { type: String },
-    numOfProducts: { type: Number },
-    productInFulfilled: { type: Number },
-    productInDraft: { type: Number }
-  }
-
-}, { _id: false });
 
 // Interface of user
 interface IUser {
@@ -69,7 +32,7 @@ interface IUser {
 }
 
 // user schema design
-var UserSchema = new Schema<IUser>({
+var UserSchema = new Schema({
   _uuid: { type: String },
   fullName: { type: String, required: true },
 
@@ -107,9 +70,45 @@ var UserSchema = new Schema<IUser>({
 
   dob: { type: String, required: true },
 
-  seller: { type: sellerType, default: undefined },
+  seller: {
+    taxId: { type: String, required: false },
+    address: {
+      country: { type: String, required: false },
+      division: { type: String, required: false },
+      city: { type: String, required: false },
+      area: { type: String, required: false },
+      landmark: { type: String, default: "", required: false },
+      postal_code: { type: String, required: false }
+    },
+    storeInfos: {
+      storeName: { type: String, required: false },
+      storeLicense: { type: String, required: false },
+      numOfProducts: { type: Number, required: false },
+      productInFulfilled: { type: Number, required: false },
+      productInDraft: { type: Number, required: false }
+    }
+  },
 
-  buyer: { type: buyerType, default: undefined },
+  buyer: {
+    taxId: { type: String, required: false },
+    defaultShippingAddress: { type: Object, required: false },
+    wishlist: { type: Array, required: false },
+    shippingAddress: [
+      {
+        _id: false,
+        addrsID: { type: String, required: false },
+        name: { type: String, default: "", required: false },
+        division: { type: String, default: "", required: false },
+        city: { type: String, default: "", required: false },
+        area: { type: String, default: "", required: false },
+        area_type: { type: String, default: "", required: false },
+        landmark: { type: String, default: "", required: false },
+        phone_number: { type: String, default: "", required: false },
+        postal_code: { type: String, default: "", required: false },
+        default_shipping_address: { type: Boolean, required: false }
+      }
+    ],
+  },
 
   isSeller: { type: String, enum: ['pending', 'fulfilled'], default: undefined },
 
@@ -126,5 +125,5 @@ var UserSchema = new Schema<IUser>({
   becomeSellerAt: { type: Date, default: undefined }
 });
 
-var User = model<IUser>("User", UserSchema, "users");
+var User = model("User", UserSchema, "users");
 module.exports = User;

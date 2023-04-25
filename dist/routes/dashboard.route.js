@@ -6,13 +6,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const router = express_1.default.Router();
 const { variationOne } = require("../middleware/Product.middleware");
-const { verifyJWT, loadWithJWT, isPermitForDashboard, isRoleSeller, isRoleAdmin } = require("../middleware/Auth.middleware");
+const { verifyJWT, isPermitForDashboard, isRoleSeller, isRoleAdmin } = require("../middleware/Auth.middleware");
 const dashboardCTRL = require("../controllers/dashboard/dashboardController");
 const ManageProductCTRL = require("../controllers/dashboard/ManageProduct.Controller");
 const AdminCTRL = require("../controllers/dashboard/Admin.controller");
 const ManageOrderCTRL = require("../controllers/dashboard/ManageOrdersController");
 try {
-    router.get("/overview", loadWithJWT, isPermitForDashboard, dashboardCTRL === null || dashboardCTRL === void 0 ? void 0 : dashboardCTRL.dashboardOverview);
+    router.get("/overview", verifyJWT, isPermitForDashboard, dashboardCTRL === null || dashboardCTRL === void 0 ? void 0 : dashboardCTRL.dashboardOverview);
     router.put("/seller/:storeName/product-control", verifyJWT, isRoleSeller, ManageProductCTRL === null || ManageProductCTRL === void 0 ? void 0 : ManageProductCTRL.productControlController);
     router.put("/seller/:storeName/product/update-stock", verifyJWT, isRoleSeller, ManageProductCTRL.updateStockController);
     router.put("/seller/products/set-product-variation", verifyJWT, isRoleSeller, ManageProductCTRL.variationController);
@@ -24,18 +24,18 @@ try {
     router.post("/delete-seller-account-request", verifyJWT, isRoleAdmin, AdminCTRL === null || AdminCTRL === void 0 ? void 0 : AdminCTRL.deleteSellerAccountRequest);
     router.post("/get-buyer-info", verifyJWT, isRoleAdmin, AdminCTRL === null || AdminCTRL === void 0 ? void 0 : AdminCTRL.getBuyerInfoByAdmin);
     // get controllers
-    router.get("/view-products", loadWithJWT, isPermitForDashboard, ManageProductCTRL.viewAllProductsInDashboard);
-    router.get("/admin/:uuid/provider", loadWithJWT, isRoleAdmin, AdminCTRL === null || AdminCTRL === void 0 ? void 0 : AdminCTRL.getAdminController);
-    router.get("/store/:storeName/manage-orders", loadWithJWT, isRoleSeller, ManageOrderCTRL === null || ManageOrderCTRL === void 0 ? void 0 : ManageOrderCTRL.manageOrders);
-    router.get("/all-sellers", loadWithJWT, isRoleAdmin, dashboardCTRL === null || dashboardCTRL === void 0 ? void 0 : dashboardCTRL.allSellers);
-    router.get("/all-buyers", loadWithJWT, isRoleAdmin, dashboardCTRL === null || dashboardCTRL === void 0 ? void 0 : dashboardCTRL.allBuyers);
+    router.get("/view-products", verifyJWT, isPermitForDashboard, ManageProductCTRL.viewAllProductsInDashboard);
+    router.get("/admin/:uuid/provider", verifyJWT, isRoleAdmin, AdminCTRL === null || AdminCTRL === void 0 ? void 0 : AdminCTRL.getAdminController);
+    router.get("/store/:storeName/manage-orders", verifyJWT, isRoleSeller, ManageOrderCTRL === null || ManageOrderCTRL === void 0 ? void 0 : ManageOrderCTRL.manageOrders);
+    router.get("/all-sellers", verifyJWT, isRoleAdmin, dashboardCTRL === null || dashboardCTRL === void 0 ? void 0 : dashboardCTRL.allSellers);
+    router.get("/all-buyers", verifyJWT, isRoleAdmin, dashboardCTRL === null || dashboardCTRL === void 0 ? void 0 : dashboardCTRL.allBuyers);
     /**
   * @requestMethod GET
   * @controller fetchSingleProductByPidController
   * @desc --> Fetch Single Product By Product ID
   * @required [pid -> query, ]
   */
-    router.get("/get-one-product-in-seller-dsb", loadWithJWT, isRoleSeller, ManageProductCTRL.getProductForSellerDSBController);
+    router.get("/get-one-product-in-seller-dsb", verifyJWT, isRoleSeller, ManageProductCTRL.getProductForSellerDSBController);
     // post controllers
     router.post("/seller/:storeName/product/listing/:formTypes", verifyJWT, isRoleSeller, ManageProductCTRL.productListingController);
     // delete controller

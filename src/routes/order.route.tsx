@@ -1,7 +1,7 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
 
-const { verifyJWT, loadWithJWT, isRoleBuyer, } = require("../middleware/Auth.middleware");
+const { verifyJWT, isRoleBuyer, } = require("../middleware/Auth.middleware");
 const { myOrder, removeOrder, cancelMyOrder } = require("../controllers/order/order.controller");
 
 // set order controller
