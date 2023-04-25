@@ -55,12 +55,12 @@ try {
 
 
   // post controllers
-  router.post("/seller/:storeName/product/listing/:formTypes", verifyJWT, isRoleSeller, ManageProductCTRL.productListingController);
+  router.post("/seller/:storeName/product/listing/:formTypes/:_lid", verifyJWT, isRoleSeller, ManageProductCTRL.productListingController);
 
 
   // delete controller
   router.delete("/seller/:storeName/product/delete-product-variation/:productID/:vId", verifyJWT, ManageProductCTRL.deleteProductVariationController);
-  router.delete("/:storeName/product/delete-product", verifyJWT, isRoleSeller, ManageProductCTRL.deleteProductController);
+  router.delete("/:storeName/product/delete-product/:productID/:listingID", verifyJWT, isRoleSeller, ManageProductCTRL.deleteProductController);
 
 
 

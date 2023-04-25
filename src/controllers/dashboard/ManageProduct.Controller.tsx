@@ -14,28 +14,27 @@ const apiResponse = require("../../errors/apiResponse");
 // Controllers
 module.exports.updateStockController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-
-      const productID: String = req.headers.authorization || "";
-      const body = req.body;
       const storeName = req.params.storeName;
 
-      if (!body?.variations?._vrid || !body?.variations?.available) {
-         throw new Error("Variation ID and unit required !");
-      }
+      const { productID, variations } = req?.body;
 
-      if (productID && body && storeName) {
-         let stock = body?.variations?.available <= 1 ? "out" : "in";
+      if (!variations?._vrid || !variations?.available)
+         throw new apiResponse.Api400Error("Variation ID and unit required !");
+
+
+      if (productID && storeName) {
+         let stock = variations?.available <= 1 ? "out" : "in";
 
          const result = await Product.findOneAndUpdate(
             { $and: [{ _id: ObjectId(productID) }, { 'sellerData.storeName': storeName }] },
             {
                $set: {
-                  "variations.$[i].available": body?.variations?.available,
+                  "variations.$[i].available": variations?.available,
                   "variations.$[i].stock": stock,
                },
             },
             {
-               arrayFilters: [{ "i._vrid": body?.variations?._vrid }]
+               arrayFilters: [{ "i._vrid": variations?._vrid }]
             }
          );
 
@@ -354,8 +353,8 @@ module.exports.productListingController = async (
    try {
       const authEmail = req.decoded.email;
       const formTypes = req.params.formTypes;
+      const _lid = req.params._lid;
       const body = req.body;
-      const lId = req.headers?.authorization || null;
       let model;
 
       const user = await User.findOne({ $and: [{ email: authEmail }, { role: 'SELLER' }] });
@@ -366,7 +365,7 @@ module.exports.productListingController = async (
             .send({ success: false, statusCode: 401, error: "Unauthorized" });
       }
 
-      if (formTypes === "update" && lId) {
+      if (formTypes === "update" && _lid) {
 
          model = product_listing_template_engine(body, {
             sellerEmail: authEmail,
@@ -378,7 +377,7 @@ module.exports.productListingController = async (
          model['modifiedAt'] = new Date(Date.now());
 
          const result = await Product.findOneAndUpdate(
-            { _lid: lId },
+            { _lid: _lid },
             { $set: model },
             { upsert: true }
          );
@@ -468,16 +467,13 @@ module.exports.deleteProductVariationController = async (req: Request, res: Resp
 
 module.exports.deleteProductController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-
-      const productID: string = req.headers?.authorization?.split(',')[0] || "";
-      const _lid: string = req.headers?.authorization?.split(',')[1] || "";
-      const storeName = req.params.storeName;
+      const { productID, storeName, listingID } = req.params
 
       //return --> "acknowledged" : true, "deletedCount" : 1
       const deletedProduct = await Product.deleteOne({
          $and: [
             { _id: ObjectId(productID) },
-            { _lid },
+            { _lid: listingID },
             { 'sellerData.storeName': storeName }
          ]
       });

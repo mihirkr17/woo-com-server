@@ -13,21 +13,21 @@ const { buyer_order_email_template, seller_order_email_template } = require("../
 
 module.exports = async function CartPurchaseOrder(req: Request, res: Response, next: NextFunction) {
    try {
-      const userEmail: string = req.headers.authorization || "";
 
       const { email: authEmail, _uuid } = req.decoded;
 
       // initialized current time stamp
       const timestamp: any = Date.now();
 
-      if (userEmail !== authEmail)
-         throw new apiResponse.Api401Error("Unauthorized access !");
 
       if (!req.body || typeof req.body === "undefined")
          throw new apiResponse.Api400Error("Required body !");
 
       // get state by body
-      const { state } = req.body;
+      const { state, customerEmail } = req.body;
+
+      if (customerEmail !== authEmail)
+      throw new apiResponse.Api401Error("Unauthorized access !");
 
       // finding user by email;
       const user = await findUserByEmail(authEmail);

@@ -22,16 +22,15 @@ module.exports = function CartPurchaseOrder(req, res, next) {
     var _a, _b;
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const userEmail = req.headers.authorization || "";
             const { email: authEmail, _uuid } = req.decoded;
             // initialized current time stamp
             const timestamp = Date.now();
-            if (userEmail !== authEmail)
-                throw new apiResponse.Api401Error("Unauthorized access !");
             if (!req.body || typeof req.body === "undefined")
                 throw new apiResponse.Api400Error("Required body !");
             // get state by body
-            const { state } = req.body;
+            const { state, customerEmail } = req.body;
+            if (customerEmail !== authEmail)
+                throw new apiResponse.Api401Error("Unauthorized access !");
             // finding user by email;
             const user = yield findUserByEmail(authEmail);
             if (!user)

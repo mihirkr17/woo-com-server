@@ -6,9 +6,8 @@ const { order_status_updater } = require("../../services/common.service");
 
 module.exports = async function RefundPayment(req: Request, res: Response, next: NextFunction) {
    try {
-      const body = req.body;
 
-      const { chargeID, reason, amount, orderID, customerEmail, trackingID } = body;
+      const { chargeID, reason, amount, orderID, customerEmail, trackingID } = req.body;
 
       if (!chargeID) throw new Error("Required charge ID !");
 
@@ -23,9 +22,7 @@ module.exports = async function RefundPayment(req: Request, res: Response, next:
       });
 
       if (refund) {
-
          await order_status_updater({ type: "refunded", orderID, customerEmail, trackingID, refundAT: refund?.created });
-
          return res.status(200).send({ success: true, statusCode: 200, data: refund });
       }
 

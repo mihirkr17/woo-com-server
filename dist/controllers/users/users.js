@@ -20,9 +20,9 @@ const apiResponse = require("../../errors/apiResponse");
 module.exports.updateProfileDataController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const email = req.decoded.email;
-        const clientEmail = req.headers.authorization || "";
+        const { userEmail } = req.query;
         const body = req.body;
-        if (clientEmail !== email) {
+        if (userEmail !== email) {
             throw new apiResponse.Api400Error("Invalid email address !");
         }
         if (!body || typeof body === "undefined") {

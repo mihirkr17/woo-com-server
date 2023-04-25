@@ -10,10 +10,10 @@ const apiResponse = require("../../errors/apiResponse");
 module.exports.updateProfileDataController = async (req: Request, res: Response, next: NextFunction) => {
    try {
       const email: string = req.decoded.email;
-      const clientEmail = req.headers.authorization || "";
+      const { userEmail } = req.query;
       const body = req.body;
 
-      if (clientEmail !== email) {
+      if (userEmail !== email) {
          throw new apiResponse.Api400Error("Invalid email address !");
       }
 

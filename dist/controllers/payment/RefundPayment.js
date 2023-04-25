@@ -14,8 +14,7 @@ const { order_status_updater } = require("../../services/common.service");
 module.exports = function RefundPayment(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const body = req.body;
-            const { chargeID, reason, amount, orderID, customerEmail, trackingID } = body;
+            const { chargeID, reason, amount, orderID, customerEmail, trackingID } = req.body;
             if (!chargeID)
                 throw new Error("Required charge ID !");
             if (!orderID)
