@@ -61,13 +61,14 @@ module.exports.variationController = (req, res, next) => __awaiter(void 0, void 
         if (!formType || formType === "")
             throw new apiResponse.Api400Error("Required form type !");
         const { request } = req.body;
-        if (!req.body || !(request === null || request === void 0 ? void 0 : request.productID))
+        if (!req.body || !req.body.hasOwnProperty("request"))
+            throw new apiResponse.Api400Error("Required request property in body !");
+        const { productID, variationID, variations } = request;
+        if (!productID)
             throw new apiResponse.Api400Error("Required product id !");
-        let model = product_variation_template_engine(request === null || request === void 0 ? void 0 : request.variations);
-        const productID = request === null || request === void 0 ? void 0 : request.productID;
-        const variationID = (request === null || request === void 0 ? void 0 : request.variationID) || "";
+        let model = product_variation_template_engine(variations);
         // Update variation
-        if (formType === 'update-variation' && requestFor === 'product_variations') {
+        if (formType === 'update-variation' && requestFor === 'product_variations' && variationID) {
             model['_vrid'] = variationID;
             if (variationID && variationID !== "") {
                 result = yield Product.findOneAndUpdate({ _id: ObjectId(productID) }, { $set: { 'variations.$[i]': model } }, { arrayFilters: [{ "i._vrid": variationID }] });
@@ -79,8 +80,13 @@ module.exports.variationController = (req, res, next) => __awaiter(void 0, void 
             model['_vrid'] = newVariationID;
             result = yield Product.findOneAndUpdate({ _id: ObjectId(productID) }, { $push: { variations: model } }, { upsert: true });
         }
-        return result ? res.status(200).send({ success: true, statusCode: 200, message: "Data Saved" })
-            : res.status(500).send({ success: false, statusCode: 500, message: "Server error !" });
+        if (result)
+            return res.status(200).send({
+                success: true,
+                statusCode: 200,
+                message: (formType === 'update-variation' ? "Variation successfully updated." : "Welcome new variation added.")
+            });
+        throw new apiResponse.Api400Error((formType === 'update-variation' ? "Variation update failed !" : "Can't added new variation !"));
     }
     catch (error) {
         next(error);
@@ -120,7 +126,7 @@ module.exports.productControlController = (req, res, next) => __awaiter(void 0, 
     }
 });
 module.exports.viewAllProductsInDashboard = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _k, _l, _m, _o, _p, _q;
+    var _k, _l, _m;
     try {
         // await db.collection("products").createIndex({ _lid: 1, slug: 1, save_as: 1, categories: 1, brand: 1, "sellerData.storeName": 1, "sellerData.sellerName": 1, "sellerData.sellerID": 1 });
         const authEmail = req.decoded.email;
@@ -139,7 +145,7 @@ module.exports.viewAllProductsInDashboard = (req, res, next) => __awaiter(void 0
         let src = [];
         if (user.role === 'SELLER') {
             showFor = [
-                { "sellerData.storeName": (_l = (_k = user === null || user === void 0 ? void 0 : user.seller) === null || _k === void 0 ? void 0 : _k.storeInfos) === null || _l === void 0 ? void 0 : _l.storeName },
+                { "sellerData.storeName": (_k = user === null || user === void 0 ? void 0 : user.store) === null || _k === void 0 ? void 0 : _k.name },
                 { save_as: "fulfilled" },
                 { isVerified: true }
             ];
@@ -193,7 +199,7 @@ module.exports.viewAllProductsInDashboard = (req, res, next) => __awaiter(void 0
         draftProducts = yield Product.aggregate([
             {
                 $match: {
-                    $and: [{ save_as: "draft" }, { "sellerData.storeName": (_o = (_m = user === null || user === void 0 ? void 0 : user.seller) === null || _m === void 0 ? void 0 : _m.storeInfos) === null || _o === void 0 ? void 0 : _o.storeName }]
+                    $and: [{ save_as: "draft" }, { "sellerData.storeName": (_l = user === null || user === void 0 ? void 0 : user.store) === null || _l === void 0 ? void 0 : _l.name }]
                 }
             },
             {
@@ -223,7 +229,7 @@ module.exports.viewAllProductsInDashboard = (req, res, next) => __awaiter(void 0
                 $match: {
                     $and: [
                         { save_as: 'fulfilled' },
-                        (user === null || user === void 0 ? void 0 : user.role) === 'SELLER' && { "sellerData.storeName": (_q = (_p = user === null || user === void 0 ? void 0 : user.seller) === null || _p === void 0 ? void 0 : _p.storeInfos) === null || _q === void 0 ? void 0 : _q.storeName },
+                        (user === null || user === void 0 ? void 0 : user.role) === 'SELLER' && { "sellerData.storeName": (_m = user === null || user === void 0 ? void 0 : user.store) === null || _m === void 0 ? void 0 : _m.name },
                         { "variations.status": 'inactive' }
                     ]
                 }
@@ -287,11 +293,10 @@ module.exports.getProductForSellerDSBController = (req, res, next) => __awaiter(
  * Adding Product Title and slug first
  */
 module.exports.productListingController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _r, _s, _t, _u;
+    var _o, _p;
     try {
         const authEmail = req.decoded.email;
-        const formTypes = req.params.formTypes;
-        const _lid = req.params._lid;
+        const { _lid, formTypes } = req.params;
         const body = req.body;
         let model;
         const user = yield User.findOne({ $and: [{ email: authEmail }, { role: 'SELLER' }] });
@@ -305,7 +310,7 @@ module.exports.productListingController = (req, res, next) => __awaiter(void 0, 
                 sellerEmail: authEmail,
                 sellerID: user === null || user === void 0 ? void 0 : user._uuid,
                 sellerName: user === null || user === void 0 ? void 0 : user.fullName,
-                storeName: (_s = (_r = user === null || user === void 0 ? void 0 : user.seller) === null || _r === void 0 ? void 0 : _r.storeInfos) === null || _s === void 0 ? void 0 : _s.storeName
+                storeName: (_o = user === null || user === void 0 ? void 0 : user.store) === null || _o === void 0 ? void 0 : _o.name
             });
             model['modifiedAt'] = new Date(Date.now());
             const result = yield Product.findOneAndUpdate({ _lid: _lid }, { $set: model }, { upsert: true });
@@ -322,7 +327,7 @@ module.exports.productListingController = (req, res, next) => __awaiter(void 0, 
                 sellerEmail: authEmail,
                 sellerID: user === null || user === void 0 ? void 0 : user._uuid,
                 sellerName: user === null || user === void 0 ? void 0 : user.fullName,
-                storeName: (_u = (_t = user === null || user === void 0 ? void 0 : user.seller) === null || _t === void 0 ? void 0 : _t.storeInfos) === null || _u === void 0 ? void 0 : _u.storeName
+                storeName: (_p = user === null || user === void 0 ? void 0 : user.store) === null || _p === void 0 ? void 0 : _p.name
             });
             model["rating"] = [
                 { weight: 5, count: 0 },
@@ -401,13 +406,13 @@ module.exports.deleteProductController = (req, res, next) => __awaiter(void 0, v
     }
 });
 module.exports.productFlashSaleController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _v, _w, _x;
+    var _q, _r, _s;
     try {
         const storeName = req.params.storeName;
         const body = req.body;
-        const productID = (_v = body === null || body === void 0 ? void 0 : body.data) === null || _v === void 0 ? void 0 : _v.productID;
-        const listingID = (_w = body === null || body === void 0 ? void 0 : body.data) === null || _w === void 0 ? void 0 : _w.listingID;
-        const fSale = (_x = body === null || body === void 0 ? void 0 : body.data) === null || _x === void 0 ? void 0 : _x.fSale;
+        const productID = (_q = body === null || body === void 0 ? void 0 : body.data) === null || _q === void 0 ? void 0 : _q.productID;
+        const listingID = (_r = body === null || body === void 0 ? void 0 : body.data) === null || _r === void 0 ? void 0 : _r.listingID;
+        const fSale = (_s = body === null || body === void 0 ? void 0 : body.data) === null || _s === void 0 ? void 0 : _s.fSale;
         const product = yield Product.findOne({ $and: [{ _id: ObjectId(productID) }, { _lid: listingID }, { "sellerData.storeName": storeName }] });
         if (!product) {
             return res.status(200).send({ success: false, statusCode: 200, message: "Product Not found !" });
@@ -509,6 +514,22 @@ module.exports.updateProductData = (req, res, next) => __awaiter(void 0, void 0,
         const result = yield Product.findOneAndUpdate({ $and: [{ _lid: listingID }, { _id: ObjectId(productID) }] }, setFilter, { upsert: true });
         return result ? res.status(200).send({ success: true, statusCode: 200, message: urlParams + " updated successfully." })
             : next({ message: "Failed to updated!" });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+module.exports.queueProductsController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { storeName } = req.params;
+        const { email } = req.decoded;
+        if (!storeName)
+            throw new apiResponse.Api400Error("Required store name as a parameter !");
+        const queueProduct = (yield QueueProduct.find({ $and: [{ "sellerData.sellerEmail": email }, { "sellerData.storeName": storeName }] })) || [];
+        let countQueue = queueProduct.length || 0;
+        if (!Array.isArray(queueProduct))
+            throw new apiResponse.Api400Error("Queue is empty !");
+        return res.status(200).send({ success: true, statusCode: 200, data: { queue: queueProduct, countQueue } });
     }
     catch (error) {
         next(error);

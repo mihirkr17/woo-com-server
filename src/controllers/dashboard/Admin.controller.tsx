@@ -43,9 +43,10 @@ module.exports.getAdminController = async (req: Request, res: Response, next: Ne
 
 module.exports.takeThisProductByAdminController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const listingID: string = req.headers.authorization || "";
       const adminEmail: string = req.decoded.email;
       const role: string = req.decoded.role;
+
+      const { listingID } = req.body;
 
       if (!listingID) {
          throw new Error("Listing ID required !");

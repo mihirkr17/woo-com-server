@@ -117,8 +117,10 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
          clientSecret: client_secret,
          customerEmail: email,
          customerID: _uuid,
-         sellerEmail,
-         sellerStore,
+         seller: {
+            email: sellerEmail,
+            store: sellerStore
+         },
          totalAmount,
          paymentIntentID: id,
          paymentStatus: "pending",

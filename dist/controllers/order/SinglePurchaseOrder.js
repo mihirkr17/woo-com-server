@@ -113,8 +113,10 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                 clientSecret: client_secret,
                 customerEmail: email,
                 customerID: _uuid,
-                sellerEmail,
-                sellerStore,
+                seller: {
+                    email: sellerEmail,
+                    store: sellerStore
+                },
                 totalAmount,
                 paymentIntentID: id,
                 paymentStatus: "pending",

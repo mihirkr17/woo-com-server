@@ -13,7 +13,7 @@ const User = require("../../model/user.model");
 const Product = require("../../model/product.model");
 const Order = require("../../model/order.model");
 module.exports.dashboardOverview = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+    var _a;
     try {
         const authEmail = req.decoded.email;
         const role = req.decoded.role;
@@ -22,7 +22,7 @@ module.exports.dashboardOverview = (req, res, next) => __awaiter(void 0, void 0,
         let matches;
         const user = yield User.findOne({ $and: [{ email: authEmail }, { role }] });
         if ((user === null || user === void 0 ? void 0 : user.role) === 'SELLER') {
-            matches = { $match: { $and: [{ 'sellerData.storeName': (_b = (_a = user === null || user === void 0 ? void 0 : user.seller) === null || _a === void 0 ? void 0 : _a.storeInfos) === null || _b === void 0 ? void 0 : _b.storeName }, { 'variations.totalSold': { $exists: true } }] } };
+            matches = { $match: { $and: [{ 'sellerData.storeName': (_a = user === null || user === void 0 ? void 0 : user.store) === null || _a === void 0 ? void 0 : _a.name }, { 'variations.totalSold': { $exists: true } }] } };
         }
         if ((user === null || user === void 0 ? void 0 : user.role) === 'ADMIN') {
             topSellers = yield User.aggregate([
@@ -74,11 +74,11 @@ module.exports.allSellers = (req, res, next) => __awaiter(void 0, void 0, void 0
     }
 });
 module.exports.allBuyers = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _c, _d, _e;
+    var _b, _c, _d;
     try {
-        const search = (_c = req.query) === null || _c === void 0 ? void 0 : _c.search;
-        let page = (_d = req.query) === null || _d === void 0 ? void 0 : _d.page;
-        let item = (_e = req.query) === null || _e === void 0 ? void 0 : _e.item;
+        const search = (_b = req.query) === null || _b === void 0 ? void 0 : _b.search;
+        let page = (_c = req.query) === null || _c === void 0 ? void 0 : _c.page;
+        let item = (_d = req.query) === null || _d === void 0 ? void 0 : _d.item;
         let filter = [];
         item = parseInt(item) || 2;
         page = parseInt(page) === 1 ? 0 : parseInt(page) - 1;

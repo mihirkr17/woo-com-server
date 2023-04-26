@@ -27,7 +27,7 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
       const { state, customerEmail } = req.body;
 
       if (customerEmail !== authEmail)
-      throw new apiResponse.Api401Error("Unauthorized access !");
+         throw new apiResponse.Api401Error("Unauthorized access !");
 
       // finding user by email;
       const user = await findUserByEmail(authEmail);
@@ -126,10 +126,10 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
 
 
          if (!groupOrdersBySeller[item?.sellerData?.sellerEmail]) {
-            groupOrdersBySeller[item?.sellerData?.sellerEmail] = { items: [], sellerStore: "", sellerID: "" };
+            groupOrdersBySeller[item?.sellerData?.sellerEmail] = { items: [], store: "", sellerID: "" };
          }
 
-         groupOrdersBySeller[item?.sellerData?.sellerEmail].sellerStore = item?.sellerData?.storeName;
+         groupOrdersBySeller[item?.sellerData?.sellerEmail].store = item?.sellerData?.storeName;
          groupOrdersBySeller[item?.sellerData?.sellerEmail].sellerID = item?.sellerData?.sellerID;
          groupOrdersBySeller[item?.sellerData?.sellerEmail].items.push(item);
 
@@ -157,7 +157,7 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
       // after successfully got order by seller as a object then loop it and trigger send email function inside for in loop
       for (const sellerEmail in groupOrdersBySeller) {
 
-         const { items, sellerStore, sellerID } = groupOrdersBySeller[sellerEmail]
+         const { items, store, sellerID } = groupOrdersBySeller[sellerEmail]
 
          // calculate total amount of orders by seller;
          const totalAmount: number = items.reduce((p: number, n: any) => p + parseInt(n?.baseAmount), 0) || 0;
@@ -172,8 +172,10 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
             clientSecret: client_secret,
             customerEmail: authEmail,
             customerID: _uuid,
-            sellerEmail,
-            sellerStore,
+            seller: {
+               email: sellerEmail,
+               store
+            },
             totalAmount,
             paymentIntentID: id,
             paymentStatus: "pending",

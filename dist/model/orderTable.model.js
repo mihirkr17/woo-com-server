@@ -6,8 +6,10 @@ const orderTab = new mongoose_1.Schema({
     orderPaymentID: String,
     customerEmail: { type: String, required: true },
     customerID: { type: String, required: true },
-    sellerEmail: { type: String, required: true },
-    sellerStore: { type: String, required: true },
+    seller: {
+        email: { type: String, required: true },
+        store: { type: String, required: true }
+    },
     shippingAddress: { type: Object, required: true },
     state: { type: String, enum: ["byCart", "byPurchase"], required: true },
     areaType: { type: String, required: true },

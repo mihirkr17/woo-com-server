@@ -13,7 +13,8 @@ try {
     router.post("/login", loginMDL, authCTRL.loginController);
     router.post("/sign-out", authCTRL.signOutController);
     router.post("/register-new-seller", authCTRL.sellerRegistrationController);
-    router.get("/verify-register-user", authCTRL.userEmailVerifyTokenController);
+    router.post("/verify-register-user", authCTRL.userEmailVerificationController);
+    router.get('/generate-verification-code', authCTRL === null || authCTRL === void 0 ? void 0 : authCTRL.generateNewVerificationCode);
     router.post("/user/changed-password", verifyJWT, authCTRL === null || authCTRL === void 0 ? void 0 : authCTRL.changePasswordController);
     router.post("/check-user-authentication", authCTRL === null || authCTRL === void 0 ? void 0 : authCTRL.checkUserAuthentication);
     router.post("/check-user-forgot-pwd-security-key", authCTRL === null || authCTRL === void 0 ? void 0 : authCTRL.checkUserForgotPwdSecurityKey);

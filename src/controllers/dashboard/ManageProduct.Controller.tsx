@@ -70,14 +70,16 @@ module.exports.variationController = async (req: Request, res: Response, next: N
 
       const { request } = req.body;
 
-      if (!req.body || !request?.productID) throw new apiResponse.Api400Error("Required product id !");
+      if (!req.body || !req.body.hasOwnProperty("request")) throw new apiResponse.Api400Error("Required request property in body !");
 
-      let model = product_variation_template_engine(request?.variations);
-      const productID: string = request?.productID;
-      const variationID: string = request?.variationID || "";
+      const { productID, variationID, variations } = request;
+
+      if (!productID) throw new apiResponse.Api400Error("Required product id !");
+
+      let model = product_variation_template_engine(variations);
 
       // Update variation
-      if (formType === 'update-variation' && requestFor === 'product_variations') {
+      if (formType === 'update-variation' && requestFor === 'product_variations' && variationID) {
 
          model['_vrid'] = variationID;
 
@@ -104,8 +106,13 @@ module.exports.variationController = async (req: Request, res: Response, next: N
          );
       }
 
-      return result ? res.status(200).send({ success: true, statusCode: 200, message: "Data Saved" })
-         : res.status(500).send({ success: false, statusCode: 500, message: "Server error !" });
+      if (result) return res.status(200).send({
+         success: true,
+         statusCode: 200,
+         message: (formType === 'update-variation' ? "Variation successfully updated." : "Welcome new variation added.")
+      })
+
+      throw new apiResponse.Api400Error((formType === 'update-variation' ? "Variation update failed !" : "Can't added new variation !"));
 
    } catch (error: any) {
       next(error);
@@ -187,7 +194,7 @@ module.exports.viewAllProductsInDashboard = async (
 
       if (user.role === 'SELLER') {
          showFor = [
-            { "sellerData.storeName": user?.seller?.storeInfos?.storeName },
+            { "sellerData.storeName": user?.store?.name },
             { save_as: "fulfilled" },
             { isVerified: true }
          ];
@@ -242,7 +249,7 @@ module.exports.viewAllProductsInDashboard = async (
       draftProducts = await Product.aggregate([
          {
             $match: {
-               $and: [{ save_as: "draft" }, { "sellerData.storeName": user?.seller?.storeInfos?.storeName }]
+               $and: [{ save_as: "draft" }, { "sellerData.storeName": user?.store?.name }]
             }
          },
          {
@@ -273,7 +280,7 @@ module.exports.viewAllProductsInDashboard = async (
             $match: {
                $and: [
                   { save_as: 'fulfilled' },
-                  user?.role === 'SELLER' && { "sellerData.storeName": user?.seller?.storeInfos?.storeName },
+                  user?.role === 'SELLER' && { "sellerData.storeName": user?.store?.name },
                   { "variations.status": 'inactive' }
                ]
             }
@@ -352,9 +359,11 @@ module.exports.productListingController = async (
 ) => {
    try {
       const authEmail = req.decoded.email;
-      const formTypes = req.params.formTypes;
-      const _lid = req.params._lid;
+
+      const { _lid, formTypes } = req.params;
+
       const body = req.body;
+      
       let model;
 
       const user = await User.findOne({ $and: [{ email: authEmail }, { role: 'SELLER' }] });
@@ -371,7 +380,7 @@ module.exports.productListingController = async (
             sellerEmail: authEmail,
             sellerID: user?._uuid,
             sellerName: user?.fullName,
-            storeName: user?.seller?.storeInfos?.storeName
+            storeName: user?.store?.name
          });
 
          model['modifiedAt'] = new Date(Date.now());
@@ -397,7 +406,7 @@ module.exports.productListingController = async (
             sellerEmail: authEmail,
             sellerID: user?._uuid,
             sellerName: user?.fullName,
-            storeName: user?.seller?.storeInfos?.storeName
+            storeName: user?.store?.name
          });
 
          model["rating"] = [
@@ -653,6 +662,29 @@ module.exports.updateProductData = async (req: Request, res: Response, next: Nex
 
       return result ? res.status(200).send({ success: true, statusCode: 200, message: urlParams + " updated successfully." })
          : next({ message: "Failed to updated!" });
+
+   } catch (error: any) {
+      next(error);
+   }
+}
+
+
+
+module.exports.queueProductsController = async (req: Request, res: Response, next: NextFunction) => {
+   try {
+
+      const { storeName } = req.params;
+      const { email } = req.decoded;
+
+      if (!storeName) throw new apiResponse.Api400Error("Required store name as a parameter !");
+
+      const queueProduct = await QueueProduct.find({ $and: [{ "sellerData.sellerEmail": email }, { "sellerData.storeName": storeName }] }) || [];
+
+      let countQueue = queueProduct.length || 0;
+
+      if (!Array.isArray(queueProduct)) throw new apiResponse.Api400Error("Queue is empty !");
+
+      return res.status(200).send({ success: true, statusCode: 200, data: { queue: queueProduct, countQueue } });
 
    } catch (error: any) {
       next(error);

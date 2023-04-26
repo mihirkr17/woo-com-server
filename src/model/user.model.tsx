@@ -1,39 +1,54 @@
 // import { Schema, model } from "mongoose";
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
+
 mongoose.set('maxTimeMS', 30000);
 let { Schema, model } = mongoose;
 
 const validator = require("validator");
 
+const storeSchema = new Schema({
+  phones: { type: String, required: false },
+  taxID: { type: String, required: false },
+  name: { type: String, required: false },
+  license: { type: String, required: false },
+  numOfProducts: { type: Number, required: false },
+  productInFulfilled: { type: Number, required: false },
+  productInDraft: { type: Number, required: false },
+  address: {
+    country: { type: String, required: false },
+    division: { type: String, required: false },
+    city: { type: String, required: false },
+    area: { type: String, required: false },
+    landmark: { type: String, default: "", required: false },
+    postal_code: { type: String, required: false }
+  }
+}, { _id: false });
 
-
-// Interface of user
-interface IUser {
-  _uuid: String;
-  fullName: String;
-  phone: String;
-  phonePrefixCode: String;
-  email: String;
-  contactEmail: String;
-  password: String;
-  hasPassword: Boolean;
-  role: String;
-  gender: String;
-  dob: String;
-  isSeller?: String;
-  idFor: String;
-  accountStatus: String;
-  authProvider: String;
-  verifyToken: String;
-  createdAt: Date;
-  becomeSellerAt?: Date;
-  seller: any;
-  buyer: any;
-}
+const buyerSchema = new Schema({
+  taxID: { type: String, required: false },
+  defaultShippingAddress: { type: Object, required: false },
+  wishlist: { type: Array, required: false },
+  shippingAddress: [
+    {
+      _id: false,
+      addrsID: { type: String, required: false },
+      name: { type: String, default: "", required: false },
+      division: { type: String, default: "", required: false },
+      city: { type: String, default: "", required: false },
+      area: { type: String, default: "", required: false },
+      area_type: { type: String, default: "", required: false },
+      landmark: { type: String, default: "", required: false },
+      phone_number: { type: String, default: "", required: false },
+      postal_code: { type: String, default: "", required: false },
+      default_shipping_address: { type: Boolean, required: false }
+    }
+  ],
+}, { _id: false })
 
 // user schema design
 var UserSchema = new Schema({
   _uuid: { type: String },
+
   fullName: { type: String, required: true },
 
   email: {
@@ -43,7 +58,7 @@ var UserSchema = new Schema({
     validate: [validator.isEmail, "Provide a valid email address !!!"],
   },
 
-  phone: { type: String },
+  phone: { type: String, required: true },
   phonePrefixCode: { type: String, enum: ["880"], default: "880" },
 
   contactEmail: { type: String },
@@ -51,6 +66,7 @@ var UserSchema = new Schema({
   password: {
     type: String,
     minLength: [5, "Password must be greater than or equal to 5 characters !!!",],
+    required: true
   },
 
   hasPassword: {
@@ -70,47 +86,13 @@ var UserSchema = new Schema({
 
   dob: { type: String, required: true },
 
-  seller: {
-    taxId: { type: String, required: false },
-    address: {
-      country: { type: String, required: false },
-      division: { type: String, required: false },
-      city: { type: String, required: false },
-      area: { type: String, required: false },
-      landmark: { type: String, default: "", required: false },
-      postal_code: { type: String, required: false }
-    },
-    storeInfos: {
-      storeName: { type: String, required: false },
-      storeLicense: { type: String, required: false },
-      numOfProducts: { type: Number, required: false },
-      productInFulfilled: { type: Number, required: false },
-      productInDraft: { type: Number, required: false }
-    }
+  store: {
+    type: storeSchema, default: undefined
   },
 
   buyer: {
-    taxId: { type: String, required: false },
-    defaultShippingAddress: { type: Object, required: false },
-    wishlist: { type: Array, required: false },
-    shippingAddress: [
-      {
-        _id: false,
-        addrsID: { type: String, required: false },
-        name: { type: String, default: "", required: false },
-        division: { type: String, default: "", required: false },
-        city: { type: String, default: "", required: false },
-        area: { type: String, default: "", required: false },
-        area_type: { type: String, default: "", required: false },
-        landmark: { type: String, default: "", required: false },
-        phone_number: { type: String, default: "", required: false },
-        postal_code: { type: String, default: "", required: false },
-        default_shipping_address: { type: Boolean, required: false }
-      }
-    ],
+    type: buyerSchema, default: undefined
   },
-
-  isSeller: { type: String, enum: ['pending', 'fulfilled'], default: undefined },
 
   idFor: { type: String, enum: ['sell', 'buy'], default: undefined },
 
@@ -118,11 +100,10 @@ var UserSchema = new Schema({
 
   authProvider: { type: String, enum: ['system', 'thirdParty'], default: 'system' },
 
-  verifyToken: { type: String, default: undefined },
+  verificationCode: { type: String, default: undefined },
+  verificationExpiredAt: { type: Date, default: undefined },
 
-  createdAt: { type: Date, default: Date.now },
-
-  becomeSellerAt: { type: Date, default: undefined }
+  createdAt: { type: Date, default: Date.now }
 });
 
 var User = model("User", UserSchema, "users");

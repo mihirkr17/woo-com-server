@@ -114,9 +114,9 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                     quantity: item === null || item === void 0 ? void 0 : item.quantity
                 });
                 if (!groupOrdersBySeller[(_c = item === null || item === void 0 ? void 0 : item.sellerData) === null || _c === void 0 ? void 0 : _c.sellerEmail]) {
-                    groupOrdersBySeller[(_d = item === null || item === void 0 ? void 0 : item.sellerData) === null || _d === void 0 ? void 0 : _d.sellerEmail] = { items: [], sellerStore: "", sellerID: "" };
+                    groupOrdersBySeller[(_d = item === null || item === void 0 ? void 0 : item.sellerData) === null || _d === void 0 ? void 0 : _d.sellerEmail] = { items: [], store: "", sellerID: "" };
                 }
-                groupOrdersBySeller[(_e = item === null || item === void 0 ? void 0 : item.sellerData) === null || _e === void 0 ? void 0 : _e.sellerEmail].sellerStore = (_f = item === null || item === void 0 ? void 0 : item.sellerData) === null || _f === void 0 ? void 0 : _f.storeName;
+                groupOrdersBySeller[(_e = item === null || item === void 0 ? void 0 : item.sellerData) === null || _e === void 0 ? void 0 : _e.sellerEmail].store = (_f = item === null || item === void 0 ? void 0 : item.sellerData) === null || _f === void 0 ? void 0 : _f.storeName;
                 groupOrdersBySeller[(_g = item === null || item === void 0 ? void 0 : item.sellerData) === null || _g === void 0 ? void 0 : _g.sellerEmail].sellerID = (_h = item === null || item === void 0 ? void 0 : item.sellerData) === null || _h === void 0 ? void 0 : _h.sellerID;
                 groupOrdersBySeller[(_j = item === null || item === void 0 ? void 0 : item.sellerData) === null || _j === void 0 ? void 0 : _j.sellerEmail].items.push(item);
                 return item;
@@ -138,7 +138,7 @@ module.exports = function CartPurchaseOrder(req, res, next) {
             const orders = [];
             // after successfully got order by seller as a object then loop it and trigger send email function inside for in loop
             for (const sellerEmail in groupOrdersBySeller) {
-                const { items, sellerStore, sellerID } = groupOrdersBySeller[sellerEmail];
+                const { items, store, sellerID } = groupOrdersBySeller[sellerEmail];
                 // calculate total amount of orders by seller;
                 const totalAmount = items.reduce((p, n) => p + parseInt(n === null || n === void 0 ? void 0 : n.baseAmount), 0) || 0;
                 // generate random order ids;
@@ -150,8 +150,10 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                     clientSecret: client_secret,
                     customerEmail: authEmail,
                     customerID: _uuid,
-                    sellerEmail,
-                    sellerStore,
+                    seller: {
+                        email: sellerEmail,
+                        store
+                    },
                     totalAmount,
                     paymentIntentID: id,
                     paymentStatus: "pending",

@@ -16,7 +16,7 @@ module.exports.dashboardOverview = async (req: Request, res: Response, next: Nex
 
       if (user?.role === 'SELLER') {
 
-         matches = { $match: { $and: [{ 'sellerData.storeName': user?.seller?.storeInfos?.storeName }, { 'variations.totalSold': { $exists: true } }] } }
+         matches = { $match: { $and: [{ 'sellerData.storeName': user?.store?.name }, { 'variations.totalSold': { $exists: true } }] } }
       }
 
       if (user?.role === 'ADMIN') {

@@ -45,6 +45,9 @@ try {
 
   router.get("/all-buyers", verifyJWT, isRoleAdmin, dashboardCTRL?.allBuyers);
 
+
+  router.get("/seller/store/:storeName/in-queue-products", verifyJWT, isRoleSeller, ManageProductCTRL?.queueProductsController)
+
   /**
 * @requestMethod GET
 * @controller fetchSingleProductByPidController
@@ -53,10 +56,8 @@ try {
 */
   router.get("/get-one-product-in-seller-dsb", verifyJWT, isRoleSeller, ManageProductCTRL.getProductForSellerDSBController);
 
-
   // post controllers
   router.post("/seller/:storeName/product/listing/:formTypes/:_lid", verifyJWT, isRoleSeller, ManageProductCTRL.productListingController);
-
 
   // delete controller
   router.delete("/seller/:storeName/product/delete-product-variation/:productID/:vId", verifyJWT, ManageProductCTRL.deleteProductVariationController);

@@ -41,9 +41,9 @@ module.exports.getAdminController = (req, res, next) => __awaiter(void 0, void 0
 });
 module.exports.takeThisProductByAdminController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const listingID = req.headers.authorization || "";
         const adminEmail = req.decoded.email;
         const role = req.decoded.role;
+        const { listingID } = req.body;
         if (!listingID) {
             throw new Error("Listing ID required !");
         }

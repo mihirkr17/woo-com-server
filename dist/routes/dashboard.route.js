@@ -29,6 +29,7 @@ try {
     router.get("/store/:storeName/manage-orders", verifyJWT, isRoleSeller, ManageOrderCTRL === null || ManageOrderCTRL === void 0 ? void 0 : ManageOrderCTRL.manageOrders);
     router.get("/all-sellers", verifyJWT, isRoleAdmin, dashboardCTRL === null || dashboardCTRL === void 0 ? void 0 : dashboardCTRL.allSellers);
     router.get("/all-buyers", verifyJWT, isRoleAdmin, dashboardCTRL === null || dashboardCTRL === void 0 ? void 0 : dashboardCTRL.allBuyers);
+    router.get("/seller/store/:storeName/in-queue-products", verifyJWT, isRoleSeller, ManageProductCTRL === null || ManageProductCTRL === void 0 ? void 0 : ManageProductCTRL.queueProductsController);
     /**
   * @requestMethod GET
   * @controller fetchSingleProductByPidController

@@ -367,12 +367,6 @@ module.exports.checkProductAvailability = async (productID: string, variationID:
    return product;
 };
 
-module.exports.get_six_digit_random_number = () => {
-   let randomBytes = cryptos.randomBytes(4);
-   let randomNumber = parseInt(randomBytes.toString('hex'), 16) % 900000 + 100000;
-   return randomNumber.toString();
-}
-
 
 module.exports.isPasswordValid = (password: string) => {
    return (/^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/).test(password);

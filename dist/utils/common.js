@@ -10,3 +10,12 @@ module.exports.generateUUID = () => {
     str = str && str.slice(0, 5) + Math.floor(10000 + Math.random() * 99999).toString();
     return str;
 };
+module.exports.generateExpireTime = () => {
+    let expirationDate = new Date();
+    return expirationDate.setMinutes(expirationDate.getMinutes() + 5);
+};
+module.exports.generateSixDigitNumber = () => {
+    let randomBytes = cryptos.randomBytes(4);
+    let randomNumber = parseInt(randomBytes.toString('hex'), 16) % 900000 + 100000;
+    return randomNumber.toString();
+};

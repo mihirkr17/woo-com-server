@@ -18,10 +18,10 @@ const setUserDataToken = require("../../utils/setUserDataToken");
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
 const email_service = require("../../services/email.service");
-const { get_six_digit_random_number, isPasswordValid } = require("../../services/common.service");
+const { isPasswordValid } = require("../../services/common.service");
 const { verify_email_html_template } = require("../../templates/email.template");
-const { generateUUID, generateVerifyToken } = require("../../utils/common");
-const { isValidString } = require("../../utils/validate");
+const { generateUUID, generateExpireTime, generateSixDigitNumber } = require("../../utils/common");
+const { isValidString, isValidEmail } = require("../../utils/validate");
 /**
  * @apiController --> Buyer Registration Controller
  * @apiMethod --> POST
@@ -34,7 +34,8 @@ module.exports.buyerRegistrationController = (req, res, next) => __awaiter(void 
         if (existUser)
             throw new apiResponse.Api400Error("User already exists, Please try another phone number or email address !");
         body['_uuid'] = "b" + generateUUID();
-        body['verifyToken'] = generateVerifyToken();
+        body['verificationCode'] = generateSixDigitNumber();
+        body['verificationExpiredAt'] = generateExpireTime();
         body["buyer"] = {};
         body["password"] = yield bcrypt.hash(body === null || body === void 0 ? void 0 : body.password, saltRounds);
         body["accountStatus"] = "inactive";
@@ -46,14 +47,17 @@ module.exports.buyerRegistrationController = (req, res, next) => __awaiter(void 
         const info = yield email_service({
             to: body === null || body === void 0 ? void 0 : body.email,
             subject: "Verify email address",
-            html: verify_email_html_template(body === null || body === void 0 ? void 0 : body.verifyToken, body === null || body === void 0 ? void 0 : body._uuid)
+            html: verify_email_html_template(body === null || body === void 0 ? void 0 : body.verificationCode)
         });
         if (info === null || info === void 0 ? void 0 : info.response) {
             let user = new User(body);
-            yield user.save();
+            user.store = undefined;
+            const result = yield user.save();
             return res.status(200).send({
                 success: true,
                 statusCode: 200,
+                returnEmail: body === null || body === void 0 ? void 0 : body.email,
+                verificationExpiredAt: result === null || result === void 0 ? void 0 : result.verificationExpiredAt,
                 message: "Thanks for your information. Verification email was sent to " + (body === null || body === void 0 ? void 0 : body.email) + ". Please verify your account.",
             });
         }
@@ -70,8 +74,22 @@ module.exports.buyerRegistrationController = (req, res, next) => __awaiter(void 
  */
 module.exports.sellerRegistrationController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/;
         let body = req.body;
-        let existUser = yield User.findOne({ $or: [{ email: body === null || body === void 0 ? void 0 : body.email }, { phone: body === null || body === void 0 ? void 0 : body.phone }] });
+        const { email, phone, fullName, password, store } = body;
+        if (!email)
+            throw new apiResponse.Api400Error("Required email address !");
+        if (!isValidEmail(email))
+            throw new apiResponse.Api400Error("Required valid email address !");
+        if (!password)
+            throw new apiResponse.Api400Error(`Required password !`);
+        if (password && typeof password !== "string")
+            throw new apiResponse.Api400Error("Password should be string !");
+        if (password.length < 5 || password.length > 8)
+            throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
+        if (!passwordRegex.test(password))
+            throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
+        let existUser = yield User.findOne({ $or: [{ email }, { phone }] });
         if (existUser) {
             throw new apiResponse.Api400Error("User already exists, Please try another phone number or email address !");
         }
@@ -79,23 +97,31 @@ module.exports.sellerRegistrationController = (req, res, next) => __awaiter(void
             throw new apiResponse.Api400Error("Need a strong password !");
         body['_uuid'] = "s" + generateUUID();
         body['authProvider'] = 'system';
-        body['isSeller'] = 'pending';
         body['idFor'] = 'sell';
         body["role"] = "SELLER";
+        body["contactEmail"] = email;
+        body['verificationCode'] = generateSixDigitNumber();
+        body['verificationExpiredAt'] = generateExpireTime();
         body["accountStatus"] = "inactive";
-        body["seller"] = (body === null || body === void 0 ? void 0 : body.seller) || {};
+        body["store"] = store || {};
+        body["password"] = yield bcrypt.hash(password, saltRounds);
+        ;
+        body["hasPassword"] = true;
         const info = yield email_service({
-            to: body === null || body === void 0 ? void 0 : body.email,
+            to: email,
             subject: "Verify email address",
-            html: verify_email_html_template(body === null || body === void 0 ? void 0 : body.verifyToken, body === null || body === void 0 ? void 0 : body._uuid)
+            html: verify_email_html_template(body === null || body === void 0 ? void 0 : body.verificationCode)
         });
         if (info === null || info === void 0 ? void 0 : info.response) {
             let user = new User(body);
-            yield user.save();
+            user.buyer = undefined;
+            const result = yield user.save();
             return res.status(200).send({
                 success: true,
                 statusCode: 200,
-                message: "Thanks for your information. Verification email was sent to " + (body === null || body === void 0 ? void 0 : body.email) + ". Please verify your account.",
+                returnEmail: email,
+                verificationExpiredAt: result === null || result === void 0 ? void 0 : result.verificationExpiredAt,
+                message: "Thanks for your information. Verification code was sent to " + email + ". Please verify your account.",
             });
         }
         throw new apiResponse.Api500Error("Sorry registration failed !");
@@ -104,24 +130,63 @@ module.exports.sellerRegistrationController = (req, res, next) => __awaiter(void
         next(error);
     }
 });
+module.exports.generateNewVerificationCode = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { email } = req.query;
+        if (!email)
+            throw new apiResponse.Api400Error("Required email address !");
+        if (!isValidEmail(email))
+            throw new apiResponse.Api400Error("Required valid email address !");
+        let user = yield User.findOne({ email });
+        if (!user)
+            throw new apiResponse.Api400Error("Sorry user not found !");
+        if ((user === null || user === void 0 ? void 0 : user.verificationCode) || (user === null || user === void 0 ? void 0 : user.accountStatus) === "inactive") {
+            user.verificationCode = generateSixDigitNumber();
+            user.verificationExpiredAt = generateExpireTime();
+            let updateUser = yield user.save();
+            if (updateUser === null || updateUser === void 0 ? void 0 : updateUser.verificationCode) {
+                const info = yield email_service({
+                    to: user === null || user === void 0 ? void 0 : user.email,
+                    subject: "Verify email address",
+                    html: verify_email_html_template(updateUser === null || updateUser === void 0 ? void 0 : updateUser.verificationCode)
+                });
+                if (info === null || info === void 0 ? void 0 : info.response) {
+                    return res.status(200).send({
+                        success: true,
+                        statusCode: 200,
+                        returnEmail: updateUser === null || updateUser === void 0 ? void 0 : updateUser.email,
+                        verificationExpiredAt: updateUser === null || updateUser === void 0 ? void 0 : updateUser.verificationExpiredAt,
+                        message: "Email was sent to " + (updateUser === null || updateUser === void 0 ? void 0 : updateUser.email) + ". Please verify your account.",
+                    });
+                }
+                throw new apiResponse.Api500Error("Internal error !");
+            }
+        }
+        throw new apiResponse.Api400Error(`Your account with ${email} already active.`);
+    }
+    catch (error) {
+        next(error);
+    }
+});
 /**
  * @controller --> registration verify by token
  */
-module.exports.userEmailVerifyTokenController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.userEmailVerificationController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { token, mailer } = req.query;
-        if (!token)
-            throw new apiResponse.Api400Error("Required token in query !");
-        const user = yield User.findOne({ $and: [{ verifyToken: token }, { _uuid: mailer }] });
+        const { verificationCode, verificationExpiredAt, email } = req.body;
+        if (!verificationCode)
+            throw new apiResponse.Api400Error("Required verification code !");
+        if (new Date(verificationExpiredAt) < new Date())
+            throw new apiResponse.Api400Error("Session expired ! resend code ..");
+        let user = yield User.findOne({ $and: [{ verificationCode }, { email }] });
         if (!user) {
-            throw new apiResponse.Api400Error("Session is expired !");
+            throw new apiResponse.Api400Error("Session expired ! resend code ..");
         }
-        if ((user === null || user === void 0 ? void 0 : user.verifyToken) !== token)
-            throw new apiResponse.Api400Error("Invalid verify token !");
+        user.verificationCode = undefined;
+        user.verificationExpiredAt = undefined;
         user.accountStatus = "active";
-        user.verifyToken = undefined;
-        yield user.save();
-        return res.redirect(`${process.env.FRONTEND_URL}login?email=${user === null || user === void 0 ? void 0 : user.email}`);
+        const result = yield user.save();
+        return result && res.status(200).send({ success: true, statusCode: 200, message: "Verification successful.", returnEmail: email });
     }
     catch (error) {
         next(error);
@@ -142,21 +207,22 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
         let user = yield User.findOne({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] });
         if (!user)
             throw new apiResponse.Api400Error(`User with ${emailOrPhone} not found!`);
-        if ((user === null || user === void 0 ? void 0 : user.isSeller) === "pending" && (user === null || user === void 0 ? void 0 : user.role) === "SELLER")
-            throw new apiResponse.Api400Error("Your seller account under processing...");
-        if ((user === null || user === void 0 ? void 0 : user.verifyToken) && (user === null || user === void 0 ? void 0 : user.accountStatus) === "inactive") {
-            user.verifyToken = generateVerifyToken();
-            let newToken = yield user.save();
+        if ((user === null || user === void 0 ? void 0 : user.verificationCode) || (user === null || user === void 0 ? void 0 : user.accountStatus) === "inactive") {
+            user.verificationCode = generateSixDigitNumber();
+            user.verificationExpiredAt = generateExpireTime();
+            let updateUser = yield user.save();
             const info = yield email_service({
                 to: user === null || user === void 0 ? void 0 : user.email,
                 subject: "Verify email address",
-                html: verify_email_html_template(newToken === null || newToken === void 0 ? void 0 : newToken.verifyToken, user === null || user === void 0 ? void 0 : user._uuid)
+                html: verify_email_html_template(updateUser === null || updateUser === void 0 ? void 0 : updateUser.verificationCode, user === null || user === void 0 ? void 0 : user._uuid)
             });
             if (info === null || info === void 0 ? void 0 : info.response) {
                 return res.status(200).send({
                     success: true,
                     statusCode: 200,
-                    message: "Email was sent to " + (user === null || user === void 0 ? void 0 : user.email) + ". Please verify your account.",
+                    returnEmail: updateUser === null || updateUser === void 0 ? void 0 : updateUser.email,
+                    verificationExpiredAt: updateUser === null || updateUser === void 0 ? void 0 : updateUser.verificationExpiredAt,
+                    message: "Email was sent to " + (updateUser === null || updateUser === void 0 ? void 0 : updateUser.email) + ". Please verify your account.",
                 });
             }
             throw new apiResponse.Api500Error("Internal error !");
@@ -229,7 +295,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
                 httpOnly: true
             });
             // if all operation success then return the response
-            return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: user === null || user === void 0 ? void 0 : user._uuid, u_data: userDataToken, token });
+            return res.status(200).send({ success: true, statusCode: 200, name: "isLogin", message: "LoginSuccess", uuid: user === null || user === void 0 ? void 0 : user._uuid, u_data: userDataToken, token });
         }
     }
     catch (error) {
@@ -300,7 +366,7 @@ module.exports.checkUserAuthentication = (req, res, next) => __awaiter(void 0, v
         const user = yield User.findOne({ email });
         if (!user || typeof user === "undefined")
             throw new apiResponse.Api404Error("Sorry user not found with this " + email);
-        let securityCode = get_six_digit_random_number();
+        let securityCode = generateSixDigitNumber();
         let lifeTime = 300000;
         const mailOptions = {
             from: process.env.GMAIL_USER,

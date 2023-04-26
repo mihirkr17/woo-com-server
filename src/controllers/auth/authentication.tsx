@@ -9,10 +9,10 @@ const setUserDataToken = require("../../utils/setUserDataToken");
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
 const email_service = require("../../services/email.service");
-const { get_six_digit_random_number, isPasswordValid } = require("../../services/common.service");
+const { isPasswordValid } = require("../../services/common.service");
 const { verify_email_html_template } = require("../../templates/email.template");
-const { generateUUID, generateVerifyToken } = require("../../utils/common");
-const { isValidString } = require("../../utils/validate");
+const { generateUUID, generateExpireTime, generateSixDigitNumber } = require("../../utils/common");
+const { isValidString, isValidEmail } = require("../../utils/validate");
 
 /**
  * @apiController --> Buyer Registration Controller
@@ -30,7 +30,8 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
          throw new apiResponse.Api400Error("User already exists, Please try another phone number or email address !");
 
       body['_uuid'] = "b" + generateUUID();
-      body['verifyToken'] = generateVerifyToken();
+      body['verificationCode'] = generateSixDigitNumber();
+      body['verificationExpiredAt'] = generateExpireTime();
       body["buyer"] = {};
       body["password"] = await bcrypt.hash(body?.password, saltRounds);
       body["accountStatus"] = "inactive";
@@ -44,15 +45,18 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
       const info = await email_service({
          to: body?.email,
          subject: "Verify email address",
-         html: verify_email_html_template(body?.verifyToken, body?._uuid)
+         html: verify_email_html_template(body?.verificationCode)
       });
 
       if (info?.response) {
          let user = new User(body);
-         await user.save();
+         user.store = undefined;
+         const result = await user.save();
          return res.status(200).send({
             success: true,
             statusCode: 200,
+            returnEmail: body?.email,
+            verificationExpiredAt: result?.verificationExpiredAt,
             message: "Thanks for your information. Verification email was sent to " + body?.email + ". Please verify your account.",
          });
       }
@@ -73,10 +77,29 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
  */
 module.exports.sellerRegistrationController = async (req: Request, res: Response, next: NextFunction) => {
    try {
+      const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/;
 
       let body = req.body;
 
-      let existUser = await User.findOne({ $or: [{ email: body?.email }, { phone: body?.phone }] });
+      const { email, phone, fullName, password, store } = body;
+
+      if (!email) throw new apiResponse.Api400Error("Required email address !");
+
+      if (!isValidEmail(email)) throw new apiResponse.Api400Error("Required valid email address !");
+
+      if (!password)
+         throw new apiResponse.Api400Error(`Required password !`);
+
+      if (password && typeof password !== "string")
+         throw new apiResponse.Api400Error("Password should be string !");
+
+      if (password.length < 5 || password.length > 8)
+         throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
+
+      if (!passwordRegex.test(password))
+         throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
+
+      let existUser = await User.findOne({ $or: [{ email }, { phone }] });
 
       if (existUser) {
          throw new apiResponse.Api400Error("User already exists, Please try another phone number or email address !")
@@ -86,26 +109,34 @@ module.exports.sellerRegistrationController = async (req: Request, res: Response
 
       body['_uuid'] = "s" + generateUUID();
       body['authProvider'] = 'system';
-      body['isSeller'] = 'pending';
       body['idFor'] = 'sell';
       body["role"] = "SELLER";
+      body["contactEmail"] = email;
+      body['verificationCode'] = generateSixDigitNumber();
+      body['verificationExpiredAt'] = generateExpireTime();
       body["accountStatus"] = "inactive";
-      body["seller"] = body?.seller || {};
+      body["store"] = store || {};
+      body["password"] = await bcrypt.hash(password, saltRounds);;
+      body["hasPassword"] = true;
+
 
       const info = await email_service({
-         to: body?.email,
+         to: email,
          subject: "Verify email address",
-         html: verify_email_html_template(body?.verifyToken, body?._uuid)
+         html: verify_email_html_template(body?.verificationCode)
       });
-
 
       if (info?.response) {
          let user = new User(body);
-         await user.save();
+         user.buyer = undefined;
+         const result = await user.save();
+
          return res.status(200).send({
             success: true,
             statusCode: 200,
-            message: "Thanks for your information. Verification email was sent to " + body?.email + ". Please verify your account.",
+            returnEmail: email,
+            verificationExpiredAt: result?.verificationExpiredAt,
+            message: "Thanks for your information. Verification code was sent to " + email + ". Please verify your account.",
          });
       }
 
@@ -117,32 +148,78 @@ module.exports.sellerRegistrationController = async (req: Request, res: Response
 };
 
 
+module.exports.generateNewVerificationCode = async (req: Request, res: Response, next: NextFunction) => {
+   try {
+      const { email } = req.query;
+
+      if (!email) throw new apiResponse.Api400Error("Required email address !");
+
+      if (!isValidEmail(email)) throw new apiResponse.Api400Error("Required valid email address !");
+
+      let user = await User.findOne({ email });
+
+      if (!user) throw new apiResponse.Api400Error("Sorry user not found !");
+
+      if (user?.verificationCode || user?.accountStatus === "inactive") {
+
+         user.verificationCode = generateSixDigitNumber();
+         user.verificationExpiredAt = generateExpireTime();
+
+         let updateUser = await user.save();
+
+         if (updateUser?.verificationCode) {
+            const info = await email_service({
+               to: user?.email,
+               subject: "Verify email address",
+               html: verify_email_html_template(updateUser?.verificationCode)
+            });
+
+            if (info?.response) {
+               return res.status(200).send({
+                  success: true,
+                  statusCode: 200,
+                  returnEmail: updateUser?.email,
+                  verificationExpiredAt: updateUser?.verificationExpiredAt,
+                  message: "Email was sent to " + updateUser?.email + ". Please verify your account.",
+               });
+            }
+
+            throw new apiResponse.Api500Error("Internal error !");
+         }
+      }
+
+      throw new apiResponse.Api400Error(`Your account with ${email} already active.`);
+
+   } catch (error: any) {
+      next(error);
+   }
+}
+
 /**
  * @controller --> registration verify by token
  */
-module.exports.userEmailVerifyTokenController = async (req: Request, res: Response, next: NextFunction) => {
+module.exports.userEmailVerificationController = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
-      const { token, mailer } = req.query;
+      const { verificationCode, verificationExpiredAt, email } = req.body;
 
-      if (!token) throw new apiResponse.Api400Error("Required token in query !");
+      if (!verificationCode) throw new apiResponse.Api400Error("Required verification code !");
 
-      const user = await User.findOne({ $and: [{ verifyToken: token }, { _uuid: mailer }] });
+      if (new Date(verificationExpiredAt) < new Date()) throw new apiResponse.Api400Error("Session expired ! resend code ..");
+
+      let user = await User.findOne({ $and: [{ verificationCode }, { email }] });
 
       if (!user) {
-         throw new apiResponse.Api400Error("Session is expired !");
+         throw new apiResponse.Api400Error("Session expired ! resend code ..");
       }
 
-      if (user?.verifyToken !== token)
-         throw new apiResponse.Api400Error("Invalid verify token !");
-
+      user.verificationCode = undefined;
+      user.verificationExpiredAt = undefined;
       user.accountStatus = "active";
 
-      user.verifyToken = undefined;
+      const result = await user.save();
 
-      await user.save();
-
-      return res.redirect(`${process.env.FRONTEND_URL}login?email=${user?.email}`);
+      return result && res.status(200).send({ success: true, statusCode: 200, message: "Verification successful.", returnEmail: email });
 
    } catch (error) {
       next(error);
@@ -161,7 +238,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 
       const { emailOrPhone, password } = req.body;
 
-      if (!isValidString(emailOrPhone)) throw new apiResponse.Api400Error("Invalid string type !"); 
+      if (!isValidString(emailOrPhone)) throw new apiResponse.Api400Error("Invalid string type !");
 
       let userDataToken: any;
 
@@ -169,25 +246,26 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 
       if (!user) throw new apiResponse.Api400Error(`User with ${emailOrPhone} not found!`);
 
-      if (user?.isSeller === "pending" && user?.role === "SELLER") throw new apiResponse.Api400Error("Your seller account under processing...");
+      if (user?.verificationCode || user?.accountStatus === "inactive") {
 
-      if (user?.verifyToken && user?.accountStatus === "inactive") {
+         user.verificationCode = generateSixDigitNumber();
+         user.verificationExpiredAt = generateExpireTime();
 
-         user.verifyToken = generateVerifyToken();
-
-         let newToken = await user.save();
+         let updateUser = await user.save();
 
          const info = await email_service({
             to: user?.email,
             subject: "Verify email address",
-            html: verify_email_html_template(newToken?.verifyToken, user?._uuid)
+            html: verify_email_html_template(updateUser?.verificationCode, user?._uuid)
          });
 
          if (info?.response) {
             return res.status(200).send({
                success: true,
                statusCode: 200,
-               message: "Email was sent to " + user?.email + ". Please verify your account.",
+               returnEmail: updateUser?.email,
+               verificationExpiredAt: updateUser?.verificationExpiredAt,
+               message: "Email was sent to " + updateUser?.email + ". Please verify your account.",
             });
          }
 
@@ -271,7 +349,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 
          // if all operation success then return the response
 
-         return res.status(200).send({ name: "isLogin", message: "LoginSuccess", uuid: user?._uuid, u_data: userDataToken, token });
+         return res.status(200).send({ success: true, statusCode: 200, name: "isLogin", message: "LoginSuccess", uuid: user?._uuid, u_data: userDataToken, token });
       }
    } catch (error: any) {
       return next(error);
@@ -368,7 +446,7 @@ module.exports.checkUserAuthentication = async (req: Request, res: Response, nex
 
       if (!user || typeof user === "undefined") throw new apiResponse.Api404Error("Sorry user not found with this " + email);
 
-      let securityCode = get_six_digit_random_number();
+      let securityCode = generateSixDigitNumber();
       let lifeTime = 300000;
 
       const mailOptions = {

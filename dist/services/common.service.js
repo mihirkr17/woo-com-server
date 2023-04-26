@@ -318,11 +318,6 @@ module.exports.checkProductAvailability = (productID, variationID) => __awaiter(
     product = product[0];
     return product;
 });
-module.exports.get_six_digit_random_number = () => {
-    let randomBytes = cryptos.randomBytes(4);
-    let randomNumber = parseInt(randomBytes.toString('hex'), 16) % 900000 + 100000;
-    return randomNumber.toString();
-};
 module.exports.isPasswordValid = (password) => {
     return (/^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/).test(password);
 };
