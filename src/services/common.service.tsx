@@ -3,8 +3,11 @@ const mdb = require("mongodb");
 const Product = require("../model/product.model");
 const UserModel = require("../model/user.model");
 const OrderModel = require("../model/order.model");
+const OrderTable = require("../model/orderTable.model");
 const ShoppingCartModel = require("../model/shoppingCart.model");
 const cryptos = require("crypto");
+const apiResponse = require("../errors/apiResponse");
+const { generateTrackingID } = require("../utils/generator");
 
 
 
@@ -24,6 +27,7 @@ module.exports.findUserByEmail = async (email: string) => {
    }
 }
 
+
 module.exports.findUserByUUID = async (uuid: string) => {
    try {
       return await UserModel.findOne(
@@ -42,9 +46,9 @@ module.exports.findUserByUUID = async (uuid: string) => {
 
 module.exports.order_status_updater = async (obj: any) => {
    try {
-      const { customerEmail, type, orderID, trackingID, cancelReason, refundAT } = obj;
+      const { customerEmail, type, orderID, cancelReason, refundAT, sellerEmail, items } = obj;
 
-      let setQuery: any;
+      let setQuery: any = {};
       const timestamp = Date.now();
 
       let timePlan = {
@@ -55,55 +59,77 @@ module.exports.order_status_updater = async (obj: any) => {
       };
 
       if (type === "dispatch") {
+         await Promise.all(items.map(async (item: any) => {
+
+            return await OrderTable.findOneAndUpdate({
+               $and: [
+                  { customerEmail }, { orderID },
+                  { "seller.email": sellerEmail }]
+            }, {
+               $set: {
+                  "items.$[i].trackingID": generateTrackingID()
+               }
+            },
+               { arrayFilters: [{ "i.itemID": item?.itemID }], upsert: true });
+         }));
+
          setQuery = {
             $set: {
-               "orders.$[i].orderStatus": "dispatch",
-               "orders.$[i].orderDispatchAT": timePlan,
-               "orders.$[i].isDispatch": true
+               orderStatus: "dispatch",
+               orderDispatchAT: timePlan,
+               isDispatch: true
             }
          }
-      } else if (type === "shipped") {
+      } 
+      
+      else if (type === "shipped") {
          setQuery = {
             $set: {
-               "orders.$[i].orderStatus": "shipped",
-               "orders.$[i].orderShippedAT": timePlan,
-               "orders.$[i].isShipped": true
-            }
-         }
-      } else if (type === "completed") {
-         setQuery = {
-            $set: {
-               "orders.$[i].orderStatus": "completed",
-               "orders.$[i].orderCompletedAT": timePlan,
-               "orders.$[i].isCompleted": true
-            }
-         }
-      } else if (type === "canceled" && cancelReason) {
-         setQuery = {
-            $set: {
-               "orders.$[i].orderStatus": "canceled",
-               "orders.$[i].cancelReason": cancelReason,
-               "orders.$[i].orderCanceledAT": timePlan,
-               "orders.$[i].isCanceled": true
-            }
-         }
-      } else if (type === "refunded" && refundAT) {
-         setQuery = {
-            $set: {
-               "orders.$[i].refund.isRefunded": true,
-               "orders.$[i].refund.refundAT": refundAT,
-               "orders.$[i].orderStatus": "refunded"
+               orderStatus: "shipped",
+               orderShippedAT: timePlan,
+               isShipped: true
             }
          }
       }
 
-      return await OrderModel.findOneAndUpdate(
-         { user_email: customerEmail },
-         setQuery,
-         {
-            arrayFilters: [{ "i.orderID": orderID, "i.trackingID": trackingID }],
+      else if (type === "completed") {
+         setQuery = {
+            $set: {
+               orderStatus: "completed",
+               orderCompletedAT: timePlan,
+               isCompleted: true
+            }
          }
-      ) ? { success: true } : { success: false };
+      }
+
+      else if (type === "canceled" && cancelReason) {
+         setQuery = {
+            $set: {
+               orderStatus: "canceled",
+               cancelReason: cancelReason,
+               orderCanceledAT: timePlan,
+               isCanceled: true
+            }
+         }
+      }
+
+      else if (type === "refunded" && refundAT) {
+         setQuery = {
+            $set: {
+               isRefunded: true,
+               refundAT: refundAT,
+               orderStatus: "refunded"
+            }
+         }
+      }
+
+      return await OrderTable.findOneAndUpdate({
+         $and: [
+            { customerEmail }, { orderID },
+            { "seller.email": sellerEmail }]
+      }, setQuery,
+         { upsert: true });
+
    } catch (error: any) {
       return error?.message;
    }
@@ -210,49 +236,6 @@ module.exports.getSellerInformationByID = async (uuid: string) => {
 }
 
 
-module.exports.actualSellingPrice = { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] }
-
-
-module.exports.newPricing = {
-   sellingPrice: { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] },
-   price: "$pricing.price",
-   discount: {
-      $toInt: {
-         $multiply: [
-            {
-               $divide: [
-                  { $subtract: ["$pricing.price", { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] }] },
-                  "$pricing.price"
-               ]
-            }, 100]
-      }
-   }
-}
-
-module.exports.basicProductProject = {
-   title: "$variations.vTitle",
-   slug: 1,
-   brand: 1,
-   categories: 1,
-   packageInfo: 1,
-   rating: 1,
-   ratingAverage: 1,
-   _lid: 1,
-   reviews: 1,
-   image: { $first: "$images" },
-   _vrid: "$variations._vrid",
-   stock: "$variations.stock",
-   variant: "$variations.variant",
-   shipping: 1,
-   pricing: {
-      sellingPrice: { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] },
-      price: "$pricing.price",
-      discount: { $toInt: { $multiply: [{ $divide: [{ $subtract: ["$pricing.price", { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] }] }, "$pricing.price"] }, 100] } }
-   }
-}
-
-
-
 module.exports.calculateShippingCost = (volWeight: number, areaType: string = "") => {
    let n = 0; // price initial 0.5 kg = 0.5 dollar
    let charge: any;
@@ -292,8 +275,6 @@ module.exports.is_product = async (productID: string, variationID: string) => {
       return error;
    }
 }
-
-
 
 
 module.exports.productCounter = async (sellerInfo: any) => {
@@ -346,7 +327,6 @@ module.exports.productCounter = async (sellerInfo: any) => {
 }
 
 
-
 module.exports.checkProductAvailability = async (productID: string, variationID: String) => {
 
    let product = await Product.aggregate([
@@ -366,12 +346,6 @@ module.exports.checkProductAvailability = async (productID: string, variationID:
 
    return product;
 };
-
-
-module.exports.isPasswordValid = (password: string) => {
-   return (/^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/).test(password);
-}
-
 
 
 module.exports.clearCart = async (email: string) => {

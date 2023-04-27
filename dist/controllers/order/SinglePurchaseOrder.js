@@ -13,10 +13,11 @@ const Order = require("../../model/order.model");
 const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
 const apiResponse = require("../../errors/apiResponse");
-const { findUserByEmail, update_variation_stock_available, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
+const { actualSellingPriceProject } = require("../../utils/projection");
+const { findUserByEmail, update_variation_stock_available, calculateShippingCost } = require("../../services/common.service");
 const email_service = require("../../services/email.service");
 const { buyer_order_email_template, seller_order_email_template } = require("../../templates/email.template");
-const { generateItemID, generateOrderID } = require("../../utils/common");
+const { generateItemID, generateOrderID } = require("../../utils/generator");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const OrderTableModel = require("../../model/orderTable.model");
 module.exports = function SinglePurchaseOrder(req, res, next) {
@@ -56,8 +57,8 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                         },
                         shipping: 1,
                         packaged: 1,
-                        baseAmount: { $multiply: [actualSellingPrice, parseInt(quantity)] },
-                        sellingPrice: actualSellingPrice,
+                        baseAmount: { $multiply: [actualSellingPriceProject, parseInt(quantity)] },
+                        sellingPrice: actualSellingPriceProject,
                     }
                 },
                 {
@@ -130,7 +131,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                 shippingAddress: defaultShippingAddress,
                 areaType,
                 paymentMode: "card",
-                orderStatus: "pending",
+                orderStatus: "placed",
                 items: product,
             });
             const result = yield orderTable.save();
@@ -219,8 +220,8 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
 //                },
 //                shipping: 1,
 //                packaged: 1,
-//                baseAmount: { $multiply: [actualSellingPrice, parseInt(quantity)] },
-//                sellingPrice: actualSellingPrice,
+//                baseAmount: { $multiply: [actualSellingPriceProject, parseInt(quantity)] },
+//                sellingPrice: actualSellingPriceProject,
 //             }
 //          },
 //          {

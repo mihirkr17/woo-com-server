@@ -5,7 +5,7 @@ const userCTRL = require("../controllers/users/users");
 const FetchAuthUser = require("../controllers/users/FetchAuthUser");
 
 // Middleware
-const { verifyJWT, isRoleOwnerOrAdmin } = require("../middleware/Auth.middleware");
+const { verifyJWT, isRoleOwnerOrAdmin } = require("../middlewares/auth.middleware");
 
 try {
   /**

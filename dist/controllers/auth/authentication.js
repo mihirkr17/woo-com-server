@@ -12,16 +12,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const User = require("../../model/user.model");
 const apiResponse = require("../../errors/apiResponse");
-const setToken = require("../../utils/setToken");
-const comparePassword = require("../../utils/comparePassword");
-const setUserDataToken = require("../../utils/setUserDataToken");
+const { comparePassword } = require("../../utils/compare");
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
 const email_service = require("../../services/email.service");
-const { isPasswordValid } = require("../../services/common.service");
 const { verify_email_html_template } = require("../../templates/email.template");
-const { generateUUID, generateExpireTime, generateSixDigitNumber } = require("../../utils/common");
-const { isValidString, isValidEmail } = require("../../utils/validate");
+const { generateUUID, generateExpireTime, generateSixDigitNumber, generateJwtToken, generateUserDataToken } = require("../../utils/generator");
+const { isValidString, isValidEmail, isValidPassword } = require("../../utils/validator");
 /**
  * @apiController --> Buyer Registration Controller
  * @apiMethod --> POST
@@ -93,7 +90,7 @@ module.exports.sellerRegistrationController = (req, res, next) => __awaiter(void
         if (existUser) {
             throw new apiResponse.Api400Error("User already exists, Please try another phone number or email address !");
         }
-        if (!isPasswordValid)
+        if (!isValidPassword)
             throw new apiResponse.Api400Error("Need a strong password !");
         body['_uuid'] = "s" + generateUUID();
         body['authProvider'] = 'system';
@@ -230,9 +227,9 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
         let comparedPassword = yield comparePassword(password, user === null || user === void 0 ? void 0 : user.password);
         if (!comparedPassword)
             throw new apiResponse.Api400Error("Password didn't match !");
-        let token = setToken(user);
+        let token = generateJwtToken(user);
         if ((user === null || user === void 0 ? void 0 : user.role) && (user === null || user === void 0 ? void 0 : user.role) === "ADMIN") {
-            userDataToken = setUserDataToken({
+            userDataToken = generateUserDataToken({
                 _uuid: user === null || user === void 0 ? void 0 : user._uuid,
                 fullName: user === null || user === void 0 ? void 0 : user.fullName,
                 email: user === null || user === void 0 ? void 0 : user.email,
@@ -248,7 +245,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
             });
         }
         if ((user === null || user === void 0 ? void 0 : user.role) && (user === null || user === void 0 ? void 0 : user.role) === "SELLER") {
-            userDataToken = setUserDataToken({
+            userDataToken = generateUserDataToken({
                 _uuid: user === null || user === void 0 ? void 0 : user._uuid,
                 fullName: user === null || user === void 0 ? void 0 : user.fullName,
                 email: user === null || user === void 0 ? void 0 : user.email,
@@ -259,17 +256,16 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
                 gender: user === null || user === void 0 ? void 0 : user.gender,
                 dob: user === null || user === void 0 ? void 0 : user.dob,
                 idFor: user === null || user === void 0 ? void 0 : user.idFor,
-                isSeller: user === null || user === void 0 ? void 0 : user.isSeller,
                 accountStatus: user === null || user === void 0 ? void 0 : user.accountStatus,
                 contactEmail: user === null || user === void 0 ? void 0 : user.contactEmail,
-                seller: user === null || user === void 0 ? void 0 : user.seller,
+                store: user === null || user === void 0 ? void 0 : user.store,
                 authProvider: user === null || user === void 0 ? void 0 : user.authProvider
             });
         }
         if ((user === null || user === void 0 ? void 0 : user.role) && (user === null || user === void 0 ? void 0 : user.role) === "BUYER") {
             user.buyer["defaultShippingAddress"] = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
                 ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.find((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true))) || {};
-            userDataToken = setUserDataToken({
+            userDataToken = generateUserDataToken({
                 _uuid: user === null || user === void 0 ? void 0 : user._uuid,
                 fullName: user === null || user === void 0 ? void 0 : user.fullName,
                 email: user === null || user === void 0 ? void 0 : user.email,
@@ -336,7 +332,7 @@ module.exports.changePasswordController = (req, res, next) => __awaiter(void 0, 
             throw new apiResponse.Api400Error("Password should be string !");
         if (newPassword.length < 5 || newPassword.length > 8)
             throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
-        if (!isPasswordValid(newPassword))
+        if (!isValidPassword(newPassword))
             throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
         // find user in user db
         const user = yield User.findOne({ email: authEmail });

@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 const { productCounter, findUserByEmail } = require("../../services/common.service");
 const apiResponse = require("../../errors/apiResponse");
-const setUserDataToken = require("../../utils/setUserDataToken");
+const { generateUserDataToken } = require("../../utils/generator");
 
 
 module.exports = async function FetchAuthUser(req: Request, res: Response, next: NextFunction) {
@@ -17,7 +17,7 @@ module.exports = async function FetchAuthUser(req: Request, res: Response, next:
       if (!user || typeof user !== "object") throw new apiResponse.Api404Error("User not found !");
 
       if (user?.role && user?.role === "ADMIN") {
-         userDataToken = setUserDataToken({
+         userDataToken = generateUserDataToken({
             _uuid: user?._uuid,
             fullName: user?.fullName,
             email: user?.email,
@@ -37,7 +37,7 @@ module.exports = async function FetchAuthUser(req: Request, res: Response, next:
       if (user?.role === 'SELLER' && user?.idFor === 'sell') {
          await productCounter({ storeName: user.seller.storeInfos?.storeName, _uuid: user?._uuid });
 
-         userDataToken = setUserDataToken({
+         userDataToken = generateUserDataToken({
             _uuid: user?._uuid,
             fullName: user?.fullName,
             email: user?.email,
@@ -61,7 +61,7 @@ module.exports = async function FetchAuthUser(req: Request, res: Response, next:
          user.buyer["defaultShippingAddress"] = (Array.isArray(user?.buyer?.shippingAddress) &&
             user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]) || {};
 
-         userDataToken = setUserDataToken({
+         userDataToken = generateUserDataToken({
             _uuid: user?._uuid,
             fullName: user?.fullName,
             email: user?.email,

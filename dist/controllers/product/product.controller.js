@@ -12,7 +12,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const { ObjectId } = require("mongodb");
 const Product = require("../../model/product.model");
-const { findUserByEmail, getSellerInformationByID, actualSellingPrice, newPricing, basicProductProject, calculateShippingCost } = require("../../services/common.service");
+const { actualSellingPriceProject, basicProductProject, newPricingProject } = require("../../utils/projection");
+const { findUserByEmail, getSellerInformationByID, calculateShippingCost } = require("../../services/common.service");
 /**
  * @controller      --> Fetch the single product information in product details page.
  * @required        --> [req.headers.authorization:email, req.query:productID, req.query:variationID, req.params:product slug]
@@ -65,7 +66,7 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
                     bodyInfo: 1,
                     description: 1,
                     manufacturer: 1,
-                    pricing: newPricing,
+                    pricing: newPricingProject,
                     isFreeShipping: "$shipping.isFree",
                     volumetricWeight: "$packaged.volumetricWeight",
                     _lid: 1
@@ -313,9 +314,9 @@ module.exports.purchaseProductController = (req, res, next) => __awaiter(void 0,
                     sku: "$variations.sku",
                     sellerData: 1,
                     shipping: 1,
-                    savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPrice] }, parseInt(body === null || body === void 0 ? void 0 : body.quantity)] },
-                    baseAmount: { $multiply: [actualSellingPrice, body === null || body === void 0 ? void 0 : body.quantity] },
-                    sellingPrice: actualSellingPrice,
+                    savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPriceProject] }, parseInt(body === null || body === void 0 ? void 0 : body.quantity)] },
+                    baseAmount: { $multiply: [actualSellingPriceProject, body === null || body === void 0 ? void 0 : body.quantity] },
+                    sellingPrice: actualSellingPriceProject,
                     variant: "$variations.variant",
                     available: "$variations.available",
                     stock: "$variations.stock"

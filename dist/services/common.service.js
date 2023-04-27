@@ -13,8 +13,11 @@ const mdb = require("mongodb");
 const Product = require("../model/product.model");
 const UserModel = require("../model/user.model");
 const OrderModel = require("../model/order.model");
+const OrderTable = require("../model/orderTable.model");
 const ShoppingCartModel = require("../model/shoppingCart.model");
 const cryptos = require("crypto");
+const apiResponse = require("../errors/apiResponse");
+const { generateTrackingID } = require("../utils/generator");
 module.exports.findUserByEmail = (email) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         return (yield UserModel.findOne({ $and: [{ email: email }, { accountStatus: 'active' }] }, {
@@ -43,8 +46,8 @@ module.exports.findUserByUUID = (uuid) => __awaiter(void 0, void 0, void 0, func
 });
 module.exports.order_status_updater = (obj) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { customerEmail, type, orderID, trackingID, cancelReason, refundAT } = obj;
-        let setQuery;
+        const { customerEmail, type, orderID, cancelReason, refundAT, sellerEmail, items } = obj;
+        let setQuery = {};
         const timestamp = Date.now();
         let timePlan = {
             iso: new Date(timestamp),
@@ -53,54 +56,69 @@ module.exports.order_status_updater = (obj) => __awaiter(void 0, void 0, void 0,
             timestamp: timestamp
         };
         if (type === "dispatch") {
+            yield Promise.all(items.map((item) => __awaiter(void 0, void 0, void 0, function* () {
+                return yield OrderTable.findOneAndUpdate({
+                    $and: [
+                        { customerEmail }, { orderID },
+                        { "seller.email": sellerEmail }
+                    ]
+                }, {
+                    $set: {
+                        "items.$[i].trackingID": generateTrackingID()
+                    }
+                }, { arrayFilters: [{ "i.itemID": item === null || item === void 0 ? void 0 : item.itemID }], upsert: true });
+            })));
             setQuery = {
                 $set: {
-                    "orders.$[i].orderStatus": "dispatch",
-                    "orders.$[i].orderDispatchAT": timePlan,
-                    "orders.$[i].isDispatch": true
+                    orderStatus: "dispatch",
+                    orderDispatchAT: timePlan,
+                    isDispatch: true
                 }
             };
         }
         else if (type === "shipped") {
             setQuery = {
                 $set: {
-                    "orders.$[i].orderStatus": "shipped",
-                    "orders.$[i].orderShippedAT": timePlan,
-                    "orders.$[i].isShipped": true
+                    orderStatus: "shipped",
+                    orderShippedAT: timePlan,
+                    isShipped: true
                 }
             };
         }
         else if (type === "completed") {
             setQuery = {
                 $set: {
-                    "orders.$[i].orderStatus": "completed",
-                    "orders.$[i].orderCompletedAT": timePlan,
-                    "orders.$[i].isCompleted": true
+                    orderStatus: "completed",
+                    orderCompletedAT: timePlan,
+                    isCompleted: true
                 }
             };
         }
         else if (type === "canceled" && cancelReason) {
             setQuery = {
                 $set: {
-                    "orders.$[i].orderStatus": "canceled",
-                    "orders.$[i].cancelReason": cancelReason,
-                    "orders.$[i].orderCanceledAT": timePlan,
-                    "orders.$[i].isCanceled": true
+                    orderStatus: "canceled",
+                    cancelReason: cancelReason,
+                    orderCanceledAT: timePlan,
+                    isCanceled: true
                 }
             };
         }
         else if (type === "refunded" && refundAT) {
             setQuery = {
                 $set: {
-                    "orders.$[i].refund.isRefunded": true,
-                    "orders.$[i].refund.refundAT": refundAT,
-                    "orders.$[i].orderStatus": "refunded"
+                    isRefunded: true,
+                    refundAT: refundAT,
+                    orderStatus: "refunded"
                 }
             };
         }
-        return (yield OrderModel.findOneAndUpdate({ user_email: customerEmail }, setQuery, {
-            arrayFilters: [{ "i.orderID": orderID, "i.trackingID": trackingID }],
-        })) ? { success: true } : { success: false };
+        return yield OrderTable.findOneAndUpdate({
+            $and: [
+                { customerEmail }, { orderID },
+                { "seller.email": sellerEmail }
+            ]
+        }, setQuery, { upsert: true });
     }
     catch (error) {
         return error === null || error === void 0 ? void 0 : error.message;
@@ -186,44 +204,6 @@ module.exports.getSellerInformationByID = (uuid) => __awaiter(void 0, void 0, vo
         return error;
     }
 });
-module.exports.actualSellingPrice = { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] };
-module.exports.newPricing = {
-    sellingPrice: { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] },
-    price: "$pricing.price",
-    discount: {
-        $toInt: {
-            $multiply: [
-                {
-                    $divide: [
-                        { $subtract: ["$pricing.price", { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] }] },
-                        "$pricing.price"
-                    ]
-                }, 100
-            ]
-        }
-    }
-};
-module.exports.basicProductProject = {
-    title: "$variations.vTitle",
-    slug: 1,
-    brand: 1,
-    categories: 1,
-    packageInfo: 1,
-    rating: 1,
-    ratingAverage: 1,
-    _lid: 1,
-    reviews: 1,
-    image: { $first: "$images" },
-    _vrid: "$variations._vrid",
-    stock: "$variations.stock",
-    variant: "$variations.variant",
-    shipping: 1,
-    pricing: {
-        sellingPrice: { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] },
-        price: "$pricing.price",
-        discount: { $toInt: { $multiply: [{ $divide: [{ $subtract: ["$pricing.price", { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] }] }, "$pricing.price"] }, 100] } }
-    }
-};
 module.exports.calculateShippingCost = (volWeight, areaType = "") => {
     let n = 0; // price initial 0.5 kg = 0.5 dollar
     let charge;
@@ -318,9 +298,6 @@ module.exports.checkProductAvailability = (productID, variationID) => __awaiter(
     product = product[0];
     return product;
 });
-module.exports.isPasswordValid = (password) => {
-    return (/^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/).test(password);
-};
 module.exports.clearCart = (email) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         return yield ShoppingCartModel.findOneAndUpdate({ customerEmail: email }, {

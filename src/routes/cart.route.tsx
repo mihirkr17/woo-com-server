@@ -1,6 +1,6 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
-const { verifyJWT } = require("../middleware/Auth.middleware");
+const { verifyJWT } = require("../middlewares/auth.middleware");
 const cartContext = require("../controllers/cart/cart");
 
 try {

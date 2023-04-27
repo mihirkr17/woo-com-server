@@ -2,7 +2,7 @@ import express, { Router } from "express";
 const router: Router = express.Router();
 const CreatePaymentIntent = require("../controllers/payment/CreatePaymentIntent");
 const RetrievePaymentIntent = require("../controllers/payment/RetrievePaymentIntent");
-const {verifyJWT} = require("../middleware/Auth.middleware");
+const {verifyJWT} = require("../middlewares/auth.middleware");
 const RefundPayment = require("../controllers/payment/RefundPayment");
 
 try {

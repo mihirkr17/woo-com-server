@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 const ShoppingCart = require("../../model/shoppingCart.model");
-const { findUserByEmail, checkProductAvailability, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
+const { actualSellingPriceProject } = require("../../utils/projection");
+const { findUserByEmail, checkProductAvailability, calculateShippingCost } = require("../../services/common.service");
 const apiResponse = require("../../errors/apiResponse");
 const { ObjectId } = require("mongodb");
 const { cartTemplate } = require("../../templates/cart.template");
@@ -123,10 +124,10 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
                sku: "$variations.sku",
                sellerData: 1,
                quantity: "$items.quantity",
-               savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPrice] }, '$items.quantity'] },
-               baseAmount: { $multiply: [actualSellingPrice, '$items.quantity'] },
+               savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPriceProject] }, '$items.quantity'] },
+               baseAmount: { $multiply: [actualSellingPriceProject, '$items.quantity'] },
                paymentInfo: 1,
-               sellingPrice: actualSellingPrice,
+               sellingPrice: actualSellingPriceProject,
                variant: "$variations.variant",
                available: "$variations.available",
                stock: "$variations.stock"
@@ -244,7 +245,7 @@ module.exports.deleteCartItem = async (req: Request, res: Response, next: NextFu
       });
 
       if (updateDocuments) return res.status(200).send({ success: true, statusCode: 200, message: "Item removed successfully from your cart." });
-      
+
       throw new apiResponse.Api500Error("Failed to delete product from cart !");
 
    } catch (error: any) {

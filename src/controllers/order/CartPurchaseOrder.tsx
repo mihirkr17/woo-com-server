@@ -5,9 +5,10 @@ import { NextFunction, Request, Response } from "express";
 const apiResponse = require("../../errors/apiResponse");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const ShoppingCart = require("../../model/shoppingCart.model");
-const { findUserByEmail, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
+const { actualSellingPriceProject } = require("../../utils/projection");
+const { findUserByEmail, calculateShippingCost } = require("../../services/common.service");
 const OrderTableModel = require("../../model/orderTable.model");
-const { generateItemID, generateOrderID } = require("../../utils/common");
+const { generateItemID, generateOrderID } = require("../../utils/generator");
 const email_service = require("../../services/email.service");
 const { buyer_order_email_template, seller_order_email_template } = require("../../templates/email.template");
 
@@ -91,8 +92,8 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
                   stripeID: "$sellerData.stripeID"
                },
                sku: "$variations.sku",
-               baseAmount: { $multiply: [actualSellingPrice, '$items.quantity'] },
-               sellingPrice: actualSellingPrice
+               baseAmount: { $multiply: [actualSellingPriceProject, '$items.quantity'] },
+               sellingPrice: actualSellingPriceProject,
             }
          },
          { $unset: ["variations", "items"] }
@@ -189,7 +190,7 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
             shippingAddress: defaultAddress,
             areaType,
             paymentMode: "card",
-            orderStatus: "pending",
+            orderStatus: "placed",
             items: items,
          });
 
@@ -309,8 +310,8 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
 //                   storeName: "$sellerData.storeName"
 //                },
 //                sku: "$variations.sku",
-//                baseAmount: { $multiply: [actualSellingPrice, '$items.quantity'] },
-//                sellingPrice: actualSellingPrice
+//                baseAmount: { $multiply: [actualSellingPriceProject, '$items.quantity'] },
+//                sellingPrice: actualSellingPriceProject
 //             }
 //          },
 //          {

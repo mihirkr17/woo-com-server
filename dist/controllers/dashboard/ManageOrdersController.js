@@ -21,28 +21,7 @@ module.exports.manageOrders = (req, res, next) => __awaiter(void 0, void 0, void
         const uuid = req.decoded._uuid;
         const email = req.decoded.email;
         let result;
-        const orders = yield OrderTableModel.aggregate([
-            { $unwind: { path: "$items" } },
-            { $match: { $and: [{ "items.sellerData.storeName": storeName }, { "items.sellerData.sellerEmail": email }] } },
-            {
-                $group: {
-                    _id: "$_id",
-                    orderPaymentID: { $first: "$orderPaymentID" },
-                    clientSecret: { $first: "$clientSecret" },
-                    customerEmail: { $first: "$customerEmail" },
-                    customerID: { $first: "$customerID" },
-                    totalAmount: { $sum: "$items.baseAmount" },
-                    shippingAddress: { $first: "$shippingAddress" },
-                    paymentIntentID: { $first: "$paymentIntentID" },
-                    paymentMethodID: { $first: "$paymentMethodID" },
-                    paymentStatus: { $first: "$paymentStatus" },
-                    paymentMode: { $first: "$paymentMode" },
-                    orderAT: { $first: "$orderAT" },
-                    state: { $first: "$state" },
-                    items: { $push: "$items" }
-                }
-            }
-        ]);
+        const orders = yield OrderTableModel.find({ $and: [{ "seller.store": storeName }, { "seller.email": email }] });
         if (storeName) {
             if (view === "group") {
                 result = yield Order.aggregate([
@@ -129,25 +108,24 @@ module.exports.orderStatusManagement = (req, res, next) => __awaiter(void 0, voi
             throw new Error("Required store name in param !");
         if (!body)
             throw new Error("Required body information about orders !");
-        const { type, customerEmail, productID, variationID, orderID, listingID, trackingID, quantity, cancelReason } = body;
+        const { type, customerEmail, orderID, cancelReason, sellerEmail, items } = body;
         if (!type || type === "")
             throw new Error("Required status type !");
         if (!customerEmail || customerEmail === "")
             throw new Error("Required customer email !");
         if (!orderID || orderID === "")
             throw new Error("Required Order ID !");
-        if (!trackingID || trackingID === "")
-            throw new Error("Required Tracking ID !");
         const result = yield order_status_updater({
             type: type,
             customerEmail,
             orderID,
-            trackingID,
-            cancelReason
+            cancelReason,
+            sellerEmail,
+            items
         });
         if (result) {
-            if (type === "canceled" && cancelReason) {
-                yield update_variation_stock_available("inc", { listingID, productID, variationID, quantity });
+            if (type === "canceled" && cancelReason && Array.isArray(items)) {
+                yield Promise.all(items.map((item) => __awaiter(void 0, void 0, void 0, function* () { return yield update_variation_stock_available("inc", item); })));
             }
             return res.status(200).send({ success: true, statusCode: 200, message: "Order status updated to " + type });
         }

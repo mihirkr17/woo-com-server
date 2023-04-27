@@ -13,7 +13,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const apiResponse = require("../../errors/apiResponse");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const ShoppingCart = require("../../model/shoppingCart.model");
-const { findUserByEmail, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
+const { findUserByEmail, actualSellingPriceProject, calculateShippingCost } = require("../../services/common.service");
 const OrderTableModel = require("../../model/orderTable.model");
 const { generateItemID, generateTrackingID } = require("../../utils/common");
 const email_service = require("../../services/email.service");
@@ -81,8 +81,8 @@ module.exports = function SetOrder(req, res, next) {
                             storeName: "$sellerData.storeName"
                         },
                         sku: "$variations.sku",
-                        baseAmount: { $multiply: [actualSellingPrice, '$items.quantity'] },
-                        sellingPrice: actualSellingPrice
+                        baseAmount: { $multiply: [actualSellingPriceProject, '$items.quantity'] },
+                        sellingPrice: actualSellingPriceProject
                     }
                 },
                 {
@@ -248,8 +248,8 @@ module.exports = function SetOrder(req, res, next) {
 //                   storeName: "$sellerData.storeName"
 //                },
 //                sku: "$variations.sku",
-//                baseAmount: { $multiply: [actualSellingPrice, '$items.quantity'] },
-//                sellingPrice: actualSellingPrice
+//                baseAmount: { $multiply: [actualSellingPriceProject, '$items.quantity'] },
+//                sellingPrice: actualSellingPriceProject
 //             }
 //          },
 //          {

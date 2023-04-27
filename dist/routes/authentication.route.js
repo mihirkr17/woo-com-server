@@ -6,8 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const router = express_1.default.Router();
 const authCTRL = require("../controllers/auth/authentication");
-const { verifyJWT } = require("../middleware/Auth.middleware");
-const { loginMDL, registrationMDL } = require("../middleware/authentication.mdl");
+const { verifyJWT } = require("../middlewares/auth.middleware");
+const { loginMDL, registrationMDL } = require("../middlewares/formInput.middleware");
 try {
     router.post("/register-new-user", registrationMDL, authCTRL.buyerRegistrationController);
     router.post("/login", loginMDL, authCTRL.loginController);

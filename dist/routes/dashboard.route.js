@@ -5,8 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const router = express_1.default.Router();
-const { variationOne } = require("../middleware/Product.middleware");
-const { verifyJWT, isPermitForDashboard, isRoleSeller, isRoleAdmin } = require("../middleware/Auth.middleware");
+const { verifyJWT, isPermitForDashboard, isRoleSeller, isRoleAdmin } = require("../middlewares/auth.middleware");
 const dashboardCTRL = require("../controllers/dashboard/dashboardController");
 const ManageProductCTRL = require("../controllers/dashboard/ManageProduct.Controller");
 const AdminCTRL = require("../controllers/dashboard/Admin.controller");

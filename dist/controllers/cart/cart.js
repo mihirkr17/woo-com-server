@@ -10,7 +10,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const ShoppingCart = require("../../model/shoppingCart.model");
-const { findUserByEmail, checkProductAvailability, actualSellingPrice, calculateShippingCost } = require("../../services/common.service");
+const { actualSellingPriceProject } = require("../../utils/projection");
+const { findUserByEmail, checkProductAvailability, calculateShippingCost } = require("../../services/common.service");
 const apiResponse = require("../../errors/apiResponse");
 const { ObjectId } = require("mongodb");
 const { cartTemplate } = require("../../templates/cart.template");
@@ -110,10 +111,10 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
                     sku: "$variations.sku",
                     sellerData: 1,
                     quantity: "$items.quantity",
-                    savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPrice] }, '$items.quantity'] },
-                    baseAmount: { $multiply: [actualSellingPrice, '$items.quantity'] },
+                    savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPriceProject] }, '$items.quantity'] },
+                    baseAmount: { $multiply: [actualSellingPriceProject, '$items.quantity'] },
                     paymentInfo: 1,
-                    sellingPrice: actualSellingPrice,
+                    sellingPrice: actualSellingPriceProject,
                     variant: "$variations.variant",
                     available: "$variations.available",
                     stock: "$variations.stock"

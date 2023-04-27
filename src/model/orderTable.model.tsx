@@ -66,8 +66,8 @@ const orderTab = new Schema({
 
    orderStatus: {
       type: String,
-      enum: ["pending", "placed", "shipped", "canceled", "dispatch", "refunded", "completed"],
-      default: 'pending'
+      enum: ["placed", "shipped", "canceled", "dispatch", "refunded", "completed"],
+      default: 'placed'
    },
 
    paymentStatus: {
@@ -89,8 +89,6 @@ const orderTab = new Schema({
    orderDispatchAT: { type: Object, required: false },
 
    orderCompletedAT: { type: Object, required: false },
-
-   orderPlacedAT: { type: Object, required: false },
 
    orderShippedAT: { type: Object, required: false },
 
@@ -117,6 +115,8 @@ const orderTab = new Schema({
          sellerData: { type: Object, required: true },
          sellingPrice: { type: Number, required: true },
          isRated: { type: Boolean, required: false },
+         packaged: { type: Object, required: true },
+         shipping: { type: Object, required: true }
       }
    ]
 });

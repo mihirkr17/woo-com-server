@@ -3,16 +3,13 @@
 import { NextFunction, Request, Response } from "express";
 const User = require("../../model/user.model");
 const apiResponse = require("../../errors/apiResponse");
-const setToken = require("../../utils/setToken");
-const comparePassword = require("../../utils/comparePassword");
-const setUserDataToken = require("../../utils/setUserDataToken");
+const { comparePassword } = require("../../utils/compare");
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
 const email_service = require("../../services/email.service");
-const { isPasswordValid } = require("../../services/common.service");
 const { verify_email_html_template } = require("../../templates/email.template");
-const { generateUUID, generateExpireTime, generateSixDigitNumber } = require("../../utils/common");
-const { isValidString, isValidEmail } = require("../../utils/validate");
+const { generateUUID, generateExpireTime, generateSixDigitNumber, generateJwtToken, generateUserDataToken } = require("../../utils/generator");
+const { isValidString, isValidEmail, isValidPassword } = require("../../utils/validator");
 
 /**
  * @apiController --> Buyer Registration Controller
@@ -105,7 +102,7 @@ module.exports.sellerRegistrationController = async (req: Request, res: Response
          throw new apiResponse.Api400Error("User already exists, Please try another phone number or email address !")
       }
 
-      if (!isPasswordValid) throw new apiResponse.Api400Error("Need a strong password !");
+      if (!isValidPassword) throw new apiResponse.Api400Error("Need a strong password !");
 
       body['_uuid'] = "s" + generateUUID();
       body['authProvider'] = 'system';
@@ -227,7 +224,6 @@ module.exports.userEmailVerificationController = async (req: Request, res: Respo
 }
 
 
-
 /**
  * @apiController --> All User Login Controller
  * @apiMethod --> POST
@@ -276,10 +272,10 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
 
       if (!comparedPassword) throw new apiResponse.Api400Error("Password didn't match !");
 
-      let token = setToken(user);
+      let token = generateJwtToken(user);
 
       if (user?.role && user?.role === "ADMIN") {
-         userDataToken = setUserDataToken({
+         userDataToken = generateUserDataToken({
             _uuid: user?._uuid,
             fullName: user?.fullName,
             email: user?.email,
@@ -296,7 +292,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
       }
 
       if (user?.role && user?.role === "SELLER") {
-         userDataToken = setUserDataToken({
+         userDataToken = generateUserDataToken({
             _uuid: user?._uuid,
             fullName: user?.fullName,
             email: user?.email,
@@ -307,10 +303,9 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
             gender: user?.gender,
             dob: user?.dob,
             idFor: user?.idFor,
-            isSeller: user?.isSeller,
             accountStatus: user?.accountStatus,
             contactEmail: user?.contactEmail,
-            seller: user?.seller,
+            store: user?.store,
             authProvider: user?.authProvider
          });
       }
@@ -320,7 +315,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
          user.buyer["defaultShippingAddress"] = (Array.isArray(user?.buyer?.shippingAddress) &&
             user?.buyer?.shippingAddress.find((adr: any) => adr?.default_shipping_address === true)) || {};
 
-         userDataToken = setUserDataToken({
+         userDataToken = generateUserDataToken({
             _uuid: user?._uuid,
             fullName: user?.fullName,
             email: user?.email,
@@ -400,7 +395,7 @@ module.exports.changePasswordController = async (req: Request, res: Response, ne
       if (newPassword.length < 5 || newPassword.length > 8)
          throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
 
-      if (!isPasswordValid(newPassword))
+      if (!isValidPassword(newPassword))
          throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
 
       // find user in user db

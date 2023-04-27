@@ -1,7 +1,6 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
-const { variationOne } = require("../middleware/Product.middleware");
-const { verifyJWT, isPermitForDashboard, isRoleSeller, isRoleAdmin } = require("../middleware/Auth.middleware");
+const { verifyJWT, isPermitForDashboard, isRoleSeller, isRoleAdmin } = require("../middlewares/auth.middleware");
 const dashboardCTRL = require("../controllers/dashboard/dashboardController");
 const ManageProductCTRL = require("../controllers/dashboard/ManageProduct.Controller");
 const AdminCTRL = require("../controllers/dashboard/Admin.controller");

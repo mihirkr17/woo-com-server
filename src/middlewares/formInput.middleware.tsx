@@ -1,6 +1,6 @@
 const apiResponse = require("../errors/apiResponse");
 import { NextFunction, Request, Response } from "express";
-const { isPasswordValid } = require("../services/common.service");
+const { isValidPassword } = require("../utils/validator");
 
 
 module.exports.loginMDL = async (req: Request, res: Response, next: NextFunction) => {
@@ -17,7 +17,7 @@ module.exports.loginMDL = async (req: Request, res: Response, next: NextFunction
       if (typeof password !== "string")
          throw new apiResponse.Api400Error("Password should be string !");
 
-      if (!isPasswordValid(password))
+      if (!isValidPassword(password))
          throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
 
       if (password.length < 5 || password.length > 8)
@@ -69,7 +69,7 @@ module.exports.registrationMDL = async (req: Request, res: Response, next: NextF
          throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
       }
 
-      else if (!isPasswordValid(password)) {
+      else if (!isValidPassword(password)) {
          throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
       }
 

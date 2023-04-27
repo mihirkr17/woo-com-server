@@ -11,7 +11,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const User = require("../../model/user.model");
 const Product = require("../../model/product.model");
-const Order = require("../../model/order.model");
 module.exports.dashboardOverview = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {

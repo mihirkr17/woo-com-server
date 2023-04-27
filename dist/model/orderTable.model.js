@@ -21,8 +21,8 @@ const orderTab = new mongoose_1.Schema({
     clientSecret: { type: String, required: false, default: undefined },
     orderStatus: {
         type: String,
-        enum: ["pending", "placed", "shipped", "canceled", "dispatch", "refunded", "completed"],
-        default: 'pending'
+        enum: ["placed", "shipped", "canceled", "dispatch", "refunded", "completed"],
+        default: 'placed'
     },
     paymentStatus: {
         type: String,
@@ -36,7 +36,6 @@ const orderTab = new mongoose_1.Schema({
     orderCanceledAT: { type: Object, required: false },
     orderDispatchAT: { type: Object, required: false },
     orderCompletedAT: { type: Object, required: false },
-    orderPlacedAT: { type: Object, required: false },
     orderShippedAT: { type: Object, required: false },
     cancelReason: { type: String, required: false },
     refund: { type: Object, required: false },
@@ -59,6 +58,8 @@ const orderTab = new mongoose_1.Schema({
             sellerData: { type: Object, required: true },
             sellingPrice: { type: Number, required: true },
             isRated: { type: Boolean, required: false },
+            packaged: { type: Object, required: true },
+            shipping: { type: Object, required: true }
         }
     ]
 });

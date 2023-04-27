@@ -13,28 +13,7 @@ module.exports.manageOrders = async (req: Request, res: Response, next: NextFunc
     const email = req.decoded.email;
     let result: any;
 
-    const orders = await OrderTableModel.aggregate([
-      { $unwind: { path: "$items" } },
-      { $match: { $and: [{ "items.sellerData.storeName": storeName }, { "items.sellerData.sellerEmail": email }] } },
-      {
-        $group: {
-          _id: "$_id",
-          orderPaymentID: { $first: "$orderPaymentID" },
-          clientSecret: { $first: "$clientSecret" },
-          customerEmail: { $first: "$customerEmail" },
-          customerID: { $first: "$customerID" },
-          totalAmount: { $sum: "$items.baseAmount" },
-          shippingAddress: { $first: "$shippingAddress" },
-          paymentIntentID: { $first: "$paymentIntentID" },
-          paymentMethodID: { $first: "$paymentMethodID" },
-          paymentStatus: { $first: "$paymentStatus" },
-          paymentMode: { $first: "$paymentMode" },
-          orderAT: { $first: "$orderAT" },
-          state: { $first: "$state" },
-          items: { $push: "$items" }
-        }
-      }
-    ]);
+    const orders = await OrderTableModel.find({ $and: [{ "seller.store": storeName }, { "seller.email": email }] });
 
 
     if (storeName) {
@@ -127,25 +106,25 @@ module.exports.orderStatusManagement = async (req: Request, res: Response, next:
 
     if (!body) throw new Error("Required body information about orders !");
 
-    const { type, customerEmail, productID, variationID, orderID, listingID, trackingID, quantity, cancelReason } = body;
+    const { type, customerEmail, orderID, cancelReason, sellerEmail, items } = body;
 
     if (!type || type === "") throw new Error("Required status type !");
     if (!customerEmail || customerEmail === "") throw new Error("Required customer email !");
     if (!orderID || orderID === "") throw new Error("Required Order ID !");
-    if (!trackingID || trackingID === "") throw new Error("Required Tracking ID !");
 
 
     const result = await order_status_updater({
       type: type,
       customerEmail,
       orderID,
-      trackingID,
-      cancelReason
+      cancelReason,
+      sellerEmail,
+      items
     });
 
     if (result) {
-      if (type === "canceled" && cancelReason) {
-        await update_variation_stock_available("inc", { listingID, productID, variationID, quantity });
+      if (type === "canceled" && cancelReason && Array.isArray(items)) {
+        await Promise.all(items.map(async (item) => await update_variation_stock_available("inc", item)));
       }
 
       return res.status(200).send({ success: true, statusCode: 200, message: "Order status updated to " + type });

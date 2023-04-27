@@ -7,3 +7,6 @@ module.exports.isValidEmail = (email: any) => {
    return re.test(String(email).toLowerCase());
 }
 
+module.exports.isValidPassword = (password: string) => {
+   return (/^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/).test(password);
+}

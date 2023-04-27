@@ -1,8 +1,8 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
 const authCTRL = require("../controllers/auth/authentication");
-const { verifyJWT } = require("../middleware/Auth.middleware");
-const { loginMDL, registrationMDL } = require("../middleware/authentication.mdl");
+const { verifyJWT } = require("../middlewares/auth.middleware");
+const { loginMDL, registrationMDL } = require("../middlewares/formInput.middleware");
 
 
 try {

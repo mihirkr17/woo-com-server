@@ -1,7 +1,7 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
 
-const { verifyJWT, isRoleBuyer, } = require("../middleware/Auth.middleware");
+const { verifyJWT, isRoleBuyer, } = require("../middlewares/auth.middleware");
 const { myOrder, removeOrder, cancelMyOrder } = require("../controllers/order/order.controller");
 
 // set order controller
@@ -11,7 +11,7 @@ const ConfirmOrder = require("../controllers/order/ConfirmOrder");
 
 // single order controller
 const SinglePurchaseOrder = require("../controllers/order/SinglePurchaseOrder");
-// const SinglePurchaseOrderConfirm = require("../controllers/order/SinglePurchaseOrderConfirm");
+
 
 
 try {
@@ -20,8 +20,6 @@ try {
   router.post("/single-purchase", verifyJWT, isRoleBuyer, SinglePurchaseOrder);
 
   router.post("/confirm-order", verifyJWT, isRoleBuyer, ConfirmOrder);
-
-  // router.post("/confirm-single-purchase-order", verifyJWT, isRoleBuyer, SinglePurchaseOrderConfirm);
 
   router.get("/my-order/:email", verifyJWT, isRoleBuyer, myOrder);
   router.delete("/remove-order/:email/:orderID", verifyJWT, isRoleBuyer, removeOrder);

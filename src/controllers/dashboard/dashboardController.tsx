@@ -1,7 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 const User = require("../../model/user.model");
 const Product = require("../../model/product.model");
-const Order = require("../../model/order.model");
 
 module.exports.dashboardOverview = async (req: Request, res: Response, next: NextFunction) => {
    try {

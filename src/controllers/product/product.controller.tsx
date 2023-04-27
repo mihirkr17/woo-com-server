@@ -4,7 +4,8 @@
 import { NextFunction, Request, Response } from "express";
 const { ObjectId } = require("mongodb");
 const Product = require("../../model/product.model");
-const { findUserByEmail, getSellerInformationByID, actualSellingPrice, newPricing, basicProductProject, calculateShippingCost } = require("../../services/common.service");
+const { actualSellingPriceProject, basicProductProject, newPricingProject } = require("../../utils/projection");
+const { findUserByEmail, getSellerInformationByID, calculateShippingCost } = require("../../services/common.service");
 
 /**
  * @controller      --> Fetch the single product information in product details page.
@@ -59,7 +60,7 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
                bodyInfo: 1,
                description: 1,
                manufacturer: 1,
-               pricing: newPricing,
+               pricing: newPricingProject,
                isFreeShipping: "$shipping.isFree",
                volumetricWeight: "$packaged.volumetricWeight",
                _lid: 1
@@ -353,9 +354,9 @@ module.exports.purchaseProductController = async (req: Request, res: Response, n
                sku: "$variations.sku",
                sellerData: 1,
                shipping: 1,
-               savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPrice] }, parseInt(body?.quantity)] },
-               baseAmount: { $multiply: [actualSellingPrice, body?.quantity] },
-               sellingPrice: actualSellingPrice,
+               savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPriceProject] }, parseInt(body?.quantity)] },
+               baseAmount: { $multiply: [actualSellingPriceProject, body?.quantity] },
+               sellingPrice: actualSellingPriceProject,
                variant: "$variations.variant",
                available: "$variations.available",
                stock: "$variations.stock"
