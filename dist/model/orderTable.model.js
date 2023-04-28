@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = require("mongoose");
 const orderTab = new mongoose_1.Schema({
     orderID: { type: String, required: true },
+    trackingID: { type: String, default: undefined },
     orderPaymentID: String,
     customerEmail: { type: String, required: true },
     customerID: { type: String, required: true },
@@ -43,7 +44,6 @@ const orderTab = new mongoose_1.Schema({
         {
             _id: false,
             itemID: String,
-            trackingID: { type: String, default: undefined },
             listingID: String,
             variationID: String,
             productID: String,

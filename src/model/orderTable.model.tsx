@@ -35,6 +35,8 @@ interface IOrderTable {
 const orderTab = new Schema({
    orderID: { type: String, required: true },
 
+   trackingID: { type: String, default: undefined },
+
    orderPaymentID: String,
 
    customerEmail: { type: String, required: true },
@@ -100,7 +102,6 @@ const orderTab = new Schema({
       {
          _id: false,
          itemID: String,
-         trackingID: { type: String, default: undefined },
          listingID: String,
          variationID: String,
          productID: String,

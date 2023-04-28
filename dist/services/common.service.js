@@ -56,23 +56,24 @@ module.exports.order_status_updater = (obj) => __awaiter(void 0, void 0, void 0,
             timestamp: timestamp
         };
         if (type === "dispatch") {
-            yield Promise.all(items.map((item) => __awaiter(void 0, void 0, void 0, function* () {
-                return yield OrderTable.findOneAndUpdate({
-                    $and: [
-                        { customerEmail }, { orderID },
-                        { "seller.email": sellerEmail }
-                    ]
-                }, {
-                    $set: {
-                        "items.$[i].trackingID": generateTrackingID()
-                    }
-                }, { arrayFilters: [{ "i.itemID": item === null || item === void 0 ? void 0 : item.itemID }], upsert: true });
-            })));
+            // await Promise.all(items.map(async (item: any) => {
+            //    return await OrderTable.findOneAndUpdate({
+            //       $and: [
+            //          { customerEmail }, { orderID },
+            //          { "seller.email": sellerEmail }]
+            //    }, {
+            //       $set: {
+            //          "items.$[i].trackingID": generateTrackingID()
+            //       }
+            //    },
+            //       { arrayFilters: [{ "i.itemID": item?.itemID }], upsert: true });
+            // }));
             setQuery = {
                 $set: {
                     orderStatus: "dispatch",
                     orderDispatchAT: timePlan,
-                    isDispatch: true
+                    isDispatch: true,
+                    trackingID: generateTrackingID()
                 }
             };
         }

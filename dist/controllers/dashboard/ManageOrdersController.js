@@ -14,87 +14,54 @@ const { order_status_updater, update_variation_stock_available } = require("../.
 const Product = require("../../model/product.model");
 const OrderTableModel = require("../../model/orderTable.model");
 module.exports.manageOrders = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     try {
-        const view = ((_a = req.query) === null || _a === void 0 ? void 0 : _a.view) || "";
+        const filters = req.query.filters;
         const storeName = req.params.storeName;
         const uuid = req.decoded._uuid;
         const email = req.decoded.email;
         let result;
-        const orders = yield OrderTableModel.find({ $and: [{ "seller.store": storeName }, { "seller.email": email }] });
-        if (storeName) {
-            if (view === "group") {
-                result = yield Order.aggregate([
-                    { $unwind: "$orders" },
-                    { $replaceRoot: { newRoot: "$orders" } },
-                    {
-                        $lookup: {
-                            from: 'products',
-                            localField: 'listingID',
-                            foreignField: "_lid",
-                            as: "main_product"
-                        }
-                    },
-                    { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } } },
-                    {
-                        $match: {
-                            $and: [{ "sellerData.storeName": storeName }, { "sellerData.sellerID": uuid }],
-                        },
-                    },
-                    {
-                        $unset: [
-                            'bodyInfo', 'main_product',
-                            "modifiedAt", "paymentInfo",
-                            "variations", "_id", "tax", "save_as", "reviews",
-                            "ratingAverage", "_lid", "specification", "rating", "isVerified", "createdAt", "categories"
-                        ]
-                    }, {
-                        $group: {
-                            _id: "$orderPaymentID",
-                            orders: {
-                                $push: "$$ROOT"
+        let f = {};
+        if (filters) {
+            f = { $and: [{ "seller.store": storeName }, { "seller.email": email }, { orderStatus: filters }] };
+        }
+        else {
+            f = { $and: [{ "seller.store": storeName }, { "seller.email": email }] };
+        }
+        const orders = yield OrderTableModel.find(f).sort({ _id: -1 });
+        let orderCounter = yield OrderTableModel.aggregate([
+            { $match: { $and: [{ "seller.store": storeName }, { "seller.email": email }] } },
+            {
+                $group: {
+                    _id: "$seller.email",
+                    placeOrderCount: {
+                        $sum: {
+                            $cond: {
+                                if: { $eq: ["$orderStatus", "placed"] }, then: 1, else: 0
                             }
                         }
-                    }, {
-                        $addFields: {
-                            totalOrderAmount: { $sum: "$orders.baseAmount" }
-                        }
-                    }
-                ]);
-            }
-            else {
-                result = yield Order.aggregate([
-                    { $unwind: "$orders" },
-                    { $replaceRoot: { newRoot: "$orders" } },
-                    {
-                        $lookup: {
-                            from: 'products',
-                            localField: 'listingID',
-                            foreignField: "_lid",
-                            as: "main_product"
+                    },
+                    dispatchOrderCount: {
+                        $sum: {
+                            $cond: {
+                                if: { $eq: ["$orderStatus", "dispatch"] }, then: 1, else: 0
+                            }
                         }
                     },
-                    { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } } },
-                    {
-                        $match: {
-                            $and: [{ "sellerData.storeName": storeName }, { "sellerData.sellerID": uuid }],
-                        },
-                    },
-                    {
-                        $unset: [
-                            'bodyInfo', 'main_product',
-                            "modifiedAt", "paymentInfo",
-                            "variations", "_id", "tax", "save_as", "reviews",
-                            "ratingAverage", "_lid", "specification", "rating", "isVerified", "createdAt", "categories"
-                        ]
+                    totalOrderCount: {
+                        $count: {}
                     }
-                ]);
+                }
             }
-        }
-        ;
-        let newOrderCount = result && result.filter((o) => (o === null || o === void 0 ? void 0 : o.orderStatus) === "pending").length;
-        let totalOrderCount = result && result.length;
-        return res.status(200).send({ success: true, statusCode: 200, data: { module: result, newOrderCount, totalOrderCount, orders } });
+        ]);
+        orderCounter = orderCounter[0];
+        return res.status(200).send({
+            success: true, statusCode: 200, data: {
+                module: result,
+                placeOrderCount: orderCounter === null || orderCounter === void 0 ? void 0 : orderCounter.placeOrderCount,
+                dispatchOrderCount: orderCounter === null || orderCounter === void 0 ? void 0 : orderCounter.dispatchOrderCount,
+                totalOrderCount: orderCounter === null || orderCounter === void 0 ? void 0 : orderCounter.totalOrderCount, orders
+            }
+        });
     }
     catch (error) {
         next(error);

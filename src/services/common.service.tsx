@@ -59,29 +59,30 @@ module.exports.order_status_updater = async (obj: any) => {
       };
 
       if (type === "dispatch") {
-         await Promise.all(items.map(async (item: any) => {
+         // await Promise.all(items.map(async (item: any) => {
 
-            return await OrderTable.findOneAndUpdate({
-               $and: [
-                  { customerEmail }, { orderID },
-                  { "seller.email": sellerEmail }]
-            }, {
-               $set: {
-                  "items.$[i].trackingID": generateTrackingID()
-               }
-            },
-               { arrayFilters: [{ "i.itemID": item?.itemID }], upsert: true });
-         }));
+         //    return await OrderTable.findOneAndUpdate({
+         //       $and: [
+         //          { customerEmail }, { orderID },
+         //          { "seller.email": sellerEmail }]
+         //    }, {
+         //       $set: {
+         //          "items.$[i].trackingID": generateTrackingID()
+         //       }
+         //    },
+         //       { arrayFilters: [{ "i.itemID": item?.itemID }], upsert: true });
+         // }));
 
          setQuery = {
             $set: {
                orderStatus: "dispatch",
                orderDispatchAT: timePlan,
-               isDispatch: true
+               isDispatch: true,
+               trackingID: generateTrackingID()
             }
          }
-      } 
-      
+      }
+
       else if (type === "shipped") {
          setQuery = {
             $set: {

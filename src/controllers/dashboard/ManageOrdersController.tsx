@@ -7,89 +7,58 @@ const OrderTableModel = require("../../model/orderTable.model");
 module.exports.manageOrders = async (req: Request, res: Response, next: NextFunction) => {
   try {
 
-    const view: any = req.query?.view || "";
+    const filters: any = req.query.filters;
     const storeName = req.params.storeName;
     const uuid = req.decoded._uuid;
     const email = req.decoded.email;
     let result: any;
 
-    const orders = await OrderTableModel.find({ $and: [{ "seller.store": storeName }, { "seller.email": email }] });
+    let f: any = {};
 
+    if (filters) {
+      f = { $and: [{ "seller.store": storeName }, { "seller.email": email }, { orderStatus: filters }] }
+    } else {
+      f = { $and: [{ "seller.store": storeName }, { "seller.email": email }] }
+    }
 
-    if (storeName) {
+    const orders = await OrderTableModel.find(f).sort({ _id: -1 });
 
-      if (view === "group") {
-        result = await Order.aggregate([
-          { $unwind: "$orders" },
-          { $replaceRoot: { newRoot: "$orders" } },
-          {
-            $lookup: {
-              from: 'products',
-              localField: 'listingID',
-              foreignField: "_lid",
-              as: "main_product"
-            }
-          },
-          { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } } },
-          {
-            $match: {
-              $and: [{ "sellerData.storeName": storeName }, { "sellerData.sellerID": uuid }],
-            },
-          },
-          {
-            $unset: [
-              'bodyInfo', 'main_product',
-              "modifiedAt", "paymentInfo",
-              "variations", "_id", "tax", "save_as", "reviews",
-              "ratingAverage", "_lid", "specification", "rating", "isVerified", "createdAt", "categories"
-            ]
-          }, {
-            $group: {
-              _id: "$orderPaymentID",
-              orders: {
-                $push: "$$ROOT"
+    let orderCounter = await OrderTableModel.aggregate([
+      { $match: { $and: [{ "seller.store": storeName }, { "seller.email": email }] } },
+      {
+        $group: {
+          _id: "$seller.email",
+          placeOrderCount: {
+            $sum: {
+              $cond: {
+                if: { $eq: ["$orderStatus", "placed"] }, then: 1, else: 0
               }
             }
-          }, {
-            $addFields: {
-              totalOrderAmount: { $sum: "$orders.baseAmount" }
-            }
-          }
-        ]);
-      } else {
-        result = await Order.aggregate([
-          { $unwind: "$orders" },
-          { $replaceRoot: { newRoot: "$orders" } },
-          {
-            $lookup: {
-              from: 'products',
-              localField: 'listingID',
-              foreignField: "_lid",
-              as: "main_product"
+          },
+          dispatchOrderCount: {
+            $sum: {
+              $cond: {
+                if: { $eq: ["$orderStatus", "dispatch"] }, then: 1, else: 0
+              }
             }
           },
-          { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } } },
-          {
-            $match: {
-              $and: [{ "sellerData.storeName": storeName }, { "sellerData.sellerID": uuid }],
-            },
-          },
-          {
-            $unset: [
-              'bodyInfo', 'main_product',
-              "modifiedAt", "paymentInfo",
-              "variations", "_id", "tax", "save_as", "reviews",
-              "ratingAverage", "_lid", "specification", "rating", "isVerified", "createdAt", "categories"
-            ]
+          totalOrderCount: {
+            $count: {}
           }
-        ]);
+        }
       }
-    };
+    ]);
 
-    let newOrderCount = result && result.filter((o: any) => o?.orderStatus === "pending").length;
-    let totalOrderCount = result && result.length;
+    orderCounter = orderCounter[0];
 
-    return res.status(200).send({ success: true, statusCode: 200, data: { module: result, newOrderCount, totalOrderCount, orders } });
+    return res.status(200).send({
+      success: true, statusCode: 200, data: {
+        module: result,
+        placeOrderCount: orderCounter?.placeOrderCount,
+        dispatchOrderCount: orderCounter?.dispatchOrderCount,
+        totalOrderCount: orderCounter?.totalOrderCount, orders
+      }
+    });
   } catch (error: any) {
     next(error);
   }
