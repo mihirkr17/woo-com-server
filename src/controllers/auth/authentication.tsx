@@ -5,7 +5,6 @@ const User = require("../../model/user.model");
 const apiResponse = require("../../errors/apiResponse");
 const { comparePassword } = require("../../utils/compare");
 const bcrypt = require("bcrypt");
-const saltRounds = 10;
 const email_service = require("../../services/email.service");
 const { verify_email_html_template } = require("../../templates/email.template");
 const { generateUUID, generateExpireTime, generateSixDigitNumber, generateJwtToken, generateUserDataToken } = require("../../utils/generator");
@@ -21,23 +20,23 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
 
       let body = req.body;
 
-      let existUser = await User.findOne({ $or: [{ phone: body?.phone }, { email: body.email }] });
+      let existUser = await User.countDocuments({ $or: [{ phone: body?.phone }, { email: body?.email }] });
 
-      if (existUser)
+      if (existUser >= 1)
          throw new apiResponse.Api400Error("User already exists, Please try another phone number or email address !");
 
       body['_uuid'] = "b" + generateUUID();
       body['verificationCode'] = generateSixDigitNumber();
       body['verificationExpiredAt'] = generateExpireTime();
       body["buyer"] = {};
-      body["password"] = await bcrypt.hash(body?.password, saltRounds);
+      body["dob"] = "";
+      body["password"] = await bcrypt.hash(body?.password, 10);
       body["accountStatus"] = "inactive";
       body["hasPassword"] = true;
       body["contactEmail"] = body?.email;
       body["idFor"] = "buy";
       body["role"] = "BUYER";
       body["authProvider"] = "system";
-
 
       const info = await email_service({
          to: body?.email,
@@ -49,16 +48,17 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
          let user = new User(body);
          user.store = undefined;
          const result = await user.save();
+
          return res.status(200).send({
             success: true,
             statusCode: 200,
             returnEmail: body?.email,
             verificationExpiredAt: result?.verificationExpiredAt,
-            message: "Thanks for your information. Verification email was sent to " + body?.email + ". Please verify your account.",
+            message: `Thanks for your information. Verification code was sent to ${body?.email}`,
          });
       }
 
-      throw new apiResponse.Api500Error("Sorry registration failed !");
+      throw new apiResponse.Api400Error("Sorry registration failed !");
 
    } catch (error: any) {
       next(error);
@@ -74,29 +74,11 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
  */
 module.exports.sellerRegistrationController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/;
-
       let body = req.body;
 
-      const { email, phone, fullName, password, store } = body;
+      const { email, phone, password, store } = body;
 
-      if (!email) throw new apiResponse.Api400Error("Required email address !");
-
-      if (!isValidEmail(email)) throw new apiResponse.Api400Error("Required valid email address !");
-
-      if (!password)
-         throw new apiResponse.Api400Error(`Required password !`);
-
-      if (password && typeof password !== "string")
-         throw new apiResponse.Api400Error("Password should be string !");
-
-      if (password.length < 5 || password.length > 8)
-         throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
-
-      if (!passwordRegex.test(password))
-         throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
-
-      let existUser = await User.findOne({ $or: [{ email }, { phone }] });
+      let existUser = await User.countDocuments({ $or: [{ email }, { phone }] });
 
       if (existUser) {
          throw new apiResponse.Api400Error("User already exists, Please try another phone number or email address !")
@@ -113,7 +95,7 @@ module.exports.sellerRegistrationController = async (req: Request, res: Response
       body['verificationExpiredAt'] = generateExpireTime();
       body["accountStatus"] = "inactive";
       body["store"] = store || {};
-      body["password"] = await bcrypt.hash(password, saltRounds);;
+      body["password"] = await bcrypt.hash(password, 10);
       body["hasPassword"] = true;
 
 
@@ -126,6 +108,7 @@ module.exports.sellerRegistrationController = async (req: Request, res: Response
       if (info?.response) {
          let user = new User(body);
          user.buyer = undefined;
+
          const result = await user.save();
 
          return res.status(200).send({
@@ -177,7 +160,7 @@ module.exports.generateNewVerificationCode = async (req: Request, res: Response,
                   statusCode: 200,
                   returnEmail: updateUser?.email,
                   verificationExpiredAt: updateUser?.verificationExpiredAt,
-                  message: "Email was sent to " + updateUser?.email + ". Please verify your account.",
+                  message: `Verification code is sent to ${updateUser?.email}`,
                });
             }
 
@@ -202,12 +185,12 @@ module.exports.userEmailVerificationController = async (req: Request, res: Respo
 
       if (!verificationCode) throw new apiResponse.Api400Error("Required verification code !");
 
-      if (new Date(verificationExpiredAt) < new Date()) throw new apiResponse.Api400Error("Session expired ! resend code ..");
+      if (new Date(verificationExpiredAt) < new Date() === true) throw new apiResponse.Api400Error("Session expired ! Please resend code ..");
 
       let user = await User.findOne({ $and: [{ verificationCode }, { email }] });
 
       if (!user) {
-         throw new apiResponse.Api400Error("Session expired ! resend code ..");
+         throw new apiResponse.Api400Error("Session expired ! Please resend code ..");
       }
 
       user.verificationCode = undefined;
@@ -410,7 +393,7 @@ module.exports.changePasswordController = async (req: Request, res: Response, ne
          throw new apiResponse.Api400Error("Password didn't match !");
       }
 
-      let hashedPwd = await bcrypt.hash(newPassword, saltRounds);
+      let hashedPwd = await bcrypt.hash(newPassword, 10);
 
       if (hashedPwd) {
          result = await User.findOneAndUpdate(
@@ -544,7 +527,7 @@ module.exports.userSetNewPassword = async (req: Request, res: Response, next: Ne
          throw new apiResponse.Api404Error(`User not found!`);
       }
 
-      let hashedPwd = await bcrypt.hash(password, saltRounds);
+      let hashedPwd = await bcrypt.hash(password, 10);
 
       let result = hashedPwd ? await User.findOneAndUpdate(
          { email },

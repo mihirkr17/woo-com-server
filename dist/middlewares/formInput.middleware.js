@@ -10,29 +10,24 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const apiResponse = require("../errors/apiResponse");
-const { isValidPassword } = require("../utils/validator");
+const { isValidPassword, isValidEmail } = require("../utils/validator");
 module.exports.loginMDL = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { emailOrPhone, password } = req.body;
-        if (!emailOrPhone)
-            throw new apiResponse.Api400Error("Required email or phone number !");
-        if (!password)
-            throw new apiResponse.Api400Error("Required password !");
-        if (typeof password !== "string")
-            throw new apiResponse.Api400Error("Password should be string !");
-        if (!isValidPassword(password))
-            throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
-        if (password.length < 5 || password.length > 8)
-            throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
-        next();
-    }
-    catch (error) {
-        next(error);
-    }
+    const { emailOrPhone, password } = req.body;
+    if (!emailOrPhone)
+        throw new apiResponse.Api400Error("Required email or phone number !");
+    if (!password)
+        throw new apiResponse.Api400Error("Required password !");
+    if (typeof password !== "string")
+        throw new apiResponse.Api400Error("Password should be string !");
+    if (!isValidPassword(password))
+        throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
+    if (password.length < 5 || password.length > 8)
+        throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
+    next();
 });
 module.exports.registrationMDL = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { phone, email, password, gender, fullName, dob } = req === null || req === void 0 ? void 0 : req.body;
+        const { phone, email, password, gender, fullName } = req === null || req === void 0 ? void 0 : req.body;
         if (!phone) {
             throw new apiResponse.Api400Error("Required phone number !");
         }
@@ -44,9 +39,6 @@ module.exports.registrationMDL = (req, res, next) => __awaiter(void 0, void 0, v
         }
         else if (!fullName) {
             throw new apiResponse.Api400Error("Required full name !");
-        }
-        else if (!dob) {
-            throw new apiResponse.Api400Error("Required date of birth !");
         }
         else if (!password) {
             throw new apiResponse.Api400Error("Required password !");
@@ -67,4 +59,22 @@ module.exports.registrationMDL = (req, res, next) => __awaiter(void 0, void 0, v
     catch (error) {
         next(error);
     }
+});
+module.exports.sellerRegistrationMDL = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    let body = req.body;
+    const { email, phone, fullName, password, store } = body;
+    // const { name, license, address } = store;
+    if (!email)
+        throw new apiResponse.Api400Error("Required email address !");
+    if (!isValidEmail(email))
+        throw new apiResponse.Api400Error("Required valid email address !");
+    if (!password)
+        throw new apiResponse.Api400Error(`Required password !`);
+    if (password && typeof password !== "string")
+        throw new apiResponse.Api400Error("Password should be string !");
+    if (password.length < 5 || password.length > 8)
+        throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
+    if (!isValidPassword(password))
+        throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
+    next();
 });

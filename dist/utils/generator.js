@@ -15,7 +15,7 @@ module.exports.generateExpireTime = () => {
     return expirationDate.setMinutes(expirationDate.getMinutes() + 5);
 };
 module.exports.generateSixDigitNumber = () => {
-    let randomBytes = cryptos.randomBytes(4);
+    let randomBytes = cryPto.randomBytes(4);
     let randomNumber = parseInt(randomBytes.toString('hex'), 16) % 900000 + 100000;
     return randomNumber.toString();
 };

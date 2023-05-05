@@ -75,7 +75,7 @@ var UserSchema = new Schema({
     gender: {
         type: String, required: true, enum: ["Male", "Female", "Others"]
     },
-    dob: { type: String, required: true },
+    dob: { type: String, required: false },
     store: {
         type: storeSchema, default: undefined
     },
@@ -86,7 +86,7 @@ var UserSchema = new Schema({
     accountStatus: { type: String, enum: ["active", "inactive", "blocked"], default: "inactive", },
     authProvider: { type: String, enum: ['system', 'thirdParty'], default: 'system' },
     verificationCode: { type: String, default: undefined },
-    verificationExpiredAt: { type: Date, default: undefined },
+    verificationExpiredAt: { type: Number, default: undefined },
     createdAt: { type: Date, default: Date.now }
 });
 var User = model("User", UserSchema, "users");

@@ -7,12 +7,12 @@ const express_1 = __importDefault(require("express"));
 const router = express_1.default.Router();
 const authCTRL = require("../controllers/auth/authentication");
 const { verifyJWT } = require("../middlewares/auth.middleware");
-const { loginMDL, registrationMDL } = require("../middlewares/formInput.middleware");
+const { loginMDL, registrationMDL, sellerRegistrationMDL } = require("../middlewares/formInput.middleware");
 try {
     router.post("/register-new-user", registrationMDL, authCTRL.buyerRegistrationController);
     router.post("/login", loginMDL, authCTRL.loginController);
     router.post("/sign-out", authCTRL.signOutController);
-    router.post("/register-new-seller", authCTRL.sellerRegistrationController);
+    router.post("/register-new-seller", sellerRegistrationMDL, authCTRL.sellerRegistrationController);
     router.post("/verify-register-user", authCTRL.userEmailVerificationController);
     router.get('/generate-verification-code', authCTRL === null || authCTRL === void 0 ? void 0 : authCTRL.generateNewVerificationCode);
     router.post("/user/changed-password", verifyJWT, authCTRL === null || authCTRL === void 0 ? void 0 : authCTRL.changePasswordController);

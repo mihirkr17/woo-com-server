@@ -2,7 +2,7 @@ import express, { Router } from "express";
 const router: Router = express.Router();
 const authCTRL = require("../controllers/auth/authentication");
 const { verifyJWT } = require("../middlewares/auth.middleware");
-const { loginMDL, registrationMDL } = require("../middlewares/formInput.middleware");
+const { loginMDL, registrationMDL, sellerRegistrationMDL } = require("../middlewares/formInput.middleware");
 
 
 try {
@@ -13,7 +13,7 @@ try {
 
    router.post("/sign-out", authCTRL.signOutController);
 
-   router.post("/register-new-seller", authCTRL.sellerRegistrationController);
+   router.post("/register-new-seller", sellerRegistrationMDL, authCTRL.sellerRegistrationController);
 
    router.post("/verify-register-user", authCTRL.userEmailVerificationController);
 
