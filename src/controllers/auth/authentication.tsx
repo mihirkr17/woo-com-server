@@ -8,7 +8,7 @@ const bcrypt = require("bcrypt");
 const email_service = require("../../services/email.service");
 const { verify_email_html_template } = require("../../templates/email.template");
 const { generateUUID, generateExpireTime, generateSixDigitNumber, generateJwtToken, generateUserDataToken } = require("../../utils/generator");
-const { isValidString, isValidEmail, isValidPassword } = require("../../utils/validator");
+const { isValidEmail, isValidPassword } = require("../../utils/validator");
 
 /**
  * @apiController --> Buyer Registration Controller
@@ -44,21 +44,21 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
          html: verify_email_html_template(body?.verificationCode)
       });
 
-      if (info?.response) {
-         let user = new User(body);
-         user.store = undefined;
-         const result = await user.save();
+      if (!info?.response) throw new apiResponse.Api400Error("Verification code not send to your email !");
 
-         return res.status(200).send({
-            success: true,
-            statusCode: 200,
-            returnEmail: body?.email,
-            verificationExpiredAt: result?.verificationExpiredAt,
-            message: `Thanks for your information. Verification code was sent to ${body?.email}`,
-         });
-      }
+      let user = new User(body);
 
-      throw new apiResponse.Api400Error("Sorry registration failed !");
+      user.store = undefined;
+
+      const result = await user.save();
+
+      return res.status(200).send({
+         success: true,
+         statusCode: 200,
+         returnEmail: body?.email,
+         verificationExpiredAt: result?.verificationExpiredAt,
+         message: `Thanks for your information. Verification code was send to ${body?.email}`,
+      });
 
    } catch (error: any) {
       next(error);
@@ -105,22 +105,20 @@ module.exports.sellerRegistrationController = async (req: Request, res: Response
          html: verify_email_html_template(body?.verificationCode)
       });
 
-      if (info?.response) {
-         let user = new User(body);
-         user.buyer = undefined;
+      if (!info?.response) throw new apiResponse.Api500Error("Sorry registration failed !");
 
-         const result = await user.save();
+      let user = new User(body);
+      user.buyer = undefined;
 
-         return res.status(200).send({
-            success: true,
-            statusCode: 200,
-            returnEmail: email,
-            verificationExpiredAt: result?.verificationExpiredAt,
-            message: "Thanks for your information. Verification code was sent to " + email + ". Please verify your account.",
-         });
-      }
+      const result = await user.save();
 
-      throw new apiResponse.Api500Error("Sorry registration failed !");
+      return res.status(200).send({
+         success: true,
+         statusCode: 200,
+         returnEmail: email,
+         verificationExpiredAt: result?.verificationExpiredAt,
+         message: "Thanks for your information. Verification code was sent to " + email + ". Please verify your account.",
+      });
 
    } catch (error: any) {
       next(error);
@@ -215,17 +213,19 @@ module.exports.userEmailVerificationController = async (req: Request, res: Respo
 module.exports.loginController = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
-      const { emailOrPhone, password } = req.body;
+      const { emailOrPhone, cPwd } = req.body;
 
-      if (!isValidString(emailOrPhone)) throw new apiResponse.Api400Error("Invalid string type !");
-
-      let userDataToken: any;
-
-      let user = await User.findOne({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] });
+      let user = await User.findOne({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] }, { createdAt: 0, __v: 0 });
 
       if (!user) throw new apiResponse.Api400Error(`User with ${emailOrPhone} not found!`);
 
-      if (user?.verificationCode || user?.accountStatus === "inactive") {
+      const { email, verificationCode, accountStatus, password } = user || {};
+
+      const matchedPwd = await comparePassword(cPwd, password);
+
+      if (!matchedPwd) throw new apiResponse.Api400Error("Password didn't matched !");
+
+      if (verificationCode || accountStatus === "inactive") {
 
          user.verificationCode = generateSixDigitNumber();
          user.verificationExpiredAt = generateExpireTime();
@@ -233,104 +233,49 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
          let updateUser = await user.save();
 
          const info = await email_service({
-            to: user?.email,
+            to: email,
             subject: "Verify email address",
-            html: verify_email_html_template(updateUser?.verificationCode, user?._uuid)
+            html: verify_email_html_template(updateUser?.verificationCode)
          });
 
-         if (info?.response) {
-            return res.status(200).send({
-               success: true,
-               statusCode: 200,
-               returnEmail: updateUser?.email,
-               verificationExpiredAt: updateUser?.verificationExpiredAt,
-               message: "Email was sent to " + updateUser?.email + ". Please verify your account.",
-            });
-         }
+         if (!info?.response) throw new apiResponse.Api500Error("Internal error !");
 
-         throw new apiResponse.Api500Error("Internal error !");
-      }
-
-      let comparedPassword = await comparePassword(password, user?.password);
-
-      if (!comparedPassword) throw new apiResponse.Api400Error("Password didn't match !");
-
-      let token = generateJwtToken(user);
-
-      if (user?.role && user?.role === "ADMIN") {
-         userDataToken = generateUserDataToken({
-            _uuid: user?._uuid,
-            fullName: user?.fullName,
-            email: user?.email,
-            phone: user?.phone,
-            phonePrefixCode: user?.phonePrefixCode,
-            hasPassword: user?.hasPassword,
-            role: user?.role,
-            gender: user?.gender,
-            dob: user?.dob,
-            accountStatus: user?.accountStatus,
-            contactEmail: user?.contactEmail,
-            authProvider: user?.authProvider
+         return res.status(200).send({
+            success: true,
+            statusCode: 200,
+            returnEmail: updateUser?.email,
+            verificationExpiredAt: updateUser?.verificationExpiredAt,
+            message: `Verification code was sent to ${updateUser?.email}. Please verify your account.`,
          });
       }
 
-      if (user?.role && user?.role === "SELLER") {
-         userDataToken = generateUserDataToken({
-            _uuid: user?._uuid,
-            fullName: user?.fullName,
-            email: user?.email,
-            phone: user?.phone,
-            phonePrefixCode: user?.phonePrefixCode,
-            hasPassword: user?.hasPassword,
-            role: user?.role,
-            gender: user?.gender,
-            dob: user?.dob,
-            idFor: user?.idFor,
-            accountStatus: user?.accountStatus,
-            contactEmail: user?.contactEmail,
-            store: user?.store,
-            authProvider: user?.authProvider
-         });
-      }
+      const loginToken = generateJwtToken(user);
 
-      if (user?.role && user?.role === "BUYER") {
+      if (!loginToken) throw new apiResponse.Api400Error("Login failed due to internal issue !");
 
-         user.buyer["defaultShippingAddress"] = (Array.isArray(user?.buyer?.shippingAddress) &&
-            user?.buyer?.shippingAddress.find((adr: any) => adr?.default_shipping_address === true)) || {};
+      const userDataToken = generateUserDataToken(user);
 
-         userDataToken = generateUserDataToken({
-            _uuid: user?._uuid,
-            fullName: user?.fullName,
-            email: user?.email,
-            phone: user?.phone,
-            phonePrefixCode: user?.phonePrefixCode,
-            hasPassword: user?.hasPassword,
-            role: user?.role,
-            gender: user?.gender,
-            dob: user?.dob,
-            idFor: user?.idFor,
-            accountStatus: user?.accountStatus,
-            contactEmail: user?.contactEmail,
-            buyer: user?.buyer,
-            authProvider: user?.authProvider
-         });
-      }
+      // if token then set it to client cookie
+      res.cookie("token", loginToken, {
+         sameSite: "none",
+         secure: true,
+         maxAge: 16 * 60 * 60 * 1000,  // 16hr [3600000 -> 1hr]ms
+         httpOnly: true
+      });
 
-      if (token) {
-         // if token then set it to client cookie
-         res.cookie("token", token, {
-            sameSite: "none",
-            secure: true,
-            maxAge: 57600000,  // 16hr [3600000 -> 1hr]ms
-            httpOnly: true
-         });
+      // if all operation success then return the response
+      return res.status(200).send({
+         success: true,
+         statusCode: 200,
+         name: "Login",
+         message: "Login success",
+         uuid: user?._uuid,
+         u_data: userDataToken,
+         token: loginToken
+      });
 
-         // if all operation success then return the response
-
-         return res.status(200).send({ success: true, statusCode: 200, name: "isLogin", message: "LoginSuccess", uuid: user?._uuid, u_data: userDataToken, token });
-      }
    } catch (error: any) {
-      return next(error);
+      next(error);
    }
 };
 

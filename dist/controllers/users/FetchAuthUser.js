@@ -13,71 +13,16 @@ const { productCounter, findUserByEmail } = require("../../services/common.servi
 const apiResponse = require("../../errors/apiResponse");
 const { generateUserDataToken } = require("../../utils/generator");
 module.exports = function FetchAuthUser(req, res, next) {
-    var _a, _b, _c;
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const authEmail = req.decoded.email;
-            let userDataToken;
             // const ipAddress = req.socket?.remoteAddress;
             let user = yield findUserByEmail(authEmail);
             if (!user || typeof user !== "object")
                 throw new apiResponse.Api404Error("User not found !");
-            if ((user === null || user === void 0 ? void 0 : user.role) && (user === null || user === void 0 ? void 0 : user.role) === "ADMIN") {
-                userDataToken = generateUserDataToken({
-                    _uuid: user === null || user === void 0 ? void 0 : user._uuid,
-                    fullName: user === null || user === void 0 ? void 0 : user.fullName,
-                    email: user === null || user === void 0 ? void 0 : user.email,
-                    phone: user === null || user === void 0 ? void 0 : user.phone,
-                    phonePrefixCode: user === null || user === void 0 ? void 0 : user.phonePrefixCode,
-                    hasPassword: user === null || user === void 0 ? void 0 : user.hasPassword,
-                    role: user === null || user === void 0 ? void 0 : user.role,
-                    gender: user === null || user === void 0 ? void 0 : user.gender,
-                    dob: user === null || user === void 0 ? void 0 : user.dob,
-                    accountStatus: user === null || user === void 0 ? void 0 : user.accountStatus,
-                    contactEmail: user === null || user === void 0 ? void 0 : user.contactEmail,
-                    authProvider: user === null || user === void 0 ? void 0 : user.authProvider
-                });
-            }
-            if ((user === null || user === void 0 ? void 0 : user.role) === 'SELLER' && (user === null || user === void 0 ? void 0 : user.idFor) === 'sell') {
-                yield productCounter({ storeName: (_a = user.seller.storeInfos) === null || _a === void 0 ? void 0 : _a.storeName, _uuid: user === null || user === void 0 ? void 0 : user._uuid });
-                userDataToken = generateUserDataToken({
-                    _uuid: user === null || user === void 0 ? void 0 : user._uuid,
-                    fullName: user === null || user === void 0 ? void 0 : user.fullName,
-                    email: user === null || user === void 0 ? void 0 : user.email,
-                    phone: user === null || user === void 0 ? void 0 : user.phone,
-                    phonePrefixCode: user === null || user === void 0 ? void 0 : user.phonePrefixCode,
-                    hasPassword: user === null || user === void 0 ? void 0 : user.hasPassword,
-                    role: user === null || user === void 0 ? void 0 : user.role,
-                    gender: user === null || user === void 0 ? void 0 : user.gender,
-                    dob: user === null || user === void 0 ? void 0 : user.dob,
-                    idFor: user === null || user === void 0 ? void 0 : user.idFor,
-                    isSeller: user === null || user === void 0 ? void 0 : user.isSeller,
-                    accountStatus: user === null || user === void 0 ? void 0 : user.accountStatus,
-                    contactEmail: user === null || user === void 0 ? void 0 : user.contactEmail,
-                    seller: user === null || user === void 0 ? void 0 : user.seller,
-                    authProvider: user === null || user === void 0 ? void 0 : user.authProvider
-                });
-            }
-            if ((user === null || user === void 0 ? void 0 : user.role) === 'BUYER' && (user === null || user === void 0 ? void 0 : user.idFor) === 'buy') {
-                user.buyer["defaultShippingAddress"] = (Array.isArray((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress) &&
-                    ((_c = user === null || user === void 0 ? void 0 : user.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0])) || {};
-                userDataToken = generateUserDataToken({
-                    _uuid: user === null || user === void 0 ? void 0 : user._uuid,
-                    fullName: user === null || user === void 0 ? void 0 : user.fullName,
-                    email: user === null || user === void 0 ? void 0 : user.email,
-                    phone: user === null || user === void 0 ? void 0 : user.phone,
-                    phonePrefixCode: user === null || user === void 0 ? void 0 : user.phonePrefixCode,
-                    hasPassword: user === null || user === void 0 ? void 0 : user.hasPassword,
-                    role: user === null || user === void 0 ? void 0 : user.role,
-                    gender: user === null || user === void 0 ? void 0 : user.gender,
-                    dob: user === null || user === void 0 ? void 0 : user.dob,
-                    idFor: user === null || user === void 0 ? void 0 : user.idFor,
-                    accountStatus: user === null || user === void 0 ? void 0 : user.accountStatus,
-                    contactEmail: user === null || user === void 0 ? void 0 : user.contactEmail,
-                    buyer: user === null || user === void 0 ? void 0 : user.buyer,
-                    authProvider: user === null || user === void 0 ? void 0 : user.authProvider
-                });
-            }
+            const userDataToken = generateUserDataToken(user);
+            if (!userDataToken)
+                throw new apiResponse.Api500Error("Internal issue !");
             return res.status(200).send({
                 success: true,
                 statusCode: 200,

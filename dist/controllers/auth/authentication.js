@@ -17,7 +17,7 @@ const bcrypt = require("bcrypt");
 const email_service = require("../../services/email.service");
 const { verify_email_html_template } = require("../../templates/email.template");
 const { generateUUID, generateExpireTime, generateSixDigitNumber, generateJwtToken, generateUserDataToken } = require("../../utils/generator");
-const { isValidString, isValidEmail, isValidPassword } = require("../../utils/validator");
+const { isValidEmail, isValidPassword } = require("../../utils/validator");
 /**
  * @apiController --> Buyer Registration Controller
  * @apiMethod --> POST
@@ -46,19 +46,18 @@ module.exports.buyerRegistrationController = (req, res, next) => __awaiter(void 
             subject: "Verify email address",
             html: verify_email_html_template(body === null || body === void 0 ? void 0 : body.verificationCode)
         });
-        if (info === null || info === void 0 ? void 0 : info.response) {
-            let user = new User(body);
-            user.store = undefined;
-            const result = yield user.save();
-            return res.status(200).send({
-                success: true,
-                statusCode: 200,
-                returnEmail: body === null || body === void 0 ? void 0 : body.email,
-                verificationExpiredAt: result === null || result === void 0 ? void 0 : result.verificationExpiredAt,
-                message: `Thanks for your information. Verification code was sent to ${body === null || body === void 0 ? void 0 : body.email}`,
-            });
-        }
-        throw new apiResponse.Api400Error("Sorry registration failed !");
+        if (!(info === null || info === void 0 ? void 0 : info.response))
+            throw new apiResponse.Api400Error("Verification code not send to your email !");
+        let user = new User(body);
+        user.store = undefined;
+        const result = yield user.save();
+        return res.status(200).send({
+            success: true,
+            statusCode: 200,
+            returnEmail: body === null || body === void 0 ? void 0 : body.email,
+            verificationExpiredAt: result === null || result === void 0 ? void 0 : result.verificationExpiredAt,
+            message: `Thanks for your information. Verification code was send to ${body === null || body === void 0 ? void 0 : body.email}`,
+        });
     }
     catch (error) {
         next(error);
@@ -95,19 +94,18 @@ module.exports.sellerRegistrationController = (req, res, next) => __awaiter(void
             subject: "Verify email address",
             html: verify_email_html_template(body === null || body === void 0 ? void 0 : body.verificationCode)
         });
-        if (info === null || info === void 0 ? void 0 : info.response) {
-            let user = new User(body);
-            user.buyer = undefined;
-            const result = yield user.save();
-            return res.status(200).send({
-                success: true,
-                statusCode: 200,
-                returnEmail: email,
-                verificationExpiredAt: result === null || result === void 0 ? void 0 : result.verificationExpiredAt,
-                message: "Thanks for your information. Verification code was sent to " + email + ". Please verify your account.",
-            });
-        }
-        throw new apiResponse.Api500Error("Sorry registration failed !");
+        if (!(info === null || info === void 0 ? void 0 : info.response))
+            throw new apiResponse.Api500Error("Sorry registration failed !");
+        let user = new User(body);
+        user.buyer = undefined;
+        const result = yield user.save();
+        return res.status(200).send({
+            success: true,
+            statusCode: 200,
+            returnEmail: email,
+            verificationExpiredAt: result === null || result === void 0 ? void 0 : result.verificationExpiredAt,
+            message: "Thanks for your information. Verification code was sent to " + email + ". Please verify your account.",
+        });
     }
     catch (error) {
         next(error);
@@ -181,107 +179,58 @@ module.exports.userEmailVerificationController = (req, res, next) => __awaiter(v
  * @apiRequired --> BODY
  */
 module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
     try {
-        const { emailOrPhone, password } = req.body;
-        if (!isValidString(emailOrPhone))
-            throw new apiResponse.Api400Error("Invalid string type !");
-        let userDataToken;
-        let user = yield User.findOne({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] });
+        const { emailOrPhone, cPwd } = req.body;
+        let user = yield User.findOne({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] }, { createdAt: 0, __v: 0 });
         if (!user)
             throw new apiResponse.Api400Error(`User with ${emailOrPhone} not found!`);
-        if ((user === null || user === void 0 ? void 0 : user.verificationCode) || (user === null || user === void 0 ? void 0 : user.accountStatus) === "inactive") {
+        const { email, verificationCode, accountStatus, password } = user || {};
+        const matchedPwd = yield comparePassword(cPwd, password);
+        if (!matchedPwd)
+            throw new apiResponse.Api400Error("Password didn't matched !");
+        if (verificationCode || accountStatus === "inactive") {
             user.verificationCode = generateSixDigitNumber();
             user.verificationExpiredAt = generateExpireTime();
             let updateUser = yield user.save();
             const info = yield email_service({
-                to: user === null || user === void 0 ? void 0 : user.email,
+                to: email,
                 subject: "Verify email address",
-                html: verify_email_html_template(updateUser === null || updateUser === void 0 ? void 0 : updateUser.verificationCode, user === null || user === void 0 ? void 0 : user._uuid)
+                html: verify_email_html_template(updateUser === null || updateUser === void 0 ? void 0 : updateUser.verificationCode)
             });
-            if (info === null || info === void 0 ? void 0 : info.response) {
-                return res.status(200).send({
-                    success: true,
-                    statusCode: 200,
-                    returnEmail: updateUser === null || updateUser === void 0 ? void 0 : updateUser.email,
-                    verificationExpiredAt: updateUser === null || updateUser === void 0 ? void 0 : updateUser.verificationExpiredAt,
-                    message: "Email was sent to " + (updateUser === null || updateUser === void 0 ? void 0 : updateUser.email) + ". Please verify your account.",
-                });
-            }
-            throw new apiResponse.Api500Error("Internal error !");
-        }
-        let comparedPassword = yield comparePassword(password, user === null || user === void 0 ? void 0 : user.password);
-        if (!comparedPassword)
-            throw new apiResponse.Api400Error("Password didn't match !");
-        let token = generateJwtToken(user);
-        if ((user === null || user === void 0 ? void 0 : user.role) && (user === null || user === void 0 ? void 0 : user.role) === "ADMIN") {
-            userDataToken = generateUserDataToken({
-                _uuid: user === null || user === void 0 ? void 0 : user._uuid,
-                fullName: user === null || user === void 0 ? void 0 : user.fullName,
-                email: user === null || user === void 0 ? void 0 : user.email,
-                phone: user === null || user === void 0 ? void 0 : user.phone,
-                phonePrefixCode: user === null || user === void 0 ? void 0 : user.phonePrefixCode,
-                hasPassword: user === null || user === void 0 ? void 0 : user.hasPassword,
-                role: user === null || user === void 0 ? void 0 : user.role,
-                gender: user === null || user === void 0 ? void 0 : user.gender,
-                dob: user === null || user === void 0 ? void 0 : user.dob,
-                accountStatus: user === null || user === void 0 ? void 0 : user.accountStatus,
-                contactEmail: user === null || user === void 0 ? void 0 : user.contactEmail,
-                authProvider: user === null || user === void 0 ? void 0 : user.authProvider
+            if (!(info === null || info === void 0 ? void 0 : info.response))
+                throw new apiResponse.Api500Error("Internal error !");
+            return res.status(200).send({
+                success: true,
+                statusCode: 200,
+                returnEmail: updateUser === null || updateUser === void 0 ? void 0 : updateUser.email,
+                verificationExpiredAt: updateUser === null || updateUser === void 0 ? void 0 : updateUser.verificationExpiredAt,
+                message: `Verification code was sent to ${updateUser === null || updateUser === void 0 ? void 0 : updateUser.email}. Please verify your account.`,
             });
         }
-        if ((user === null || user === void 0 ? void 0 : user.role) && (user === null || user === void 0 ? void 0 : user.role) === "SELLER") {
-            userDataToken = generateUserDataToken({
-                _uuid: user === null || user === void 0 ? void 0 : user._uuid,
-                fullName: user === null || user === void 0 ? void 0 : user.fullName,
-                email: user === null || user === void 0 ? void 0 : user.email,
-                phone: user === null || user === void 0 ? void 0 : user.phone,
-                phonePrefixCode: user === null || user === void 0 ? void 0 : user.phonePrefixCode,
-                hasPassword: user === null || user === void 0 ? void 0 : user.hasPassword,
-                role: user === null || user === void 0 ? void 0 : user.role,
-                gender: user === null || user === void 0 ? void 0 : user.gender,
-                dob: user === null || user === void 0 ? void 0 : user.dob,
-                idFor: user === null || user === void 0 ? void 0 : user.idFor,
-                accountStatus: user === null || user === void 0 ? void 0 : user.accountStatus,
-                contactEmail: user === null || user === void 0 ? void 0 : user.contactEmail,
-                store: user === null || user === void 0 ? void 0 : user.store,
-                authProvider: user === null || user === void 0 ? void 0 : user.authProvider
-            });
-        }
-        if ((user === null || user === void 0 ? void 0 : user.role) && (user === null || user === void 0 ? void 0 : user.role) === "BUYER") {
-            user.buyer["defaultShippingAddress"] = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
-                ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.find((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true))) || {};
-            userDataToken = generateUserDataToken({
-                _uuid: user === null || user === void 0 ? void 0 : user._uuid,
-                fullName: user === null || user === void 0 ? void 0 : user.fullName,
-                email: user === null || user === void 0 ? void 0 : user.email,
-                phone: user === null || user === void 0 ? void 0 : user.phone,
-                phonePrefixCode: user === null || user === void 0 ? void 0 : user.phonePrefixCode,
-                hasPassword: user === null || user === void 0 ? void 0 : user.hasPassword,
-                role: user === null || user === void 0 ? void 0 : user.role,
-                gender: user === null || user === void 0 ? void 0 : user.gender,
-                dob: user === null || user === void 0 ? void 0 : user.dob,
-                idFor: user === null || user === void 0 ? void 0 : user.idFor,
-                accountStatus: user === null || user === void 0 ? void 0 : user.accountStatus,
-                contactEmail: user === null || user === void 0 ? void 0 : user.contactEmail,
-                buyer: user === null || user === void 0 ? void 0 : user.buyer,
-                authProvider: user === null || user === void 0 ? void 0 : user.authProvider
-            });
-        }
-        if (token) {
-            // if token then set it to client cookie
-            res.cookie("token", token, {
-                sameSite: "none",
-                secure: true,
-                maxAge: 57600000,
-                httpOnly: true
-            });
-            // if all operation success then return the response
-            return res.status(200).send({ success: true, statusCode: 200, name: "isLogin", message: "LoginSuccess", uuid: user === null || user === void 0 ? void 0 : user._uuid, u_data: userDataToken, token });
-        }
+        const loginToken = generateJwtToken(user);
+        if (!loginToken)
+            throw new apiResponse.Api400Error("Login failed due to internal issue !");
+        const userDataToken = generateUserDataToken(user);
+        // if token then set it to client cookie
+        res.cookie("token", loginToken, {
+            sameSite: "none",
+            secure: true,
+            maxAge: 16 * 60 * 60 * 1000,
+            httpOnly: true
+        });
+        // if all operation success then return the response
+        return res.status(200).send({
+            success: true,
+            statusCode: 200,
+            name: "Login",
+            message: "Login success",
+            uuid: user === null || user === void 0 ? void 0 : user._uuid,
+            u_data: userDataToken,
+            token: loginToken
+        });
     }
     catch (error) {
-        return next(error);
+        next(error);
     }
 });
 /**

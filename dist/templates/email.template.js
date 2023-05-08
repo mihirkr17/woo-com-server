@@ -82,37 +82,27 @@ module.exports.seller_order_email_template = (product, customerEmail, orderID) =
       </div>`);
 };
 module.exports.verify_email_html_template = (verifyToken, email) => {
-    return (`<table cellspacing="0" cellpadding="0" style="margin: 0 auto;">
-   <tr>
-      <td><h5>Verify your email address.</h5></td>
-   </tr>
-   <tr>
-      <td align="center" bgcolor="#FFFFFF" style="padding: 1.3rem 1.4rem; border-radius: 4px;">
-         <span style="font-weight: bold; 
-         font-family: Arial, sans-serif; 
-         color: #FFFFFF; 
-         text-decoration: none; 
-         display: block;
-         letter-spacing: 1px;
-         font-size: 1rem;
-         appearance: button;
-         background-color: hotpink;
-         border: 1px solid hotpink;
-         border-radius: 4px;
-         padding: 0.3rem 0.8rem;
-         ">
-         
-            Your verification code is: ${verifyToken} <br />
+    return (`<div style="font-family: Helvetica,Arial,sans-serif;min-width:1000px;overflow:auto;line-height:2">
+      <div style="margin:50px auto;width:70%;padding:20px 0">
+        <div style="border-bottom:1px solid #eee">
+          <a href="" style="font-size:1.4em;color: #00466a;text-decoration:none;font-weight:600">WooKart</a>
+        </div>
+        <p style="font-size:1.1em">Hi,</p>
 
-            expired after 5 min. 
-         </span>
-      </td>
-   </tr>
-</table>`);
+        <p>Thank you for choosing WooKart. Use the following OTP to complete your Sign Up procedures. OTP is valid for 5 minutes</p>
+
+        <h2 style="background: #00466a;margin: 0 auto;width: max-content;padding: 0 10px;color: #fff;border-radius: 4px;">${verifyToken}</h2>
+
+        <p style="font-size:0.9em;">Regards,<br />WooKart</p>
+
+        <hr style="border:none;border-top:1px solid #eee" />
+
+        <div style="float:right;padding:8px 0;color:#aaa;font-size:0.8em;line-height:1;font-weight:300">
+          <p>WooKart Inc</p>
+          <p>Lalmonirhat, 5510</p>
+          <p>Bangladesh</p>
+        </div>
+
+      </div>
+    </div>`);
 };
-{ /* <tr style="line-height: 30px; text-align: center; font-weight: bold; letter-spacing: 0.4px">
-<td style="border: 1px solid #777">${product?.title}</td>
-<td style="border: 1px solid #777">${product?.quantity}</td>
-<td style="border: 1px solid #777">${product?.sku}</td>
-</tr> */
-}

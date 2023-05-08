@@ -1,28 +1,35 @@
 const apiResponse = require("../errors/apiResponse");
 import { NextFunction, Request, Response } from "express";
-const { isValidPassword, isValidEmail } = require("../utils/validator");
+const { isValidPassword, isValidEmail, isValidString } = require("../utils/validator");
 
 
 module.exports.loginMDL = async (req: Request, res: Response, next: NextFunction) => {
 
-   const { emailOrPhone, password } = req.body;
+   const { emailOrPhone, cPwd } = req.body;
 
-   if (!emailOrPhone)
-      throw new apiResponse.Api400Error("Required email or phone number !");
 
-   if (!password)
-      throw new apiResponse.Api400Error("Required password !");
+   try {
+      if (!emailOrPhone)
+         throw new apiResponse.Api400Error("Required email or phone number !");
 
-   if (typeof password !== "string")
-      throw new apiResponse.Api400Error("Password should be string !");
+      if (!isValidString(emailOrPhone)) throw new apiResponse.Api400Error("Invalid string type !");
 
-   if (!isValidPassword(password))
-      throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
+      if (!cPwd)
+         throw new apiResponse.Api400Error("Required password !");
 
-   if (password.length < 5 || password.length > 8)
-      throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
+      if (typeof cPwd !== "string")
+         throw new apiResponse.Api400Error("Password should be string !");
 
-   next();
+      if (!isValidPassword(cPwd))
+         throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
+
+      if (cPwd.length < 5 || cPwd.length > 8)
+         throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
+
+      next();
+   } catch (error) {
+      next(error);
+   }
 }
 
 module.exports.registrationMDL = async (req: Request, res: Response, next: NextFunction) => {
