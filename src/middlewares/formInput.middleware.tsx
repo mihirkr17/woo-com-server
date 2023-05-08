@@ -1,6 +1,6 @@
 const apiResponse = require("../errors/apiResponse");
 import { NextFunction, Request, Response } from "express";
-const { isValidPassword, isValidEmail, isValidString } = require("../utils/validator");
+const { validPassword, validEmail, validString } = require("../utils/validator");
 
 
 module.exports.loginMDL = async (req: Request, res: Response, next: NextFunction) => {
@@ -12,7 +12,7 @@ module.exports.loginMDL = async (req: Request, res: Response, next: NextFunction
       if (!emailOrPhone)
          throw new apiResponse.Api400Error("Required email or phone number !");
 
-      if (!isValidString(emailOrPhone)) throw new apiResponse.Api400Error("Invalid string type !");
+      if (!validString(emailOrPhone)) throw new apiResponse.Api400Error("Invalid string type !");
 
       if (!cPwd)
          throw new apiResponse.Api400Error("Required password !");
@@ -20,7 +20,7 @@ module.exports.loginMDL = async (req: Request, res: Response, next: NextFunction
       if (typeof cPwd !== "string")
          throw new apiResponse.Api400Error("Password should be string !");
 
-      if (!isValidPassword(cPwd))
+      if (!validPassword(cPwd))
          throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
 
       if (cPwd.length < 5 || cPwd.length > 8)
@@ -66,7 +66,7 @@ module.exports.registrationMDL = async (req: Request, res: Response, next: NextF
          throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
       }
 
-      else if (!isValidPassword(password)) {
+      else if (!validPassword(password)) {
          throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
       }
 
@@ -86,7 +86,7 @@ module.exports.sellerRegistrationMDL = async (req: Request, res: Response, next:
 
    if (!email) throw new apiResponse.Api400Error("Required email address !");
 
-   if (!isValidEmail(email)) throw new apiResponse.Api400Error("Required valid email address !");
+   if (!validEmail(email)) throw new apiResponse.Api400Error("Required valid email address !");
 
    if (!password)
       throw new apiResponse.Api400Error(`Required password !`);
@@ -97,7 +97,7 @@ module.exports.sellerRegistrationMDL = async (req: Request, res: Response, next:
    if (password.length < 5 || password.length > 8)
       throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
 
-   if (!isValidPassword(password))
+   if (!validPassword(password))
       throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
 
 

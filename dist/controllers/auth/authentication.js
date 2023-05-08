@@ -12,12 +12,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const User = require("../../model/user.model");
 const apiResponse = require("../../errors/apiResponse");
-const { comparePassword } = require("../../utils/compare");
 const bcrypt = require("bcrypt");
 const email_service = require("../../services/email.service");
 const { verify_email_html_template } = require("../../templates/email.template");
 const { generateUUID, generateExpireTime, generateSixDigitNumber, generateJwtToken, generateUserDataToken } = require("../../utils/generator");
-const { isValidEmail, isValidPassword } = require("../../utils/validator");
+const { validEmail, validPassword } = require("../../utils/validator");
 /**
  * @apiController --> Buyer Registration Controller
  * @apiMethod --> POST
@@ -41,22 +40,22 @@ module.exports.buyerRegistrationController = (req, res, next) => __awaiter(void 
         body["idFor"] = "buy";
         body["role"] = "BUYER";
         body["authProvider"] = "system";
-        const info = yield email_service({
-            to: body === null || body === void 0 ? void 0 : body.email,
-            subject: "Verify email address",
-            html: verify_email_html_template(body === null || body === void 0 ? void 0 : body.verificationCode)
-        });
-        if (!(info === null || info === void 0 ? void 0 : info.response))
+        const [userResult, emailResult] = yield Promise.all([
+            new User(body).save(),
+            email_service({
+                to: body === null || body === void 0 ? void 0 : body.email,
+                subject: "Verify email address",
+                html: verify_email_html_template(body === null || body === void 0 ? void 0 : body.verificationCode)
+            })
+        ]);
+        if (!(emailResult === null || emailResult === void 0 ? void 0 : emailResult.response))
             throw new apiResponse.Api400Error("Verification code not send to your email !");
-        let user = new User(body);
-        user.store = undefined;
-        const result = yield user.save();
         return res.status(200).send({
             success: true,
             statusCode: 200,
-            returnEmail: body === null || body === void 0 ? void 0 : body.email,
-            verificationExpiredAt: result === null || result === void 0 ? void 0 : result.verificationExpiredAt,
-            message: `Thanks for your information. Verification code was send to ${body === null || body === void 0 ? void 0 : body.email}`,
+            returnEmail: userResult === null || userResult === void 0 ? void 0 : userResult.email,
+            verificationExpiredAt: userResult === null || userResult === void 0 ? void 0 : userResult.verificationExpiredAt,
+            message: `Thanks for your information. Verification code was send to ${userResult === null || userResult === void 0 ? void 0 : userResult.email}`,
         });
     }
     catch (error) {
@@ -73,11 +72,9 @@ module.exports.sellerRegistrationController = (req, res, next) => __awaiter(void
         let body = req.body;
         const { email, phone, password, store } = body;
         let existUser = yield User.countDocuments({ $or: [{ email }, { phone }] });
-        if (existUser) {
+        if (existUser >= 1) {
             throw new apiResponse.Api400Error("User already exists, Please try another phone number or email address !");
         }
-        if (!isValidPassword)
-            throw new apiResponse.Api400Error("Need a strong password !");
         body['_uuid'] = "s" + generateUUID();
         body['authProvider'] = 'system';
         body['idFor'] = 'sell';
@@ -116,7 +113,7 @@ module.exports.generateNewVerificationCode = (req, res, next) => __awaiter(void 
         const { email } = req.query;
         if (!email)
             throw new apiResponse.Api400Error("Required email address !");
-        if (!isValidEmail(email))
+        if (!validEmail(email))
             throw new apiResponse.Api400Error("Required valid email address !");
         let user = yield User.findOne({ email });
         if (!user)
@@ -157,12 +154,13 @@ module.exports.userEmailVerificationController = (req, res, next) => __awaiter(v
         const { verificationCode, verificationExpiredAt, email } = req.body;
         if (!verificationCode)
             throw new apiResponse.Api400Error("Required verification code !");
+        if (verificationCode.length >= 7 || verificationCode <= 5)
+            throw new apiResponse.Api400Error("Verification code should be 6 digits !");
         if (new Date(verificationExpiredAt) < new Date() === true)
             throw new apiResponse.Api400Error("Session expired ! Please resend code ..");
         let user = yield User.findOne({ $and: [{ verificationCode }, { email }] });
-        if (!user) {
-            throw new apiResponse.Api400Error("Session expired ! Please resend code ..");
-        }
+        if (!user)
+            throw new apiResponse.Api400Error("Session expired !");
         user.verificationCode = undefined;
         user.verificationExpiredAt = undefined;
         user.accountStatus = "active";
@@ -185,7 +183,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
         if (!user)
             throw new apiResponse.Api400Error(`User with ${emailOrPhone} not found!`);
         const { email, verificationCode, accountStatus, password } = user || {};
-        const matchedPwd = yield comparePassword(cPwd, password);
+        const matchedPwd = yield bcrypt.compare(cPwd, password);
         if (!matchedPwd)
             throw new apiResponse.Api400Error("Password didn't matched !");
         if (verificationCode || accountStatus === "inactive") {
@@ -259,7 +257,6 @@ module.exports.signOutController = (req, res, next) => __awaiter(void 0, void 0,
 module.exports.changePasswordController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const authEmail = req.decoded.email;
-        let result;
         const { oldPassword, newPassword } = req.body;
         if (!oldPassword || !newPassword)
             throw new apiResponse.Api400Error(`Required old password and new password !`);
@@ -267,22 +264,22 @@ module.exports.changePasswordController = (req, res, next) => __awaiter(void 0, 
             throw new apiResponse.Api400Error("Password should be string !");
         if (newPassword.length < 5 || newPassword.length > 8)
             throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
-        if (!isValidPassword(newPassword))
+        if (!validPassword(newPassword))
             throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
-        // find user in user db
-        const user = yield User.findOne({ email: authEmail });
+        // find user in db by email
+        let user = yield User.findOne({ email: authEmail });
         if (!user && typeof user !== "object")
-            throw new apiResponse.Api404Error(`User not found!`);
-        const comparedPassword = yield comparePassword(oldPassword, user === null || user === void 0 ? void 0 : user.password);
+            throw new apiResponse.Api404Error(`User not found !`);
+        const comparedPassword = yield bcrypt.compare(oldPassword, user === null || user === void 0 ? void 0 : user.password);
         if (!comparedPassword) {
             throw new apiResponse.Api400Error("Password didn't match !");
         }
         let hashedPwd = yield bcrypt.hash(newPassword, 10);
-        if (hashedPwd) {
-            result = yield User.findOneAndUpdate({ email: authEmail }, { $set: { password: hashedPwd } }, { upsert: true });
-        }
-        if (result)
-            return res.status(200).send({ success: true, statusCode: 200, message: "Password updated successfully." });
+        if (!hashedPwd)
+            throw new apiResponse.Api500Error("Internal errors !");
+        user.password = hashedPwd;
+        const result = yield user.save();
+        return result && res.status(200).send({ success: true, statusCode: 200, message: "Password updated successfully." });
     }
     catch (error) {
         next(error);
@@ -296,33 +293,24 @@ module.exports.checkUserAuthentication = (req, res, next) => __awaiter(void 0, v
         const { email } = body;
         const user = yield User.findOne({ email });
         if (!user || typeof user === "undefined")
-            throw new apiResponse.Api404Error("Sorry user not found with this " + email);
+            throw new apiResponse.Api404Error(`Sorry user not found with this ${email}`);
         let securityCode = generateSixDigitNumber();
         let lifeTime = 300000;
-        const mailOptions = {
-            from: process.env.GMAIL_USER,
-            to: email,
-            subject: 'Reset your WooKart Password',
-            html: `<p>Your Security Code is <b>${securityCode}</b> and expire in 5 minutes.</p>`
-        };
         const info = yield email_service({
             to: email,
             subject: 'Reset your WooKart Password',
             html: `<p>Your Security Code is <b>${securityCode}</b> and expire in 5 minutes.</p>`
         });
-        if (info === null || info === void 0 ? void 0 : info.response) {
-            res.cookie("securityCode", securityCode, { httpOnly: true, sameSite: "none", secure: true, maxAge: lifeTime });
-            return res.status(200).send({
-                success: true,
-                statusCode: 200,
-                message: "We have to send security code to your email..",
-                lifeTime,
-                email
-            });
-        }
-        else {
+        if (!(info === null || info === void 0 ? void 0 : info.response))
             throw new apiResponse.Api500Error("Sorry ! Something wrong in your email. please provide valid email address.");
-        }
+        res.cookie("securityCode", securityCode, { httpOnly: true, sameSite: "none", secure: true, maxAge: lifeTime });
+        return res.status(200).send({
+            success: true,
+            statusCode: 200,
+            message: "We have to send security code to your email..",
+            lifeTime,
+            email
+        });
     }
     catch (error) {
         next(error);
@@ -346,7 +334,7 @@ module.exports.checkUserForgotPwdSecurityKey = (req, res, next) => __awaiter(voi
         if (securityCode !== sCode)
             throw new apiResponse.Api400Error("Invalid security code !");
         res.clearCookie("securityCode");
-        let life = 120000;
+        const life = 120000;
         res.cookie("set_new_pwd_session", securityCode, { httpOnly: true, sameSite: "none", secure: true, maxAge: life });
         return res.status(200).send({ success: true, statusCode: 200, message: "Success. Please set a new password.", data: { email: user === null || user === void 0 ? void 0 : user.email, securityCode, sessionLifeTime: life } });
     }
