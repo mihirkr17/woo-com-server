@@ -82,7 +82,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
             const productInfos = [];
             product.forEach((p) => {
                 var _a, _b, _c, _d, _e;
-                p["shippingCharge"] = ((_a = p === null || p === void 0 ? void 0 : p.shipping) === null || _a === void 0 ? void 0 : _a.isFree) ? 0 : calculateShippingCost((_b = p === null || p === void 0 ? void 0 : p.packaged) === null || _b === void 0 ? void 0 : _b.volumetricWeight, areaType);
+                p["shippingCharge"] = ((_a = p === null || p === void 0 ? void 0 : p.shipping) === null || _a === void 0 ? void 0 : _a.isFree) ? 0 : calculateShippingCost((((_b = p === null || p === void 0 ? void 0 : p.packaged) === null || _b === void 0 ? void 0 : _b.volumetricWeight) * (p === null || p === void 0 ? void 0 : p.quantity)), areaType);
                 p["itemID"] = "item" + (generateItemID() + (itemNumber++)).toString();
                 p["baseAmount"] = parseInt((p === null || p === void 0 ? void 0 : p.baseAmount) + (p === null || p === void 0 ? void 0 : p.shippingCharge));
                 sellerEmail = (_c = p === null || p === void 0 ? void 0 : p.sellerData) === null || _c === void 0 ? void 0 : _c.sellerEmail;

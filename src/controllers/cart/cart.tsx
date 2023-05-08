@@ -145,7 +145,7 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
             if (p?.shipping?.isFree && p?.shipping?.isFree) {
                p["shippingCharge"] = 0;
             } else {
-               p["shippingCharge"] = calculateShippingCost(p?.packaged?.volumetricWeight, areaType);
+               p["shippingCharge"] = calculateShippingCost((p?.packaged?.volumetricWeight * p?.quantity), areaType);
             }
 
             return p;

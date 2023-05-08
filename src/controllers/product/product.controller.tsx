@@ -377,7 +377,7 @@ module.exports.purchaseProductController = async (req: Request, res: Response, n
          if (product?.shipping?.isFree && product?.shipping?.isFree) {
             product["shippingCharge"] = 0;
          } else {
-            product["shippingCharge"] = calculateShippingCost(product?.packaged?.volumetricWeight, areaType);
+            product["shippingCharge"] = calculateShippingCost((product?.packaged?.volumetricWeight * product?.quantity), areaType);
          }
 
          const baseAmounts = product?.baseAmount && parseInt(product?.baseAmount);

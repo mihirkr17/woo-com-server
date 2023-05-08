@@ -131,7 +131,7 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
                     p["shippingCharge"] = 0;
                 }
                 else {
-                    p["shippingCharge"] = calculateShippingCost((_c = p === null || p === void 0 ? void 0 : p.packaged) === null || _c === void 0 ? void 0 : _c.volumetricWeight, areaType);
+                    p["shippingCharge"] = calculateShippingCost((((_c = p === null || p === void 0 ? void 0 : p.packaged) === null || _c === void 0 ? void 0 : _c.volumetricWeight) * (p === null || p === void 0 ? void 0 : p.quantity)), areaType);
                 }
                 return p;
             });

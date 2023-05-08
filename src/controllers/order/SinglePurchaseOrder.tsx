@@ -82,7 +82,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
       const productInfos: any[] = [];
 
       product.forEach((p: any) => {
-         p["shippingCharge"] = p?.shipping?.isFree ? 0 : calculateShippingCost(p?.packaged?.volumetricWeight, areaType);
+         p["shippingCharge"] = p?.shipping?.isFree ? 0 : calculateShippingCost((p?.packaged?.volumetricWeight * p?.quantity), areaType);
          p["itemID"] = "item" + (generateItemID() + (itemNumber++)).toString();
          p["baseAmount"] = parseInt(p?.baseAmount + p?.shippingCharge);
          sellerEmail = p?.sellerData?.sellerEmail;

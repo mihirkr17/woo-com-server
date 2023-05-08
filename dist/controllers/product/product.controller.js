@@ -336,7 +336,7 @@ module.exports.purchaseProductController = (req, res, next) => __awaiter(void 0,
                 product["shippingCharge"] = 0;
             }
             else {
-                product["shippingCharge"] = calculateShippingCost((_j = product === null || product === void 0 ? void 0 : product.packaged) === null || _j === void 0 ? void 0 : _j.volumetricWeight, areaType);
+                product["shippingCharge"] = calculateShippingCost((((_j = product === null || product === void 0 ? void 0 : product.packaged) === null || _j === void 0 ? void 0 : _j.volumetricWeight) * (product === null || product === void 0 ? void 0 : product.quantity)), areaType);
             }
             const baseAmounts = (product === null || product === void 0 ? void 0 : product.baseAmount) && parseInt(product === null || product === void 0 ? void 0 : product.baseAmount);
             const totalQuantities = (product === null || product === void 0 ? void 0 : product.quantity) && parseInt(product === null || product === void 0 ? void 0 : product.quantity);
