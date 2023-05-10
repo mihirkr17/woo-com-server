@@ -2,10 +2,12 @@
 // product.controller.tsx
 
 import { NextFunction, Request, Response } from "express";
-const { ObjectId } = require("mongodb");
 const Product = require("../../model/product.model");
-const { actualSellingPriceProject, basicProductProject, newPricingProject } = require("../../utils/projection");
-const { findUserByEmail, getSellerInformationByID, calculateShippingCost } = require("../../services/common.service");
+const { findUserByEmail, calculateShippingCost } = require("../../services/common.service");
+const { product_detail_pipe, product_detail_relate_pipe, home_store_product_pipe, search_product_pipe, single_purchase_pipe, ctg_filter_product_pipe, ctg_main_product_pipe } = require("../../utils/pipelines");
+const NodeCache = require("node-cache");
+
+const Caches = new NodeCache({ stdTTL: 600 });
 
 /**
  * @controller      --> Fetch the single product information in product details page.
@@ -15,81 +17,28 @@ const { findUserByEmail, getSellerInformationByID, calculateShippingCost } = req
 module.exports.fetchSingleProductController = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
-      const productID = req.query?.pId;
-      const variationID = req.query?.vId;
+      const { pId: productID, vId: variationID } = req.query;
+
+      let productDetail: any;
 
       // Product Details
-      let productDetail = await Product.aggregate([
-         { $match: { _id: ObjectId(productID) } },
-         {
-            $addFields: {
-               swatch: {
-                  $map: {
-                     input: {
-                        $filter: {
-                           input: "$variations",
-                           cond: {
-                              $eq: ["$$v.status", "active"]
-                           },
-                           as: "v"
-                        }
-                     },
-                     as: "variation",
-                     in: { variant: "$$variation.variant", _vrid: "$$variation._vrid" }
-                  }
-               }
-            }
-         },
-         { $unwind: { path: '$variations' } },
-         { $match: { 'variations._vrid': variationID } },
-         {
-            $project: {
-               title: '$variations.vTitle',
-               slug: 1,
-               variations: 1,
-               swatch: 1,
-               fulfilledBy: "$shipping.fulfilledBy",
-               specification: 1,
-               brand: 1, categories: 1,
-               sellerData: 1,
-               images: 1,
-               rating: 1,
-               ratingAverage: 1,
-               save_as: 1,
-               createdAt: 1,
-               bodyInfo: 1,
-               description: 1,
-               manufacturer: 1,
-               pricing: newPricingProject,
-               isFreeShipping: "$shipping.isFree",
-               volumetricWeight: "$packaged.volumetricWeight",
-               _lid: 1
-            }
-         }
-      ]);
+      let cacheData = Caches.get(`${productID}_${variationID}`);
 
-      productDetail = productDetail[0];
+      if (cacheData) {
+         productDetail = JSON.parse(cacheData);
 
-      if (productDetail?.sellerData?.sellerID) {
-         productDetail["sellerInfo"] = await getSellerInformationByID(productDetail?.sellerData?.sellerID);
+      } else {
+
+         productDetail = await Product.aggregate(product_detail_pipe(productID, variationID));
+
+         productDetail = productDetail[0];
+
+         Caches.set(`${productID}_${variationID}`, JSON.stringify(productDetail), 60000);
       }
 
 
       // Related products
-      const relatedProducts = await Product.aggregate([
-         { $unwind: { path: '$variations' } },
-         {
-            $match: {
-               $and: [
-                  { categories: { $in: productDetail.categories } },
-                  { "variations._vrid": { $ne: variationID } },
-                  { "variations.status": "active" },
-               ],
-            },
-         },
-         { $project: basicProductProject },
-         { $limit: 5 },
-      ]);
+      const relatedProducts = await Product.aggregate(product_detail_relate_pipe(variationID, productDetail?.categories));
 
       return res.status(200).send({
          success: true,
@@ -137,56 +86,11 @@ module.exports.productsByCategoryController = async (req: Request, res: Response
          "pricing.sellingPrice": { $lte: parseInt(price_range) }
       } : {}
 
-      const filterData = await Product.aggregate([
-         {
-            $match: { categories: { $all: category } }
-         },
-         {
-            $addFields: {
-               variations: {
-                  $slice: [{
-                     $filter: {
-                        input: "$variations",
-                        cond: { $and: [{ $eq: ["$$v.status", 'active'] }, { $eq: ["$$v.stock", "in"] }] },
-                        as: "v"
-                     }
-                  }, 1]
-               },
-            },
-         },
-         { $unwind: { path: "$variations" } },
-         {
-            $project: {
-               _id: 0,
-               brand: 1,
-               variant: "$variations.variant"
-            }
-         }
-      ]) || [];
+      const filterData = await Product.aggregate(ctg_filter_product_pipe(category)) || [];
 
-      const products = await Product.aggregate([
-         { $match: { categories: { $all: category } } },
-         {
-            $addFields: {
-               variations: {
-                  $slice: [{
-                     $filter: {
-                        input: "$variations",
-                        cond: { $and: [{ $eq: ["$$v.status", 'active'] }, { $eq: ["$$v.stock", "in"] }] },
-                        as: "v"
-                     }
-                  }, 1]
-               },
-            }
-         },
-         { $unwind: { path: '$variations' } },
-         { $match: filterByBrand },
-         { $project: basicProductProject },
-         { $match: filterByPriceRange },
-         sorting
-      ]) || [];
+      const products = await Product.aggregate(ctg_main_product_pipe(category, filterByBrand, filterByPriceRange, sorting)) || [];
 
-      return products ? res.status(200).send({ products, filterData })
+      return products ? res.status(200).send({ success: true, statusCode: 200, products, filterData })
          : res.status(404).send({
             success: false,
             statusCode: 404,
@@ -209,30 +113,7 @@ module.exports.searchProducts = async (req: Request, res: Response, next: NextFu
          return res.status(200).send([]);
       }
 
-      const result = (await Product.aggregate([
-         { $unwind: { path: "$variations" } },
-         {
-            $match: {
-               $and: [{ 'variations.status': "active" }, { save_as: "fulfilled" }],
-               $or: [
-                  { title: { $regex: q, $options: "i" } },
-                  { "sellerData.storeName": { $regex: q, $options: "i" } },
-                  { brand: { $regex: q, $options: "i" } },
-                  { categories: { $in: [q] } },
-               ],
-            },
-         },
-         {
-            $project: {
-               title: "$variations.vTitle",
-               categories: 1,
-               _vrid: "$variations._vrid",
-               image: { $first: "$images" },
-               slug: 1,
-               _lid: 1
-            },
-         },
-      ])) || [];
+      const result = (await Product.aggregate(search_product_pipe(q))) || [];
 
       return result && res.status(200).send(result);
    } catch (error: any) {
@@ -250,47 +131,13 @@ module.exports.homeStoreController = async (req: Request, res: Response, next: N
    try {
       const totalLimits = parseInt(req.params.limits);
 
-      const products = await Product.aggregate([
-         { $match: { save_as: 'fulfilled' } },
-         {
-            $addFields: {
-               variations: {
-                  $slice: [{
-                     $filter: {
-                        input: "$variations",
-                        cond: { $eq: ["$$v.status", 'active'] },
-                        as: "v"
-                     }
-                  }, 1]
-               },
-            }
-         },
-         { $unwind: { path: "$variations" } },
-         { $project: basicProductProject },
-         { $sort: { "variations._vrid": -1 } },
-         { $limit: totalLimits }
-      ]);
-
-      const topSellingProduct = await Product.aggregate([
-         { $unwind: { path: '$variations' } },
-         { $match: { 'variations.status': "active" } },
-         { $sort: { 'variations.totalSold': -1 } },
-         { $limit: 6 }
-      ]);
-
-      const topRatedProduct = await Product.aggregate([
-         { $addFields: { variations: { $first: "$variations" } } },
-         { $match: { 'variations.status': 'active' } },
-         { $project: basicProductProject },
-         { $sort: { ratingAverage: -1 } },
-         { $limit: 6 }
-      ]);
+      const products = await Product.aggregate(home_store_product_pipe(totalLimits));
 
       return res.status(200).send({
          success: true, statusCode: 200, data: {
             store: products,
-            topSellingProducts: topSellingProduct,
-            topRatedProducts: topRatedProduct
+            topSellingProducts: null,
+            topRatedProducts: null
          }
       });
 
@@ -329,51 +176,21 @@ module.exports.fetchTopSellingProduct = async (req: Request, res: Response, next
 module.exports.purchaseProductController = async (req: Request, res: Response, next: NextFunction) => {
    try {
       const authEmail = req.decoded.email;
-      const body = req.body;
 
       let user = await findUserByEmail(authEmail);
+
+      const { listingID, variationID, quantity, productID, customerEmail } = req?.body;
 
       let defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
          user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
 
       let areaType = defaultShippingAddress?.area_type;
 
-      let product = await Product.aggregate([
-         { $match: { _lid: body?.listingID } },
-         { $unwind: { path: "$variations" } },
-         { $match: { $and: [{ 'variations._vrid': body?.variationID }, { 'variations.stock': "in" }, { 'variations.status': "active" }] } },
-         {
-            $project: {
-               _id: 0,
-               title: "$variations.vTitle",
-               slug: 1,
-               variations: 1,
-               brand: 1,
-               packaged: 1,
-               image: { $first: "$images" },
-               sku: "$variations.sku",
-               sellerData: 1,
-               shipping: 1,
-               savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPriceProject] }, parseInt(body?.quantity)] },
-               baseAmount: { $multiply: [actualSellingPriceProject, body?.quantity] },
-               sellingPrice: actualSellingPriceProject,
-               paymentInfo: 1,
-               variant: "$variations.variant",
-               available: "$variations.available",
-               stock: "$variations.stock"
-            }
-         }, {
-            $unset: ["variations"]
-         }
-      ]);
+      let product = await Product.aggregate(single_purchase_pipe(productID, listingID, variationID, quantity));
 
       if (product && typeof product !== 'undefined') {
          product = product[0];
-         product["quantity"] = body?.quantity;
-         product["productID"] = body.productID;
-         product["listingID"] = body?.listingID;
-         product["variationID"] = body?.variationID;
-         product["customerEmail"] = body?.customerEmail;
+         product["customerEmail"] = customerEmail;
 
          if (product?.shipping?.isFree && product?.shipping?.isFree) {
             product["shippingCharge"] = 0;
@@ -381,25 +198,21 @@ module.exports.purchaseProductController = async (req: Request, res: Response, n
             product["shippingCharge"] = calculateShippingCost((product?.packaged?.volumetricWeight * product?.quantity), areaType);
          }
 
-         const baseAmounts = product?.baseAmount && parseInt(product?.baseAmount);
-         const totalQuantities = product?.quantity && parseInt(product?.quantity);
-         const shippingFees = product?.shippingCharge && parseInt(product?.shippingCharge);
-         const finalAmounts = product && (parseInt(product?.baseAmount) + product?.shippingCharge);
-         const savingAmounts = product && (parseInt(product?.savingAmount));
-
-         let buyingCartData = {
-            product: product,
-            container_p: {
-               baseAmounts,
-               totalQuantities,
-               finalAmounts,
-               shippingFees,
-               savingAmounts
-            },
-            numberOfProducts: product.length || 0
-         }
-
-         return res.status(200).send({ success: true, statusCode: 200, data: { module: buyingCartData } });
+         return res.status(200).send({
+            success: true, statusCode: 200, data: {
+               module: {
+                  product,
+                  container_p: {
+                     baseAmounts: parseInt(product?.baseAmount),
+                     totalQuantities: product?.quantity,
+                     finalAmounts: (parseInt(product?.baseAmount) + product?.shippingCharge),
+                     shippingFees: product?.shippingCharge,
+                     savingAmounts: product?.savingAmount
+                  },
+                  numberOfProducts: product.length || 0
+               }
+            }
+         });
       }
    } catch (error: any) {
       next(error)

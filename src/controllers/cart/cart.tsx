@@ -1,12 +1,13 @@
 import { NextFunction, Request, Response } from "express";
 const ShoppingCart = require("../../model/shoppingCart.model");
-const { actualSellingPriceProject, shoppingCartProject } = require("../../utils/projection");
+const { shopping_cart_pipe } = require("../../utils/pipelines");
 const { findUserByEmail, checkProductAvailability, calculateShippingCost } = require("../../services/common.service");
 const apiResponse = require("../../errors/apiResponse");
 const { ObjectId } = require("mongodb");
 const { cartTemplate } = require("../../templates/cart.template");
 const NodeCache = require("node-cache");
-const cache = new NodeCache({ stdTTL: 100 });
+const nCache = new NodeCache({ stdTTL: 600 });
+
 
 
 /**
@@ -28,7 +29,6 @@ module.exports.addToCartHandler = async (req: Request, res: Response, next: Next
       if (!productID || !variationID || !listingID)
          throw new apiResponse.Api400Error("Required product id, listing id, variation id in body !");
 
-
       const availableProduct = await checkProductAvailability(productID, variationID);
 
       if (!availableProduct) throw new apiResponse.Api404Error("Product is not available !");
@@ -49,7 +49,7 @@ module.exports.addToCartHandler = async (req: Request, res: Response, next: Next
 
          existsProduct.items = [...items, cartTemp];
 
-         cache.del(`${authEmail}_cartProducts`);
+         nCache.del(`${authEmail}_cartProducts`);
 
          await existsProduct.save();
          return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart." });
@@ -60,7 +60,7 @@ module.exports.addToCartHandler = async (req: Request, res: Response, next: Next
             customerEmail: authEmail,
             items: [cartTemp]
          });
-         cache.del(`${authEmail}_cartProducts`);
+         nCache.del(`${authEmail}_cartProducts`);
          await shop.save();
 
          return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart." });
@@ -77,67 +77,34 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
       const { email } = req.decoded;
 
       let cart: any[];
-      let areaType: string;
-      let defaultShippingAddress: any;
 
       let user = await findUserByEmail(email);
 
       if (!user) throw new apiResponse.Api500Error("Something wrong !");
 
-      const cartData = cache.get(`${email}_cartProducts`);// await client.get(`${email}_cartProducts`);
+      let defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
+         user?.buyer?.shippingAddress.find((adr: any) => adr?.default_shipping_address === true));
+
+      let areaType: string = defaultShippingAddress?.area_type || "";
+
+      const cartData = nCache.get(`${email}_cartProducts`);
 
       if (cartData) {
          cart = JSON.parse(cartData);
+      } else {
+         cart = await ShoppingCart.aggregate(shopping_cart_pipe(email));
+         await nCache.set(`${email}_cartProducts`, JSON.stringify(cart), 60000);
       }
 
-      else {
-         console.log("Cart Fetching...");
-         defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
-            user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
+      if (typeof cart === "object" && cart.length >= 1) {
 
-         areaType = defaultShippingAddress?.area_type || "";
+         let baseAmounts: number = 0;
+         let totalQuantities: number = 0;
+         let shippingFees: number = 0;
+         let finalAmounts: number = 0;
+         let savingAmounts: number = 0;
 
-         cart = await ShoppingCart.aggregate([
-            { $match: { customerEmail: email } },
-            { $unwind: { path: "$items" } },
-            {
-               $lookup: {
-                  from: 'products',
-                  localField: "items.listingID",
-                  foreignField: "_lid",
-                  as: "main_product"
-               }
-            },
-            { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } } },
-            { $project: { main_product: 0 } },
-            { $unwind: { path: "$variations" } },
-            {
-               $match: {
-                  $expr: {
-                     $and: [
-                        { $eq: ['$variations._vrid', '$items.variationID'] },
-                        { $eq: ["$variations.stock", "in"] },
-                        { $eq: ["$variations.status", "active"] },
-                        { $eq: ["$save_as", "fulfilled"] }
-                     ]
-                  }
-               }
-            },
-            {
-               $project: shoppingCartProject
-            },
-            {
-               $unset: ["variations", "items"]
-            }
-         ]);
-
-         await cache.set(`${email}_cartProducts`, JSON.stringify(cart), 10000);
-      }
-
-
-      if (typeof cart === "object") {
-
-         cart && cart.map((p: any) => {
+         cart.forEach((p: any) => {
 
             if (p?.shipping?.isFree && p?.shipping?.isFree) {
                p["shippingCharge"] = 0;
@@ -145,30 +112,31 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
                p["shippingCharge"] = calculateShippingCost((p?.packaged?.volumetricWeight * p?.quantity), areaType);
             }
 
+            baseAmounts += p?.baseAmount;
+            totalQuantities += p?.quantity;
+            shippingFees += p?.shippingCharge;
+            finalAmounts += (parseInt(p?.baseAmount) + p?.shippingCharge);
+            savingAmounts += p?.savingAmount;
+
             return p;
          });
 
-
-         const baseAmounts = cart && cart.map((tAmount: any) => (parseInt(tAmount?.baseAmount))).reduce((p: any, c: any) => p + c, 0);
-         const totalQuantities = cart && cart.map((tQuant: any) => (parseInt(tQuant?.quantity))).reduce((p: any, c: any) => p + c, 0);
-         const shippingFees = cart && cart.map((p: any) => parseInt(p?.shippingCharge)).reduce((p: any, c: any) => p + c, 0);
-         const finalAmounts = cart && cart.map((fAmount: any) => (parseInt(fAmount?.baseAmount) + fAmount?.shippingCharge)).reduce((p: any, c: any) => p + c, 0);
-         const savingAmounts = cart && cart.map((fAmount: any) => (parseInt(fAmount?.savingAmount))).reduce((p: any, c: any) => p + c, 0);
-
-         let shoppingCartData = {
-            products: cart,
-            container_p: {
-               baseAmounts,
-               totalQuantities,
-               finalAmounts,
-               shippingFees,
-               savingAmounts
-            },
-            numberOfProducts: cart.length || 0,
-            defaultShippingAddress
-         }
-
-         return res.status(200).send({ success: true, statusCode: 200, data: { module: shoppingCartData } });
+         return res.status(200).send({
+            success: true, statusCode: 200, data: {
+               module: {
+                  products: cart,
+                  container_p: {
+                     baseAmounts,
+                     totalQuantities,
+                     finalAmounts,
+                     shippingFees,
+                     savingAmounts
+                  },
+                  numberOfProducts: cart.length || 0,
+                  defaultShippingAddress
+               }
+            }
+         });
       }
 
    } catch (error: any) {
@@ -180,17 +148,11 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
 
 module.exports.updateCartProductQuantityController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const authEmail = req.decoded.email || "";
+      const { email } = req.decoded;
 
-      const body = req.body;
+      const { type } = req?.body?.actionRequestContext;
 
-      const cartType = body?.actionRequestContext?.type;
-
-      const upsertRequest = body?.upsertRequest;
-
-      const cartContext = upsertRequest?.cartContext;
-
-      const { productID, variationID, cartID, quantity } = cartContext;
+      const { productID, variationID, cartID, quantity } = req?.body?.upsertRequest?.cartContext;
 
       if (!productID || !variationID || !cartID) throw new apiResponse.Api400Error("Required product id, variation id, cart id !");
 
@@ -198,7 +160,7 @@ module.exports.updateCartProductQuantityController = async (req: Request, res: R
 
       if (quantity > 5 || quantity <= 0) throw new apiResponse.Api400Error("Quantity can not greater than 5 and less than 1 !");
 
-      if (cartType !== 'toCart') throw new apiResponse.Api404Error("Invalid cart context !");
+      if (type !== 'toCart') throw new apiResponse.Api404Error("Invalid cart context !");
 
       const productAvailability = await checkProductAvailability(productID, variationID);
 
@@ -209,36 +171,33 @@ module.exports.updateCartProductQuantityController = async (req: Request, res: R
          return res.status(200).send({ success: false, statusCode: 200, message: "Sorry ! your selected quantity out of range." });
       }
 
-      let getCart = cache.get(`${authEmail}_cartProducts`);
+      let getCart = nCache.get(`${email}_cartProducts`);
 
-      getCart = JSON.parse(getCart);
+      // if cart has cache then some operation 
+      if (getCart) {
 
-      if (!getCart) {
+         getCart = JSON.parse(getCart);
 
-         console.log("Quantity updating...");
-         const result = await ShoppingCart.findOneAndUpdate({ $and: [{ customerEmail: authEmail }, { _id: ObjectId(cartID) }] }, {
-            $set: { "items.$[i].quantity": parseInt(quantity) }
-         }, { arrayFilters: [{ "i.variationID": variationID }], upsert: true });
+         let product = getCart.find((e: any) => e?.variationID === variationID);
 
-         if (result) return res.status(200).send({ success: true, statusCode: 200, message: `Quantity updated to ${quantity}.` });
+         let productIndex = getCart.findIndex((e: any) => e?.variationID === variationID);
 
-         throw new apiResponse.Api500Error("Failed to update quantity !");
+         getCart[productIndex].quantity = quantity;
+
+         getCart[productIndex].baseAmount = product.sellingPrice * quantity;
+
+         getCart[productIndex].savingAmount = (product.price - product.sellingPrice);
+
+         nCache.set(`${email}_cartProducts`, JSON.stringify(getCart), 60000);
       }
 
-      let product = getCart.find((e: any) => e?.variationID === variationID);
+      const result = await ShoppingCart.findOneAndUpdate({ $and: [{ customerEmail: email }, { _id: ObjectId(cartID) }] }, {
+         $set: { "items.$[i].quantity": parseInt(quantity) }
+      }, { arrayFilters: [{ "i.variationID": variationID }], upsert: true });
 
-      let productIndex = getCart.findIndex((e: any) => e?.variationID === variationID);
+      if (result) return res.status(200).send({ success: true, statusCode: 200, message: `Quantity updated to ${quantity}.` });
 
-      getCart[productIndex].quantity = quantity;
-
-      getCart[productIndex].baseAmount = product.sellingPrice * quantity;
-
-      getCart[productIndex].savingAmount = (product.price - product.sellingPrice);
-
-      cache.set(`${authEmail}_cartProducts`, JSON.stringify(getCart), 10000);
-
-      return res.status(200).send({ success: true, statusCode: 200, message: `Quantity updated to ${quantity}.` });
-
+      throw new apiResponse.Api500Error("Failed to update quantity !");
    } catch (error: any) {
       next(error);
    }
@@ -267,12 +226,12 @@ module.exports.deleteCartItem = async (req: Request, res: Response, next: NextFu
          $pull: { items: { $and: [{ variationID }, { productID }] } }
       });
 
-      let cartProducts = cache.get(`${authEmail}_cartProducts`);
+      let cartProducts = nCache.get(`${authEmail}_cartProducts`);
       cartProducts = cartProducts && JSON.parse(cartProducts);
 
       cartProducts = cartProducts.filter((e: any) => e?.variationID !== variationID);
 
-      cache.set(`${authEmail}_cartProducts`, JSON.stringify(cartProducts));
+      nCache.set(`${authEmail}_cartProducts`, JSON.stringify(cartProducts));
 
       if (updateDocuments) return res.status(200).send({ success: true, statusCode: 200, message: "Item removed successfully from your cart." });
 
