@@ -5,17 +5,8 @@ const { findUserByEmail, checkProductAvailability, calculateShippingCost } = req
 const apiResponse = require("../../errors/apiResponse");
 const { ObjectId } = require("mongodb");
 const { cartTemplate } = require("../../templates/cart.template");
-const Product = require("../../model/product.model");
-const client = require("../../utils/redis");
-
-// const redis = require("redis");
-// const REDIS_PORT = process.env.PORT || 6379;
-// const client = redis.createClient(REDIS_PORT);
-
-// client.on("connect", function () {
-//    console.log("Redis client connected");
-// });
-
+const NodeCache = require("node-cache");
+const cache = new NodeCache({ stdTTL: 100 });
 
 
 /**
@@ -58,7 +49,7 @@ module.exports.addToCartHandler = async (req: Request, res: Response, next: Next
 
          existsProduct.items = [...items, cartTemp];
 
-         await client.del(`${authEmail}_cartProducts`);
+         cache.del(`${authEmail}_cartProducts`);
 
          await existsProduct.save();
          return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart." });
@@ -69,7 +60,7 @@ module.exports.addToCartHandler = async (req: Request, res: Response, next: Next
             customerEmail: authEmail,
             items: [cartTemp]
          });
-         await client.del(`${authEmail}_cartProducts`);
+         cache.del(`${authEmail}_cartProducts`);
          await shop.save();
 
          return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart." });
@@ -93,7 +84,7 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
 
       if (!user) throw new apiResponse.Api500Error("Something wrong !");
 
-      const cartData = await client.get(`${email}_cartProducts`);
+      const cartData = cache.get(`${email}_cartProducts`);// await client.get(`${email}_cartProducts`);
 
       if (cartData) {
          cart = JSON.parse(cartData);
@@ -140,7 +131,7 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
             }
          ]);
 
-         await client.set(`${email}_cartProducts`, JSON.stringify(cart));
+         await cache.set(`${email}_cartProducts`, JSON.stringify(cart), 10000);
       }
 
 
@@ -218,7 +209,7 @@ module.exports.updateCartProductQuantityController = async (req: Request, res: R
          return res.status(200).send({ success: false, statusCode: 200, message: "Sorry ! your selected quantity out of range." });
       }
 
-      let getCart = await client.get(`${authEmail}_cartProducts`);
+      let getCart = cache.get(`${authEmail}_cartProducts`);
 
       getCart = JSON.parse(getCart);
 
@@ -244,7 +235,7 @@ module.exports.updateCartProductQuantityController = async (req: Request, res: R
 
       getCart[productIndex].savingAmount = (product.price - product.sellingPrice);
 
-      await client.set(`${authEmail}_cartProducts`, JSON.stringify(getCart), "EX", 60);
+      cache.set(`${authEmail}_cartProducts`, JSON.stringify(getCart), 10000);
 
       return res.status(200).send({ success: true, statusCode: 200, message: `Quantity updated to ${quantity}.` });
 
@@ -276,12 +267,12 @@ module.exports.deleteCartItem = async (req: Request, res: Response, next: NextFu
          $pull: { items: { $and: [{ variationID }, { productID }] } }
       });
 
-      let cartProducts = await client.get(`${authEmail}_cartProducts`);
+      let cartProducts = cache.get(`${authEmail}_cartProducts`);
       cartProducts = cartProducts && JSON.parse(cartProducts);
 
       cartProducts = cartProducts.filter((e: any) => e?.variationID !== variationID);
 
-      await client.set(`${authEmail}_cartProducts`, JSON.stringify(cartProducts));
+      cache.set(`${authEmail}_cartProducts`, JSON.stringify(cartProducts));
 
       if (updateDocuments) return res.status(200).send({ success: true, statusCode: 200, message: "Item removed successfully from your cart." });
 
