@@ -23,6 +23,7 @@
     "mongodb": "^4.5.0",
     "mongoose": "^6.6.3",
     "nodemailer": "^6.9.1",
+    "redis": "^4.6.6",
     "stripe": "^11.11.0",
     "validator": "^13.7.0"
   },

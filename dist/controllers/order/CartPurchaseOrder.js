@@ -102,14 +102,12 @@ module.exports = function CartPurchaseOrder(req, res, next) {
             const productInfos = [];
             let totalAmount = 0;
             const groupOrdersBySeller = {};
-            let totalShippingCost = 0;
             cartItems.forEach((item) => {
                 var _a, _b, _c, _d, _e, _f, _g, _h, _j;
                 item["shippingCharge"] = ((_a = item === null || item === void 0 ? void 0 : item.shipping) === null || _a === void 0 ? void 0 : _a.isFree) ? 0 : calculateShippingCost((((_b = item === null || item === void 0 ? void 0 : item.packaged) === null || _b === void 0 ? void 0 : _b.volumetricWeight) * (item === null || item === void 0 ? void 0 : item.quantity)), areaType);
                 item["itemID"] = "item" + (generateItemID() + (itemNumber++)).toString();
                 item["baseAmount"] = parseInt((item === null || item === void 0 ? void 0 : item.baseAmount) + (item === null || item === void 0 ? void 0 : item.shippingCharge));
                 totalAmount += item === null || item === void 0 ? void 0 : item.baseAmount;
-                totalShippingCost += item === null || item === void 0 ? void 0 : item.shippingCharge;
                 productInfos.push({
                     productID: item === null || item === void 0 ? void 0 : item.productID,
                     listingID: item === null || item === void 0 ? void 0 : item.listingID,
@@ -126,7 +124,6 @@ module.exports = function CartPurchaseOrder(req, res, next) {
             });
             if (!totalAmount)
                 throw new apiResponse.Api503Error("Service unavailable !");
-            // totalAmount = totalAmount >= 1000 ? totalAmount - totalShippingCost : totalAmount;
             // Creating payment intent after getting total amount of order items. 
             const { client_secret, metadata, id } = yield stripe.paymentIntents.create({
                 amount: (totalAmount * 100),

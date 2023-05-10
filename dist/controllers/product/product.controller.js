@@ -317,6 +317,7 @@ module.exports.purchaseProductController = (req, res, next) => __awaiter(void 0,
                     savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPriceProject] }, parseInt(body === null || body === void 0 ? void 0 : body.quantity)] },
                     baseAmount: { $multiply: [actualSellingPriceProject, body === null || body === void 0 ? void 0 : body.quantity] },
                     sellingPrice: actualSellingPriceProject,
+                    paymentInfo: 1,
                     variant: "$variations.variant",
                     available: "$variations.available",
                     stock: "$variations.stock"

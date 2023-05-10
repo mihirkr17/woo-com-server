@@ -39,3 +39,30 @@ module.exports.basicProductProject = {
       discount: { $toInt: { $multiply: [{ $divide: [{ $subtract: ["$pricing.price", { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] }] }, "$pricing.price"] }, 100] } }
    }
 }
+
+module.exports.shoppingCartProject = {
+
+   cartID: "$_id",
+   _id: 0,
+   title: "$variations.vTitle",
+   slug: 1,
+   packaged: 1,
+   listingID: "$items.listingID",
+   productID: "$items.productID",
+   customerEmail: 1,
+   variationID: "$items.variationID",
+   shipping: 1,
+   brand: 1,
+   image: { $first: "$images" },
+   sku: "$variations.sku",
+   sellerData: 1,
+   quantity: "$items.quantity",
+   savingAmount: { $multiply: [{ $subtract: ["$pricing.price", { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] }] }, '$items.quantity'] },
+   baseAmount: { $multiply: [{ $add: ["$pricing.sellingPrice", "$variations.priceModifier"] }, '$items.quantity'] },
+   paymentInfo: 1,
+   sellingPrice: { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] },
+   price: "$pricing.price",
+   variant: "$variations.variant",
+   available: "$variations.available",
+   stock: "$variations.stock"
+}

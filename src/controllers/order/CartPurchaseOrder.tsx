@@ -110,7 +110,7 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
 
       let totalAmount: number = 0;
       const groupOrdersBySeller: any = {};
-      let totalShippingCost: number = 0;
+
 
       cartItems.forEach((item: any) => {
          item["shippingCharge"] = item?.shipping?.isFree ? 0 : calculateShippingCost((item?.packaged?.volumetricWeight * item?.quantity), areaType);
@@ -118,7 +118,6 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
          item["baseAmount"] = parseInt(item?.baseAmount + item?.shippingCharge);
 
          totalAmount += item?.baseAmount;
-         totalShippingCost += item?.shippingCharge;
 
          productInfos.push({
             productID: item?.productID,
@@ -140,8 +139,6 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
       });
 
       if (!totalAmount) throw new apiResponse.Api503Error("Service unavailable !");
-
-      // totalAmount = totalAmount >= 1000 ? totalAmount - totalShippingCost : totalAmount;
 
 
       // Creating payment intent after getting total amount of order items. 

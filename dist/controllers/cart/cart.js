@@ -10,12 +10,19 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const ShoppingCart = require("../../model/shoppingCart.model");
-const { actualSellingPriceProject } = require("../../utils/projection");
+const { actualSellingPriceProject, shoppingCartProject } = require("../../utils/projection");
 const { findUserByEmail, checkProductAvailability, calculateShippingCost } = require("../../services/common.service");
 const apiResponse = require("../../errors/apiResponse");
 const { ObjectId } = require("mongodb");
 const { cartTemplate } = require("../../templates/cart.template");
 const Product = require("../../model/product.model");
+const client = require("../../utils/redis");
+// const redis = require("redis");
+// const REDIS_PORT = process.env.PORT || 6379;
+// const client = redis.createClient(REDIS_PORT);
+// client.on("connect", function () {
+//    console.log("Redis client connected");
+// });
 /**
  * @apiController --> ADD PRODUCT IN CART
  * @apiMethod --> POST
@@ -33,25 +40,27 @@ module.exports.addToCartHandler = (req, res, next) => __awaiter(void 0, void 0, 
         if (!availableProduct)
             throw new apiResponse.Api404Error("Product is not available !");
         const cartTemp = cartTemplate(productID, listingID, variationID);
-        if (action === "toCart") {
-            let existsProduct = yield ShoppingCart.findOne({ customerEmail: authEmail });
-            if (existsProduct) {
-                let items = (Array.isArray(existsProduct.items) && existsProduct.items) || [];
-                let isExist = items.some((e) => e.variationID === variationID);
-                if (isExist)
-                    throw new apiResponse.Api400Error("Product has already in your cart !");
-                existsProduct.items = [...items, cartTemp];
-                yield existsProduct.save();
-                return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart." });
-            }
-            else {
-                let shop = new ShoppingCart({
-                    customerEmail: authEmail,
-                    items: [cartTemp]
-                });
-                yield shop.save();
-                return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart." });
-            }
+        if (action !== "toCart")
+            throw new apiResponse.Api400Error("Required cart operation !");
+        let existsProduct = yield ShoppingCart.findOne({ customerEmail: authEmail });
+        if (existsProduct) {
+            let items = (Array.isArray(existsProduct.items) && existsProduct.items) || [];
+            let isExist = items.some((e) => e.variationID === variationID);
+            if (isExist)
+                throw new apiResponse.Api400Error("Product has already in your cart !");
+            existsProduct.items = [...items, cartTemp];
+            yield client.del(`${authEmail}_cartProducts`);
+            yield existsProduct.save();
+            return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart." });
+        }
+        else {
+            let shop = new ShoppingCart({
+                customerEmail: authEmail,
+                items: [cartTemp]
+            });
+            yield client.del(`${authEmail}_cartProducts`);
+            yield shop.save();
+            return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart." });
         }
     }
     catch (error) {
@@ -61,69 +70,57 @@ module.exports.addToCartHandler = (req, res, next) => __awaiter(void 0, void 0, 
 module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     try {
-        const authEmail = req.decoded.email;
-        let user = yield findUserByEmail(authEmail);
+        const { email } = req.decoded;
+        let cart;
+        let areaType;
+        let defaultShippingAddress;
+        let user = yield findUserByEmail(email);
         if (!user)
             throw new apiResponse.Api500Error("Something wrong !");
-        let defaultShippingAddress = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
-            ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
-        let areaType = (defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type) || "";
-        let cart = yield ShoppingCart.aggregate([
-            { $match: { customerEmail: authEmail } },
-            { $unwind: { path: "$items" } },
-            {
-                $lookup: {
-                    from: 'products',
-                    localField: "items.listingID",
-                    foreignField: "_lid",
-                    as: "main_product"
-                }
-            },
-            { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } } },
-            { $project: { main_product: 0 } },
-            { $unwind: { path: "$variations" } },
-            {
-                $match: {
-                    $expr: {
-                        $and: [
-                            { $eq: ['$variations._vrid', '$items.variationID'] },
-                            { $eq: ["$variations.stock", "in"] },
-                            { $eq: ["$variations.status", "active"] },
-                            { $eq: ["$save_as", "fulfilled"] }
-                        ]
+        const cartData = yield client.get(`${email}_cartProducts`);
+        if (cartData) {
+            cart = JSON.parse(cartData);
+        }
+        else {
+            console.log("Cart Fetching...");
+            defaultShippingAddress = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
+                ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
+            areaType = (defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type) || "";
+            cart = yield ShoppingCart.aggregate([
+                { $match: { customerEmail: email } },
+                { $unwind: { path: "$items" } },
+                {
+                    $lookup: {
+                        from: 'products',
+                        localField: "items.listingID",
+                        foreignField: "_lid",
+                        as: "main_product"
                     }
+                },
+                { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } } },
+                { $project: { main_product: 0 } },
+                { $unwind: { path: "$variations" } },
+                {
+                    $match: {
+                        $expr: {
+                            $and: [
+                                { $eq: ['$variations._vrid', '$items.variationID'] },
+                                { $eq: ["$variations.stock", "in"] },
+                                { $eq: ["$variations.status", "active"] },
+                                { $eq: ["$save_as", "fulfilled"] }
+                            ]
+                        }
+                    }
+                },
+                {
+                    $project: shoppingCartProject
+                },
+                {
+                    $unset: ["variations", "items"]
                 }
-            },
-            {
-                $project: {
-                    cartID: "$_id",
-                    _id: 0,
-                    title: "$variations.vTitle",
-                    slug: 1,
-                    packaged: 1,
-                    listingID: "$items.listingID",
-                    productID: "$items.productID",
-                    customerEmail: 1,
-                    variationID: "$items.variationID",
-                    shipping: 1,
-                    brand: 1,
-                    image: { $first: "$images" },
-                    sku: "$variations.sku",
-                    sellerData: 1,
-                    quantity: "$items.quantity",
-                    savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPriceProject] }, '$items.quantity'] },
-                    baseAmount: { $multiply: [actualSellingPriceProject, '$items.quantity'] },
-                    paymentInfo: 1,
-                    sellingPrice: actualSellingPriceProject,
-                    variant: "$variations.variant",
-                    available: "$variations.available",
-                    stock: "$variations.stock"
-                }
-            },
-            {
-                $unset: ["variations", "items"]
-            }
-        ]);
+            ]);
+            yield client.set(`${email}_cartProducts`, JSON.stringify(cart));
+        }
         if (typeof cart === "object") {
             cart && cart.map((p) => {
                 var _a, _b, _c;
@@ -172,6 +169,8 @@ module.exports.updateCartProductQuantityController = (req, res, next) => __await
             throw new apiResponse.Api400Error("Required product id, variation id, cart id !");
         if (!quantity || typeof quantity === "undefined")
             throw new apiResponse.Api400Error("Required quantity !");
+        if (quantity > 5 || quantity <= 0)
+            throw new apiResponse.Api400Error("Quantity can not greater than 5 and less than 1 !");
         if (cartType !== 'toCart')
             throw new apiResponse.Api404Error("Invalid cart context !");
         const productAvailability = yield checkProductAvailability(productID, variationID);
@@ -180,12 +179,24 @@ module.exports.updateCartProductQuantityController = (req, res, next) => __await
         if (parseInt(quantity) >= ((_d = productAvailability === null || productAvailability === void 0 ? void 0 : productAvailability.variations) === null || _d === void 0 ? void 0 : _d.available)) {
             return res.status(200).send({ success: false, statusCode: 200, message: "Sorry ! your selected quantity out of range." });
         }
-        const result = yield ShoppingCart.findOneAndUpdate({ $and: [{ customerEmail: authEmail }, { _id: ObjectId(cartID) }] }, {
-            $set: { "items.$[i].quantity": parseInt(quantity) }
-        }, { arrayFilters: [{ "i.variationID": variationID }], upsert: true });
-        if (result)
-            return res.status(200).send({ success: true, statusCode: 200, message: `Quantity updated to ${quantity}.` });
-        throw new apiResponse.Api500Error("Failed to update quantity !");
+        let getCart = yield client.get(`${authEmail}_cartProducts`);
+        getCart = JSON.parse(getCart);
+        if (!getCart) {
+            console.log("Quantity updating...");
+            const result = yield ShoppingCart.findOneAndUpdate({ $and: [{ customerEmail: authEmail }, { _id: ObjectId(cartID) }] }, {
+                $set: { "items.$[i].quantity": parseInt(quantity) }
+            }, { arrayFilters: [{ "i.variationID": variationID }], upsert: true });
+            if (result)
+                return res.status(200).send({ success: true, statusCode: 200, message: `Quantity updated to ${quantity}.` });
+            throw new apiResponse.Api500Error("Failed to update quantity !");
+        }
+        let product = getCart.find((e) => (e === null || e === void 0 ? void 0 : e.variationID) === variationID);
+        let productIndex = getCart.findIndex((e) => (e === null || e === void 0 ? void 0 : e.variationID) === variationID);
+        getCart[productIndex].quantity = quantity;
+        getCart[productIndex].baseAmount = product.sellingPrice * quantity;
+        getCart[productIndex].savingAmount = (product.price - product.sellingPrice);
+        yield client.set(`${authEmail}_cartProducts`, JSON.stringify(getCart), "EX", 60);
+        return res.status(200).send({ success: true, statusCode: 200, message: `Quantity updated to ${quantity}.` });
     }
     catch (error) {
         next(error);
@@ -211,6 +222,10 @@ module.exports.deleteCartItem = (req, res, next) => __awaiter(void 0, void 0, vo
         let updateDocuments = yield ShoppingCart.findOneAndUpdate({ customerEmail: authEmail }, {
             $pull: { items: { $and: [{ variationID }, { productID }] } }
         });
+        let cartProducts = yield client.get(`${authEmail}_cartProducts`);
+        cartProducts = cartProducts && JSON.parse(cartProducts);
+        cartProducts = cartProducts.filter((e) => (e === null || e === void 0 ? void 0 : e.variationID) !== variationID);
+        yield client.set(`${authEmail}_cartProducts`, JSON.stringify(cartProducts));
         if (updateDocuments)
             return res.status(200).send({ success: true, statusCode: 200, message: "Item removed successfully from your cart." });
         throw new apiResponse.Api500Error("Failed to delete product from cart !");
