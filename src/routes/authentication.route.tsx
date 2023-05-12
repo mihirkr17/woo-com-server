@@ -11,7 +11,7 @@ try {
 
    router.post("/login", loginMDL, authCTRL.loginController);
 
-   router.post("/sign-out", authCTRL.signOutController);
+   // router.post("/sign-out", authCTRL.signOutController);
 
    router.post("/register-new-seller", sellerRegistrationMDL, authCTRL.sellerRegistrationController);
 

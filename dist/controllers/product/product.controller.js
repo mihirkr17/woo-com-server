@@ -152,22 +152,22 @@ module.exports.purchaseProductController = (req, res, next) => __awaiter(void 0,
             else {
                 product["shippingCharge"] = calculateShippingCost((((_e = product === null || product === void 0 ? void 0 : product.packaged) === null || _e === void 0 ? void 0 : _e.volumetricWeight) * (product === null || product === void 0 ? void 0 : product.quantity)), areaType);
             }
-            return res.status(200).send({
-                success: true, statusCode: 200, data: {
-                    module: {
-                        product,
-                        container_p: {
-                            baseAmounts: parseInt(product === null || product === void 0 ? void 0 : product.baseAmount),
-                            totalQuantities: product === null || product === void 0 ? void 0 : product.quantity,
-                            finalAmounts: (parseInt(product === null || product === void 0 ? void 0 : product.baseAmount) + (product === null || product === void 0 ? void 0 : product.shippingCharge)),
-                            shippingFees: product === null || product === void 0 ? void 0 : product.shippingCharge,
-                            savingAmounts: product === null || product === void 0 ? void 0 : product.savingAmount
-                        },
-                        numberOfProducts: product.length || 0
-                    }
-                }
-            });
         }
+        return res.status(200).send({
+            success: true, statusCode: 200, data: {
+                module: {
+                    product,
+                    container_p: {
+                        baseAmounts: parseInt(product === null || product === void 0 ? void 0 : product.baseAmount),
+                        totalQuantities: product === null || product === void 0 ? void 0 : product.quantity,
+                        finalAmounts: (parseInt(product === null || product === void 0 ? void 0 : product.baseAmount) + (product === null || product === void 0 ? void 0 : product.shippingCharge)),
+                        shippingFees: product === null || product === void 0 ? void 0 : product.shippingCharge,
+                        savingAmounts: product === null || product === void 0 ? void 0 : product.savingAmount
+                    },
+                    numberOfProducts: product.length || 0
+                }
+            }
+        });
     }
     catch (error) {
         next(error);

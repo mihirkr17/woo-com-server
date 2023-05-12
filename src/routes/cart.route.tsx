@@ -10,7 +10,7 @@ try {
 
   router.put('/update-cart-product-quantity', verifyJWT, cartContext.updateCartProductQuantityController);
 
-  router.delete("/delete-cart-item/:productID/:cartTypes", verifyJWT, cartContext.deleteCartItem);
+  router.delete("/delete-cart-item/:productID/:variationID/:cartTypes", verifyJWT, cartContext.deleteCartItem);
 
 } catch (error: any) {
   console.log(error?.message);

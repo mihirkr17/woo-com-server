@@ -197,23 +197,23 @@ module.exports.purchaseProductController = async (req: Request, res: Response, n
          } else {
             product["shippingCharge"] = calculateShippingCost((product?.packaged?.volumetricWeight * product?.quantity), areaType);
          }
-
-         return res.status(200).send({
-            success: true, statusCode: 200, data: {
-               module: {
-                  product,
-                  container_p: {
-                     baseAmounts: parseInt(product?.baseAmount),
-                     totalQuantities: product?.quantity,
-                     finalAmounts: (parseInt(product?.baseAmount) + product?.shippingCharge),
-                     shippingFees: product?.shippingCharge,
-                     savingAmounts: product?.savingAmount
-                  },
-                  numberOfProducts: product.length || 0
-               }
-            }
-         });
       }
+
+      return res.status(200).send({
+         success: true, statusCode: 200, data: {
+            module: {
+               product,
+               container_p: {
+                  baseAmounts: parseInt(product?.baseAmount),
+                  totalQuantities: product?.quantity,
+                  finalAmounts: (parseInt(product?.baseAmount) + product?.shippingCharge),
+                  shippingFees: product?.shippingCharge,
+                  savingAmounts: product?.savingAmount
+               },
+               numberOfProducts: product.length || 0
+            }
+         }
+      });
    } catch (error: any) {
       next(error)
    }

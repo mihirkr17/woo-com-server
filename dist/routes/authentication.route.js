@@ -11,7 +11,7 @@ const { loginMDL, registrationMDL, sellerRegistrationMDL } = require("../middlew
 try {
     router.post("/register-new-user", registrationMDL, authCTRL.buyerRegistrationController);
     router.post("/login", loginMDL, authCTRL.loginController);
-    router.post("/sign-out", authCTRL.signOutController);
+    // router.post("/sign-out", authCTRL.signOutController);
     router.post("/register-new-seller", sellerRegistrationMDL, authCTRL.sellerRegistrationController);
     router.post("/verify-register-user", authCTRL.userEmailVerificationController);
     router.get('/generate-verification-code', authCTRL === null || authCTRL === void 0 ? void 0 : authCTRL.generateNewVerificationCode);

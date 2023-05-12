@@ -80,12 +80,7 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
 
       let user = await findUserByEmail(email);
 
-      if (!user) throw new apiResponse.Api500Error("Something wrong !");
-
-      let defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
-         user?.buyer?.shippingAddress.find((adr: any) => adr?.default_shipping_address === true));
-
-      let areaType: string = defaultShippingAddress?.area_type || "";
+      if (!user || user?.role !== "BUYER") throw new apiResponse.Api401Error("Permission denied !");
 
       const cartData = nCache.get(`${email}_cartProducts`);
 
@@ -96,13 +91,18 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
          await nCache.set(`${email}_cartProducts`, JSON.stringify(cart), 60000);
       }
 
-      if (typeof cart === "object" && cart.length >= 1) {
+      // declare cart calculation variables 
+      let baseAmounts: number = 0;
+      let totalQuantities: number = 0;
+      let shippingFees: number = 0;
+      let finalAmounts: number = 0;
+      let savingAmounts: number = 0;
 
-         let baseAmounts: number = 0;
-         let totalQuantities: number = 0;
-         let shippingFees: number = 0;
-         let finalAmounts: number = 0;
-         let savingAmounts: number = 0;
+      const defaultShippingAddress = user?.buyer?.shippingAddress?.find((adr: any) => adr.default_shipping_address === true);
+
+      const areaType = defaultShippingAddress?.area_type ?? "";
+
+      if (typeof cart === "object" && cart.length >= 1) {
 
          cart.forEach((p: any) => {
 
@@ -117,27 +117,25 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
             shippingFees += p?.shippingCharge;
             finalAmounts += (parseInt(p?.baseAmount) + p?.shippingCharge);
             savingAmounts += p?.savingAmount;
-
-            return p;
-         });
-
-         return res.status(200).send({
-            success: true, statusCode: 200, data: {
-               module: {
-                  products: cart,
-                  container_p: {
-                     baseAmounts,
-                     totalQuantities,
-                     finalAmounts,
-                     shippingFees,
-                     savingAmounts
-                  },
-                  numberOfProducts: cart.length || 0,
-                  defaultShippingAddress
-               }
-            }
          });
       }
+
+      return res.status(200).send({
+         success: true, statusCode: 200, data: {
+            module: {
+               products: cart,
+               container_p: {
+                  baseAmounts,
+                  totalQuantities,
+                  finalAmounts,
+                  shippingFees,
+                  savingAmounts
+               },
+               numberOfProducts: cart.length || 0,
+               defaultShippingAddress
+            }
+         }
+      });
 
    } catch (error: any) {
       next(error);
@@ -211,31 +209,34 @@ module.exports.updateCartProductQuantityController = async (req: Request, res: R
  */
 module.exports.deleteCartItem = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const productID = req.params.productID;
-      const variationID = req.query.vr;
-      const authEmail = req.decoded.email;
-      const cart_types = req.params.cartTypes;
+      const { productID, variationID, cartTypes } = req.params as { productID: string, variationID: string, cartTypes: string };
 
+      const { email } = req.decoded;
 
       if (!variationID || !productID) throw new apiResponse.Api400Error("Required product id & variation id !");
+
       if (!ObjectId.isValid(productID)) throw new apiResponse.Api400Error("Product id is not valid !");
 
-      if (cart_types !== "toCart") throw new apiResponse.Api500Error("Invalid cart type !");
+      if (cartTypes !== "toCart") throw new apiResponse.Api500Error("Invalid cart type !");
 
-      let updateDocuments = await ShoppingCart.findOneAndUpdate({ customerEmail: authEmail }, {
+      let deleted = await ShoppingCart.findOneAndUpdate({ customerEmail: email }, {
          $pull: { items: { $and: [{ variationID }, { productID }] } }
       });
 
-      let cartProducts = nCache.get(`${authEmail}_cartProducts`);
-      cartProducts = cartProducts && JSON.parse(cartProducts);
+      if (!deleted) throw new apiResponse.Api500Error(`Couldn't delete product with variation id ${variationID}!`);
 
-      cartProducts = cartProducts.filter((e: any) => e?.variationID !== variationID);
 
-      nCache.set(`${authEmail}_cartProducts`, JSON.stringify(cartProducts));
+      // getting cart items from cache
+      let cartProductsInCache = nCache.get(`${email}_cartProducts`);
 
-      if (updateDocuments) return res.status(200).send({ success: true, statusCode: 200, message: "Item removed successfully from your cart." });
+      if (cartProductsInCache) {
+         cartProductsInCache = JSON.parse(cartProductsInCache);
 
-      throw new apiResponse.Api500Error("Failed to delete product from cart !");
+         nCache.set(`${email}_cartProducts`, JSON.stringify(Array.isArray(cartProductsInCache) && cartProductsInCache.filter((e: any) => e?.variationID !== variationID)));
+      }
+
+
+      return res.status(200).send({ success: true, statusCode: 200, message: "Item removed successfully from your cart." });
 
    } catch (error: any) {
       next(error);

@@ -209,13 +209,6 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
         if (!loginToken)
             throw new apiResponse.Api400Error("Login failed due to internal issue !");
         const userDataToken = generateUserDataToken(user);
-        // if token then set it to client cookie
-        res.cookie("token", loginToken, {
-            sameSite: "none",
-            secure: true,
-            maxAge: 16 * 60 * 60 * 1000,
-            httpOnly: true
-        });
         // if all operation success then return the response
         return res.status(200).send({
             success: true,
@@ -226,24 +219,6 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
             u_data: userDataToken,
             token: loginToken
         });
-    }
-    catch (error) {
-        next(error);
-    }
-});
-/**
- * @apiController --> Sign Out Users Controller
- * @apiMethod --> POST
- * @apiRequired --> BODY
- */
-module.exports.signOutController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { token } = req.cookies; // finding token in http only cookies.
-        if (token && typeof token !== "undefined") {
-            res.clearCookie("token");
-            return res.status(200).send({ success: true, statusCode: 200, message: "Sign out successfully" });
-        }
-        throw new apiResponse.Api400Error("You already logged out !");
     }
     catch (error) {
         next(error);

@@ -15,19 +15,12 @@ const apiResponse = require("../errors/apiResponse");
 
 const verifyJWT = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const token = req.cookies.token; // finding token in http only cookies.
-    const log_tok = req.headers?.authorization?.split(" ")[1] || req.cookies.log_tok;
+    const token = req.headers?.authorization?.split(" ")[1] || req.cookies.log_tok;
 
-    // if token not present in cookies then return 403 status code and terminate the request here....
+    // if token not present in cookies then return 401 unauthorized errors...
     if (!token || typeof token === "undefined") {
       throw new apiResponse.Api401Error('Token not found');
     }
-
-    if (log_tok !== token) {
-      res.clearCookie("token");
-      throw new apiResponse.Api401Error('Token is not valid !');
-    }
-
 
     jwt.verify(
       token,
