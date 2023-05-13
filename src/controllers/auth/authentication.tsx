@@ -246,10 +246,9 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
       }
 
       const loginToken = generateJwtToken(user);
-
-      if (!loginToken) throw new apiResponse.Api400Error("Login failed due to internal issue !");
-
       const userDataToken = generateUserDataToken(user);
+
+      if (!loginToken || !userDataToken) throw new apiResponse.Api400Error("Login failed due to internal issue !");
 
       // if all operation success then return the response
       return res.status(200).send({
@@ -275,7 +274,7 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
  */
 module.exports.changePasswordController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const authEmail = req.decoded.email;
+      const { email } = req.decoded;
 
       const { oldPassword, newPassword } = req.body;
 
@@ -292,7 +291,7 @@ module.exports.changePasswordController = async (req: Request, res: Response, ne
          throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
 
       // find user in db by email
-      let user = await User.findOne({ email: authEmail });
+      let user = await User.findOne({ email: email });
 
       if (!user && typeof user !== "object")
          throw new apiResponse.Api404Error(`User not found !`);
@@ -319,26 +318,24 @@ module.exports.changePasswordController = async (req: Request, res: Response, ne
 }
 
 
-module.exports.checkUserAuthentication = async (req: Request, res: Response, next: NextFunction) => {
+module.exports.checkUserAuthenticationByEmail = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
-      const body = req.body;
+      const { email } = req?.body;
 
-      if (!body || typeof body === "undefined") throw new apiResponse.Api400Error("Required body !");
-
-      const { email } = body;
+      if (!email || !validEmail(email)) throw new apiResponse.Api400Error("Required valid email address !");
 
       const user = await User.findOne({ email });
 
       if (!user || typeof user === "undefined") throw new apiResponse.Api404Error(`Sorry user not found with this ${email}`);
 
-      let securityCode = generateSixDigitNumber();
-      let lifeTime = 300000;
+      const securityCode = generateSixDigitNumber();
+      const lifeTime = 300000;
 
       const info = await email_service({
          to: email, // the user email
          subject: 'Reset your WooKart Password',
-         html: `<p>Your Security Code is <b>${securityCode}</b> and expire in 5 minutes.</p>`
+         html: `<p>Your Security Code is <b style="font-size: 1.5rem">${securityCode}</b> and expire in 5 minutes.</p>`
       })
 
       if (!info?.response) throw new apiResponse.Api500Error("Sorry ! Something wrong in your email. please provide valid email address.");
@@ -398,39 +395,29 @@ module.exports.checkUserForgotPwdSecurityKey = async (req: Request, res: Respons
 
 module.exports.userSetNewPassword = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      let set_new_pwd_session = req.cookies.set_new_pwd_session;
+      const { set_new_pwd_session } = req.cookies;
 
       if (!set_new_pwd_session) throw new apiResponse.Api400Error("Sorry ! your session is expired !");
-
-      const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/;
 
       const { email, password, securityCode } = req.body;
 
       if (securityCode !== set_new_pwd_session) throw new apiResponse.Api400Error("Invalid security code !");
 
-      if (!email) throw new apiResponse.Api400Error("Required email address !");
-
-      if (!password)
-         throw new apiResponse.Api400Error(`Required password !`);
-
-      if (password && typeof password !== "string")
-         throw new apiResponse.Api400Error("Password should be string !");
+      if (!email || !validEmail(email)) throw new apiResponse.Api400Error("Required valid email address !");
 
       if (password.length < 5 || password.length > 8)
          throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
 
-      if (!passwordRegex.test(password))
+      if (!validPassword(password) || typeof password !== "string")
          throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
 
       const user = await User.findOne({ email });
 
-      if (!user && typeof user !== "object") {
-         throw new apiResponse.Api404Error(`User not found!`);
-      }
+      if (!user && typeof user !== "object") throw new apiResponse.Api404Error(`User not found!`);
 
-      let hashedPwd = await bcrypt.hash(password, 10);
+      const hashedPwd = await bcrypt.hash(password, 10);
 
-      let result = hashedPwd ? await User.findOneAndUpdate(
+      const result = hashedPwd ? await User.findOneAndUpdate(
          { email },
          { $set: { password: hashedPwd } },
          { upsert: true }
@@ -440,7 +427,7 @@ module.exports.userSetNewPassword = async (req: Request, res: Response, next: Ne
 
       if (!result) throw new apiResponse.Api500Error("Something wrong in server !");
 
-      return result && res.status(200).send({ success: true, statusCode: 200, message: "Password updated successfully." });
+      return res.status(200).send({ success: true, statusCode: 200, message: "Password updated successfully." });
 
    } catch (error: any) {
       next(error);

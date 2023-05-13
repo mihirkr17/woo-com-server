@@ -11,7 +11,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const ShoppingCart = require("../../model/shoppingCart.model");
 const { shopping_cart_pipe } = require("../../utils/pipelines");
-const { findUserByEmail, checkProductAvailability, calculateShippingCost } = require("../../services/common.service");
+const { findUserByEmail, checkProductAvailability } = require("../../services/common.service");
+const { calculateShippingCost } = require("../../utils/common");
 const apiResponse = require("../../errors/apiResponse");
 const { ObjectId } = require("mongodb");
 const { cartTemplate } = require("../../templates/cart.template");

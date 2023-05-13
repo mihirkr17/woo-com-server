@@ -21,7 +21,7 @@ try {
 
    router.post("/user/changed-password", verifyJWT, authCTRL?.changePasswordController);
 
-   router.post("/check-user-authentication", authCTRL?.checkUserAuthentication);
+   router.post("/check-user-authentication", authCTRL?.checkUserAuthenticationByEmail);
 
    router.post("/check-user-forgot-pwd-security-key", authCTRL?.checkUserForgotPwdSecurityKey);
 

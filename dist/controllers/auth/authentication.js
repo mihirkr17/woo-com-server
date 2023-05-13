@@ -206,9 +206,9 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
             });
         }
         const loginToken = generateJwtToken(user);
-        if (!loginToken)
-            throw new apiResponse.Api400Error("Login failed due to internal issue !");
         const userDataToken = generateUserDataToken(user);
+        if (!loginToken || !userDataToken)
+            throw new apiResponse.Api400Error("Login failed due to internal issue !");
         // if all operation success then return the response
         return res.status(200).send({
             success: true,
@@ -231,7 +231,7 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
  */
 module.exports.changePasswordController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const authEmail = req.decoded.email;
+        const { email } = req.decoded;
         const { oldPassword, newPassword } = req.body;
         if (!oldPassword || !newPassword)
             throw new apiResponse.Api400Error(`Required old password and new password !`);
@@ -242,7 +242,7 @@ module.exports.changePasswordController = (req, res, next) => __awaiter(void 0, 
         if (!validPassword(newPassword))
             throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
         // find user in db by email
-        let user = yield User.findOne({ email: authEmail });
+        let user = yield User.findOne({ email: email });
         if (!user && typeof user !== "object")
             throw new apiResponse.Api404Error(`User not found !`);
         const comparedPassword = yield bcrypt.compare(oldPassword, user === null || user === void 0 ? void 0 : user.password);
@@ -260,21 +260,20 @@ module.exports.changePasswordController = (req, res, next) => __awaiter(void 0, 
         next(error);
     }
 });
-module.exports.checkUserAuthentication = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.checkUserAuthenticationByEmail = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const body = req.body;
-        if (!body || typeof body === "undefined")
-            throw new apiResponse.Api400Error("Required body !");
-        const { email } = body;
+        const { email } = req === null || req === void 0 ? void 0 : req.body;
+        if (!email || !validEmail(email))
+            throw new apiResponse.Api400Error("Required valid email address !");
         const user = yield User.findOne({ email });
         if (!user || typeof user === "undefined")
             throw new apiResponse.Api404Error(`Sorry user not found with this ${email}`);
-        let securityCode = generateSixDigitNumber();
-        let lifeTime = 300000;
+        const securityCode = generateSixDigitNumber();
+        const lifeTime = 300000;
         const info = yield email_service({
             to: email,
             subject: 'Reset your WooKart Password',
-            html: `<p>Your Security Code is <b>${securityCode}</b> and expire in 5 minutes.</p>`
+            html: `<p>Your Security Code is <b style="font-size: 1.5rem">${securityCode}</b> and expire in 5 minutes.</p>`
         });
         if (!(info === null || info === void 0 ? void 0 : info.response))
             throw new apiResponse.Api500Error("Sorry ! Something wrong in your email. please provide valid email address.");
@@ -319,33 +318,27 @@ module.exports.checkUserForgotPwdSecurityKey = (req, res, next) => __awaiter(voi
 });
 module.exports.userSetNewPassword = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        let set_new_pwd_session = req.cookies.set_new_pwd_session;
+        const { set_new_pwd_session } = req.cookies;
         if (!set_new_pwd_session)
             throw new apiResponse.Api400Error("Sorry ! your session is expired !");
-        const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{5,}$/;
         const { email, password, securityCode } = req.body;
         if (securityCode !== set_new_pwd_session)
             throw new apiResponse.Api400Error("Invalid security code !");
-        if (!email)
-            throw new apiResponse.Api400Error("Required email address !");
-        if (!password)
-            throw new apiResponse.Api400Error(`Required password !`);
-        if (password && typeof password !== "string")
-            throw new apiResponse.Api400Error("Password should be string !");
+        if (!email || !validEmail(email))
+            throw new apiResponse.Api400Error("Required valid email address !");
         if (password.length < 5 || password.length > 8)
             throw new apiResponse.Api400Error("Password length should be 5 to 8 characters !");
-        if (!passwordRegex.test(password))
+        if (!validPassword(password) || typeof password !== "string")
             throw new apiResponse.Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
         const user = yield User.findOne({ email });
-        if (!user && typeof user !== "object") {
+        if (!user && typeof user !== "object")
             throw new apiResponse.Api404Error(`User not found!`);
-        }
-        let hashedPwd = yield bcrypt.hash(password, 10);
-        let result = hashedPwd ? yield User.findOneAndUpdate({ email }, { $set: { password: hashedPwd } }, { upsert: true }) : false;
+        const hashedPwd = yield bcrypt.hash(password, 10);
+        const result = hashedPwd ? yield User.findOneAndUpdate({ email }, { $set: { password: hashedPwd } }, { upsert: true }) : false;
         res.clearCookie('set_new_pwd_session');
         if (!result)
             throw new apiResponse.Api500Error("Something wrong in server !");
-        return result && res.status(200).send({ success: true, statusCode: 200, message: "Password updated successfully." });
+        return res.status(200).send({ success: true, statusCode: 200, message: "Password updated successfully." });
     }
     catch (error) {
         next(error);

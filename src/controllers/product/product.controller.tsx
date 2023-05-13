@@ -3,7 +3,8 @@
 
 import { NextFunction, Request, Response } from "express";
 const Product = require("../../model/product.model");
-const { findUserByEmail, calculateShippingCost } = require("../../services/common.service");
+const { findUserByEmail } = require("../../services/common.service");
+const { calculateShippingCost } = require("../../utils/common");
 const { product_detail_pipe, product_detail_relate_pipe, home_store_product_pipe, search_product_pipe, single_purchase_pipe, ctg_filter_product_pipe, ctg_main_product_pipe } = require("../../utils/pipelines");
 const NodeCache = require("node-cache");
 

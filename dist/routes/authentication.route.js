@@ -16,7 +16,7 @@ try {
     router.post("/verify-register-user", authCTRL.userEmailVerificationController);
     router.get('/generate-verification-code', authCTRL === null || authCTRL === void 0 ? void 0 : authCTRL.generateNewVerificationCode);
     router.post("/user/changed-password", verifyJWT, authCTRL === null || authCTRL === void 0 ? void 0 : authCTRL.changePasswordController);
-    router.post("/check-user-authentication", authCTRL === null || authCTRL === void 0 ? void 0 : authCTRL.checkUserAuthentication);
+    router.post("/check-user-authentication", authCTRL === null || authCTRL === void 0 ? void 0 : authCTRL.checkUserAuthenticationByEmail);
     router.post("/check-user-forgot-pwd-security-key", authCTRL === null || authCTRL === void 0 ? void 0 : authCTRL.checkUserForgotPwdSecurityKey);
     router.post("/user/set-new-password", authCTRL === null || authCTRL === void 0 ? void 0 : authCTRL.userSetNewPassword);
 }
