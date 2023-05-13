@@ -16,8 +16,7 @@ const { calculateShippingCost } = require("../../utils/common");
 const apiResponse = require("../../errors/apiResponse");
 const { ObjectId } = require("mongodb");
 const { cartTemplate } = require("../../templates/cart.template");
-const NodeCache = require("node-cache");
-const nCache = new NodeCache({ stdTTL: 600 });
+const NodeCache = require("../../utils/NodeCache");
 /**
  * @apiController --> ADD PRODUCT IN CART
  * @apiMethod --> POST
@@ -44,7 +43,7 @@ module.exports.addToCartHandler = (req, res, next) => __awaiter(void 0, void 0, 
             if (isExist)
                 throw new apiResponse.Api400Error("Product has already in your cart !");
             existsProduct.items = [...items, cartTemp];
-            nCache.del(`${authEmail}_cartProducts`);
+            NodeCache.deleteCache(`${authEmail}_cartProducts`);
             yield existsProduct.save();
             return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart." });
         }
@@ -53,7 +52,7 @@ module.exports.addToCartHandler = (req, res, next) => __awaiter(void 0, void 0, 
                 customerEmail: authEmail,
                 items: [cartTemp]
             });
-            nCache.del(`${authEmail}_cartProducts`);
+            NodeCache.deleteCache(`${authEmail}_cartProducts`);
             yield shop.save();
             return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart." });
         }
@@ -70,13 +69,13 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
         let user = yield findUserByEmail(email);
         if (!user || (user === null || user === void 0 ? void 0 : user.role) !== "BUYER")
             throw new apiResponse.Api401Error("Permission denied !");
-        const cartData = nCache.get(`${email}_cartProducts`);
+        const cartData = NodeCache.getCache(`${email}_cartProducts`);
         if (cartData) {
-            cart = JSON.parse(cartData);
+            cart = cartData;
         }
         else {
             cart = yield ShoppingCart.aggregate(shopping_cart_pipe(email));
-            yield nCache.set(`${email}_cartProducts`, JSON.stringify(cart), 60000);
+            yield NodeCache.saveCache(`${email}_cartProducts`, cart);
         }
         // declare cart calculation variables 
         let baseAmounts = 0;
@@ -143,16 +142,15 @@ module.exports.updateCartProductQuantityController = (req, res, next) => __await
         if (parseInt(quantity) >= ((_g = productAvailability === null || productAvailability === void 0 ? void 0 : productAvailability.variations) === null || _g === void 0 ? void 0 : _g.available)) {
             return res.status(200).send({ success: false, statusCode: 200, message: "Sorry ! your selected quantity out of range." });
         }
-        let getCart = nCache.get(`${email}_cartProducts`);
+        let getCart = NodeCache.getCache(`${email}_cartProducts`);
         // if cart has cache then some operation 
         if (getCart) {
-            getCart = JSON.parse(getCart);
             let product = getCart.find((e) => (e === null || e === void 0 ? void 0 : e.variationID) === variationID);
             let productIndex = getCart.findIndex((e) => (e === null || e === void 0 ? void 0 : e.variationID) === variationID);
             getCart[productIndex].quantity = quantity;
             getCart[productIndex].baseAmount = product.sellingPrice * quantity;
             getCart[productIndex].savingAmount = (product.price - product.sellingPrice);
-            nCache.set(`${email}_cartProducts`, JSON.stringify(getCart), 60000);
+            NodeCache.saveCache(`${email}_cartProducts`, getCart);
         }
         const result = yield ShoppingCart.findOneAndUpdate({ $and: [{ customerEmail: email }, { _id: ObjectId(cartID) }] }, {
             $set: { "items.$[i].quantity": parseInt(quantity) }
@@ -186,10 +184,9 @@ module.exports.deleteCartItem = (req, res, next) => __awaiter(void 0, void 0, vo
         if (!deleted)
             throw new apiResponse.Api500Error(`Couldn't delete product with variation id ${variationID}!`);
         // getting cart items from cache
-        let cartProductsInCache = nCache.get(`${email}_cartProducts`);
+        let cartProductsInCache = NodeCache.getCache(`${email}_cartProducts`);
         if (cartProductsInCache) {
-            cartProductsInCache = JSON.parse(cartProductsInCache);
-            nCache.set(`${email}_cartProducts`, JSON.stringify(Array.isArray(cartProductsInCache) && cartProductsInCache.filter((e) => (e === null || e === void 0 ? void 0 : e.variationID) !== variationID)));
+            NodeCache.saveCache(`${email}_cartProducts`, Array.isArray(cartProductsInCache) && cartProductsInCache.filter((e) => (e === null || e === void 0 ? void 0 : e.variationID) !== variationID));
         }
         return res.status(200).send({ success: true, statusCode: 200, message: "Item removed successfully from your cart." });
     }

@@ -14,8 +14,7 @@ const Product = require("../../model/product.model");
 const { findUserByEmail } = require("../../services/common.service");
 const { calculateShippingCost } = require("../../utils/common");
 const { product_detail_pipe, product_detail_relate_pipe, home_store_product_pipe, search_product_pipe, single_purchase_pipe, ctg_filter_product_pipe, ctg_main_product_pipe } = require("../../utils/pipelines");
-const NodeCache = require("node-cache");
-const Caches = new NodeCache({ stdTTL: 600 });
+const NodeCache = require("../../utils/NodeCache");
 /**
  * @controller      --> Fetch the single product information in product details page.
  * @required        --> [req.headers.authorization:email, req.query:productID, req.query:variationID, req.params:product slug]
@@ -26,14 +25,14 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
         const { pId: productID, vId: variationID } = req.query;
         let productDetail;
         // Product Details
-        let cacheData = Caches.get(`${productID}_${variationID}`);
+        let cacheData = NodeCache.getCache(`${productID}_${variationID}`);
         if (cacheData) {
-            productDetail = JSON.parse(cacheData);
+            productDetail = cacheData;
         }
         else {
             productDetail = yield Product.aggregate(product_detail_pipe(productID, variationID));
             productDetail = productDetail[0];
-            Caches.set(`${productID}_${variationID}`, JSON.stringify(productDetail), 60000);
+            NodeCache.saveCache(`${productID}_${variationID}`, productDetail);
         }
         // Related products
         const relatedProducts = yield Product.aggregate(product_detail_relate_pipe(variationID, productDetail === null || productDetail === void 0 ? void 0 : productDetail.categories));

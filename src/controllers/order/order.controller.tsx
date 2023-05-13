@@ -3,7 +3,7 @@ const OrderTableModel = require("../../model/orderTable.model");
 const { update_variation_stock_available } = require("../../services/common.service");
 const apiResponse = require("../../errors/apiResponse");
 const email_service = require("../../services/email.service");
-
+const NodeCache = require("../../utils/NodeCache");
 
 
 module.exports.myOrder = async (req: Request, res: Response, next: NextFunction) => {
@@ -11,11 +11,21 @@ module.exports.myOrder = async (req: Request, res: Response, next: NextFunction)
     const email = req.params.email;
     const authEmail = req.decoded.email;
 
+    let orders: any[];
+
     if (email !== authEmail) {
       return res.status(401).send();
     }
 
-    const orders = await OrderTableModel.find({ customerEmail: email }).sort({ _id: -1 });
+    // let cacheMyOrder = nCache.get(`${authEmail}_myOrders`);
+    let cacheMyOrder = NodeCache.getCache(`${authEmail}_myOrders`);
+
+    if (cacheMyOrder) {
+      orders = cacheMyOrder;
+    } else {
+      orders = await OrderTableModel.find({ customerEmail: email }).sort({ _id: -1 });
+      NodeCache.saveCache(`${authEmail}_myOrders`, orders);
+    }
 
     return res.status(200).send({ success: true, statusCode: 200, data: { module: { orders } } });
   } catch (error: any) {

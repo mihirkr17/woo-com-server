@@ -13,14 +13,24 @@ const OrderTableModel = require("../../model/orderTable.model");
 const { update_variation_stock_available } = require("../../services/common.service");
 const apiResponse = require("../../errors/apiResponse");
 const email_service = require("../../services/email.service");
+const NodeCache = require("../../utils/NodeCache");
 module.exports.myOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const email = req.params.email;
         const authEmail = req.decoded.email;
+        let orders;
         if (email !== authEmail) {
             return res.status(401).send();
         }
-        const orders = yield OrderTableModel.find({ customerEmail: email }).sort({ _id: -1 });
+        // let cacheMyOrder = nCache.get(`${authEmail}_myOrders`);
+        let cacheMyOrder = NodeCache.getCache(`${authEmail}_myOrders`);
+        if (cacheMyOrder) {
+            orders = cacheMyOrder;
+        }
+        else {
+            orders = yield OrderTableModel.find({ customerEmail: email }).sort({ _id: -1 });
+            NodeCache.saveCache(`${authEmail}_myOrders`, orders);
+        }
         return res.status(200).send({ success: true, statusCode: 200, data: { module: { orders } } });
     }
     catch (error) {

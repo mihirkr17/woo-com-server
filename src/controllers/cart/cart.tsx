@@ -6,8 +6,7 @@ const { calculateShippingCost } = require("../../utils/common");
 const apiResponse = require("../../errors/apiResponse");
 const { ObjectId } = require("mongodb");
 const { cartTemplate } = require("../../templates/cart.template");
-const NodeCache = require("node-cache");
-const nCache = new NodeCache({ stdTTL: 600 });
+const NodeCache = require("../../utils/NodeCache");
 
 
 
@@ -50,7 +49,7 @@ module.exports.addToCartHandler = async (req: Request, res: Response, next: Next
 
          existsProduct.items = [...items, cartTemp];
 
-         nCache.del(`${authEmail}_cartProducts`);
+         NodeCache.deleteCache(`${authEmail}_cartProducts`);
 
          await existsProduct.save();
          return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart." });
@@ -61,7 +60,7 @@ module.exports.addToCartHandler = async (req: Request, res: Response, next: Next
             customerEmail: authEmail,
             items: [cartTemp]
          });
-         nCache.del(`${authEmail}_cartProducts`);
+         NodeCache.deleteCache(`${authEmail}_cartProducts`);
          await shop.save();
 
          return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully added to your cart." });
@@ -83,13 +82,12 @@ module.exports.getCartContext = async (req: Request, res: Response, next: NextFu
 
       if (!user || user?.role !== "BUYER") throw new apiResponse.Api401Error("Permission denied !");
 
-      const cartData = nCache.get(`${email}_cartProducts`);
-
+      const cartData = NodeCache.getCache(`${email}_cartProducts`);
       if (cartData) {
-         cart = JSON.parse(cartData);
+         cart = cartData;
       } else {
          cart = await ShoppingCart.aggregate(shopping_cart_pipe(email));
-         await nCache.set(`${email}_cartProducts`, JSON.stringify(cart), 60000);
+         await NodeCache.saveCache(`${email}_cartProducts`, cart);
       }
 
       // declare cart calculation variables 
@@ -170,12 +168,10 @@ module.exports.updateCartProductQuantityController = async (req: Request, res: R
          return res.status(200).send({ success: false, statusCode: 200, message: "Sorry ! your selected quantity out of range." });
       }
 
-      let getCart = nCache.get(`${email}_cartProducts`);
+      let getCart = NodeCache.getCache(`${email}_cartProducts`);
 
       // if cart has cache then some operation 
       if (getCart) {
-
-         getCart = JSON.parse(getCart);
 
          let product = getCart.find((e: any) => e?.variationID === variationID);
 
@@ -187,7 +183,7 @@ module.exports.updateCartProductQuantityController = async (req: Request, res: R
 
          getCart[productIndex].savingAmount = (product.price - product.sellingPrice);
 
-         nCache.set(`${email}_cartProducts`, JSON.stringify(getCart), 60000);
+         NodeCache.saveCache(`${email}_cartProducts`, getCart);
       }
 
       const result = await ShoppingCart.findOneAndUpdate({ $and: [{ customerEmail: email }, { _id: ObjectId(cartID) }] }, {
@@ -228,12 +224,10 @@ module.exports.deleteCartItem = async (req: Request, res: Response, next: NextFu
 
 
       // getting cart items from cache
-      let cartProductsInCache = nCache.get(`${email}_cartProducts`);
+      let cartProductsInCache = NodeCache.getCache(`${email}_cartProducts`);
 
       if (cartProductsInCache) {
-         cartProductsInCache = JSON.parse(cartProductsInCache);
-
-         nCache.set(`${email}_cartProducts`, JSON.stringify(Array.isArray(cartProductsInCache) && cartProductsInCache.filter((e: any) => e?.variationID !== variationID)));
+         NodeCache.saveCache(`${email}_cartProducts`, Array.isArray(cartProductsInCache) && cartProductsInCache.filter((e: any) => e?.variationID !== variationID));
       }
 
 
