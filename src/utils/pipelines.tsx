@@ -101,7 +101,8 @@ module.exports.home_store_product_pipe = (totalLimit: number) => {
       { $unwind: { path: "$variations" } },
       { $project: basicProductProject },
       { $sort: { "variations._vrid": -1 } },
-      { $limit: totalLimit }
+      { $limit: totalLimit },
+      { $sample: { size: totalLimit ?? 6 } }
    ]
 }
 

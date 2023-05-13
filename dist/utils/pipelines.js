@@ -96,7 +96,8 @@ module.exports.home_store_product_pipe = (totalLimit) => {
         { $unwind: { path: "$variations" } },
         { $project: basicProductProject },
         { $sort: { "variations._vrid": -1 } },
-        { $limit: totalLimit }
+        { $limit: totalLimit },
+        { $sample: { size: totalLimit !== null && totalLimit !== void 0 ? totalLimit : 6 } }
     ];
 };
 module.exports.search_product_pipe = (q) => {

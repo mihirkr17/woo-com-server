@@ -49,7 +49,7 @@ module.exports.generateJwtToken = (userInfo: any) => {
 
 
 module.exports.generateUserDataToken = (user: any) => {
-
+   user = user.toObject();
    user["password"] = undefined;
 
    if (user?.role === "BUYER") {
@@ -57,7 +57,7 @@ module.exports.generateUserDataToken = (user: any) => {
          user?.buyer?.shippingAddress.find((adr: any) => adr?.default_shipping_address === true)) || {};
    }
 
-   const token = jwt.sign(user.toObject(), process.env.ACCESS_TOKEN, {
+   const token = jwt.sign(user, process.env.ACCESS_TOKEN, {
       algorithm: "HS256",
       expiresIn: "16h",
    });

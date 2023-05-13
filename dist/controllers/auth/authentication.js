@@ -217,7 +217,8 @@ module.exports.loginController = (req, res, next) => __awaiter(void 0, void 0, v
             message: "Login success",
             uuid: user === null || user === void 0 ? void 0 : user._uuid,
             u_data: userDataToken,
-            token: loginToken
+            token: loginToken,
+            role: user === null || user === void 0 ? void 0 : user.role
         });
     }
     catch (error) {

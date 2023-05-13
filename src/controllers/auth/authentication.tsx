@@ -258,7 +258,8 @@ module.exports.loginController = async (req: Request, res: Response, next: NextF
          message: "Login success",
          uuid: user?._uuid,
          u_data: userDataToken,
-         token: loginToken
+         token: loginToken,
+         role: user?.role
       });
 
    } catch (error: any) {
