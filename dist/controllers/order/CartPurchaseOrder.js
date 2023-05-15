@@ -62,7 +62,7 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                             $and: [
                                 { $eq: ['$variations._vrid', '$items.variationID'] },
                                 { $eq: ["$variations.stock", "in"] },
-                                { $eq: ["$variations.status", "active"] },
+                                { $eq: ["$status", "active"] },
                                 { $gte: ["$variations.available", "$items.quantity"] }
                             ]
                         }

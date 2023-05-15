@@ -71,7 +71,6 @@ const product_variation_template_engine = (body) => {
         priceModifier,
         stock,
         available: parseInt(body === null || body === void 0 ? void 0 : body.available),
-        status: body === null || body === void 0 ? void 0 : body.status
     };
 };
 module.exports = { product_listing_template_engine, product_variation_template_engine };

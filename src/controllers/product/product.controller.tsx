@@ -31,10 +31,9 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
          productDetail = await Product.aggregate(product_detail_pipe(productID, variationID));
 
          productDetail = productDetail[0];
-
+         
          NodeCache.saveCache(`${productID}_${variationID}`, productDetail);
       }
-
 
       // Related products
       const relatedProducts = await Product.aggregate(product_detail_relate_pipe(variationID, productDetail?.categories));
@@ -42,7 +41,7 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
       return res.status(200).send({
          success: true,
          statusCode: 200,
-         data: { product: productDetail, relatedProducts },
+         data: { product: productDetail ?? {}, relatedProducts: relatedProducts ?? [] },
       });
 
    } catch (error: any) {

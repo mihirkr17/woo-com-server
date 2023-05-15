@@ -88,7 +88,6 @@ const product_variation_template_engine = (body: any) => {
     priceModifier,
     stock,
     available: parseInt(body?.available),
-    status: body?.status
   }
 }
 

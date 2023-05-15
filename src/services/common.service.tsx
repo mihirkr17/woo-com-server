@@ -129,7 +129,7 @@ module.exports.order_status_updater = async (obj: any) => {
             { customerEmail }, { orderID },
             { "seller.email": sellerEmail }]
       }, setQuery,
-         { upsert: true });
+         { upsert: true }) ? true : false;
 
    } catch (error: any) {
       return error?.message;

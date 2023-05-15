@@ -16,13 +16,12 @@ const email_service = require("../../services/email.service");
 const NodeCache = require("../../utils/NodeCache");
 module.exports.myOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const email = req.params.email;
-        const authEmail = req.decoded.email;
+        const { email } = req.params;
+        const { email: authEmail } = req.decoded;
         let orders;
         if (email !== authEmail) {
             return res.status(401).send();
         }
-        // let cacheMyOrder = nCache.get(`${authEmail}_myOrders`);
         let cacheMyOrder = NodeCache.getCache(`${authEmail}_myOrders`);
         if (cacheMyOrder) {
             orders = cacheMyOrder;

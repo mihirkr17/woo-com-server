@@ -55,6 +55,8 @@ var QueueProductSchema = new Schema({
 
    save_as: { type: String, required: true, default: "queue" },
 
+   status: { type: String, required: true, default: "inactive" },
+
    createdAt: { type: Date, default: Date.now },
 
    packaged: { type: Object, required: true },

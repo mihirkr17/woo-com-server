@@ -64,10 +64,9 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
                   $and: [
                      { $eq: ['$variations._vrid', '$items.variationID'] },
                      { $eq: ["$variations.stock", "in"] },
-                     { $eq: ["$variations.status", "active"] },
+                     { $eq: ["$status", "active"] },
                      { $gte: ["$variations.available", "$items.quantity"] }
                   ]
-
                }
             }
          },

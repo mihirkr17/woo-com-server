@@ -1,13 +1,23 @@
 import { NextFunction, Request, Response } from "express";
-const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const apiResponse = require("../../errors/apiResponse");
+const PrivacyPolicy = require("../../model/privacyPolicy.model");
+const NodeCache = require("../../utils/NodeCache");
 
 module.exports.privacyPolicy = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const db = await dbConnection();
+    const pCache = NodeCache.getCache(`privacyPolicy`);
+    let privacyPolicy;
 
-    res.status(200).send(await db.collection("privacy-policy").findOne({}));
+    if (pCache) {
+      privacyPolicy = pCache;
+    } else {
+      privacyPolicy = await PrivacyPolicy.findOne({});
+      NodeCache.saveCache(`privacyPolicy`, privacyPolicy);
+    }
+
+    res.status(200).send({ success: true, statusCode: 200, data: privacyPolicy });
+
   } catch (error: any) {
     next(error);
   }
@@ -15,14 +25,14 @@ module.exports.privacyPolicy = async (req: Request, res: Response, next: NextFun
 
 module.exports.updatePolicy = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const db = await dbConnection();
 
     const policyId: string = req.params.policyId;
     const body = req.body;
 
-    const result = await db.collection("privacy-policy").updateOne({ _id: ObjectId(policyId) }, { $set: body }, { upsert: true });
+    const result = await PrivacyPolicy.findOneAndUpdate({ _id: ObjectId(policyId) }, { $set: body }, { upsert: true });
 
     if (result) {
+      NodeCache.deleteCache(`privacyPolicy`);
       return res.status(200).send({ success: true, statusCode: 200, message: "Policy updated successfully" });
     } else {
       throw new apiResponse.Api500Error("Update failed !");

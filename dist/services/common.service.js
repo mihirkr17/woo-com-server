@@ -114,12 +114,12 @@ module.exports.order_status_updater = (obj) => __awaiter(void 0, void 0, void 0,
                 }
             };
         }
-        return yield OrderTable.findOneAndUpdate({
+        return (yield OrderTable.findOneAndUpdate({
             $and: [
                 { customerEmail }, { orderID },
                 { "seller.email": sellerEmail }
             ]
-        }, setQuery, { upsert: true });
+        }, setQuery, { upsert: true })) ? true : false;
     }
     catch (error) {
         return error === null || error === void 0 ? void 0 : error.message;

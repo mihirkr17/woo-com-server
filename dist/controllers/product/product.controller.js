@@ -39,7 +39,7 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
         return res.status(200).send({
             success: true,
             statusCode: 200,
-            data: { product: productDetail, relatedProducts },
+            data: { product: productDetail !== null && productDetail !== void 0 ? productDetail : {}, relatedProducts: relatedProducts !== null && relatedProducts !== void 0 ? relatedProducts : [] },
         });
     }
     catch (error) {

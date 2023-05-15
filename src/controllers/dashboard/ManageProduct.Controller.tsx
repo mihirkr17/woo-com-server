@@ -122,41 +122,39 @@ module.exports.variationController = async (req: Request, res: Response, next: N
 
 module.exports.productControlController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const body = req.body;
-      let result: any;
 
-      if (body?.market_place !== 'woo-kart') {
-         return res.status(403).send({ success: false, statusCode: 403, error: "Forbidden." });
+      const { market_place, actionType, actionFor,
+         listingID, productID } = req?.body;
+
+      if (market_place !== 'wooKart') throw new apiResponse.Api400Error("Permission denied !");
+
+      if (!listingID || !productID) throw new apiResponse.Api400Error("Required product id and listing id !");
+
+      let filters: any;
+
+      if (actionFor === "status" && (["active", "inactive"].includes(actionType))) {
+         filters = {
+            $set: { status: actionType }
+         }
       }
 
-      if (body?.data?.vId) {
 
-         result = await Product.findOneAndUpdate(
-            {
-               $and: [
-                  { _id: ObjectId(body?.data?.pId) },
-                  { _lid: body?.data?.lId },
-                  { save_as: 'fulfilled' }
-               ]
-            },
-            { $set: { 'variations.$[i].status': body?.data?.action } },
-            { arrayFilters: [{ "i._vrid": body?.data?.vId }] }
-         );
-
-      } else {
-         result = await Product.findOneAndUpdate(
-            {
-               $and: [
-                  { _id: ObjectId(body?.data?.pId) },
-                  { _lid: body?.data?.lId }
-               ]
-            },
-            { $set: { save_as: body?.data?.action, "variations.$[].status": "inactive" } },
-            { upsert: true, multi: true });
+      if (actionFor === "save_as" && (["fulfilled", "draft"].includes(actionType))) {
+         filters = {
+            $set: { save_as: actionType }
+         }
       }
+
+      console.log(filters);
+
+      if (!filters) throw new apiResponse.Api400Error("Required filter !");
+
+      const result = await Product.findOneAndUpdate({ $and: [{ _lid: listingID }, { _id: ObjectId(productID) }] },
+         filters, { upsert: true }
+      );
 
       if (result) {
-         return res.status(200).send({ success: true, statusCode: 200, message: `Request ${body?.data?.action} successful.` });
+         return res.status(200).send({ success: true, statusCode: 200, message: `Request ${actionType} success.` });
       }
 
    } catch (error: any) {
@@ -199,7 +197,7 @@ module.exports.viewAllProductsInDashboard = async (
             { isVerified: true }
          ];
       } else {
-         showFor = [{ 'variations.status': "active" }, { save_as: "fulfilled" }];
+         showFor = [{ status: "active" }, { save_as: "fulfilled" }];
       }
 
       page = parseInt(page) === 1 ? 0 : parseInt(page) - 1;
@@ -236,6 +234,7 @@ module.exports.viewAllProductsInDashboard = async (
                description: 1,
                manufacturer: 1,
                sellerData: 1,
+               status: 1,
                totalVariation: { $cond: { if: { $isArray: "$variations" }, then: { $size: "$variations" }, else: 0 } }
             }
          },
@@ -281,7 +280,7 @@ module.exports.viewAllProductsInDashboard = async (
                $and: [
                   { save_as: 'fulfilled' },
                   user?.role === 'SELLER' && { "sellerData.storeName": user?.store?.name },
-                  { "variations.status": 'inactive' }
+                  { status: 'inactive' }
                ]
             }
          }
@@ -363,7 +362,7 @@ module.exports.productListingController = async (
       const { _lid, formTypes } = req.params;
 
       const body = req.body;
-      
+
       let model;
 
       const user = await User.findOne({ $and: [{ email: authEmail }, { role: 'SELLER' }] });

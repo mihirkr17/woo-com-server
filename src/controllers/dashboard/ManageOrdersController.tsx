@@ -1,27 +1,24 @@
 import { NextFunction, Request, Response } from "express";
-const Order = require("../../model/order.model");
 const { order_status_updater, update_variation_stock_available } = require("../../services/common.service");
-const Product = require("../../model/product.model");
 const OrderTableModel = require("../../model/orderTable.model");
+const apiResponse = require("../../errors/apiResponse");
 
 module.exports.manageOrders = async (req: Request, res: Response, next: NextFunction) => {
   try {
 
     const filters: any = req.query.filters;
-    const storeName = req.params.storeName;
-    const uuid = req.decoded._uuid;
-    const email = req.decoded.email;
-    let result: any;
+    const { storeName } = req.params;
+    const { email } = req.decoded;
 
-    let f: any = {};
+    let filterProjection: any = {};
 
     if (filters) {
-      f = { $and: [{ "seller.store": storeName }, { "seller.email": email }, { orderStatus: filters }] }
+      filterProjection = { $and: [{ "seller.store": storeName }, { "seller.email": email }, { orderStatus: filters }] }
     } else {
-      f = { $and: [{ "seller.store": storeName }, { "seller.email": email }] }
+      filterProjection = { $and: [{ "seller.store": storeName }, { "seller.email": email }] }
     }
 
-    const orders = await OrderTableModel.find(f).sort({ _id: -1 });
+    const orders = await OrderTableModel.find(filterProjection).sort({ _id: -1 }) ?? [];
 
     let orderCounter = await OrderTableModel.aggregate([
       { $match: { $and: [{ "seller.store": storeName }, { "seller.email": email }] } },
@@ -53,10 +50,10 @@ module.exports.manageOrders = async (req: Request, res: Response, next: NextFunc
 
     return res.status(200).send({
       success: true, statusCode: 200, data: {
-        module: result,
         placeOrderCount: orderCounter?.placeOrderCount,
         dispatchOrderCount: orderCounter?.dispatchOrderCount,
-        totalOrderCount: orderCounter?.totalOrderCount, orders
+        totalOrderCount: orderCounter?.totalOrderCount,
+        orders
       }
     });
   } catch (error: any) {
@@ -67,23 +64,25 @@ module.exports.manageOrders = async (req: Request, res: Response, next: NextFunc
 
 module.exports.orderStatusManagement = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const body = req.body;
     const storeName: string = req.params.storeName;
 
-    if (!storeName) throw new Error("Required store name in param !");
+    if (!storeName) throw new apiResponse.Api400Error("Required store name in param !");
 
+    if (!req.body) throw new apiResponse.Api400Error("Required body information about orders !");
 
-    if (!body) throw new Error("Required body information about orders !");
+    const { type, customerEmail, orderID, cancelReason, sellerEmail, items } = req.body as {
+      type: string, customerEmail: string, orderID: string, cancelReason: string, sellerEmail: string, items: any[]
+    };
 
-    const { type, customerEmail, orderID, cancelReason, sellerEmail, items } = body;
+    if (!type || type === "") throw new apiResponse.Api400Error("Required status type !");
 
-    if (!type || type === "") throw new Error("Required status type !");
-    if (!customerEmail || customerEmail === "") throw new Error("Required customer email !");
-    if (!orderID || orderID === "") throw new Error("Required Order ID !");
+    if (!customerEmail) throw new apiResponse.Api400Error("Required customer email !");
+
+    if (!orderID || orderID === "") throw new apiResponse.Api400Error("Required Order ID !");
 
 
     const result = await order_status_updater({
-      type: type,
+      type,
       customerEmail,
       orderID,
       cancelReason,

@@ -8,8 +8,8 @@ const NodeCache = require("../../utils/NodeCache");
 
 module.exports.myOrder = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const email = req.params.email;
-    const authEmail = req.decoded.email;
+    const { email } = req.params;
+    const { email: authEmail } = req.decoded;
 
     let orders: any[];
 
@@ -17,7 +17,6 @@ module.exports.myOrder = async (req: Request, res: Response, next: NextFunction)
       return res.status(401).send();
     }
 
-    // let cacheMyOrder = nCache.get(`${authEmail}_myOrders`);
     let cacheMyOrder = NodeCache.getCache(`${authEmail}_myOrders`);
 
     if (cacheMyOrder) {

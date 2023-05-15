@@ -47,6 +47,7 @@ var ProductSchema = new mongoose_1.Schema({
         details: { type: String, required: false }
     },
     save_as: { type: String, required: true, enum: ["fulfilled", "draft"] },
+    status: { type: String, required: true, enum: ["active", "inactive"], default: "inactive" },
     createdAt: { type: Date, required: true },
     modifiedAt: { type: Date, required: false },
     isVerified: { type: Boolean, required: true },

@@ -3,28 +3,32 @@ const mongoDB = require("mongodb");
 const { newPricingProject, basicProductProject, actualSellingPriceProject, shoppingCartProject } = require("./projection");
 module.exports.product_detail_pipe = (productID, variationID) => {
     return [
-        { $match: { _id: mongoDB.ObjectId(productID) } },
+        { $match: { $and: [{ _id: mongoDB.ObjectId(productID) }, { status: "active" }] } },
         {
             $addFields: {
                 swatch: {
                     $map: {
-                        input: {
-                            $filter: {
-                                input: "$variations",
-                                cond: {
-                                    $eq: ["$$v.status", "active"]
-                                },
-                                as: "v"
-                            }
-                        },
+                        input: "$variations",
                         as: "variation",
                         in: { variant: "$$variation.variant", _vrid: "$$variation._vrid" }
                     }
+                },
+                variations: {
+                    $ifNull: [
+                        {
+                            $arrayElemAt: [{
+                                    $filter: {
+                                        input: "$variations",
+                                        as: "variation",
+                                        cond: { $eq: ["$$variation._vrid", variationID] }
+                                    }
+                                }, 0]
+                        },
+                        null
+                    ]
                 }
             }
         },
-        { $unwind: { path: '$variations' } },
-        { $match: { 'variations._vrid': variationID } },
         {
             $lookup: {
                 from: 'users',
@@ -43,7 +47,9 @@ module.exports.product_detail_pipe = (productID, variationID) => {
                 store: 1,
                 fulfilledBy: "$shipping.fulfilledBy",
                 specification: 1,
-                brand: 1, categories: 1,
+                brand: 1,
+                status: 1,
+                categories: 1,
                 sellerData: 1,
                 images: 1,
                 rating: 1,
@@ -63,37 +69,23 @@ module.exports.product_detail_pipe = (productID, variationID) => {
 };
 module.exports.product_detail_relate_pipe = (variationID, categories) => {
     return [
+        { $match: { $and: [{ categories: { $in: categories } }, { status: "active" }] } },
         { $unwind: { path: '$variations' } },
-        {
-            $match: {
-                $and: [
-                    { categories: { $in: categories } },
-                    { "variations._vrid": { $ne: variationID } },
-                    { "variations.status": "active" },
-                ],
-            },
-        },
+        { $match: { "variations._vrid": { $ne: variationID } } },
         { $project: basicProductProject },
-        { $limit: 5 },
+        { $limit: 10 },
     ];
 };
 module.exports.home_store_product_pipe = (totalLimit) => {
     return [
-        { $match: { save_as: 'fulfilled' } },
+        { $match: { $and: [{ save_as: 'fulfilled' }, { status: "active" }] } },
         {
             $addFields: {
                 variations: {
-                    $slice: [{
-                            $filter: {
-                                input: "$variations",
-                                cond: { $eq: ["$$v.status", 'active'] },
-                                as: "v"
-                            }
-                        }, 1]
-                },
+                    $ifNull: [{ $arrayElemAt: ["$variations", { $floor: { $multiply: [{ $rand: {} }, { $size: "$variations" }] } }] }, null]
+                }
             }
         },
-        { $unwind: { path: "$variations" } },
         { $project: basicProductProject },
         { $sort: { "variations._vrid": -1 } },
         { $limit: totalLimit },
@@ -102,10 +94,10 @@ module.exports.home_store_product_pipe = (totalLimit) => {
 };
 module.exports.search_product_pipe = (q) => {
     return [
+        { $match: { $and: [{ save_as: "fulfilled" }, { status: "active" }] } },
         { $unwind: { path: "$variations" } },
         {
             $match: {
-                $and: [{ 'variations.status': "active" }, { save_as: "fulfilled" }],
                 $or: [
                     { title: { $regex: q, $options: "i" } },
                     { "sellerData.storeName": { $regex: q, $options: "i" } },
@@ -179,9 +171,9 @@ module.exports.ctg_main_product_pipe = (category, filterByBrand, filterByPriceRa
 };
 module.exports.single_purchase_pipe = (productID, listingID, variationID, quantity) => {
     return [
-        { $match: { _lid: listingID } },
+        { $match: { $and: [{ _lid: listingID }, { status: "active" }] } },
         { $unwind: { path: "$variations" } },
-        { $match: { $and: [{ 'variations._vrid': variationID }, { 'variations.stock': "in" }, { 'variations.status': "active" }] } },
+        { $match: { $and: [{ 'variations._vrid': variationID }, { 'variations.stock': "in" }] } },
         {
             $project: {
                 _id: 0,
@@ -231,7 +223,7 @@ module.exports.shopping_cart_pipe = (email) => {
                     $and: [
                         { $eq: ['$variations._vrid', '$items.variationID'] },
                         { $eq: ["$variations.stock", "in"] },
-                        { $eq: ["$variations.status", "active"] },
+                        { $eq: ["$status", "active"] },
                         { $eq: ["$save_as", "fulfilled"] }
                     ]
                 }

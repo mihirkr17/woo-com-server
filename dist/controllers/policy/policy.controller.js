@@ -9,13 +9,22 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const { dbConnection } = require("../../utils/db");
 const { ObjectId } = require("mongodb");
 const apiResponse = require("../../errors/apiResponse");
+const PrivacyPolicy = require("../../model/privacyPolicy.model");
+const NodeCache = require("../../utils/NodeCache");
 module.exports.privacyPolicy = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const db = yield dbConnection();
-        res.status(200).send(yield db.collection("privacy-policy").findOne({}));
+        const pCache = NodeCache.getCache(`privacyPolicy`);
+        let privacyPolicy;
+        if (pCache) {
+            privacyPolicy = pCache;
+        }
+        else {
+            privacyPolicy = yield PrivacyPolicy.findOne({});
+            NodeCache.saveCache(`privacyPolicy`, privacyPolicy);
+        }
+        res.status(200).send({ success: true, statusCode: 200, data: privacyPolicy });
     }
     catch (error) {
         next(error);
@@ -23,11 +32,11 @@ module.exports.privacyPolicy = (req, res, next) => __awaiter(void 0, void 0, voi
 });
 module.exports.updatePolicy = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const db = yield dbConnection();
         const policyId = req.params.policyId;
         const body = req.body;
-        const result = yield db.collection("privacy-policy").updateOne({ _id: ObjectId(policyId) }, { $set: body }, { upsert: true });
+        const result = yield PrivacyPolicy.findOneAndUpdate({ _id: ObjectId(policyId) }, { $set: body }, { upsert: true });
         if (result) {
+            NodeCache.deleteCache(`privacyPolicy`);
             return res.status(200).send({ success: true, statusCode: 200, message: "Policy updated successfully" });
         }
         else {
