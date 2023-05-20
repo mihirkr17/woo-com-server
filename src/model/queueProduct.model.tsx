@@ -46,13 +46,12 @@ var QueueProductSchema = new Schema({
       code: { type: String, required: true }
    },
 
-   sellerData: {
-      storeName: { type: String, required: true },
-      sellerEmail: { type: String, required: true },
-      sellerID: { type: String, required: true },
-      sellerName: { type: String, required: true }
+   supplier: {
+      id: { type: String, required: true },
+      email: { type: String, required: true },
+      store_name: { type: String, required: true }
    },
-
+   
    save_as: { type: String, required: true, default: "queue" },
 
    status: { type: String, required: true, default: "inactive" },

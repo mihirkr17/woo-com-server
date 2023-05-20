@@ -55,7 +55,7 @@ module.exports.shoppingCartProject = {
    brand: 1,
    image: { $first: "$images" },
    sku: "$variations.sku",
-   sellerData: 1,
+   supplier: 1,
    quantity: "$items.quantity",
    savingAmount: { $multiply: [{ $subtract: ["$pricing.price", { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] }] }, '$items.quantity'] },
    baseAmount: { $multiply: [{ $add: ["$pricing.sellingPrice", "$variations.priceModifier"] }, '$items.quantity'] },

@@ -1,5 +1,5 @@
 "use strict";
-const product_listing_template_engine = (body, sellerData) => {
+const product_listing_template_engine = (body, supplier) => {
     let price = parseFloat(body === null || body === void 0 ? void 0 : body.price);
     let sellingPrice = parseFloat(body === null || body === void 0 ? void 0 : body.sellingPrice);
     let discount = ((price - sellingPrice) / price);
@@ -18,7 +18,7 @@ const product_listing_template_engine = (body, sellerData) => {
             discount,
             currency: 'us'
         },
-        sellerData,
+        supplier,
         packaged: {
             dimension: {
                 height: parseFloat(body === null || body === void 0 ? void 0 : body.packageHeight),
@@ -56,7 +56,7 @@ const product_variation_template_engine = (body) => {
     let available = parseInt(body === null || body === void 0 ? void 0 : body.available) || 0;
     let priceModifier = parseInt(body === null || body === void 0 ? void 0 : body.priceModifier) || 0;
     let stock;
-    if (available && available >= 1) {
+    if (available && available >= 0) {
         stock = "in";
     }
     else {
@@ -70,7 +70,7 @@ const product_variation_template_engine = (body) => {
         highlights: (body === null || body === void 0 ? void 0 : body.highlight) || [],
         priceModifier,
         stock,
-        available: parseInt(body === null || body === void 0 ? void 0 : body.available),
+        available,
     };
 };
 module.exports = { product_listing_template_engine, product_variation_template_engine };

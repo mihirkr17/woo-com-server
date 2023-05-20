@@ -55,7 +55,7 @@ const orderTab = new mongoose_1.Schema({
             quantity: Number,
             sku: String,
             shippingCharge: Number,
-            sellerData: { type: Object, required: true },
+            supplier: { type: Object, required: true },
             sellingPrice: { type: Number, required: true },
             isRated: { type: Boolean, required: false },
             packaged: { type: Object, required: true },

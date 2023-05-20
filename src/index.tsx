@@ -13,6 +13,7 @@ const wishlistRoutes = require("./routes/wishlist.route");
 const dashboardRoutes = require("./routes/dashboard.route");
 const paymentRoutes = require("./routes/payment.route");
 const returnErrors = require("./errors/errors");
+const storeRoutes = require("./routes/store.route");
 const port = process.env.PORT || 9000;
 
 
@@ -61,6 +62,7 @@ app.get("/", (req: Request, res: Response) => {
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/product", productRoutes);
+app.use("/api/v1/store", storeRoutes);
 app.use("/api/v1/dashboard", dashboardRoutes);
 app.use("/api/v1/cart", cartRoutes);
 app.use("/api/v1/order", orderRoutes);

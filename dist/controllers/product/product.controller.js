@@ -15,12 +15,17 @@ const { findUserByEmail } = require("../../services/common.service");
 const { calculateShippingCost } = require("../../utils/common");
 const { product_detail_pipe, product_detail_relate_pipe, home_store_product_pipe, search_product_pipe, single_purchase_pipe, ctg_filter_product_pipe, ctg_main_product_pipe } = require("../../utils/pipelines");
 const NodeCache = require("../../utils/NodeCache");
+const PrivacyPolicy = require("../../model/privacyPolicy.model");
+const apiResponse = require("../../errors/apiResponse");
+const { validEmail } = require("../../utils/validator");
+const User = require("../../model/user.model");
 /**
  * @controller      --> Fetch the single product information in product details page.
  * @required        --> [req.headers.authorization:email, req.query:productID, req.query:variationID, req.params:product slug]
  * @request_method  --> GET
  */
 module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const { pId: productID, vId: variationID } = req.query;
         let productDetail;
@@ -32,6 +37,7 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
         else {
             productDetail = yield Product.aggregate(product_detail_pipe(productID, variationID));
             productDetail = productDetail[0];
+            productDetail["policies"] = (_a = yield PrivacyPolicy.findOne({})) !== null && _a !== void 0 ? _a : {};
             NodeCache.saveCache(`${productID}_${variationID}`, productDetail);
         }
         // Related products
@@ -39,7 +45,7 @@ module.exports.fetchSingleProductController = (req, res, next) => __awaiter(void
         return res.status(200).send({
             success: true,
             statusCode: 200,
-            data: { product: productDetail !== null && productDetail !== void 0 ? productDetail : {}, relatedProducts: relatedProducts !== null && relatedProducts !== void 0 ? relatedProducts : [] },
+            data: { product: productDetail !== null && productDetail !== void 0 ? productDetail : {}, relatedProducts: relatedProducts !== null && relatedProducts !== void 0 ? relatedProducts : [], }
         });
     }
     catch (error) {
@@ -134,23 +140,23 @@ module.exports.fetchTopSellingProduct = (req, res, next) => __awaiter(void 0, vo
     }
 });
 module.exports.purchaseProductController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e;
+    var _b, _c, _d, _e, _f;
     try {
         const authEmail = req.decoded.email;
         let user = yield findUserByEmail(authEmail);
         const { listingID, variationID, quantity, productID, customerEmail } = req === null || req === void 0 ? void 0 : req.body;
-        let defaultShippingAddress = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
-            ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
+        let defaultShippingAddress = (Array.isArray((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress) &&
+            ((_c = user === null || user === void 0 ? void 0 : user.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
         let areaType = defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type;
         let product = yield Product.aggregate(single_purchase_pipe(productID, listingID, variationID, quantity));
         if (product && typeof product !== 'undefined') {
             product = product[0];
             product["customerEmail"] = customerEmail;
-            if (((_c = product === null || product === void 0 ? void 0 : product.shipping) === null || _c === void 0 ? void 0 : _c.isFree) && ((_d = product === null || product === void 0 ? void 0 : product.shipping) === null || _d === void 0 ? void 0 : _d.isFree)) {
+            if (((_d = product === null || product === void 0 ? void 0 : product.shipping) === null || _d === void 0 ? void 0 : _d.isFree) && ((_e = product === null || product === void 0 ? void 0 : product.shipping) === null || _e === void 0 ? void 0 : _e.isFree)) {
                 product["shippingCharge"] = 0;
             }
             else {
-                product["shippingCharge"] = calculateShippingCost((((_e = product === null || product === void 0 ? void 0 : product.packaged) === null || _e === void 0 ? void 0 : _e.volumetricWeight) * (product === null || product === void 0 ? void 0 : product.quantity)), areaType);
+                product["shippingCharge"] = calculateShippingCost((((_f = product === null || product === void 0 ? void 0 : product.packaged) === null || _f === void 0 ? void 0 : _f.volumetricWeight) * (product === null || product === void 0 ? void 0 : product.quantity)), areaType);
             }
         }
         return res.status(200).send({

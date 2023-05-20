@@ -7,7 +7,10 @@ const { findUserByEmail } = require("../../services/common.service");
 const { calculateShippingCost } = require("../../utils/common");
 const { product_detail_pipe, product_detail_relate_pipe, home_store_product_pipe, search_product_pipe, single_purchase_pipe, ctg_filter_product_pipe, ctg_main_product_pipe } = require("../../utils/pipelines");
 const NodeCache = require("../../utils/NodeCache");
-
+const PrivacyPolicy = require("../../model/privacyPolicy.model");
+const apiResponse = require("../../errors/apiResponse");
+const { validEmail } = require("../../utils/validator");
+const User = require("../../model/user.model");
 /**
  * @controller      --> Fetch the single product information in product details page.
  * @required        --> [req.headers.authorization:email, req.query:productID, req.query:variationID, req.params:product slug]
@@ -31,7 +34,9 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
          productDetail = await Product.aggregate(product_detail_pipe(productID, variationID));
 
          productDetail = productDetail[0];
-         
+
+         productDetail["policies"] = await PrivacyPolicy.findOne({}) ?? {};
+
          NodeCache.saveCache(`${productID}_${variationID}`, productDetail);
       }
 
@@ -41,15 +46,13 @@ module.exports.fetchSingleProductController = async (req: Request, res: Response
       return res.status(200).send({
          success: true,
          statusCode: 200,
-         data: { product: productDetail ?? {}, relatedProducts: relatedProducts ?? [] },
+         data: { product: productDetail ?? {}, relatedProducts: relatedProducts ?? [], }
       });
 
    } catch (error: any) {
       next(error);
    }
 };
-
-
 
 
 /**

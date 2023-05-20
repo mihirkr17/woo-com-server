@@ -8,7 +8,8 @@ const privacyPolicySchema = new Schema({
    purchase_last_note: String,
    purchase_policy: Array,
    refund_policy: Array,
-   replace_policy: Array
+   replace_policy: Array,
+   legal_disclaimer: String
 });
 
 const PrivacyPolicy = model("privacy-policy", privacyPolicySchema, "privacy-policy");

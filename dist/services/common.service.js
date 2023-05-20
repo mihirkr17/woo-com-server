@@ -234,8 +234,8 @@ module.exports.productCounter = (sellerInfo) => __awaiter(void 0, void 0, void 0
                     f = {
                         $and: [
                             isSaveAs,
-                            { 'sellerData.storeName': sellerInfo === null || sellerInfo === void 0 ? void 0 : sellerInfo.storeName },
-                            { 'sellerData.sellerID': sellerInfo === null || sellerInfo === void 0 ? void 0 : sellerInfo._uuid }
+                            { 'supplier.store_name': sellerInfo === null || sellerInfo === void 0 ? void 0 : sellerInfo.storeName },
+                            { 'supplier.id': sellerInfo === null || sellerInfo === void 0 ? void 0 : sellerInfo._uuid }
                         ]
                     };
                 }

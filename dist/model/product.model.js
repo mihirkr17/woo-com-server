@@ -35,11 +35,10 @@ var ProductSchema = new mongoose_1.Schema({
         hsn: { type: String, required: true },
         code: { type: String, required: true }
     },
-    sellerData: {
-        storeName: { type: String, required: true },
-        sellerEmail: { type: String, required: true },
-        sellerID: { type: String, required: true },
-        sellerName: { type: String, required: true }
+    supplier: {
+        id: { type: String, required: true },
+        email: { type: String, required: true },
+        store_name: { type: String, required: true }
     },
     warranty: {
         type: { type: String, required: false },

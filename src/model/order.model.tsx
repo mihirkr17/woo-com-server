@@ -18,7 +18,7 @@ interface IOrder {
    paymentMode: string;
    shippingAddress: object;
    shippingCharge: number;
-   sellerData: object;
+   supplier: object;
    sellingPrice: number;
    state: string;
    sku: string;
@@ -61,7 +61,7 @@ var orderSchemaList = new Schema<IOrder>({
    sku: String,
    shippingAddress: Object,
    shippingCharge: Number,
-   sellerData: Object,
+   supplier: Object,
    sellingPrice: Number,
    state: String,
    trackingID: String,

@@ -26,7 +26,7 @@ module.exports.updateStockController = (req, res, next) => __awaiter(void 0, voi
             throw new apiResponse.Api400Error("Variation ID and unit required !");
         if (productID && storeName) {
             let stock = (variations === null || variations === void 0 ? void 0 : variations.available) <= 1 ? "out" : "in";
-            const result = yield Product.findOneAndUpdate({ $and: [{ _id: ObjectId(productID) }, { 'sellerData.storeName': storeName }] }, {
+            const result = yield Product.findOneAndUpdate({ $and: [{ _id: ObjectId(productID) }, { 'supplier.store_name': storeName }] }, {
                 $set: {
                     "variations.$[i].available": variations === null || variations === void 0 ? void 0 : variations.available,
                     "variations.$[i].stock": stock,
@@ -125,7 +125,6 @@ module.exports.productControlController = (req, res, next) => __awaiter(void 0, 
 module.exports.viewAllProductsInDashboard = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c;
     try {
-        // await db.collection("products").createIndex({ _lid: 1, slug: 1, save_as: 1, categories: 1, brand: 1, "sellerData.storeName": 1, "sellerData.sellerName": 1, "sellerData.sellerID": 1 });
         const authEmail = req.decoded.email;
         const role = req.decoded.role;
         const user = yield User.findOne({ $and: [{ email: authEmail }, { role }] });
@@ -142,7 +141,7 @@ module.exports.viewAllProductsInDashboard = (req, res, next) => __awaiter(void 0
         let src = [];
         if (user.role === 'SELLER') {
             showFor = [
-                { "sellerData.storeName": (_a = user === null || user === void 0 ? void 0 : user.store) === null || _a === void 0 ? void 0 : _a.name },
+                { "supplier.store_name": (_a = user === null || user === void 0 ? void 0 : user.store) === null || _a === void 0 ? void 0 : _a.name },
                 { save_as: "fulfilled" },
                 { isVerified: true }
             ];
@@ -155,7 +154,7 @@ module.exports.viewAllProductsInDashboard = (req, res, next) => __awaiter(void 0
             filters = '';
             src = [
                 { title: { $regex: searchText, $options: "i" } },
-                { "sellerData.storeName": { $regex: searchText, $options: "i" } },
+                { "supplier.store_name": { $regex: searchText, $options: "i" } },
             ];
         }
         else if (filters) {
@@ -183,7 +182,7 @@ module.exports.viewAllProductsInDashboard = (req, res, next) => __awaiter(void 0
                     specification: 1,
                     description: 1,
                     manufacturer: 1,
-                    sellerData: 1,
+                    supplier: 1,
                     status: 1,
                     totalVariation: { $cond: { if: { $isArray: "$variations" }, then: { $size: "$variations" }, else: 0 } }
                 }
@@ -197,7 +196,7 @@ module.exports.viewAllProductsInDashboard = (req, res, next) => __awaiter(void 0
         draftProducts = yield Product.aggregate([
             {
                 $match: {
-                    $and: [{ save_as: "draft" }, { "sellerData.storeName": (_b = user === null || user === void 0 ? void 0 : user.store) === null || _b === void 0 ? void 0 : _b.name }]
+                    $and: [{ save_as: "draft" }, { "supplier.store_name": (_b = user === null || user === void 0 ? void 0 : user.store) === null || _b === void 0 ? void 0 : _b.name }]
                 }
             },
             {
@@ -211,7 +210,7 @@ module.exports.viewAllProductsInDashboard = (req, res, next) => __awaiter(void 0
                     specification: 1,
                     description: 1,
                     manufacturer: 1,
-                    sellerData: 1,
+                    supplier: 1,
                     totalVariation: { $cond: { if: { $isArray: "$variations" }, then: { $size: "$variations" }, else: 0 } }
                 }
             },
@@ -227,7 +226,7 @@ module.exports.viewAllProductsInDashboard = (req, res, next) => __awaiter(void 0
                 $match: {
                     $and: [
                         { save_as: 'fulfilled' },
-                        (user === null || user === void 0 ? void 0 : user.role) === 'SELLER' && { "sellerData.storeName": (_c = user === null || user === void 0 ? void 0 : user.store) === null || _c === void 0 ? void 0 : _c.name },
+                        (user === null || user === void 0 ? void 0 : user.role) === 'SELLER' && { "supplier.store_name": (_c = user === null || user === void 0 ? void 0 : user.store) === null || _c === void 0 ? void 0 : _c.name },
                         { status: 'inactive' }
                     ]
                 }
@@ -272,7 +271,7 @@ module.exports.getProductForSellerDSBController = (req, res, next) => __awaiter(
         }
         else {
             product = yield Product.findOne({
-                $and: [{ _id: ObjectId(productID) }, { "sellerData.storeName": storeName }],
+                $and: [{ _id: ObjectId(productID) }, { "supplier.store_name": storeName }],
             });
         }
         return product
@@ -305,10 +304,9 @@ module.exports.productListingController = (req, res, next) => __awaiter(void 0, 
         }
         if (formTypes === "update" && _lid) {
             model = product_listing_template_engine(body, {
-                sellerEmail: authEmail,
-                sellerID: user === null || user === void 0 ? void 0 : user._uuid,
-                sellerName: user === null || user === void 0 ? void 0 : user.fullName,
-                storeName: (_d = user === null || user === void 0 ? void 0 : user.store) === null || _d === void 0 ? void 0 : _d.name
+                email: authEmail,
+                id: user === null || user === void 0 ? void 0 : user._uuid,
+                store_name: (_d = user === null || user === void 0 ? void 0 : user.store) === null || _d === void 0 ? void 0 : _d.name
             });
             model['modifiedAt'] = new Date(Date.now());
             const result = yield Product.findOneAndUpdate({ _lid: _lid }, { $set: model }, { upsert: true });
@@ -322,10 +320,9 @@ module.exports.productListingController = (req, res, next) => __awaiter(void 0, 
         }
         if (formTypes === 'create') {
             model = product_listing_template_engine(body, {
-                sellerEmail: authEmail,
-                sellerID: user === null || user === void 0 ? void 0 : user._uuid,
-                sellerName: user === null || user === void 0 ? void 0 : user.fullName,
-                storeName: (_e = user === null || user === void 0 ? void 0 : user.store) === null || _e === void 0 ? void 0 : _e.name
+                email: authEmail,
+                id: user === null || user === void 0 ? void 0 : user._uuid,
+                store_name: (_e = user === null || user === void 0 ? void 0 : user.store) === null || _e === void 0 ? void 0 : _e.name
             });
             model["rating"] = [
                 { weight: 5, count: 0 },
@@ -358,14 +355,14 @@ module.exports.deleteProductVariationController = (req, res, next) => __awaiter(
         const productID = req.params.productID;
         const _vrid = req.params.vId;
         const storeName = req.params.storeName;
-        const product = yield Product.findOne({ $and: [{ _id: ObjectId(productID) }, { "sellerData.storeName": storeName }] });
+        const product = yield Product.findOne({ $and: [{ _id: ObjectId(productID) }, { "supplier.store_name": storeName }] });
         if (!product) {
             return res.status(404).send({ success: false, statusCode: 404, error: 'Sorry! Product not found!!!' });
         }
         if (product && Array.isArray(product === null || product === void 0 ? void 0 : product.variations) && (product === null || product === void 0 ? void 0 : product.variations.length) <= 1) {
             return res.status(200).send({ success: false, statusCode: 200, message: "Please create another variation before delete this variation !" });
         }
-        const result = yield Product.updateOne({ $and: [{ _id: ObjectId(productID) }, { "sellerData.storeName": storeName }] }, { $pull: { variations: { _vrid } } });
+        const result = yield Product.updateOne({ $and: [{ _id: ObjectId(productID) }, { "supplier.store_name": storeName }] }, { $pull: { variations: { _vrid } } });
         if (result) {
             return res.status(200).send({ success: true, statusCode: 200, message: 'Variation deleted successfully.' });
         }
@@ -383,7 +380,7 @@ module.exports.deleteProductController = (req, res, next) => __awaiter(void 0, v
             $and: [
                 { _id: ObjectId(productID) },
                 { _lid: listingID },
-                { 'sellerData.storeName': storeName }
+                { 'supplier.store_name': storeName }
             ]
         });
         if (!deletedProduct.deletedCount) {
@@ -411,13 +408,13 @@ module.exports.productFlashSaleController = (req, res, next) => __awaiter(void 0
         const productID = (_f = body === null || body === void 0 ? void 0 : body.data) === null || _f === void 0 ? void 0 : _f.productID;
         const listingID = (_g = body === null || body === void 0 ? void 0 : body.data) === null || _g === void 0 ? void 0 : _g.listingID;
         const fSale = (_h = body === null || body === void 0 ? void 0 : body.data) === null || _h === void 0 ? void 0 : _h.fSale;
-        const product = yield Product.findOne({ $and: [{ _id: ObjectId(productID) }, { _lid: listingID }, { "sellerData.storeName": storeName }] });
+        const product = yield Product.findOne({ $and: [{ _id: ObjectId(productID) }, { _lid: listingID }, { "supplier.store_name": storeName }] });
         if (!product) {
             return res.status(200).send({ success: false, statusCode: 200, message: "Product Not found !" });
         }
         const result = yield Product.updateOne({
             $and: [
-                { _id: ObjectId(productID) }, { _lid: listingID }, { "sellerData.storeName": storeName }
+                { _id: ObjectId(productID) }, { _lid: listingID }, { "supplier.store_name": storeName }
             ]
         }, {
             $set: {
@@ -523,7 +520,7 @@ module.exports.queueProductsController = (req, res, next) => __awaiter(void 0, v
         const { email } = req.decoded;
         if (!storeName)
             throw new apiResponse.Api400Error("Required store name as a parameter !");
-        const queueProduct = (yield QueueProduct.find({ $and: [{ "sellerData.sellerEmail": email }, { "sellerData.storeName": storeName }] })) || [];
+        const queueProduct = (yield QueueProduct.find({ $and: [{ "supplier.email": email }, { "supplier.store_name": storeName }] })) || [];
         let countQueue = queueProduct.length || 0;
         if (!Array.isArray(queueProduct))
             throw new apiResponse.Api400Error("Queue is empty !");

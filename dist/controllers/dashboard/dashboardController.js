@@ -21,7 +21,7 @@ module.exports.dashboardOverview = (req, res, next) => __awaiter(void 0, void 0,
         let matches;
         const user = yield User.findOne({ $and: [{ email: authEmail }, { role }] });
         if ((user === null || user === void 0 ? void 0 : user.role) === 'SELLER') {
-            matches = { $match: { $and: [{ 'sellerData.storeName': (_a = user === null || user === void 0 ? void 0 : user.store) === null || _a === void 0 ? void 0 : _a.name }, { 'variations.totalSold': { $exists: true } }] } };
+            matches = { $match: { $and: [{ 'supplier.store_name': (_a = user === null || user === void 0 ? void 0 : user.store) === null || _a === void 0 ? void 0 : _a.name }, { 'variations.totalSold': { $exists: true } }] } };
         }
         if ((user === null || user === void 0 ? void 0 : user.role) === 'ADMIN') {
             topSellers = yield User.aggregate([
@@ -47,7 +47,7 @@ module.exports.dashboardOverview = (req, res, next) => __awaiter(void 0, void 0,
                     totalSold: '$variations.totalSold',
                     images: '$variations.images',
                     title: '$title',
-                    storeName: '$sellerData.storeName',
+                    storeName: '$supplier.store_name',
                     sku: '$variations.sku',
                     brand: '$brand',
                     categories: '$categories',

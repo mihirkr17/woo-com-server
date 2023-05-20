@@ -268,8 +268,8 @@ module.exports.productCounter = async (sellerInfo: any) => {
             f = {
                $and: [
                   isSaveAs,
-                  { 'sellerData.storeName': sellerInfo?.storeName },
-                  { 'sellerData.sellerID': sellerInfo?._uuid }
+                  { 'supplier.store_name': sellerInfo?.storeName },
+                  { 'supplier.id': sellerInfo?._uuid }
                ]
             }
          } else {

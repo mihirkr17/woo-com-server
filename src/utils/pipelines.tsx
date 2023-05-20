@@ -33,7 +33,7 @@ module.exports.product_detail_pipe = (productID: string, variationID: string) =>
       {
          $lookup: {
             from: 'users',
-            localField: 'sellerData.sellerID',
+            localField: 'supplier.id',
             foreignField: '_uuid',
             as: 'user'
          }
@@ -51,7 +51,7 @@ module.exports.product_detail_pipe = (productID: string, variationID: string) =>
             brand: 1,
             status: 1,
             categories: 1,
-            sellerData: 1,
+            supplier: 1,
             images: 1,
             rating: 1,
             ratingAverage: 1,
@@ -63,8 +63,13 @@ module.exports.product_detail_pipe = (productID: string, variationID: string) =>
             pricing: newPricingProject,
             isFreeShipping: "$shipping.isFree",
             volumetricWeight: "$packaged.volumetricWeight",
+            weight: "$packaged.weight",
+            weightUnit: "$packaged.weightUnit",
             _lid: 1
          }
+      },
+      {
+         $set: { "supplier.contact_numbers": "$store.phones", store: 0 }
       }
    ]
 }
@@ -107,7 +112,7 @@ module.exports.search_product_pipe = (q: any) => {
          $match: {
             $or: [
                { title: { $regex: q, $options: "i" } },
-               { "sellerData.storeName": { $regex: q, $options: "i" } },
+               { "supplier.store_name": { $regex: q, $options: "i" } },
                { brand: { $regex: q, $options: "i" } },
                { categories: { $in: [q] } },
             ],
@@ -198,7 +203,7 @@ module.exports.single_purchase_pipe = (productID: string, listingID: string, var
             packaged: 1,
             image: { $first: "$images" },
             sku: "$variations.sku",
-            sellerData: 1,
+            supplier: 1,
             shipping: 1,
             savingAmount: { $multiply: [{ $subtract: ["$pricing.price", actualSellingPriceProject] }, quantity] },
             baseAmount: { $multiply: [actualSellingPriceProject, quantity] },

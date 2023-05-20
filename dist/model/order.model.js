@@ -20,7 +20,7 @@ var orderSchemaList = new mongoose_1.Schema({
     sku: String,
     shippingAddress: Object,
     shippingCharge: Number,
-    sellerData: Object,
+    supplier: Object,
     sellingPrice: Number,
     state: String,
     trackingID: String,

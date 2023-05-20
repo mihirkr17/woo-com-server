@@ -15,7 +15,7 @@ module.exports.dashboardOverview = async (req: Request, res: Response, next: Nex
 
       if (user?.role === 'SELLER') {
 
-         matches = { $match: { $and: [{ 'sellerData.storeName': user?.store?.name }, { 'variations.totalSold': { $exists: true } }] } }
+         matches = { $match: { $and: [{ 'supplier.store_name': user?.store?.name }, { 'variations.totalSold': { $exists: true } }] } }
       }
 
       if (user?.role === 'ADMIN') {
@@ -45,7 +45,7 @@ module.exports.dashboardOverview = async (req: Request, res: Response, next: Nex
                totalSold: '$variations.totalSold',
                images: '$variations.images',
                title: '$title',
-               storeName: '$sellerData.storeName',
+               storeName: '$supplier.store_name',
                sku: '$variations.sku',
                brand: '$brand',
                categories: '$categories',

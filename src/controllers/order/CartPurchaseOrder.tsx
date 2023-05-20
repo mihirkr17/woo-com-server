@@ -84,11 +84,11 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
                title: "$variations.vTitle",
                slug: 1,
                brand: 1,
-               sellerData: {
-                  sellerEmail: '$sellerData.sellerEmail',
-                  sellerID: "$sellerData.sellerID",
-                  storeName: "$sellerData.storeName",
-                  stripeID: "$sellerData.stripeID"
+               supplier: {
+                  email: '$supplier.email',
+                  id: "$supplier.id",
+                  store_name: "$supplier.store_name",
+                  stripe_id: "$supplier.stripeID"
                },
                sku: "$variations.sku",
                baseAmount: { $multiply: [actualSellingPriceProject, '$items.quantity'] },
@@ -126,13 +126,13 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
          });
 
 
-         if (!groupOrdersBySeller[item?.sellerData?.sellerEmail]) {
-            groupOrdersBySeller[item?.sellerData?.sellerEmail] = { items: [], store: "", sellerID: "" };
+         if (!groupOrdersBySeller[item?.supplier?.email]) {
+            groupOrdersBySeller[item?.supplier?.email] = { items: [], store: "", sellerID: "" };
          }
 
-         groupOrdersBySeller[item?.sellerData?.sellerEmail].store = item?.sellerData?.storeName;
-         groupOrdersBySeller[item?.sellerData?.sellerEmail].sellerID = item?.sellerData?.sellerID;
-         groupOrdersBySeller[item?.sellerData?.sellerEmail].items.push(item);
+         groupOrdersBySeller[item?.supplier?.email].store = item?.supplier?.store_name;
+         groupOrdersBySeller[item?.supplier?.email].sellerID = item?.supplier?.id;
+         groupOrdersBySeller[item?.supplier?.email].items.push(item);
       });
 
       if (!totalAmount) throw new apiResponse.Api503Error("Service unavailable !");
@@ -155,9 +155,9 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
       const orders: any[] = [];
 
       // after successfully got order by seller as a object then loop it and trigger send email function inside for in loop
-      for (const sellerEmail in groupOrdersBySeller) {
+      for (const sEmail in groupOrdersBySeller) {
 
-         const { items, store, sellerID } = groupOrdersBySeller[sellerEmail]
+         const { items, store, sellerID } = groupOrdersBySeller[sEmail]
 
          // calculate total amount of orders by seller;
          const totalAmount: number = items.reduce((p: number, n: any) => p + parseInt(n?.baseAmount), 0) || 0;
@@ -173,7 +173,7 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
             customerEmail: email,
             customerID: _uuid,
             seller: {
-               email: sellerEmail,
+               email: sEmail,
                store
             },
             totalAmount,
@@ -195,7 +195,7 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
 
 
          await email_service({
-            to: sellerEmail,
+            to: sEmail,
             subject: "New order confirmed",
             html: seller_order_email_template(items, email, orderID)
          });

@@ -1,37 +1,5 @@
 import { Schema, model } from "mongoose";
 
-interface IOrderTable {
-   orderID: string;
-   orderPaymentID: string;
-   customerEmail: string;
-   customerID: string;
-   sellerEmail: string;
-   storeName: string;
-   shippingAddress: object;
-   state: string;
-   areaType: string;
-   totalAmount: number;
-   paymentMode: string;
-   paymentIntentID: string;
-   paymentMethodID: string;
-   clientSecret: string;
-   orderStatus: string;
-   paymentStatus: string;
-   orderAT: object;
-   items: any;
-   isCompleted?: boolean;
-   isDispatch?: boolean;
-   isCanceled?: boolean;
-   isShipped?: boolean;
-   orderDispatchAT?: boolean;
-   orderCanceledAT?: object;
-   cancelReason?: string;
-   orderShippedAT?: object;
-   orderPlacedAT?: object;
-   orderCompletedAT?: object;
-   refund?: object;
-}
-
 const orderTab = new Schema({
    orderID: { type: String, required: true },
 
@@ -113,7 +81,7 @@ const orderTab = new Schema({
          quantity: Number,
          sku: String,
          shippingCharge: Number,
-         sellerData: { type: Object, required: true },
+         supplier: { type: Object, required: true },
          sellingPrice: { type: Number, required: true },
          isRated: { type: Boolean, required: false },
          packaged: { type: Object, required: true },

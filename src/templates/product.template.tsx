@@ -1,4 +1,4 @@
-const product_listing_template_engine = (body: any, sellerData: any) => {
+const product_listing_template_engine = (body: any, supplier: any) => {
 
   let price = parseFloat(body?.price);
   let sellingPrice = parseFloat(body?.sellingPrice);
@@ -25,7 +25,7 @@ const product_listing_template_engine = (body: any, sellerData: any) => {
       currency: 'us'
     },
 
-    sellerData,
+    supplier,
 
     packaged: {
       dimension: {
@@ -69,11 +69,11 @@ const product_listing_template_engine = (body: any, sellerData: any) => {
 }
 
 const product_variation_template_engine = (body: any) => {
-  let available = parseInt(body?.available) || 0;
-  let priceModifier = parseInt(body?.priceModifier) || 0
-  let stock;
+  let available: number = parseInt(body?.available) || 0;
+  let priceModifier: number = parseInt(body?.priceModifier) || 0
+  let stock: string;
 
-  if (available && available >= 1) {
+  if (available && available >= 0) {
     stock = "in";
   } else {
     stock = "out";
@@ -87,7 +87,7 @@ const product_variation_template_engine = (body: any) => {
     highlights: body?.highlight || [],
     priceModifier,
     stock,
-    available: parseInt(body?.available),
+    available,
   }
 }
 

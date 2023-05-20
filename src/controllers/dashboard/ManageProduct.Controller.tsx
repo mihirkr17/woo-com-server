@@ -26,7 +26,7 @@ module.exports.updateStockController = async (req: Request, res: Response, next:
          let stock = variations?.available <= 1 ? "out" : "in";
 
          const result = await Product.findOneAndUpdate(
-            { $and: [{ _id: ObjectId(productID) }, { 'sellerData.storeName': storeName }] },
+            { $and: [{ _id: ObjectId(productID) }, { 'supplier.store_name': storeName }] },
             {
                $set: {
                   "variations.$[i].available": variations?.available,
@@ -170,8 +170,6 @@ module.exports.viewAllProductsInDashboard = async (
    next: NextFunction
 ) => {
    try {
-      // await db.collection("products").createIndex({ _lid: 1, slug: 1, save_as: 1, categories: 1, brand: 1, "sellerData.storeName": 1, "sellerData.sellerName": 1, "sellerData.sellerID": 1 });
-
       const authEmail = req.decoded.email;
       const role = req.decoded.role;
 
@@ -192,7 +190,7 @@ module.exports.viewAllProductsInDashboard = async (
 
       if (user.role === 'SELLER') {
          showFor = [
-            { "sellerData.storeName": user?.store?.name },
+            { "supplier.store_name": user?.store?.name },
             { save_as: "fulfilled" },
             { isVerified: true }
          ];
@@ -206,7 +204,7 @@ module.exports.viewAllProductsInDashboard = async (
          filters = '';
          src = [
             { title: { $regex: searchText, $options: "i" } },
-            { "sellerData.storeName": { $regex: searchText, $options: "i" } },
+            { "supplier.store_name": { $regex: searchText, $options: "i" } },
          ]
       } else if (filters) {
          searchText = '';
@@ -233,7 +231,7 @@ module.exports.viewAllProductsInDashboard = async (
                specification: 1,
                description: 1,
                manufacturer: 1,
-               sellerData: 1,
+               supplier: 1,
                status: 1,
                totalVariation: { $cond: { if: { $isArray: "$variations" }, then: { $size: "$variations" }, else: 0 } }
             }
@@ -248,7 +246,7 @@ module.exports.viewAllProductsInDashboard = async (
       draftProducts = await Product.aggregate([
          {
             $match: {
-               $and: [{ save_as: "draft" }, { "sellerData.storeName": user?.store?.name }]
+               $and: [{ save_as: "draft" }, { "supplier.store_name": user?.store?.name }]
             }
          },
          {
@@ -262,7 +260,7 @@ module.exports.viewAllProductsInDashboard = async (
                specification: 1,
                description: 1,
                manufacturer: 1,
-               sellerData: 1,
+               supplier: 1,
                totalVariation: { $cond: { if: { $isArray: "$variations" }, then: { $size: "$variations" }, else: 0 } }
             }
          },
@@ -279,7 +277,7 @@ module.exports.viewAllProductsInDashboard = async (
             $match: {
                $and: [
                   { save_as: 'fulfilled' },
-                  user?.role === 'SELLER' && { "sellerData.storeName": user?.store?.name },
+                  user?.role === 'SELLER' && { "supplier.store_name": user?.store?.name },
                   { status: 'inactive' }
                ]
             }
@@ -330,7 +328,7 @@ module.exports.getProductForSellerDSBController = async (req: Request, res: Resp
 
       } else {
          product = await Product.findOne({
-            $and: [{ _id: ObjectId(productID) }, { "sellerData.storeName": storeName }],
+            $and: [{ _id: ObjectId(productID) }, { "supplier.store_name": storeName }],
          });
       }
 
@@ -376,10 +374,9 @@ module.exports.productListingController = async (
       if (formTypes === "update" && _lid) {
 
          model = product_listing_template_engine(body, {
-            sellerEmail: authEmail,
-            sellerID: user?._uuid,
-            sellerName: user?.fullName,
-            storeName: user?.store?.name
+            email: authEmail,
+            id: user?._uuid,
+            store_name: user?.store?.name
          });
 
          model['modifiedAt'] = new Date(Date.now());
@@ -402,10 +399,9 @@ module.exports.productListingController = async (
 
       if (formTypes === 'create') {
          model = product_listing_template_engine(body, {
-            sellerEmail: authEmail,
-            sellerID: user?._uuid,
-            sellerName: user?.fullName,
-            storeName: user?.store?.name
+            email: authEmail,
+            id: user?._uuid,
+            store_name: user?.store?.name
          });
 
          model["rating"] = [
@@ -445,7 +441,7 @@ module.exports.deleteProductVariationController = async (req: Request, res: Resp
       const _vrid = req.params.vId;
       const storeName = req.params.storeName;
 
-      const product = await Product.findOne({ $and: [{ _id: ObjectId(productID) }, { "sellerData.storeName": storeName }] });
+      const product = await Product.findOne({ $and: [{ _id: ObjectId(productID) }, { "supplier.store_name": storeName }] });
 
       if (!product) {
          return res.status(404).send({ success: false, statusCode: 404, error: 'Sorry! Product not found!!!' });
@@ -456,7 +452,7 @@ module.exports.deleteProductVariationController = async (req: Request, res: Resp
       }
 
       const result = await Product.updateOne(
-         { $and: [{ _id: ObjectId(productID) }, { "sellerData.storeName": storeName }] },
+         { $and: [{ _id: ObjectId(productID) }, { "supplier.store_name": storeName }] },
          { $pull: { variations: { _vrid } } }
       );
 
@@ -482,7 +478,7 @@ module.exports.deleteProductController = async (req: Request, res: Response, nex
          $and: [
             { _id: ObjectId(productID) },
             { _lid: listingID },
-            { 'sellerData.storeName': storeName }
+            { 'supplier.store_name': storeName }
          ]
       });
 
@@ -519,7 +515,7 @@ module.exports.productFlashSaleController = async (req: Request, res: Response, 
 
       const fSale = body?.data?.fSale;
 
-      const product = await Product.findOne({ $and: [{ _id: ObjectId(productID) }, { _lid: listingID }, { "sellerData.storeName": storeName }] });
+      const product = await Product.findOne({ $and: [{ _id: ObjectId(productID) }, { _lid: listingID }, { "supplier.store_name": storeName }] });
 
 
       if (!product) {
@@ -530,7 +526,7 @@ module.exports.productFlashSaleController = async (req: Request, res: Response, 
          {
             $and:
                [
-                  { _id: ObjectId(productID) }, { _lid: listingID }, { "sellerData.storeName": storeName }
+                  { _id: ObjectId(productID) }, { _lid: listingID }, { "supplier.store_name": storeName }
                ]
          },
 
@@ -677,7 +673,7 @@ module.exports.queueProductsController = async (req: Request, res: Response, nex
 
       if (!storeName) throw new apiResponse.Api400Error("Required store name as a parameter !");
 
-      const queueProduct = await QueueProduct.find({ $and: [{ "sellerData.sellerEmail": email }, { "sellerData.storeName": storeName }] }) || [];
+      const queueProduct = await QueueProduct.find({ $and: [{ "supplier.email": email }, { "supplier.store_name": storeName }] }) || [];
 
       let countQueue = queueProduct.length || 0;
 

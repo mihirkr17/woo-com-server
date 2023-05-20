@@ -82,11 +82,11 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                         title: "$variations.vTitle",
                         slug: 1,
                         brand: 1,
-                        sellerData: {
-                            sellerEmail: '$sellerData.sellerEmail',
-                            sellerID: "$sellerData.sellerID",
-                            storeName: "$sellerData.storeName",
-                            stripeID: "$sellerData.stripeID"
+                        supplier: {
+                            email: '$supplier.email',
+                            id: "$supplier.id",
+                            store_name: "$supplier.store_name",
+                            stripe_id: "$supplier.stripeID"
                         },
                         sku: "$variations.sku",
                         baseAmount: { $multiply: [actualSellingPriceProject, '$items.quantity'] },
@@ -114,12 +114,12 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                     variationID: item === null || item === void 0 ? void 0 : item.variationID,
                     quantity: item === null || item === void 0 ? void 0 : item.quantity
                 });
-                if (!groupOrdersBySeller[(_c = item === null || item === void 0 ? void 0 : item.sellerData) === null || _c === void 0 ? void 0 : _c.sellerEmail]) {
-                    groupOrdersBySeller[(_d = item === null || item === void 0 ? void 0 : item.sellerData) === null || _d === void 0 ? void 0 : _d.sellerEmail] = { items: [], store: "", sellerID: "" };
+                if (!groupOrdersBySeller[(_c = item === null || item === void 0 ? void 0 : item.supplier) === null || _c === void 0 ? void 0 : _c.email]) {
+                    groupOrdersBySeller[(_d = item === null || item === void 0 ? void 0 : item.supplier) === null || _d === void 0 ? void 0 : _d.email] = { items: [], store: "", sellerID: "" };
                 }
-                groupOrdersBySeller[(_e = item === null || item === void 0 ? void 0 : item.sellerData) === null || _e === void 0 ? void 0 : _e.sellerEmail].store = (_f = item === null || item === void 0 ? void 0 : item.sellerData) === null || _f === void 0 ? void 0 : _f.storeName;
-                groupOrdersBySeller[(_g = item === null || item === void 0 ? void 0 : item.sellerData) === null || _g === void 0 ? void 0 : _g.sellerEmail].sellerID = (_h = item === null || item === void 0 ? void 0 : item.sellerData) === null || _h === void 0 ? void 0 : _h.sellerID;
-                groupOrdersBySeller[(_j = item === null || item === void 0 ? void 0 : item.sellerData) === null || _j === void 0 ? void 0 : _j.sellerEmail].items.push(item);
+                groupOrdersBySeller[(_e = item === null || item === void 0 ? void 0 : item.supplier) === null || _e === void 0 ? void 0 : _e.email].store = (_f = item === null || item === void 0 ? void 0 : item.supplier) === null || _f === void 0 ? void 0 : _f.store_name;
+                groupOrdersBySeller[(_g = item === null || item === void 0 ? void 0 : item.supplier) === null || _g === void 0 ? void 0 : _g.email].sellerID = (_h = item === null || item === void 0 ? void 0 : item.supplier) === null || _h === void 0 ? void 0 : _h.id;
+                groupOrdersBySeller[(_j = item === null || item === void 0 ? void 0 : item.supplier) === null || _j === void 0 ? void 0 : _j.email].items.push(item);
             });
             if (!totalAmount)
                 throw new apiResponse.Api503Error("Service unavailable !");
@@ -137,8 +137,8 @@ module.exports = function CartPurchaseOrder(req, res, next) {
             // after order succeed then group the order item by seller email and send email to the seller
             const orders = [];
             // after successfully got order by seller as a object then loop it and trigger send email function inside for in loop
-            for (const sellerEmail in groupOrdersBySeller) {
-                const { items, store, sellerID } = groupOrdersBySeller[sellerEmail];
+            for (const sEmail in groupOrdersBySeller) {
+                const { items, store, sellerID } = groupOrdersBySeller[sEmail];
                 // calculate total amount of orders by seller;
                 const totalAmount = items.reduce((p, n) => p + parseInt(n === null || n === void 0 ? void 0 : n.baseAmount), 0) || 0;
                 // generate random order ids;
@@ -151,7 +151,7 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                     customerEmail: email,
                     customerID: _uuid,
                     seller: {
-                        email: sellerEmail,
+                        email: sEmail,
                         store
                     },
                     totalAmount,
@@ -171,7 +171,7 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                     items: items,
                 });
                 yield email_service({
-                    to: sellerEmail,
+                    to: sEmail,
                     subject: "New order confirmed",
                     html: seller_order_email_template(items, email, orderID)
                 });
