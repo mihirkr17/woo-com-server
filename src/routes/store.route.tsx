@@ -3,7 +3,7 @@ const router: Router = express.Router();
 const { getStore } = require("../controllers/store/store.controller");
 
 try {
-   router.get(`/storeName`, getStore);
+   router.get(`/:storeName`, getStore);
 
 } catch (error: any) {
    console.log(error?.message);

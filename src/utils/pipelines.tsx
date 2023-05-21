@@ -1,6 +1,25 @@
 const mongoDB = require("mongodb");
 const { newPricingProject, basicProductProject, actualSellingPriceProject, shoppingCartProject } = require("./projection");
 
+module.exports.store_products_pipe = (storeName: string, limit: any) => {
+
+   limit = parseInt(limit);
+
+   return [
+      { $match: { $and: [{ "supplier.store_name": storeName }, { status: "active" }] } },
+      {
+         $addFields: {
+            variations: {
+               $ifNull: [{ $arrayElemAt: ["$variations", 0] }, null]
+            }
+         }
+      },
+      { $project: basicProductProject },
+      // { $sort: { "variations._vrid": -1 } },
+      { $skip: 0 },
+      { $limit: limit }
+   ]
+}
 
 module.exports.product_detail_pipe = (productID: string, variationID: string) => {
    return [

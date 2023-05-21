@@ -12,7 +12,7 @@ try {
      * @apiRoutes /api/product
      */
     router.get("/search-products/:q", productCTRL.searchProducts);
-    router.get("/fetch-single-product/:product_slug", productCTRL.fetchSingleProductController);
+    router.get("/fetch-single-product/:product_slug", productCTRL.fetchProductDetails);
     router.get("/store/:limits", productCTRL.homeStoreController);
     router.post("/purchase", verifyJWT, isRoleBuyer, productCTRL === null || productCTRL === void 0 ? void 0 : productCTRL.purchaseProductController);
     /**

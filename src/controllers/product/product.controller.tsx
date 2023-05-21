@@ -8,7 +8,7 @@ const { calculateShippingCost } = require("../../utils/common");
 const { product_detail_pipe, product_detail_relate_pipe, home_store_product_pipe, search_product_pipe, single_purchase_pipe, ctg_filter_product_pipe, ctg_main_product_pipe } = require("../../utils/pipelines");
 const NodeCache = require("../../utils/NodeCache");
 const PrivacyPolicy = require("../../model/privacyPolicy.model");
-const apiResponse = require("../../errors/apiResponse");
+const { Api400Error } = require("../../errors/apiResponse");
 const { validEmail } = require("../../utils/validator");
 const User = require("../../model/user.model");
 /**
@@ -16,10 +16,14 @@ const User = require("../../model/user.model");
  * @required        --> [req.headers.authorization:email, req.query:productID, req.query:variationID, req.params:product slug]
  * @request_method  --> GET
  */
-module.exports.fetchSingleProductController = async (req: Request, res: Response, next: NextFunction) => {
+module.exports.fetchProductDetails = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
       const { pId: productID, vId: variationID } = req.query;
+
+      if (!productID || typeof productID !== "string") throw new Api400Error("Invalid product id ");
+
+      if (!variationID || typeof variationID !== "string") throw new Api400Error("Invalid variation id ");
 
       let productDetail: any;
 

@@ -9,7 +9,7 @@ try {
    */
   router.get("/search-products/:q", productCTRL.searchProducts);
 
-  router.get("/fetch-single-product/:product_slug", productCTRL.fetchSingleProductController);
+  router.get("/fetch-single-product/:product_slug", productCTRL.fetchProductDetails);
 
   router.get("/store/:limits", productCTRL.homeStoreController);
 

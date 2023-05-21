@@ -55,10 +55,13 @@ module.exports.addProductRating = async (req: Request, res: Response, next: Next
     newRatingArray &&
       newRatingArray.length > 0 &&
       newRatingArray.forEach((rat: any) => {
+
         const multiWeight = parseInt(rat?.weight) * parseInt(rat?.count);
+
         weightVal += multiWeight;
         countValue += rat?.count;
       });
+      
     const ava = weightVal / countValue;
     const average = parseFloat(ava.toFixed(1));
 
