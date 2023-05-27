@@ -1,5 +1,6 @@
-import express, { Express, Request, Response } from "express";
+import express, { Express, NextFunction, Request, Response } from "express";
 var mongoose = require("mongoose");
+const cors = require("cors");
 require("dotenv").config();
 const cookieParser = require("cookie-parser");
 const authRoutes = require("./routes/authentication.route");
@@ -15,15 +16,23 @@ const paymentRoutes = require("./routes/payment.route");
 const returnErrors = require("./errors/errors");
 const storeRoutes = require("./routes/store.route");
 const port = process.env.PORT || 9000;
+const sanitizeUrl = require("@braintree/sanitize-url").sanitizeUrl;
+const allowedOrigins = ['http://localhost:3000', 'https://wookart.vercel.app'];
+const mongoUri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PWD}@cluster0.8bccj.mongodb.net/ecommerce-db?retryWrites=true&w=majority`;
 
 
 // Server setup
-const cors = require("cors");
 const app: Express = express();
 
-// middleware
-const allowedOrigins = ['http://localhost:3000', 'https://wookart.vercel.app'];
+// middleware functions
+//Sanitizing URLs
+app.use((req: any, res: any, next: NextFunction) => {
+  req.url = sanitizeUrl(req.url);
+  req.originalUrl = sanitizeUrl(req.originalUrl);
+  next();
+});
 
+// Cors policy
 app.use(
   cors({
     origin: function (origin: any, callback: any) {
@@ -45,8 +54,6 @@ app.use(cookieParser());
 app.use(express.json());
 
 // Set up default mongoose connection
-const mongoUri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PWD}@cluster0.8bccj.mongodb.net/ecommerce-db?retryWrites=true&w=majority`;
-
 mongoose.connect(mongoUri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
@@ -54,11 +61,11 @@ mongoose.connect(mongoUri, {
 }).then(() => console.log("Connection Successful..."))
   .catch((err: any) => console.log(err));
 
+// Routes declared here
 app.get("/", (req: Request, res: Response) => {
   res.status(200).send("WooKart Server is running perfectly...");
 });
 
-// all the routes
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/product", productRoutes);
@@ -72,6 +79,7 @@ app.use("/api/v1/wishlist", wishlistRoutes);
 app.use("/api/v1/payment", paymentRoutes);
 app.use(returnErrors);
 
+// Start server
 const server = app.listen(port, () => {
   console.log(`Running port is ${port}`);
 });

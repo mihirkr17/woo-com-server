@@ -10,11 +10,64 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
    try {
 
       const { storeName } = req?.params;
-      const { limit } = req.query;
+      const { page } = req.query;
+      const filters: any = req.query?.filters;
+
+      const regex = /[<>{}|\\^%]/g;
 
       if (typeof storeName !== "string") throw new Api400Error("Invalid store name !");
 
-      const allProducts = await Product.aggregate(store_products_pipe(storeName, limit));
+      let filterArr = filters ? filters.replace(regex, "").split("--") : [];
+
+      const filterResult = filterArr.reduce((obj: any, items: any) => {
+         const [key, value] = items?.split("__");
+
+         if (obj[key]) {
+            obj[key].push(value);
+         } else {
+            obj[key] = [value];
+         }
+
+         return obj;
+      }, {});
+
+      let Filter: any = {};
+
+      Filter["$and"] = [
+         { "supplier.store_name": storeName },
+         { status: "active" },
+      ];
+
+      for (const key in filterResult) {
+         let item = filterResult[key];
+
+         Filter[key] = {
+            $in: item.map((v: any) => {
+               return new RegExp("\\b" + v + "\\b", "i");
+            })
+         }
+
+         if (key === "rating") {
+            Filter[key + "Average"] = { $gte: Math.max(...item.map(parseFloat)) }
+            // Filter["$or"] = item.map((v: any) => ({ ratingAverage: { $gte: parseFloat(v) } }))
+            delete Filter["rating"];
+         }
+      }
+
+      const allProducts = await Product.aggregate(store_products_pipe(page, Filter));
+
+      let filteringProductTotal = await Product.aggregate([
+         { $match: Filter },
+         {
+            $group: {
+               _id: "$supplier.store_name",
+               totalProduct: { $count: {} },
+            }
+         },
+         { $project: { totalProduct: 1 } }
+      ]);
+
+      filteringProductTotal = filteringProductTotal[0];
 
       let storeInfo = await Product.aggregate([
          {
@@ -28,6 +81,7 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
          {
             $project: {
                supplier: 1,
+               pricing: 1,
                rating: 1,
                categories: 1,
                brand: 1,
@@ -54,7 +108,8 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
                categories: { $push: { $last: "$categories" } },
                brands: { $push: "$brand" },
                totalRatingCount: { $sum: "$totalCount" },
-               totalRatingMulti: { $sum: "$totalMulti" }
+               totalRatingMulti: { $sum: "$totalMulti" },
+               prices: { $addToSet: "$pricing.sellingPrice" }
             }
          },
          {
@@ -65,6 +120,7 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
                brands: 1,
                categories: 1,
                totalRatingCount: 1,
+               prices: 1,
                averageRating: {
                   $round: [
                      { $cond: [{ $eq: ["$totalRatingCount", 0] }, 0, { $divide: ["$totalRatingMulti", "$totalRatingCount"] }] },
@@ -77,7 +133,12 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
 
       storeInfo = storeInfo[0];
 
-      return res.status(200).send({ success: true, statusCode: 200, data: { allProducts, storeInfo } });
+      return res.status(200).send({
+         success: true, statusCode: 200, data: {
+            allProducts, storeInfo,
+            filteringProductTotal: filteringProductTotal?.totalProduct ?? 0
+         }
+      });
    } catch (error: any) {
       next(error);
    }

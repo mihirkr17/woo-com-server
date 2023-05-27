@@ -13,12 +13,55 @@ const Product = require("../../model/product.model");
 const { Api400Error } = require("../../errors/apiResponse");
 const { store_products_pipe } = require("../../utils/pipelines");
 module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
     try {
         const { storeName } = req === null || req === void 0 ? void 0 : req.params;
-        const { limit } = req.query;
+        const { page } = req.query;
+        const filters = (_a = req.query) === null || _a === void 0 ? void 0 : _a.filters;
+        const regex = /[<>{}|\\^%]/g;
         if (typeof storeName !== "string")
             throw new Api400Error("Invalid store name !");
-        const allProducts = yield Product.aggregate(store_products_pipe(storeName, limit));
+        let filterArr = filters ? filters.replace(regex, "").split("--") : [];
+        const filterResult = filterArr.reduce((obj, items) => {
+            const [key, value] = items === null || items === void 0 ? void 0 : items.split("__");
+            if (obj[key]) {
+                obj[key].push(value);
+            }
+            else {
+                obj[key] = [value];
+            }
+            return obj;
+        }, {});
+        let Filter = {};
+        Filter["$and"] = [
+            { "supplier.store_name": storeName },
+            { status: "active" },
+        ];
+        for (const key in filterResult) {
+            let item = filterResult[key];
+            Filter[key] = {
+                $in: item.map((v) => {
+                    return new RegExp("\\b" + v + "\\b", "i");
+                })
+            };
+            if (key === "rating") {
+                Filter[key + "Average"] = { $gte: Math.max(...item.map(parseFloat)) };
+                // Filter["$or"] = item.map((v: any) => ({ ratingAverage: { $gte: parseFloat(v) } }))
+                delete Filter["rating"];
+            }
+        }
+        const allProducts = yield Product.aggregate(store_products_pipe(page, Filter));
+        let filteringProductTotal = yield Product.aggregate([
+            { $match: Filter },
+            {
+                $group: {
+                    _id: "$supplier.store_name",
+                    totalProduct: { $count: {} },
+                }
+            },
+            { $project: { totalProduct: 1 } }
+        ]);
+        filteringProductTotal = filteringProductTotal[0];
         let storeInfo = yield Product.aggregate([
             {
                 $match: {
@@ -31,6 +74,7 @@ module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, 
             {
                 $project: {
                     supplier: 1,
+                    pricing: 1,
                     rating: 1,
                     categories: 1,
                     brand: 1,
@@ -57,7 +101,8 @@ module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, 
                     categories: { $push: { $last: "$categories" } },
                     brands: { $push: "$brand" },
                     totalRatingCount: { $sum: "$totalCount" },
-                    totalRatingMulti: { $sum: "$totalMulti" }
+                    totalRatingMulti: { $sum: "$totalMulti" },
+                    prices: { $addToSet: "$pricing.sellingPrice" }
                 }
             },
             {
@@ -68,6 +113,7 @@ module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, 
                     brands: 1,
                     categories: 1,
                     totalRatingCount: 1,
+                    prices: 1,
                     averageRating: {
                         $round: [
                             { $cond: [{ $eq: ["$totalRatingCount", 0] }, 0, { $divide: ["$totalRatingMulti", "$totalRatingCount"] }] },
@@ -78,7 +124,12 @@ module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, 
             }
         ]);
         storeInfo = storeInfo[0];
-        return res.status(200).send({ success: true, statusCode: 200, data: { allProducts, storeInfo } });
+        return res.status(200).send({
+            success: true, statusCode: 200, data: {
+                allProducts, storeInfo,
+                filteringProductTotal: (_b = filteringProductTotal === null || filteringProductTotal === void 0 ? void 0 : filteringProductTotal.totalProduct) !== null && _b !== void 0 ? _b : 0
+            }
+        });
     }
     catch (error) {
         next(error);

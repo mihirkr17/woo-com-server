@@ -1,12 +1,15 @@
 const mongoDB = require("mongodb");
 const { newPricingProject, basicProductProject, actualSellingPriceProject, shoppingCartProject } = require("./projection");
 
-module.exports.store_products_pipe = (storeName: string, limit: any) => {
+module.exports.store_products_pipe = (page: any, Filter: any) => {
 
-   limit = parseInt(limit);
+   page = parseInt(page);
+   page = page === 1 ? 0 : page - 1;
 
    return [
-      { $match: { $and: [{ "supplier.store_name": storeName }, { status: "active" }] } },
+      {
+         $match: Filter
+      },
       {
          $addFields: {
             variations: {
@@ -16,8 +19,8 @@ module.exports.store_products_pipe = (storeName: string, limit: any) => {
       },
       { $project: basicProductProject },
       // { $sort: { "variations._vrid": -1 } },
-      { $skip: 0 },
-      { $limit: limit }
+      { $skip: 1 * page },
+      { $limit: 1 }
    ]
 }
 
