@@ -331,3 +331,31 @@ module.exports.clearCart = async (email: string) => {
       return error;
    }
 }
+
+
+module.exports.updateProductInformation = async (product: any, option: any) => {
+
+   const { productID, views, ratingAverage, sales } = product;
+
+   let viewsWeight = 0.4;
+   let ratingWeight = 0.5;
+   let salesWeight = 0.3;
+
+   let totalViews = option?.actionType === "views" ? ((views ?? 0) + 1) : (views ?? 0);
+   let totalSales = option?.actionType === "sales" ? (sales ?? 0) + 1 : (sales ?? 0);
+
+   let score = (totalViews * viewsWeight) + (ratingAverage * ratingWeight) + (totalSales * salesWeight);
+
+   try {
+      await Product.findOneAndUpdate({ $and: [{ _id: mdb.ObjectId(productID) }, { status: "active" }] }, {
+         $set: {
+            views: totalViews,
+            score: score
+         }
+      }, { upsert: true });
+
+      return { request: "Request success..." };
+   } catch (error: any) {
+      return error;
+   }
+}

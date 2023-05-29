@@ -11,14 +11,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const Product = require("../../model/product.model");
-const { findUserByEmail } = require("../../services/common.service");
-const { calculateShippingCost } = require("../../utils/common");
+const { findUserByEmail, updateProductInformation } = require("../../services/common.service");
+const { calculateShippingCost, calculatePopularityScore } = require("../../utils/common");
 const { product_detail_pipe, product_detail_relate_pipe, home_store_product_pipe, search_product_pipe, single_purchase_pipe, ctg_filter_product_pipe, ctg_main_product_pipe } = require("../../utils/pipelines");
 const NodeCache = require("../../utils/NodeCache");
 const PrivacyPolicy = require("../../model/privacyPolicy.model");
 const { Api400Error } = require("../../errors/apiResponse");
 const { validEmail } = require("../../utils/validator");
 const User = require("../../model/user.model");
+const { ObjectId } = require("mongodb");
 /**
  * @controller      --> Fetch the single product information in product details page.
  * @required        --> [req.headers.authorization:email, req.query:productID, req.query:variationID, req.params:product slug]
@@ -27,7 +28,7 @@ const User = require("../../model/user.model");
 module.exports.fetchProductDetails = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        const { pId: productID, vId: variationID } = req.query;
+        const { pId: productID, vId: variationID, oTracker } = req.query;
         if (!productID || typeof productID !== "string")
             throw new Api400Error("Invalid product id ");
         if (!variationID || typeof variationID !== "string")
@@ -41,6 +42,10 @@ module.exports.fetchProductDetails = (req, res, next) => __awaiter(void 0, void 
         else {
             productDetail = yield Product.aggregate(product_detail_pipe(productID, variationID));
             productDetail = productDetail[0];
+            if (oTracker) {
+                productDetail["productID"] = productDetail === null || productDetail === void 0 ? void 0 : productDetail._id;
+                yield updateProductInformation(productDetail, { actionType: "views" });
+            }
             productDetail["policies"] = (_a = yield PrivacyPolicy.findOne({})) !== null && _a !== void 0 ? _a : {};
             NodeCache.saveCache(`${productID}_${variationID}`, productDetail);
         }

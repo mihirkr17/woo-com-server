@@ -15,3 +15,15 @@ module.exports.calculateShippingCost = (volWeight: number, areaType: string = ""
 
    return charge;
 }
+
+
+module.exports.calculatePopularityScore = (product: any) => {
+
+   const { views, ratingAverage, sales } = product;
+
+   let viewsWeight = 0.4;
+   let ratingWeight = 0.5;
+   let salesWeight = 0.3;
+
+   return (views * viewsWeight) + (ratingAverage * ratingWeight) + (sales * salesWeight);
+}

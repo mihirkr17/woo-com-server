@@ -3,14 +3,15 @@
 
 import { NextFunction, Request, Response } from "express";
 const Product = require("../../model/product.model");
-const { findUserByEmail } = require("../../services/common.service");
-const { calculateShippingCost } = require("../../utils/common");
+const { findUserByEmail, updateProductInformation } = require("../../services/common.service");
+const { calculateShippingCost, calculatePopularityScore } = require("../../utils/common");
 const { product_detail_pipe, product_detail_relate_pipe, home_store_product_pipe, search_product_pipe, single_purchase_pipe, ctg_filter_product_pipe, ctg_main_product_pipe } = require("../../utils/pipelines");
 const NodeCache = require("../../utils/NodeCache");
 const PrivacyPolicy = require("../../model/privacyPolicy.model");
 const { Api400Error } = require("../../errors/apiResponse");
 const { validEmail } = require("../../utils/validator");
 const User = require("../../model/user.model");
+const { ObjectId } = require("mongodb");
 /**
  * @controller      --> Fetch the single product information in product details page.
  * @required        --> [req.headers.authorization:email, req.query:productID, req.query:variationID, req.params:product slug]
@@ -19,7 +20,7 @@ const User = require("../../model/user.model");
 module.exports.fetchProductDetails = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
-      const { pId: productID, vId: variationID } = req.query;
+      const { pId: productID, vId: variationID, oTracker } = req.query;
 
       if (!productID || typeof productID !== "string") throw new Api400Error("Invalid product id ");
 
@@ -38,6 +39,11 @@ module.exports.fetchProductDetails = async (req: Request, res: Response, next: N
          productDetail = await Product.aggregate(product_detail_pipe(productID, variationID));
 
          productDetail = productDetail[0];
+
+         if (oTracker) {
+            productDetail["productID"] = productDetail?._id;
+            await updateProductInformation(productDetail, { actionType: "views" });
+         }
 
          productDetail["policies"] = await PrivacyPolicy.findOne({}) ?? {};
 

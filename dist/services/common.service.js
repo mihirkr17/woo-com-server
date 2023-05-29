@@ -288,3 +288,24 @@ module.exports.clearCart = (email) => __awaiter(void 0, void 0, void 0, function
         return error;
     }
 });
+module.exports.updateProductInformation = (product, option) => __awaiter(void 0, void 0, void 0, function* () {
+    const { productID, views, ratingAverage, sales } = product;
+    let viewsWeight = 0.4;
+    let ratingWeight = 0.5;
+    let salesWeight = 0.3;
+    let totalViews = (option === null || option === void 0 ? void 0 : option.actionType) === "views" ? ((views !== null && views !== void 0 ? views : 0) + 1) : (views !== null && views !== void 0 ? views : 0);
+    let totalSales = (option === null || option === void 0 ? void 0 : option.actionType) === "sales" ? (sales !== null && sales !== void 0 ? sales : 0) + 1 : (sales !== null && sales !== void 0 ? sales : 0);
+    let score = (totalViews * viewsWeight) + (ratingAverage * ratingWeight) + (totalSales * salesWeight);
+    try {
+        yield Product.findOneAndUpdate({ $and: [{ _id: mdb.ObjectId(productID) }, { status: "active" }] }, {
+            $set: {
+                views: totalViews,
+                score: score
+            }
+        }, { upsert: true });
+        return { request: "Request success..." };
+    }
+    catch (error) {
+        return error;
+    }
+});

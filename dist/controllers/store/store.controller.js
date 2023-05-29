@@ -16,7 +16,7 @@ module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, 
     var _a, _b;
     try {
         const { storeName } = req === null || req === void 0 ? void 0 : req.params;
-        const { page } = req.query;
+        const { page, sorted } = req.query;
         const filters = (_a = req.query) === null || _a === void 0 ? void 0 : _a.filters;
         const regex = /[<>{}|\\^%]/g;
         if (typeof storeName !== "string")
@@ -37,6 +37,19 @@ module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, 
             { "supplier.store_name": storeName },
             { status: "active" },
         ];
+        let sortList = {};
+        if (sorted === "lowest") {
+            sortList = { $sort: { "pricing.sellingPrice": 1 } };
+        }
+        else if (sorted === "highest") {
+            sortList = { $sort: { "pricing.sellingPrice": -1 } };
+        }
+        else if (sorted === "popularity") {
+            sortList = { $sort: { score: -1 } };
+        }
+        else {
+            sortList = { $sort: { _id: -1 } };
+        }
         for (const key in filterResult) {
             let item = filterResult[key];
             Filter[key] = {
@@ -50,7 +63,7 @@ module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, 
                 delete Filter["rating"];
             }
         }
-        const allProducts = yield Product.aggregate(store_products_pipe(page, Filter));
+        const allProducts = yield Product.aggregate(store_products_pipe(page, Filter, sortList));
         let filteringProductTotal = yield Product.aggregate([
             { $match: Filter },
             {

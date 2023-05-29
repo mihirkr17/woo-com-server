@@ -1,7 +1,7 @@
 "use strict";
 const mongoDB = require("mongodb");
 const { newPricingProject, basicProductProject, actualSellingPriceProject, shoppingCartProject } = require("./projection");
-module.exports.store_products_pipe = (page, Filter) => {
+module.exports.store_products_pipe = (page, Filter, sortList) => {
     page = parseInt(page);
     page = page === 1 ? 0 : page - 1;
     return [
@@ -16,7 +16,7 @@ module.exports.store_products_pipe = (page, Filter) => {
             }
         },
         { $project: basicProductProject },
-        // { $sort: { "variations._vrid": -1 } },
+        sortList,
         { $skip: 1 * page },
         { $limit: 1 }
     ];
@@ -69,6 +69,9 @@ module.exports.product_detail_pipe = (productID, variationID) => {
                 specification: 1,
                 brand: 1,
                 status: 1,
+                score: 1,
+                sales: 1,
+                views: 1,
                 categories: 1,
                 supplier: 1,
                 images: 1,

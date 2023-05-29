@@ -10,7 +10,7 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
    try {
 
       const { storeName } = req?.params;
-      const { page } = req.query;
+      const { page, sorted } = req.query;
       const filters: any = req.query?.filters;
 
       const regex = /[<>{}|\\^%]/g;
@@ -38,6 +38,20 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
          { status: "active" },
       ];
 
+      let sortList: any = {};
+
+      if (sorted === "lowest") {
+         sortList = { $sort: { "pricing.sellingPrice": 1 } };
+      } else if (sorted === "highest") {
+         sortList = { $sort: { "pricing.sellingPrice": -1 } }
+      } else if (sorted === "popularity") {
+         sortList = { $sort: { score: -1 } };
+      } else {
+         sortList = { $sort: { _id: -1 } }
+      }
+
+
+
       for (const key in filterResult) {
          let item = filterResult[key];
 
@@ -54,7 +68,7 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
          }
       }
 
-      const allProducts = await Product.aggregate(store_products_pipe(page, Filter));
+      const allProducts = await Product.aggregate(store_products_pipe(page, Filter, sortList));
 
       let filteringProductTotal = await Product.aggregate([
          { $match: Filter },

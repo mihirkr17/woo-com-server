@@ -68,6 +68,12 @@ var ProductSchema = new Schema({
 
    status: { type: String, required: true, enum: ["active", "inactive"], default: "inactive" },
 
+   views: { type: Number },
+
+   score: { type: Number },
+
+   sales: { type: Number },
+
    createdAt: { type: Date, required: true },
 
    modifiedAt: { type: Date, required: false },
