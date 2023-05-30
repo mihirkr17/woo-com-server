@@ -21,6 +21,7 @@ module.exports.generateSixDigitNumber = () => {
 };
 module.exports.generateJwtToken = (userInfo) => {
     const token = jwt.sign({
+        fullName: userInfo === null || userInfo === void 0 ? void 0 : userInfo.fullName,
         _uuid: userInfo === null || userInfo === void 0 ? void 0 : userInfo._uuid,
         email: userInfo === null || userInfo === void 0 ? void 0 : userInfo.email,
         role: userInfo === null || userInfo === void 0 ? void 0 : userInfo.role,

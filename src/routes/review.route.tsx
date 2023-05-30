@@ -4,7 +4,7 @@ const { verifyJWT, isRoleBuyer } = require("../middlewares/auth.middleware");
 const { addProductRating } = require("../controllers/review/review.controller");
 
 try {
-  router.put("/add-product-rating/:productID", verifyJWT, isRoleBuyer, addProductRating);
+  router.post("/add-product-rating", verifyJWT, isRoleBuyer, addProductRating);
 } catch (error: any) {
   console.log(error?.message);
 }

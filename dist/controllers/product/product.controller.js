@@ -20,13 +20,14 @@ const { Api400Error } = require("../../errors/apiResponse");
 const { validEmail } = require("../../utils/validator");
 const User = require("../../model/user.model");
 const { ObjectId } = require("mongodb");
+const Review = require("../../model/reviews.model");
 /**
  * @controller      --> Fetch the single product information in product details page.
  * @required        --> [req.headers.authorization:email, req.query:productID, req.query:variationID, req.params:product slug]
  * @request_method  --> GET
  */
 module.exports.fetchProductDetails = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+    var _a, _b, _c;
     try {
         const { pId: productID, vId: variationID, oTracker } = req.query;
         if (!productID || typeof productID !== "string")
@@ -47,10 +48,13 @@ module.exports.fetchProductDetails = (req, res, next) => __awaiter(void 0, void 
                 yield updateProductInformation(productDetail, { actionType: "views" });
             }
             productDetail["policies"] = (_a = yield PrivacyPolicy.findOne({})) !== null && _a !== void 0 ? _a : {};
+            productDetail["reviews"] = yield Review.find({ productID: ObjectId(productID) }).limit(6);
+            productDetail["reviewCount"] = (_c = (_b = productDetail === null || productDetail === void 0 ? void 0 : productDetail.reviews) === null || _b === void 0 ? void 0 : _b.length) !== null && _c !== void 0 ? _c : 0;
             NodeCache.saveCache(`${productID}_${variationID}`, productDetail);
         }
         // Related products
         const relatedProducts = yield Product.aggregate(product_detail_relate_pipe(variationID, productDetail === null || productDetail === void 0 ? void 0 : productDetail.categories));
+        // all success
         return res.status(200).send({
             success: true,
             statusCode: 200,
@@ -149,23 +153,23 @@ module.exports.fetchTopSellingProduct = (req, res, next) => __awaiter(void 0, vo
     }
 });
 module.exports.purchaseProductController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _b, _c, _d, _e, _f;
+    var _d, _e, _f, _g, _h;
     try {
         const authEmail = req.decoded.email;
         let user = yield findUserByEmail(authEmail);
         const { listingID, variationID, quantity, productID, customerEmail } = req === null || req === void 0 ? void 0 : req.body;
-        let defaultShippingAddress = (Array.isArray((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress) &&
-            ((_c = user === null || user === void 0 ? void 0 : user.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
+        let defaultShippingAddress = (Array.isArray((_d = user === null || user === void 0 ? void 0 : user.buyer) === null || _d === void 0 ? void 0 : _d.shippingAddress) &&
+            ((_e = user === null || user === void 0 ? void 0 : user.buyer) === null || _e === void 0 ? void 0 : _e.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
         let areaType = defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type;
         let product = yield Product.aggregate(single_purchase_pipe(productID, listingID, variationID, quantity));
         if (product && typeof product !== 'undefined') {
             product = product[0];
             product["customerEmail"] = customerEmail;
-            if (((_d = product === null || product === void 0 ? void 0 : product.shipping) === null || _d === void 0 ? void 0 : _d.isFree) && ((_e = product === null || product === void 0 ? void 0 : product.shipping) === null || _e === void 0 ? void 0 : _e.isFree)) {
+            if (((_f = product === null || product === void 0 ? void 0 : product.shipping) === null || _f === void 0 ? void 0 : _f.isFree) && ((_g = product === null || product === void 0 ? void 0 : product.shipping) === null || _g === void 0 ? void 0 : _g.isFree)) {
                 product["shippingCharge"] = 0;
             }
             else {
-                product["shippingCharge"] = calculateShippingCost((((_f = product === null || product === void 0 ? void 0 : product.packaged) === null || _f === void 0 ? void 0 : _f.volumetricWeight) * (product === null || product === void 0 ? void 0 : product.quantity)), areaType);
+                product["shippingCharge"] = calculateShippingCost((((_h = product === null || product === void 0 ? void 0 : product.packaged) === null || _h === void 0 ? void 0 : _h.volumetricWeight) * (product === null || product === void 0 ? void 0 : product.quantity)), areaType);
             }
         }
         return res.status(200).send({

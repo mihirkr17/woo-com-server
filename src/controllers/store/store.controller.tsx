@@ -92,6 +92,7 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
                ]
             }
          },
+
          {
             $project: {
                supplier: 1,
@@ -117,7 +118,7 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
          },
          {
             $group: {
-               _id: "$supplier.store_name",
+               _id: "$supplier.id",
                totalProduct: { $count: {} },
                categories: { $push: { $last: "$categories" } },
                brands: { $push: "$brand" },
@@ -127,8 +128,17 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
             }
          },
          {
+            $lookup: {
+               from: 'users',
+               localField: "_id",
+               foreignField: '_uuid',
+               as: 'user'
+            }
+         },
+         { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$user", 0] }, "$$ROOT"] } } },
+         {
             $project: {
-               storeName: "$_id",
+               store: 1,
                _id: 0,
                totalProduct: 1,
                brands: 1,

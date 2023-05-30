@@ -77,6 +77,13 @@ module.exports.product_detail_pipe = (productID, variationID) => {
                 images: 1,
                 rating: 1,
                 ratingAverage: 1,
+                ratingCount: {
+                    $reduce: {
+                        input: "$rating",
+                        initialValue: 0,
+                        in: { $add: ["$$value", "$$this.count"] }
+                    }
+                },
                 save_as: 1,
                 createdAt: 1,
                 bodyInfo: 1,
@@ -91,7 +98,7 @@ module.exports.product_detail_pipe = (productID, variationID) => {
             }
         },
         {
-            $set: { "supplier.contact_numbers": "$store.phones", store: 0 }
+            $set: { "supplier.contact_numbers": "$store.phones", store: 0, }
         }
     ];
 };

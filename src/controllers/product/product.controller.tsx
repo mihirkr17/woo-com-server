@@ -12,6 +12,7 @@ const { Api400Error } = require("../../errors/apiResponse");
 const { validEmail } = require("../../utils/validator");
 const User = require("../../model/user.model");
 const { ObjectId } = require("mongodb");
+const Review = require("../../model/reviews.model");
 /**
  * @controller      --> Fetch the single product information in product details page.
  * @required        --> [req.headers.authorization:email, req.query:productID, req.query:variationID, req.params:product slug]
@@ -47,12 +48,17 @@ module.exports.fetchProductDetails = async (req: Request, res: Response, next: N
 
          productDetail["policies"] = await PrivacyPolicy.findOne({}) ?? {};
 
+         productDetail["reviews"] = await Review.find({ productID: ObjectId(productID) }).limit(6);
+
+         productDetail["reviewCount"] = productDetail?.reviews?.length ?? 0;
+
          NodeCache.saveCache(`${productID}_${variationID}`, productDetail);
       }
 
       // Related products
       const relatedProducts = await Product.aggregate(product_detail_relate_pipe(variationID, productDetail?.categories));
 
+      // all success
       return res.status(200).send({
          success: true,
          statusCode: 200,

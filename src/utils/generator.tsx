@@ -35,6 +35,7 @@ module.exports.generateSixDigitNumber = () => {
 
 module.exports.generateJwtToken = (userInfo: any) => {
    const token = jwt.sign({
+      fullName: userInfo?.fullName,
       _uuid: userInfo?._uuid,
       email: userInfo?.email,
       role: userInfo?.role,
