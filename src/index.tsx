@@ -20,41 +20,29 @@ const sanitizeUrl = require("@braintree/sanitize-url").sanitizeUrl;
 const allowedOrigins = ['http://localhost:3000', 'https://wookart.vercel.app', 'https://red-encouraging-shark.cyclic.app'];
 const mongoUri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PWD}@cluster0.8bccj.mongodb.net/ecommerce-db?retryWrites=true&w=majority`;
 
-
-
 // Server setup
 const app: Express = express();
 
 // middleware functions
+app.use(cookieParser());
+app.use(express.json());
 
 // Cors policy
 app.use(
   cors({
     origin: function (origin: any, callback: any) {
-      if (!origin) return callback(null, true);
 
-      if (allowedOrigins.indexOf(origin) === -1) {
-
-        return callback(new Error('The CORS policy for this site does not allow access from the specified origin.'), false);
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error('The CORS policy for this site does not allow access from the specified origin.'), false);
       }
-
-      return callback(null, true);
     },
     methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   })
 );
-
-app.use(cookieParser());
-app.use(express.json());
-
-//Sanitizing URLs
-app.use((req: any, res: any, next: NextFunction) => {
-  req.url = sanitizeUrl(req.url);
-  req.originalUrl = sanitizeUrl(req.originalUrl);
-  next();
-});
 
 // Set up default mongoose connection
 mongoose.connect(mongoUri, {
@@ -65,6 +53,14 @@ mongoose.connect(mongoUri, {
   .catch((err: any) => console.log(err));
 
 // Routes declared here
+
+//Sanitizing URLs
+app.use((req: any, res: any, next: NextFunction) => {
+  req.url = sanitizeUrl(req.url);
+  req.originalUrl = sanitizeUrl(req.originalUrl);
+  next();
+});
+
 app.get("/", (req: Request, res: Response) => {
   res.status(200).send("WooKart Server is running perfectly...");
 });

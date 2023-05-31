@@ -27,28 +27,22 @@ const mongoUri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PWD}@clu
 // Server setup
 const app = (0, express_1.default)();
 // middleware functions
+app.use(cookieParser());
+app.use(express_1.default.json());
 // Cors policy
 app.use(cors({
     origin: function (origin, callback) {
-        if (!origin)
-            return callback(null, true);
-        if (allowedOrigins.indexOf(origin) === -1) {
-            return callback(new Error('The CORS policy for this site does not allow access from the specified origin.'), false);
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
         }
-        return callback(null, true);
+        else {
+            callback(new Error('The CORS policy for this site does not allow access from the specified origin.'), false);
+        }
     },
     methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
 }));
-app.use(cookieParser());
-app.use(express_1.default.json());
-//Sanitizing URLs
-app.use((req, res, next) => {
-    req.url = sanitizeUrl(req.url);
-    req.originalUrl = sanitizeUrl(req.originalUrl);
-    next();
-});
 // Set up default mongoose connection
 mongoose.connect(mongoUri, {
     useNewUrlParser: true,
@@ -57,6 +51,12 @@ mongoose.connect(mongoUri, {
 }).then(() => console.log("Connection Successful..."))
     .catch((err) => console.log(err));
 // Routes declared here
+//Sanitizing URLs
+app.use((req, res, next) => {
+    req.url = sanitizeUrl(req.url);
+    req.originalUrl = sanitizeUrl(req.originalUrl);
+    next();
+});
 app.get("/", (req, res) => {
     res.status(200).send("WooKart Server is running perfectly...");
 });
