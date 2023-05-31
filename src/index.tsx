@@ -28,31 +28,24 @@ const app: Express = express();
 // middleware functions
 
 // Cors policy
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: function (origin: any, callback: any) {
+      if (!origin) return callback(null, true);
 
+      if (allowedOrigins.indexOf(origin) === -1) {
 
-// app.use(
-//   cors({
-//     origin: function (origin: any, callback: any) {
-//       if (!origin) return callback(null, true);
+        return callback(new Error('The CORS policy for this site does not allow access from the specified origin.'), false);
+      }
 
-//       if (allowedOrigins.indexOf(origin) === -1) {
+      return callback(null, true);
+    },
+    methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  })
+);
 
-//         return callback(new Error('The CORS policy for this site does not allow access from the specified origin.'), false);
-//       }
-
-//       return callback(null, true);
-//     },
-//     methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
-//     allowedHeaders: ['Content-Type', 'Authorization'],
-//     credentials: true,
-//   })
-// );
 app.use(cookieParser());
 app.use(express.json());
 
