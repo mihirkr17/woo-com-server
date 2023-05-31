@@ -13,8 +13,10 @@ const { ObjectId } = require("mongodb");
 const Product = require("../../model/product.model");
 const OrderTable = require("../../model/orderTable.model");
 const Review = require("../../model/reviews.model");
+const querystring = require("querystring");
 module.exports.addProductRating = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        // const { _uuid } = req.decoded;
         const { orderID, itemID, productID, ratingWeight, productReview, name } = req === null || req === void 0 ? void 0 : req.body;
         const files = req.files;
         if (!files || files.length === 0) {
@@ -22,8 +24,6 @@ module.exports.addProductRating = (req, res, next) => __awaiter(void 0, void 0, 
             return;
         }
         let imgUrls = files && files.map((file) => process.env.BACKEND_URL + file.path);
-        console.log(imgUrls, orderID, itemID, productID, ratingWeight, productReview, name);
-        // const { _uuid } = req.decoded;
         const [updatedProduct, newReview, orderUpdateResult] = yield Promise.all([
             Product.findOneAndUpdate({ _id: ObjectId(productID) }, [
                 {

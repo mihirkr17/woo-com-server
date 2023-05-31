@@ -27,28 +27,35 @@ const mongoUri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PWD}@clu
 // Server setup
 const app = (0, express_1.default)();
 // middleware functions
+// Cors policy
+app.use(cors({
+    origin: ["http://localhost:3000", "https://wookart.vercel.app"],
+    methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true
+}));
+// app.use(
+//   cors({
+//     origin: function (origin: any, callback: any) {
+//       if (!origin) return callback(null, true);
+//       if (allowedOrigins.indexOf(origin) === -1) {
+//         return callback(new Error('The CORS policy for this site does not allow access from the specified origin.'), false);
+//       }
+//       return callback(null, true);
+//     },
+//     methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
+//     allowedHeaders: ['Content-Type', 'Authorization'],
+//     credentials: true,
+//   })
+// );
+app.use(cookieParser());
+app.use(express_1.default.json());
 //Sanitizing URLs
 app.use((req, res, next) => {
     req.url = sanitizeUrl(req.url);
     req.originalUrl = sanitizeUrl(req.originalUrl);
     next();
 });
-// Cors policy
-app.use(cors({
-    origin: function (origin, callback) {
-        if (!origin)
-            return callback(null, true);
-        if (allowedOrigins.indexOf(origin) === -1) {
-            return callback(new Error('The CORS policy for this site does not allow access from the specified origin.'), false);
-        }
-        return callback(null, true);
-    },
-    methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-}));
-app.use(cookieParser());
-app.use(express_1.default.json());
 // Set up default mongoose connection
 mongoose.connect(mongoUri, {
     useNewUrlParser: true,

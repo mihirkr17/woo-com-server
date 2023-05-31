@@ -3,9 +3,11 @@ const { ObjectId } = require("mongodb");
 const Product = require("../../model/product.model");
 const OrderTable = require("../../model/orderTable.model");
 const Review = require("../../model/reviews.model");
+const querystring = require("querystring");
 
 module.exports.addProductRating = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // const { _uuid } = req.decoded;
 
     const { orderID, itemID, productID, ratingWeight, productReview, name } = req?.body;
 
@@ -18,10 +20,6 @@ module.exports.addProductRating = async (req: Request, res: Response, next: Next
 
 
     let imgUrls = files && files.map((file: any) => process.env.BACKEND_URL + file.path);
-
-console.log(imgUrls, orderID, itemID, productID, ratingWeight, productReview, name);
-    // const { _uuid } = req.decoded;
-
 
     const [updatedProduct, newReview, orderUpdateResult] = await Promise.all([
 
