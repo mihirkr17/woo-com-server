@@ -29,11 +29,13 @@ const app: Express = express();
 
 // Cors policy
 app.use(cors({
-  origin: ["http://localhost:3000", "https://wookart.vercel.app"],
+  origin: "*",
   methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
 }));
+
+
 // app.use(
 //   cors({
 //     origin: function (origin: any, callback: any) {
