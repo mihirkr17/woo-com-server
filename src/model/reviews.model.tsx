@@ -11,6 +11,8 @@ const reviewSchema = new Schema({
 
    orderItemID: { type: String, required: true },
 
+   product_images: { type: Array },
+
    product_review: { type: String, required: false },
 
    rating_point: { type: Number, required: true }

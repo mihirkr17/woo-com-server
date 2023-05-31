@@ -15,8 +15,15 @@ const OrderTable = require("../../model/orderTable.model");
 const Review = require("../../model/reviews.model");
 module.exports.addProductRating = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { _uuid } = req.decoded;
         const { orderID, itemID, productID, ratingWeight, productReview, name } = req === null || req === void 0 ? void 0 : req.body;
+        const files = req.files;
+        if (!files || files.length === 0) {
+            res.status(400).json({ message: 'No files uploaded' });
+            return;
+        }
+        let imgUrls = files && files.map((file) => process.env.BACKEND_URL + file.path);
+        console.log(imgUrls, orderID, itemID, productID, ratingWeight, productReview, name);
+        // const { _uuid } = req.decoded;
         const [updatedProduct, newReview, orderUpdateResult] = yield Promise.all([
             Product.findOneAndUpdate({ _id: ObjectId(productID) }, [
                 {
@@ -70,8 +77,9 @@ module.exports.addProductRating = (req, res, next) => __awaiter(void 0, void 0, 
                 productID,
                 orderID,
                 name,
-                customerID: _uuid,
+                customerID: "gasfdigvif",
                 orderItemID: itemID,
+                product_images: imgUrls !== null && imgUrls !== void 0 ? imgUrls : [],
                 product_review: productReview,
                 rating_point: parseInt(ratingWeight)
             }).save(),
