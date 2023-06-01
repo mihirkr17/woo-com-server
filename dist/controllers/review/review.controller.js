@@ -13,17 +13,12 @@ const { ObjectId } = require("mongodb");
 const Product = require("../../model/product.model");
 const OrderTable = require("../../model/orderTable.model");
 const Review = require("../../model/reviews.model");
-const querystring = require("querystring");
+const { Api400Error } = require("../../errors/apiResponse");
 module.exports.addProductRating = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
-        // const { _uuid } = req.decoded;
-        const { orderID, itemID, productID, ratingWeight, productReview, name } = req === null || req === void 0 ? void 0 : req.body;
-        const files = req.files;
-        if (!files || files.length === 0) {
-            res.status(400).json({ message: 'No files uploaded' });
-            return;
-        }
-        let imgUrls = files && files.map((file) => process.env.BACKEND_URL + file.path);
+        const { _uuid } = req.decoded;
+        const { orderID, itemID, productID, ratingWeight, productReview, name, reviewImage } = req === null || req === void 0 ? void 0 : req.body;
         const [updatedProduct, newReview, orderUpdateResult] = yield Promise.all([
             Product.findOneAndUpdate({ _id: ObjectId(productID) }, [
                 {
@@ -77,9 +72,9 @@ module.exports.addProductRating = (req, res, next) => __awaiter(void 0, void 0, 
                 productID,
                 orderID,
                 name,
-                customerID: "gasfdigvif",
+                customerID: _uuid,
                 orderItemID: itemID,
-                product_images: imgUrls !== null && imgUrls !== void 0 ? imgUrls : [],
+                product_images: (_a = reviewImage.slice(0, 5)) !== null && _a !== void 0 ? _a : [],
                 product_review: productReview,
                 rating_point: parseInt(ratingWeight)
             }).save(),
@@ -95,3 +90,26 @@ module.exports.addProductRating = (req, res, next) => __awaiter(void 0, void 0, 
         next(error);
     }
 });
+module.exports.getReviews = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _b, _c;
+    try {
+        const { productID } = req.params;
+        let { page } = req.query;
+        if (!productID)
+            throw new Api400Error("Required product id !");
+        page = page && parseInt(page);
+        page = typeof page === "number" && page === 1 ? 0 : page - 1;
+        const result = (_b = yield Review.find({ productID: ObjectId(productID) }).sort({ _id: -1 }).skip(page * 2).limit(2)) !== null && _b !== void 0 ? _b : [];
+        const reviewCount = (_c = yield Review.countDocuments({ productID: ObjectId(productID) })) !== null && _c !== void 0 ? _c : 0;
+        res.status(200).send({ success: true, statusCode: 200, reviews: result, reviewCount });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// module.exports.addReviewHelpful = async (req: Request, res: Response, next: NextFunction) => {
+//   try {
+//     const {reviewID} = req.params
+//   } catch (error:any) {
+//   }
+// }

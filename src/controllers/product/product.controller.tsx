@@ -48,10 +48,6 @@ module.exports.fetchProductDetails = async (req: Request, res: Response, next: N
 
          productDetail["policies"] = await PrivacyPolicy.findOne({}) ?? {};
 
-         productDetail["reviews"] = await Review.find({ productID: ObjectId(productID) }).limit(6);
-
-         productDetail["reviewCount"] = productDetail?.reviews?.length ?? 0;
-
          NodeCache.saveCache(`${productID}_${variationID}`, productDetail);
       }
 

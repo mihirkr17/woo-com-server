@@ -3,23 +3,13 @@ const { ObjectId } = require("mongodb");
 const Product = require("../../model/product.model");
 const OrderTable = require("../../model/orderTable.model");
 const Review = require("../../model/reviews.model");
-const querystring = require("querystring");
+const { Api400Error } = require("../../errors/apiResponse");
 
 module.exports.addProductRating = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // const { _uuid } = req.decoded;
+    const { _uuid } = req.decoded;
 
-    const { orderID, itemID, productID, ratingWeight, productReview, name } = req?.body;
-
-    const files: any = req.files;
-
-    if (!files || files.length === 0) {
-      res.status(400).json({ message: 'No files uploaded' });
-      return;
-    }
-
-
-    let imgUrls = files && files.map((file: any) => process.env.BACKEND_URL + file.path);
+    const { orderID, itemID, productID, ratingWeight, productReview, name, reviewImage } = req?.body;
 
     const [updatedProduct, newReview, orderUpdateResult] = await Promise.all([
 
@@ -80,9 +70,9 @@ module.exports.addProductRating = async (req: Request, res: Response, next: Next
         productID,
         orderID,
         name,
-        customerID: "gasfdigvif",
+        customerID: _uuid,
         orderItemID: itemID,
-        product_images: imgUrls ?? [],
+        product_images: reviewImage.slice(0, 5) ?? [],
         product_review: productReview,
         rating_point: parseInt(ratingWeight)
       }).save(),
@@ -104,3 +94,35 @@ module.exports.addProductRating = async (req: Request, res: Response, next: Next
     next(error);
   }
 };
+
+module.exports.getReviews = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { productID } = req.params;
+
+    let { page } = req.query as { page: any };
+
+    if (!productID) throw new Api400Error("Required product id !");
+
+    page = page && parseInt(page);
+
+    page = typeof page === "number" && page === 1 ? 0 : page - 1;
+
+    const result = await Review.find({ productID: ObjectId(productID) }).sort({ _id: -1 }).skip(page * 2).limit(2) ?? [];
+
+    const reviewCount = await Review.countDocuments({ productID: ObjectId(productID) }) ?? 0;
+
+    res.status(200).send({ success: true, statusCode: 200, reviews: result, reviewCount });
+
+  } catch (error: any) {
+    next(error);
+  }
+}
+
+
+// module.exports.addReviewHelpful = async (req: Request, res: Response, next: NextFunction) => {
+//   try {
+//     const {reviewID} = req.params
+//   } catch (error:any) {
+    
+//   }
+// }
