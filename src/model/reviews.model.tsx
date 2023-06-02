@@ -15,7 +15,19 @@ const reviewSchema = new Schema({
 
    product_review: { type: String, required: false },
 
-   rating_point: { type: Number, required: true }
+   rating_point: { type: Number, required: true },
+
+   likes: Array,
+
+   disLikes: Array,
+
+   replied: {
+      by: { type: String, required: false },
+      message: { type: String, required: false },
+      replied_at: Date
+   },
+
+   review_at: { type: Date }
 });
 
 const Review = model("reviews", reviewSchema, "reviews");

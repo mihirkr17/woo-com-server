@@ -107,9 +107,29 @@ module.exports.getReviews = (req, res, next) => __awaiter(void 0, void 0, void 0
         next(error);
     }
 });
-// module.exports.addReviewHelpful = async (req: Request, res: Response, next: NextFunction) => {
-//   try {
-//     const {reviewID} = req.params
-//   } catch (error:any) {
-//   }
-// }
+module.exports.toggleVotingLike = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { _uuid } = req.decoded;
+        const { reviewID } = req.body;
+        const review = yield Review.findOne({ _id: ObjectId(reviewID) });
+        if (!review)
+            throw new Api400Error("Review not found !");
+        let userIndex = review.likes.indexOf(_uuid);
+        let flag = "";
+        if (userIndex !== -1) {
+            flag = "";
+            review.likes.splice(userIndex, 1);
+        }
+        else {
+            flag = "Thanks for liked.";
+            review.likes.push(_uuid);
+        }
+        const result = yield review.save();
+        console.log(result);
+        if (result)
+            return res.status(200).send({ success: true, statusCode: 200, message: flag, data: result });
+    }
+    catch (error) {
+        next(error);
+    }
+});

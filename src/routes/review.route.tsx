@@ -1,7 +1,7 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
 const { verifyJWT, isRoleBuyer } = require("../middlewares/auth.middleware");
-const { addProductRating, getReviews } = require("../controllers/review/review.controller");
+const { addProductRating, getReviews, toggleVotingLike } = require("../controllers/review/review.controller");
 
 
 
@@ -20,7 +20,10 @@ const { addProductRating, getReviews } = require("../controllers/review/review.c
 
 try {
   router.post("/add-product-rating", verifyJWT, addProductRating);
-  router.get("/product-review/:productID", getReviews)
+  
+  router.get("/product-review/:productID", getReviews);
+
+  router.post("/toggle-vote-like", verifyJWT, toggleVotingLike);
 } catch (error: any) {
   console.log(error?.message);
 }
