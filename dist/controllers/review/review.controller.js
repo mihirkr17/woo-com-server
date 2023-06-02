@@ -13,7 +13,7 @@ const { ObjectId } = require("mongodb");
 const Product = require("../../model/product.model");
 const OrderTable = require("../../model/orderTable.model");
 const Review = require("../../model/reviews.model");
-const { Api400Error } = require("../../errors/apiResponse");
+const { Api400Error, Api401Error } = require("../../errors/apiResponse");
 module.exports.addProductRating = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
@@ -76,7 +76,9 @@ module.exports.addProductRating = (req, res, next) => __awaiter(void 0, void 0, 
                 orderItemID: itemID,
                 product_images: (_a = reviewImage.slice(0, 5)) !== null && _a !== void 0 ? _a : [],
                 product_review: productReview,
-                rating_point: parseInt(ratingWeight)
+                rating_point: parseInt(ratingWeight),
+                likes: [],
+                review_at: new Date(Date.now())
             }).save(),
             OrderTable.findOneAndUpdate({ orderID }, {
                 $set: {
@@ -109,25 +111,74 @@ module.exports.getReviews = (req, res, next) => __awaiter(void 0, void 0, void 0
 });
 module.exports.toggleVotingLike = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        // getting uuid from jwt token;
         const { _uuid } = req.decoded;
+        // getting review id from req body;
         const { reviewID } = req.body;
+        if (!reviewID)
+            throw new Api400Error("Required review id from body !");
+        // find one review by review id;
         const review = yield Review.findOne({ _id: ObjectId(reviewID) });
         if (!review)
             throw new Api400Error("Review not found !");
+        // finding user id inside review like array;
         let userIndex = review.likes.indexOf(_uuid);
-        let flag = "";
         if (userIndex !== -1) {
-            flag = "";
             review.likes.splice(userIndex, 1);
         }
         else {
-            flag = "Thanks for liked.";
             review.likes.push(_uuid);
         }
         const result = yield review.save();
-        console.log(result);
-        if (result)
-            return res.status(200).send({ success: true, statusCode: 200, message: flag, data: result });
+        if (!result)
+            throw new Api400Error("Operation failed !");
+        return res.status(200).send({ success: true, statusCode: 200 });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+//  get customer reviews in user account
+module.exports.getMyReviews = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { _uuid } = req.decoded;
+        const { uuid } = req.params;
+        if (_uuid !== uuid)
+            return next(new Api401Error("Unauthorized access !"));
+        const reviews = yield Review.aggregate([
+            { $match: { customerID: uuid } },
+            {
+                $lookup: {
+                    from: 'order_table',
+                    localField: 'orderID',
+                    foreignField: 'orderID',
+                    as: 'order'
+                }
+            },
+            { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$order", 0] }, "$$ROOT"] } } },
+            { $unset: ["order"] },
+            {
+                $set: {
+                    item: {
+                        $arrayElemAt: [
+                            {
+                                $filter: {
+                                    input: "$items",
+                                    as: "item",
+                                    cond: { $eq: ["$$item.itemID", "$orderItemID"] }
+                                }
+                            },
+                            0
+                        ]
+                    }
+                }
+            }, {
+                $unset: ["items"]
+            }, {
+                $sort: { _id: -1 }
+            }
+        ]);
+        return res.status(200).send({ success: true, statusCode: 200, reviews });
     }
     catch (error) {
         next(error);

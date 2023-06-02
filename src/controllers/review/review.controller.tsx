@@ -3,7 +3,7 @@ const { ObjectId } = require("mongodb");
 const Product = require("../../model/product.model");
 const OrderTable = require("../../model/orderTable.model");
 const Review = require("../../model/reviews.model");
-const { Api400Error } = require("../../errors/apiResponse");
+const { Api400Error, Api401Error } = require("../../errors/apiResponse");
 
 module.exports.addProductRating = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -74,7 +74,9 @@ module.exports.addProductRating = async (req: Request, res: Response, next: Next
         orderItemID: itemID,
         product_images: reviewImage.slice(0, 5) ?? [],
         product_review: productReview,
-        rating_point: parseInt(ratingWeight)
+        rating_point: parseInt(ratingWeight),
+        likes: [],
+        review_at: new Date(Date.now())
       }).save(),
 
       OrderTable.findOneAndUpdate(
@@ -121,29 +123,87 @@ module.exports.getReviews = async (req: Request, res: Response, next: NextFuncti
 
 module.exports.toggleVotingLike = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // getting uuid from jwt token;
     const { _uuid } = req.decoded;
+
+    // getting review id from req body;
     const { reviewID } = req.body;
 
+    if (!reviewID) throw new Api400Error("Required review id from body !");
+
+
+    // find one review by review id;
     const review = await Review.findOne({ _id: ObjectId(reviewID) });
 
     if (!review) throw new Api400Error("Review not found !");
 
+    // finding user id inside review like array;
     let userIndex = review.likes.indexOf(_uuid);
-    let flag: string = "";
 
     if (userIndex !== -1) {
-      flag = "";
       review.likes.splice(userIndex, 1);
     } else {
-      flag = "Thanks for liked."
       review.likes.push(_uuid);
     }
 
     const result = await review.save();
 
-    console.log(result);
+    if (!result) throw new Api400Error("Operation failed !");
 
-    if (result) return res.status(200).send({ success: true, statusCode: 200, message: flag, data: result });
+    return res.status(200).send({ success: true, statusCode: 200 });
+
+  } catch (error: any) {
+    next(error);
+  }
+}
+
+
+
+//  get customer reviews in user account
+module.exports.getMyReviews = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+
+    const { _uuid } = req.decoded;
+
+    const { uuid } = req.params;
+
+    if (_uuid !== uuid) return next(new Api401Error("Unauthorized access !"));
+
+    const reviews = await Review.aggregate([
+      { $match: { customerID: uuid } },
+      {
+        $lookup: {
+          from: 'order_table',
+          localField: 'orderID',
+          foreignField: 'orderID',
+          as: 'order'
+        }
+      },
+      { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$order", 0] }, "$$ROOT"] } } },
+      { $unset: ["order"] },
+      {
+        $set: {
+          item: {
+            $arrayElemAt: [
+              {
+                $filter: {
+                  input: "$items",
+                  as: "item",
+                  cond: { $eq: ["$$item.itemID", "$orderItemID"] }
+                }
+              },
+              0
+            ]
+          }
+        }
+      }, {
+        $unset: ["items"]
+      }, {
+        $sort: { _id: -1 }
+      }
+    ]);
+
+    return res.status(200).send({ success: true, statusCode: 200, reviews });
 
   } catch (error: any) {
     next(error);
