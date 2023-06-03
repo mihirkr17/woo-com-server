@@ -66,7 +66,7 @@ module.exports.addProductRating = async (req: Request, res: Response, next: Next
         { new: true }
       ),
 
-      new Review({
+      productReview && new Review({
         product_id: productID,
         order_id: orderID,
         name,
@@ -98,6 +98,8 @@ module.exports.addProductRating = async (req: Request, res: Response, next: Next
   }
 };
 
+// this is controllers of getting all reviews in product detail page
+// get reviews in product detail page
 module.exports.getReviews = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { productID } = req.params;

@@ -68,7 +68,7 @@ module.exports.addProductRating = (req, res, next) => __awaiter(void 0, void 0, 
                     }
                 }
             ], { new: true }),
-            new Review({
+            productReview && new Review({
                 product_id: productID,
                 order_id: orderID,
                 name,
@@ -93,6 +93,8 @@ module.exports.addProductRating = (req, res, next) => __awaiter(void 0, void 0, 
         next(error);
     }
 });
+// this is controllers of getting all reviews in product detail page
+// get reviews in product detail page
 module.exports.getReviews = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _b, _c;
     try {
