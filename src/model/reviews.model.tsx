@@ -1,25 +1,25 @@
 import { Schema, model } from "mongoose";
 
 const reviewSchema = new Schema({
-   productID: { type: String, required: true },
+   product_id: { type: String, required: true },
 
    name: { type: String, required: true },
 
-   customerID: { type: String, required: true },
+   customer_id: { type: String, required: true },
 
-   orderID: { type: String, required: true },
+   order_id: { type: String, required: true },
 
-   orderItemID: { type: String, required: true },
+   order_item_id: { type: String, required: true },
 
    product_images: { type: Array },
 
-   product_review: { type: String, required: false },
+   comments: { type: String, required: false },
 
    rating_point: { type: Number, required: true },
 
-   likes: Array,
+   verified_purchase: Boolean,
 
-   disLikes: Array,
+   likes: Array,
 
    replied: {
       by: { type: String, required: false },

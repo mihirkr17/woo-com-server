@@ -69,14 +69,15 @@ module.exports.addProductRating = (req, res, next) => __awaiter(void 0, void 0, 
                 }
             ], { new: true }),
             new Review({
-                productID,
-                orderID,
+                product_id: productID,
+                order_id: orderID,
                 name,
-                customerID: _uuid,
-                orderItemID: itemID,
+                customer_id: _uuid,
+                order_item_id: itemID,
                 product_images: (_a = reviewImage.slice(0, 5)) !== null && _a !== void 0 ? _a : [],
-                product_review: productReview,
+                comments: productReview,
                 rating_point: parseInt(ratingWeight),
+                verified_purchase: true,
                 likes: [],
                 review_at: new Date(Date.now())
             }).save(),
@@ -96,13 +97,14 @@ module.exports.getReviews = (req, res, next) => __awaiter(void 0, void 0, void 0
     var _b, _c;
     try {
         const { productID } = req.params;
-        let { page } = req.query;
+        let { page, sort } = req.query;
         if (!productID)
             throw new Api400Error("Required product id !");
         page = page && parseInt(page);
         page = typeof page === "number" && page === 1 ? 0 : page - 1;
-        const result = (_b = yield Review.find({ productID: ObjectId(productID) }).sort({ _id: -1 }).skip(page * 2).limit(2)) !== null && _b !== void 0 ? _b : [];
-        const reviewCount = (_c = yield Review.countDocuments({ productID: ObjectId(productID) })) !== null && _c !== void 0 ? _c : 0;
+        let sortFilter = sort === "asc" ? { rating_point: 1 } : sort === "dsc" ? { rating_point: -1 } : { _id: -1 };
+        const result = (_b = yield Review.find({ product_id: ObjectId(productID) }).sort(sortFilter).skip(page * 2).limit(2)) !== null && _b !== void 0 ? _b : [];
+        const reviewCount = (_c = yield Review.countDocuments({ product_id: ObjectId(productID) })) !== null && _c !== void 0 ? _c : 0;
         res.status(200).send({ success: true, statusCode: 200, reviews: result, reviewCount });
     }
     catch (error) {
@@ -146,11 +148,11 @@ module.exports.getMyReviews = (req, res, next) => __awaiter(void 0, void 0, void
         if (_uuid !== uuid)
             return next(new Api401Error("Unauthorized access !"));
         const reviews = yield Review.aggregate([
-            { $match: { customerID: uuid } },
+            { $match: { customer_id: uuid } },
             {
                 $lookup: {
                     from: 'order_table',
-                    localField: 'orderID',
+                    localField: 'order_id',
                     foreignField: 'orderID',
                     as: 'order'
                 }
@@ -165,7 +167,7 @@ module.exports.getMyReviews = (req, res, next) => __awaiter(void 0, void 0, void
                                 $filter: {
                                     input: "$items",
                                     as: "item",
-                                    cond: { $eq: ["$$item.itemID", "$orderItemID"] }
+                                    cond: { $eq: ["$$item.itemID", "$order_item_id"] }
                                 }
                             },
                             0

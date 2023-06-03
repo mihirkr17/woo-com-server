@@ -67,14 +67,15 @@ module.exports.addProductRating = async (req: Request, res: Response, next: Next
       ),
 
       new Review({
-        productID,
-        orderID,
+        product_id: productID,
+        order_id: orderID,
         name,
-        customerID: _uuid,
-        orderItemID: itemID,
+        customer_id: _uuid,
+        order_item_id: itemID,
         product_images: reviewImage.slice(0, 5) ?? [],
-        product_review: productReview,
+        comments: productReview,
         rating_point: parseInt(ratingWeight),
+        verified_purchase: true,
         likes: [],
         review_at: new Date(Date.now())
       }).save(),
@@ -101,7 +102,7 @@ module.exports.getReviews = async (req: Request, res: Response, next: NextFuncti
   try {
     const { productID } = req.params;
 
-    let { page } = req.query as { page: any };
+    let { page, sort } = req.query as { page: any, sort: string };
 
     if (!productID) throw new Api400Error("Required product id !");
 
@@ -109,9 +110,11 @@ module.exports.getReviews = async (req: Request, res: Response, next: NextFuncti
 
     page = typeof page === "number" && page === 1 ? 0 : page - 1;
 
-    const result = await Review.find({ productID: ObjectId(productID) }).sort({ _id: -1 }).skip(page * 2).limit(2) ?? [];
+    let sortFilter = sort === "asc" ? { rating_point: 1 } : sort === "dsc" ? { rating_point: -1 } : { _id: -1 };
 
-    const reviewCount = await Review.countDocuments({ productID: ObjectId(productID) }) ?? 0;
+    const result = await Review.find({ product_id: ObjectId(productID) }).sort(sortFilter).skip(page * 2).limit(2) ?? [];
+
+    const reviewCount = await Review.countDocuments({ product_id: ObjectId(productID) }) ?? 0;
 
     res.status(200).send({ success: true, statusCode: 200, reviews: result, reviewCount });
 
@@ -170,11 +173,11 @@ module.exports.getMyReviews = async (req: Request, res: Response, next: NextFunc
     if (_uuid !== uuid) return next(new Api401Error("Unauthorized access !"));
 
     const reviews = await Review.aggregate([
-      { $match: { customerID: uuid } },
+      { $match: { customer_id: uuid } },
       {
         $lookup: {
           from: 'order_table',
-          localField: 'orderID',
+          localField: 'order_id',
           foreignField: 'orderID',
           as: 'order'
         }
@@ -189,7 +192,7 @@ module.exports.getMyReviews = async (req: Request, res: Response, next: NextFunc
                 $filter: {
                   input: "$items",
                   as: "item",
-                  cond: { $eq: ["$$item.itemID", "$orderItemID"] }
+                  cond: { $eq: ["$$item.itemID", "$order_item_id"] }
                 }
               },
               0
