@@ -29,7 +29,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
             const timestamp = Date.now();
             if (!req.body)
                 throw new apiResponse.Api503Error("Service unavailable !");
-            const { variationID, productID, quantity, listingID, state, customerEmail } = req.body;
+            const { variationID, productID, quantity, listingID, state, customerEmail, variantID } = req.body;
             if (!variationID || !productID || !quantity || !listingID || !state || !customerEmail)
                 throw new apiResponse.Api400Error("Required variationID, productID, quantity, listingID, state, customerEmail");
             const user = yield findUserByEmail(email);
@@ -55,6 +55,15 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                             email: '$supplier.email',
                             id: "$supplier.id",
                             store_name: "$supplier.store_name"
+                        },
+                        variant: {
+                            $arrayElemAt: [{
+                                    $filter: {
+                                        input: "$variations.variants",
+                                        as: "variant",
+                                        cond: { $eq: ["$$variant.variant_id", variantID] }
+                                    }
+                                }, 0]
                         },
                         shipping: 1,
                         packaged: 1,

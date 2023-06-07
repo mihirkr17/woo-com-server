@@ -35,6 +35,8 @@ var QueueProductSchema = new Schema({
       metaDescription: { type: String, required: true }
    },
 
+   highlights: { type: Array, required: false },
+
    specification: { type: Object, required: false, default: {} },
 
    description: { type: String, required: true },
@@ -51,7 +53,7 @@ var QueueProductSchema = new Schema({
       email: { type: String, required: true },
       store_name: { type: String, required: true }
    },
-   
+
    save_as: { type: String, required: true, default: "queue" },
 
    status: { type: String, required: true, default: "inactive" },
@@ -66,7 +68,7 @@ var QueueProductSchema = new Schema({
 
    pricing: { type: Object, required: true },
 
-   images: { type: Array, required: true },
+   image: { type: String, required: true },
 
    warranty: {
       type: { type: String, required: false },

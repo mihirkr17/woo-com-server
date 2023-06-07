@@ -174,7 +174,7 @@ module.exports.viewAllProductsInDashboard = (req, res, next) => __awaiter(void 0
             {
                 $project: {
                     title: 1, slug: 1, categories: 1, pricing: 1,
-                    images: 1, variations: 1, brand: 1, _lid: 1,
+                    image: 1, variations: 1, brand: 1, _lid: 1,
                     packaged: 1,
                     save_as: 1,
                     shipping: 1,

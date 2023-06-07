@@ -29,7 +29,7 @@ module.exports.basicProductProject = {
     ratingAverage: 1,
     _lid: 1,
     reviews: 1,
-    image: { $first: "$images" },
+    image: 1,
     _vrid: "$variations._vrid",
     stock: "$variations.stock",
     variant: "$variations.variant",

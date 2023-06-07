@@ -16,7 +16,7 @@ const product_listing_template_engine = (body: any, supplier: any) => {
 
     brand: body?.brand,
 
-    images: body?.images,
+    image: body?.image,
 
     pricing: {
       price,
@@ -24,6 +24,8 @@ const product_listing_template_engine = (body: any, supplier: any) => {
       discount,
       currency: 'us'
     },
+
+    highlights: body?.highlights || [],
 
     supplier,
 
@@ -81,10 +83,10 @@ const product_variation_template_engine = (body: any) => {
 
   return {
     vTitle: body?.vTitle,
+    images: body?.images,
     sku: body?.sku,
     variant: body?.variant || {},
     attrs: body?.attrs || {},
-    highlights: body?.highlight || [],
     priceModifier,
     stock,
     available,

@@ -13,7 +13,7 @@ var ProductSchema = new Schema({
 
    brand: { type: String, required: true },
 
-   images: { type: Array, required: true },
+   image: { type: String, required: true },
 
    manufacturer: {
       origin: { type: String, required: true },
@@ -40,6 +40,8 @@ var ProductSchema = new Schema({
       searchKeywords: { type: Array, required: true },
       metaDescription: { type: String, required: true }
    },
+
+   highlights: { type: Array, required: false },
 
    specification: { type: Object, required: true },
 

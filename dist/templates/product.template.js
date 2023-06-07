@@ -11,13 +11,14 @@ const product_listing_template_engine = (body, supplier) => {
         slug: body === null || body === void 0 ? void 0 : body.slug,
         categories: [body === null || body === void 0 ? void 0 : body.category, body === null || body === void 0 ? void 0 : body.subCategory, body === null || body === void 0 ? void 0 : body.postCategory] || [],
         brand: body === null || body === void 0 ? void 0 : body.brand,
-        images: body === null || body === void 0 ? void 0 : body.images,
+        image: body === null || body === void 0 ? void 0 : body.image,
         pricing: {
             price,
             sellingPrice,
             discount,
             currency: 'us'
         },
+        highlights: (body === null || body === void 0 ? void 0 : body.highlights) || [],
         supplier,
         packaged: {
             dimension: {
@@ -64,10 +65,10 @@ const product_variation_template_engine = (body) => {
     }
     return {
         vTitle: body === null || body === void 0 ? void 0 : body.vTitle,
+        images: body === null || body === void 0 ? void 0 : body.images,
         sku: body === null || body === void 0 ? void 0 : body.sku,
         variant: (body === null || body === void 0 ? void 0 : body.variant) || {},
         attrs: (body === null || body === void 0 ? void 0 : body.attrs) || {},
-        highlights: (body === null || body === void 0 ? void 0 : body.highlight) || [],
         priceModifier,
         stock,
         available,

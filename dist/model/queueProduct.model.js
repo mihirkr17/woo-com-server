@@ -34,6 +34,7 @@ var QueueProductSchema = new mongoose_1.Schema({
         searchKeywords: { type: Array, required: true },
         metaDescription: { type: String, required: true }
     },
+    highlights: { type: Array, required: false },
     specification: { type: Object, required: false, default: {} },
     description: { type: String, required: true },
     variations: { type: Array, required: false, default: [] },
@@ -53,7 +54,7 @@ var QueueProductSchema = new mongoose_1.Schema({
     modifiedAt: { type: Date, required: false, default: "" },
     isVerified: { type: Boolean, default: false },
     pricing: { type: Object, required: true },
-    images: { type: Array, required: true },
+    image: { type: String, required: true },
     warranty: {
         type: { type: String, required: false },
         duration: { type: Number, required: false },

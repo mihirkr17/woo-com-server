@@ -30,7 +30,11 @@ module.exports.product_detail_pipe = (productID, variationID) => {
                     $map: {
                         input: "$variations",
                         as: "variation",
-                        in: { variant: "$$variation.variant", _vrid: "$$variation._vrid" }
+                        in: {
+                            variant: "$$variation.variant",
+                            _vrid: "$$variation._vrid",
+                            image: { $first: "$$variation.images" }
+                        }
                     }
                 },
                 variations: {
@@ -44,7 +48,7 @@ module.exports.product_detail_pipe = (productID, variationID) => {
                                     }
                                 }, 0]
                         },
-                        null
+                        {}
                     ]
                 }
             }
@@ -60,7 +64,7 @@ module.exports.product_detail_pipe = (productID, variationID) => {
         { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$user", 0] }, "$$ROOT"] } } },
         {
             $project: {
-                title: '$variations.vTitle',
+                title: "$variations.vTitle",
                 slug: 1,
                 variations: 1,
                 swatch: 1,
@@ -74,7 +78,9 @@ module.exports.product_detail_pipe = (productID, variationID) => {
                 views: 1,
                 categories: 1,
                 supplier: 1,
-                images: 1,
+                images: {
+                    $concatArrays: [["$image"], "$variations.images"]
+                },
                 rating: 1,
                 ratingAverage: 1,
                 ratingCount: {
@@ -89,6 +95,7 @@ module.exports.product_detail_pipe = (productID, variationID) => {
                 bodyInfo: 1,
                 description: 1,
                 manufacturer: 1,
+                highlights: 1,
                 pricing: newPricingProject,
                 isFreeShipping: "$shipping.isFree",
                 volumetricWeight: "$packaged.volumetricWeight",

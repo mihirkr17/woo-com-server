@@ -8,7 +8,7 @@ var ProductSchema = new mongoose_1.Schema({
     pricing: { type: Object, required: true },
     categories: { type: Array, required: true },
     brand: { type: String, required: true },
-    images: { type: Array, required: true },
+    image: { type: String, required: true },
     manufacturer: {
         origin: { type: String, required: true },
         details: { type: String, required: true }
@@ -28,6 +28,7 @@ var ProductSchema = new mongoose_1.Schema({
         searchKeywords: { type: Array, required: true },
         metaDescription: { type: String, required: true }
     },
+    highlights: { type: Array, required: false },
     specification: { type: Object, required: true },
     description: { type: String, required: true },
     variations: { type: Array, required: true },
