@@ -159,7 +159,8 @@ module.exports.purchaseProductController = (req, res, next) => __awaiter(void 0,
         let defaultShippingAddress = (Array.isArray((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress) &&
             ((_c = user === null || user === void 0 ? void 0 : user.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
         let areaType = defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type;
-        let product = yield Product.aggregate(single_purchase_pipe(productID, listingID, variationID, quantity));
+        let newQuantity = parseInt(quantity);
+        let product = yield Product.aggregate(single_purchase_pipe(productID, listingID, variationID, newQuantity));
         if (product && typeof product !== 'undefined') {
             product = product[0];
             product["customerEmail"] = customerEmail;

@@ -53,7 +53,6 @@ var QueueProductSchema = new mongoose_1.Schema({
     packaged: { type: Object, required: true },
     modifiedAt: { type: Date, required: false, default: "" },
     isVerified: { type: Boolean, default: false },
-    pricing: { type: Object, required: true },
     image: { type: String, required: true },
     warranty: {
         type: { type: String, required: false },

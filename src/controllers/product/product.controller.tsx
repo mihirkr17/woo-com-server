@@ -199,7 +199,9 @@ module.exports.purchaseProductController = async (req: Request, res: Response, n
 
       let areaType = defaultShippingAddress?.area_type;
 
-      let product = await Product.aggregate(single_purchase_pipe(productID, listingID, variationID, quantity));
+      let newQuantity = parseInt(quantity);
+
+      let product = await Product.aggregate(single_purchase_pipe(productID, listingID, variationID, newQuantity));
 
       if (product && typeof product !== 'undefined') {
          product = product[0];

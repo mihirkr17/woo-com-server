@@ -66,8 +66,6 @@ var QueueProductSchema = new Schema({
 
    isVerified: { type: Boolean, default: false },
 
-   pricing: { type: Object, required: true },
-
    image: { type: String, required: true },
 
    warranty: {

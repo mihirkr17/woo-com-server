@@ -5,7 +5,6 @@ import { NextFunction, Request, Response } from "express";
 const apiResponse = require("../../errors/apiResponse");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const ShoppingCart = require("../../model/shoppingCart.model");
-const { actualSellingPriceProject } = require("../../utils/projection");
 const { findUserByEmail } = require("../../services/common.service");
 const { calculateShippingCost } = require("../../utils/common");
 const OrderTableModel = require("../../model/orderTable.model");
@@ -57,18 +56,31 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
          },
          { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } } },
          { $unset: ["main_product"] },
-         { $unwind: { path: "$variations" } },
          {
-            $match: {
-               $expr: {
-                  $and: [
-                     { $eq: ['$variations._vrid', '$items.variationID'] },
-                     { $eq: ["$variations.stock", "in"] },
-                     { $eq: ["$status", "active"] },
-                     { $gte: ["$variations.available", "$items.quantity"] }
+            $addFields: {
+               variations: {
+                  $ifNull: [
+                     {
+                        $arrayElemAt: [{
+                           $filter: {
+                              input: "$variations",
+                              cond: {
+                                 $and: [
+                                    { $eq: ['$$variation._vrid', '$items.variationID'] },
+                                    { $eq: ['$$variation.stock', "in"] },
+                                    { $eq: ["$status", "active"] },
+                                    { $eq: ["$save_as", "fulfilled"] },
+                                    { $gte: ["$$variation.available", "$items.quantity"] }
+                                 ]
+                              },
+                              as: "variation"
+                           }
+                        }, 0]
+                     },
+                     {}
                   ]
                }
-            }
+            },
          },
          {
             $project: {
@@ -80,19 +92,14 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
                packaged: 1,
                listingID: "$items.listingID",
                variationID: "$items.variationID",
-               image: { $first: "$images" },
+               image: { $first: "$variations.images" },
                title: "$variations.vTitle",
                slug: 1,
                brand: 1,
-               supplier: {
-                  email: '$supplier.email',
-                  id: "$supplier.id",
-                  store_name: "$supplier.store_name",
-                  stripe_id: "$supplier.stripeID"
-               },
+               supplier: 1,
                sku: "$variations.sku",
-               baseAmount: { $multiply: [actualSellingPriceProject, '$items.quantity'] },
-               sellingPrice: actualSellingPriceProject,
+               baseAmount: { $multiply: ["$variations.pricing.sellingPrice", '$items.quantity'] },
+               sellingPrice: "$variations.pricing.sellingPrice",
             }
          },
          { $unset: ["variations", "items"] }

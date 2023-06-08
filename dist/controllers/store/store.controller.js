@@ -114,8 +114,7 @@ module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, 
                     categories: { $push: { $last: "$categories" } },
                     brands: { $push: "$brand" },
                     totalRatingCount: { $sum: "$totalCount" },
-                    totalRatingMulti: { $sum: "$totalMulti" },
-                    prices: { $addToSet: "$pricing.sellingPrice" }
+                    totalRatingMulti: { $sum: "$totalMulti" }
                 }
             },
             {

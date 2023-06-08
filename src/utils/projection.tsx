@@ -1,23 +1,17 @@
-module.exports.actualSellingPriceProject = { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] }
-
-
-module.exports.newPricingProject = {
-   sellingPrice: { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] },
-   price: "$pricing.price",
-   discount: {
-      $toInt: {
-         $multiply: [
-            {
-               $divide: [
-                  { $subtract: ["$pricing.price", { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] }] },
-                  "$pricing.price"
-               ]
-            }, 100]
-      }
+const discount = {
+   $toInt: {
+      $multiply: [
+         {
+            $divide: [
+               {
+                  $subtract: ["$pricing.price", {
+                     $add:
+                        ["$pricing.sellingPrice", "$variations.priceModifier"]
+                  }]
+               }, "$pricing.price"]
+         }, 100]
    }
 }
-
-
 
 module.exports.basicProductProject = {
    title: "$variations.vTitle",
@@ -37,11 +31,7 @@ module.exports.basicProductProject = {
    stock: "$variations.stock",
    variant: "$variations.variant",
    shipping: 1,
-   pricing: {
-      sellingPrice: { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] },
-      price: "$pricing.price",
-      discount: { $toInt: { $multiply: [{ $divide: [{ $subtract: ["$pricing.price", { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] }] }, "$pricing.price"] }, 100] } }
-   }
+   pricing: "$variations.pricing"
 }
 
 module.exports.shoppingCartProject = {
@@ -57,15 +47,15 @@ module.exports.shoppingCartProject = {
    variationID: "$items.variationID",
    shipping: 1,
    brand: 1,
-   image: { $first: "$images" },
+   image: { $first: "$variations.images" },
    sku: "$variations.sku",
    supplier: 1,
    quantity: "$items.quantity",
-   savingAmount: { $multiply: [{ $subtract: ["$pricing.price", { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] }] }, '$items.quantity'] },
-   baseAmount: { $multiply: [{ $add: ["$pricing.sellingPrice", "$variations.priceModifier"] }, '$items.quantity'] },
+   savingAmount: { $multiply: [{ $subtract: ["$variations.pricing.price", "$variations.pricing.sellingPrice"] }, '$items.quantity'] },
+   baseAmount: { $multiply: ["$variations.pricing.sellingPrice", '$items.quantity'] },
    paymentInfo: 1,
-   sellingPrice: { $add: ["$pricing.sellingPrice", "$variations.priceModifier"] },
-   price: "$pricing.price",
+   sellingPrice: "$variations.pricing.sellingPrice",
+   price: "$variations.pricing.price",
    variant: "$variations.variant",
    available: "$variations.available",
    stock: "$variations.stock"

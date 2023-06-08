@@ -7,7 +7,7 @@ const User = require("../../model/user.model");
 const QueueProduct = require("../../model/queueProduct.model");
 const Product = require("../../model/product.model");
 const { product_variation_template_engine } = require("../../templates/product.template");
-const apiResponse = require("../../errors/apiResponse");
+const { Api400Error, Api500Error } = require("../../errors/apiResponse");
 
 
 
@@ -19,7 +19,7 @@ module.exports.updateStockController = async (req: Request, res: Response, next:
       const { productID, variations } = req?.body;
 
       if (!variations?._vrid || !variations?.available)
-         throw new apiResponse.Api400Error("Variation ID and unit required !");
+         throw new Api400Error("Variation ID and unit required !");
 
 
       if (productID && storeName) {
@@ -40,12 +40,7 @@ module.exports.updateStockController = async (req: Request, res: Response, next:
 
 
          if (!result) {
-            return res.status(500).send({
-               success: false,
-               statusCode: 500,
-               name: "Server Error",
-               message: "Failed to update stock quantity !!!",
-            });
+            throw new Api500Error("Failed to update stock quantity !!!");
          }
 
          return res.status(200).send({
@@ -66,15 +61,15 @@ module.exports.variationController = async (req: Request, res: Response, next: N
 
       let result: any;
 
-      if (!formType || formType === "") throw new apiResponse.Api400Error("Required form type !");
+      if (!formType || formType === "") throw new Api400Error("Required form type !");
 
       const { request } = req.body;
 
-      if (!req.body || !req.body.hasOwnProperty("request")) throw new apiResponse.Api400Error("Required request property in body !");
+      if (!req.body || !req.body.hasOwnProperty("request")) throw new Api400Error("Required request property in body !");
 
       const { productID, variationID, variations } = request;
 
-      if (!productID) throw new apiResponse.Api400Error("Required product id !");
+      if (!productID) throw new Api400Error("Required product id !");
 
       let model = product_variation_template_engine(variations);
 
@@ -112,7 +107,7 @@ module.exports.variationController = async (req: Request, res: Response, next: N
          message: (formType === 'update-variation' ? "Variation successfully updated." : "Welcome new variation added.")
       })
 
-      throw new apiResponse.Api400Error((formType === 'update-variation' ? "Variation update failed !" : "Can't added new variation !"));
+      throw new Api400Error((formType === 'update-variation' ? "Variation update failed !" : "Can't added new variation !"));
 
    } catch (error: any) {
       next(error);
@@ -126,9 +121,9 @@ module.exports.productControlController = async (req: Request, res: Response, ne
       const { market_place, actionType, actionFor,
          listingID, productID } = req?.body;
 
-      if (market_place !== 'wooKart') throw new apiResponse.Api400Error("Permission denied !");
+      if (market_place !== 'wooKart') throw new Api400Error("Permission denied !");
 
-      if (!listingID || !productID) throw new apiResponse.Api400Error("Required product id and listing id !");
+      if (!listingID || !productID) throw new Api400Error("Required product id and listing id !");
 
       let filters: any;
 
@@ -147,7 +142,7 @@ module.exports.productControlController = async (req: Request, res: Response, ne
 
       console.log(filters);
 
-      if (!filters) throw new apiResponse.Api400Error("Required filter !");
+      if (!filters) throw new Api400Error("Required filter !");
 
       const result = await Product.findOneAndUpdate({ $and: [{ _lid: listingID }, { _id: ObjectId(productID) }] },
          filters, { upsert: true }
@@ -387,7 +382,7 @@ module.exports.productListingController = async (
             { upsert: true }
          );
 
-         if (!result) throw new apiResponse.Api400Error("Sorry, Product not found !");
+         if (!result) throw new Api400Error("Sorry, Product not found !");
 
          return res.status(200).send({
             success: true,
@@ -562,22 +557,22 @@ module.exports.updateProductData = async (req: Request, res: Response, next: Nex
       const urlParams = req.params.paramsType;
       let setFilter: any;
 
-      const { listingID, productID, actionType, pricing, shipping, packageInfo, manufacturer } = req.body;
+      const { listingID, productID, actionType, pricing, shipping, packageInfo, manufacturer, description } = req.body;
 
-      if (!productID) throw new apiResponse.Api400Error("Required product ID !");
+      if (!productID) throw new Api400Error("Required product ID !");
 
-      if (!listingID) throw new apiResponse.Api400Error("Required listing ID !");
+      if (!listingID) throw new Api400Error("Required listing ID !");
 
-      if (!actionType) throw new apiResponse.Api400Error("Required actionType !");
+      if (!actionType) throw new Api400Error("Required actionType !");
 
       if (actionType === "PRICING" && urlParams === "pricing") {
 
-         if (!pricing) throw new apiResponse.Api400Error("Required pricing !");
+         if (!pricing) throw new Api400Error("Required pricing !");
 
          const { price, sellingPrice } = pricing;
          let discount: any = 0;
 
-         if (!price && price === "") throw new apiResponse.Api400Error("Required price identifier !");
+         if (!price && price === "") throw new Api400Error("Required price identifier !");
 
          if (!sellingPrice && sellingPrice === "") throw new Error("Required selling price identifier !");
 
@@ -636,7 +631,7 @@ module.exports.updateProductData = async (req: Request, res: Response, next: Nex
 
       if (actionType === "MANUFACTURER-INFORMATION" && urlParams === "manufacturer-information") {
 
-         if (!manufacturer || typeof manufacturer !== "object") throw new Error("Required manufacturer details about product !");
+         if (!manufacturer || typeof manufacturer !== "object") throw new Api400Error("Required manufacturer details about product !");
 
          const { manufacturerOrigin, manufacturerDetails } = manufacturer && manufacturer;
 
@@ -648,6 +643,14 @@ module.exports.updateProductData = async (req: Request, res: Response, next: Nex
          }
       }
 
+      if (actionType === "DESCRIPTION-INFORMATION" && urlParams === "description") {
+         setFilter = {
+            $set: {
+               description
+            }
+         }
+      }
+
 
       const result = await Product.findOneAndUpdate(
          { $and: [{ _lid: listingID }, { _id: ObjectId(productID) }] },
@@ -655,9 +658,9 @@ module.exports.updateProductData = async (req: Request, res: Response, next: Nex
          { upsert: true }
       );
 
-      return result ? res.status(200).send({ success: true, statusCode: 200, message: urlParams + " updated successfully." })
-         : next({ message: "Failed to updated!" });
+      if (!result) throw new Api500Error("Failed to updated!");
 
+      return res.status(200).send({ success: true, statusCode: 200, message: urlParams + " updated successfully." })
    } catch (error: any) {
       next(error);
    }
@@ -671,13 +674,13 @@ module.exports.queueProductsController = async (req: Request, res: Response, nex
       const { storeName } = req.params;
       const { email } = req.decoded;
 
-      if (!storeName) throw new apiResponse.Api400Error("Required store name as a parameter !");
+      if (!storeName) throw new Api400Error("Required store name as a parameter !");
 
       const queueProduct = await QueueProduct.find({ $and: [{ "supplier.email": email }, { "supplier.store_name": storeName }] }) || [];
 
       let countQueue = queueProduct.length || 0;
 
-      if (!Array.isArray(queueProduct)) throw new apiResponse.Api400Error("Queue is empty !");
+      if (!Array.isArray(queueProduct)) throw new Api400Error("Queue is empty !");
 
       return res.status(200).send({ success: true, statusCode: 200, data: { queue: queueProduct, countQueue } });
 

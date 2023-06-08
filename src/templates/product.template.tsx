@@ -1,11 +1,5 @@
 const product_listing_template_engine = (body: any, supplier: any) => {
 
-  let price = parseFloat(body?.price);
-  let sellingPrice = parseFloat(body?.sellingPrice);
-
-  let discount: any = ((price - sellingPrice) / price);
-  discount = parseInt(discount) * 100;
-
   let volumetricWeight: any = ((parseFloat(body?.packageHeight) * parseFloat(body?.packageLength) * parseFloat(body?.packageWidth)) / 5000).toFixed(1);
   volumetricWeight = parseFloat(volumetricWeight);
 
@@ -17,13 +11,6 @@ const product_listing_template_engine = (body: any, supplier: any) => {
     brand: body?.brand,
 
     image: body?.image,
-
-    pricing: {
-      price,
-      sellingPrice,
-      discount,
-      currency: 'us'
-    },
 
     highlights: body?.highlights || [],
 
@@ -72,8 +59,14 @@ const product_listing_template_engine = (body: any, supplier: any) => {
 
 const product_variation_template_engine = (body: any) => {
   let available: number = parseInt(body?.available) || 0;
-  let priceModifier: number = parseInt(body?.priceModifier) || 0
   let stock: string;
+
+  let price = parseInt(body?.price);
+  let sellingPrice = parseInt(body?.sellingPrice);
+
+  let discount: any = ((price - sellingPrice) / price);
+
+  discount = (discount * 100);
 
   if (available && available >= 0) {
     stock = "in";
@@ -87,7 +80,12 @@ const product_variation_template_engine = (body: any) => {
     sku: body?.sku,
     variant: body?.variant || {},
     attrs: body?.attrs || {},
-    priceModifier,
+    pricing: {
+      price,
+      sellingPrice,
+      discount: parseInt(discount),
+      currency: 'bdt'
+    },
     stock,
     available,
   }

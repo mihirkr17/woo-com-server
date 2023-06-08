@@ -5,7 +5,6 @@ var ProductSchema = new mongoose_1.Schema({
     _lid: { type: String, required: true },
     title: { type: String, required: true },
     slug: { type: String, required: true },
-    pricing: { type: Object, required: true },
     categories: { type: Array, required: true },
     brand: { type: String, required: true },
     image: { type: String, required: true },

@@ -123,8 +123,7 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
                categories: { $push: { $last: "$categories" } },
                brands: { $push: "$brand" },
                totalRatingCount: { $sum: "$totalCount" },
-               totalRatingMulti: { $sum: "$totalMulti" },
-               prices: { $addToSet: "$pricing.sellingPrice" }
+               totalRatingMulti: { $sum: "$totalMulti" }
             }
          },
          {

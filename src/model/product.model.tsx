@@ -7,8 +7,6 @@ var ProductSchema = new Schema({
 
    slug: { type: String, required: true },
 
-   pricing: { type: Object, required: true },
-
    categories: { type: Array, required: true },
 
    brand: { type: String, required: true },
