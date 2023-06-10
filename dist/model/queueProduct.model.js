@@ -30,10 +30,8 @@ var QueueProductSchema = new mongoose_1.Schema({
     rating: { type: Array, required: false },
     reviews: { type: Array, required: false, default: [] },
     ratingAverage: { type: Number, required: false, default: 0 },
-    bodyInfo: {
-        searchKeywords: { type: Array, required: true },
-        metaDescription: { type: String, required: true }
-    },
+    keywords: { type: Array, required: true },
+    meta_description: { type: String, required: true },
     highlights: { type: Array, required: false },
     specification: { type: Object, required: false, default: {} },
     description: { type: String, required: true },
@@ -53,7 +51,13 @@ var QueueProductSchema = new mongoose_1.Schema({
     packaged: { type: Object, required: true },
     modifiedAt: { type: Date, required: false, default: "" },
     isVerified: { type: Boolean, default: false },
-    image: { type: String, required: true },
+    options: [
+        {
+            _id: false,
+            color: String,
+            images: Array
+        }
+    ],
     warranty: {
         type: { type: String, required: false },
         duration: { type: Number, required: false },

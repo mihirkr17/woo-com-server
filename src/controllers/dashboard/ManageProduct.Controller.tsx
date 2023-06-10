@@ -73,6 +73,22 @@ module.exports.variationController = async (req: Request, res: Response, next: N
 
       let model = product_variation_template_engine(variations);
 
+      let n = await Product.findOne({ _id: ObjectId(productID) });
+
+      let images = variations?.images;
+
+      let color = variations?.variant?.color;
+      let options = n?.options ?? {};
+
+      let index = n?.options.findIndex((e: any) => e?.color === color);
+
+      if (index !== -1) {
+         options.splice(index, 1);
+         options.push({ color, images });
+      } else {
+         options.push({ color, images })
+      }
+
       // Update variation
       if (formType === 'update-variation' && requestFor === 'product_variations' && variationID) {
 
@@ -80,9 +96,11 @@ module.exports.variationController = async (req: Request, res: Response, next: N
 
          if (variationID && variationID !== "") {
 
+            // result = n?.variations.push(model)
+
             result = await Product.findOneAndUpdate(
                { _id: ObjectId(productID) },
-               { $set: { 'variations.$[i]': model } },
+               { $set: { 'variations.$[i]': model, options } },
                { arrayFilters: [{ "i._vrid": variationID }] }
             );
          }
@@ -91,12 +109,13 @@ module.exports.variationController = async (req: Request, res: Response, next: N
       // create new variation
       if (formType === 'new-variation') {
          let newVariationID = "vi_" + Math.random().toString(36).toLowerCase().slice(2, 18);
-
          model['_vrid'] = newVariationID;
+
+         // n?.variations.push(model);
 
          result = await Product.findOneAndUpdate(
             { _id: ObjectId(productID) },
-            { $push: { variations: model } },
+            { $push: { variations: model }, $set: options },
             { upsert: true }
          );
       }
@@ -140,7 +159,6 @@ module.exports.productControlController = async (req: Request, res: Response, ne
          }
       }
 
-      console.log(filters);
 
       if (!filters) throw new Api400Error("Required filter !");
 
@@ -218,14 +236,16 @@ module.exports.viewAllProductsInDashboard = async (
          {
             $project: {
                title: 1, slug: 1, categories: 1, pricing: 1,
-               image: 1, variations: 1, brand: 1, _lid: 1,
+               variations: 1, brand: 1, _lid: 1,
                packaged: 1,
                save_as: 1,
                shipping: 1,
-               bodyInfo: 1,
+               keywords: 1,
+               meta_description: 1,
                specification: 1,
                description: 1,
                manufacturer: 1,
+               options: 1,
                supplier: 1,
                status: 1,
                totalVariation: { $cond: { if: { $isArray: "$variations" }, then: { $size: "$variations" }, else: 0 } }
@@ -251,7 +271,9 @@ module.exports.viewAllProductsInDashboard = async (
                packaged: 1,
                save_as: 1,
                shipping: 1,
-               bodyInfo: 1,
+               keywords: 1,
+               meta_description: 1,
+               options: 1,
                specification: 1,
                description: 1,
                manufacturer: 1,

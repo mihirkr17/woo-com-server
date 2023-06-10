@@ -7,7 +7,6 @@ const product_listing_template_engine = (body, supplier) => {
         slug: body === null || body === void 0 ? void 0 : body.slug,
         categories: [body === null || body === void 0 ? void 0 : body.category, body === null || body === void 0 ? void 0 : body.subCategory, body === null || body === void 0 ? void 0 : body.postCategory] || [],
         brand: body === null || body === void 0 ? void 0 : body.brand,
-        image: body === null || body === void 0 ? void 0 : body.image,
         highlights: (body === null || body === void 0 ? void 0 : body.highlights) || [],
         supplier,
         packaged: {
@@ -38,7 +37,8 @@ const product_listing_template_engine = (body, supplier) => {
             details: body === null || body === void 0 ? void 0 : body.manufacturerDetails,
         },
         warranty: body === null || body === void 0 ? void 0 : body.warranty,
-        bodyInfo: (body === null || body === void 0 ? void 0 : body.bodyInfo) || {},
+        keywords: body === null || body === void 0 ? void 0 : body.keywords,
+        meta_description: body === null || body === void 0 ? void 0 : body.meta_description,
         specification: (body === null || body === void 0 ? void 0 : body.specification) || {},
         description: (body === null || body === void 0 ? void 0 : body.description) || ""
     };

@@ -7,7 +7,6 @@ var ProductSchema = new mongoose_1.Schema({
     slug: { type: String, required: true },
     categories: { type: Array, required: true },
     brand: { type: String, required: true },
-    image: { type: String, required: true },
     manufacturer: {
         origin: { type: String, required: true },
         details: { type: String, required: true }
@@ -23,13 +22,18 @@ var ProductSchema = new mongoose_1.Schema({
     rating: { type: Array, required: true },
     reviews: { type: Array, required: true },
     ratingAverage: { type: Number, required: true, default: 0 },
-    bodyInfo: {
-        searchKeywords: { type: Array, required: true },
-        metaDescription: { type: String, required: true }
-    },
+    keywords: { type: Array, required: true },
+    meta_description: { type: String, required: true },
     highlights: { type: Array, required: false },
     specification: { type: Object, required: true },
     description: { type: String, required: true },
+    options: [
+        {
+            _id: false,
+            color: String,
+            images: Array
+        }
+    ],
     variations: { type: Array, required: true },
     tax: {
         hsn: { type: String, required: true },

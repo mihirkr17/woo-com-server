@@ -30,10 +30,9 @@ var QueueProductSchema = new Schema({
 
    ratingAverage: { type: Number, required: false, default: 0 },
 
-   bodyInfo: {
-      searchKeywords: { type: Array, required: true },
-      metaDescription: { type: String, required: true }
-   },
+   keywords: { type: Array, required: true },
+
+   meta_description: { type: String, required: true },
 
    highlights: { type: Array, required: false },
 
@@ -66,7 +65,13 @@ var QueueProductSchema = new Schema({
 
    isVerified: { type: Boolean, default: false },
 
-   image: { type: String, required: true },
+   options: [
+      {
+         _id: false,
+         color: String,
+         images: Array
+      }
+   ],
 
    warranty: {
       type: { type: String, required: false },

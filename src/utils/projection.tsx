@@ -16,6 +16,13 @@ const discount = {
 module.exports.basicProductProject = {
    title: "$variations.vTitle",
    slug: 1,
+   assets:
+   {
+      $ifNull: [
+         { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.variant.color"] }] },
+         null
+      ]
+   },
    brand: 1,
    score: 1,
    sales: 1,
@@ -26,7 +33,6 @@ module.exports.basicProductProject = {
    ratingAverage: 1,
    _lid: 1,
    reviews: 1,
-   image: 1,
    _vrid: "$variations._vrid",
    stock: "$variations.stock",
    variant: "$variations.variant",
@@ -38,6 +44,7 @@ module.exports.shoppingCartProject = {
 
    cartID: "$_id",
    _id: 0,
+   asset: 1,
    title: "$variations.vTitle",
    slug: 1,
    packaged: 1,
@@ -47,7 +54,13 @@ module.exports.shoppingCartProject = {
    variationID: "$items.variationID",
    shipping: 1,
    brand: 1,
-   image: { $first: "$variations.images" },
+   assets:
+   {
+      $ifNull: [
+         { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.variant.color"] }] },
+         null
+      ]
+   },
    sku: "$variations.sku",
    supplier: 1,
    quantity: "$items.quantity",

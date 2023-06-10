@@ -10,8 +10,6 @@ const product_listing_template_engine = (body: any, supplier: any) => {
 
     brand: body?.brand,
 
-    image: body?.image,
-
     highlights: body?.highlights || [],
 
     supplier,
@@ -49,7 +47,9 @@ const product_listing_template_engine = (body: any, supplier: any) => {
 
     warranty: body?.warranty,
 
-    bodyInfo: body?.bodyInfo || {},
+    keywords: body?.keywords,
+
+    meta_description: body?.meta_description,
 
     specification: body?.specification || {},
 

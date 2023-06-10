@@ -3,7 +3,6 @@ const Order = require("../../model/order.model");
 const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
 const apiResponse = require("../../errors/apiResponse");
-const { actualSellingPriceProject } = require("../../utils/projection");
 const { findUserByEmail, update_variation_stock_available } = require("../../services/common.service");
 const { calculateShippingCost } = require("../../utils/common");
 const email_service = require("../../services/email.service");
@@ -47,7 +46,12 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
                slug: 1,
                variations: 1,
                brand: 1,
-               image: { $first: "$images" },
+               assets: {
+                  $ifNull: [
+                     { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.variant.color"] }] },
+                     null
+                  ]
+               },
                sku: "$variations.sku",
                supplier: {
                   email: '$supplier.email',
@@ -65,8 +69,8 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
                },
                shipping: 1,
                packaged: 1,
-               baseAmount: { $multiply: [actualSellingPriceProject, parseInt(quantity)] },
-               sellingPrice: actualSellingPriceProject,
+               baseAmount: { $multiply: ["$variations.pricing.sellingPrice", parseInt(quantity)] },
+               sellingPrice: "$variations.pricing.sellingPrice",
             }
          },
          {

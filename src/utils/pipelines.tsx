@@ -35,8 +35,7 @@ module.exports.product_detail_pipe = (productID: string, variationID: string) =>
                   as: "variation",
                   in: {
                      variant: "$$variation.variant",
-                     _vrid: "$$variation._vrid",
-                     image: { $first: "$$variation.images" }
+                     _vrid: "$$variation._vrid"
                   }
                }
             },
@@ -81,8 +80,13 @@ module.exports.product_detail_pipe = (productID: string, variationID: string) =>
             views: 1,
             categories: 1,
             supplier: 1,
-            images: {
-               $concatArrays: [["$image"], "$variations.images"]
+            options: 1,
+            assets:
+            {
+               $ifNull: [
+                  { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.variant.color"] }] },
+                  null
+               ]
             },
             rating: 1,
             ratingAverage: 1,
@@ -95,7 +99,8 @@ module.exports.product_detail_pipe = (productID: string, variationID: string) =>
             },
             save_as: 1,
             createdAt: 1,
-            bodyInfo: 1,
+            keywords: 1,
+            meta_description: 1,
             description: 1,
             manufacturer: 1,
             highlights: 1,
@@ -108,7 +113,7 @@ module.exports.product_detail_pipe = (productID: string, variationID: string) =>
          }
       },
       {
-         $set: { "supplier.contact_numbers": "$store.phones", store: 0, }
+         $set: { "supplier.contact_numbers": "$store.phones", store: 0 }
       }
    ]
 }
@@ -174,7 +179,12 @@ module.exports.search_product_pipe = (q: any) => {
             title: "$variations.vTitle",
             categories: 1,
             _vrid: "$variations._vrid",
-            image: { $first: "$images" },
+            assets: {
+               $ifNull: [
+                  { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.variant.color"] }] },
+                  null
+               ]
+            },
             slug: 1,
             _lid: 1
          },
@@ -267,7 +277,12 @@ module.exports.single_purchase_pipe = (productID: string, listingID: string, var
             slug: 1,
             brand: 1,
             packaged: 1,
-            image: { $first: "$variations.images" },
+            assets: {
+               $ifNull: [
+                  { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.variant.color"] }] },
+                  null
+               ]
+            },
             sku: "$variations.sku",
             supplier: 1,
             shipping: 1,

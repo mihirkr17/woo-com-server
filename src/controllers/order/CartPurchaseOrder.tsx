@@ -64,6 +64,7 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
                         $arrayElemAt: [{
                            $filter: {
                               input: "$variations",
+                              as: "variation",
                               cond: {
                                  $and: [
                                     { $eq: ['$$variation._vrid', '$items.variationID'] },
@@ -72,8 +73,8 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
                                     { $eq: ["$save_as", "fulfilled"] },
                                     { $gte: ["$$variation.available", "$items.quantity"] }
                                  ]
-                              },
-                              as: "variation"
+                              }
+           
                            }
                         }, 0]
                      },
@@ -92,7 +93,12 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
                packaged: 1,
                listingID: "$items.listingID",
                variationID: "$items.variationID",
-               image: { $first: "$variations.images" },
+               assets: {
+                  $ifNull: [
+                     { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.variant.color"] }] },
+                     null
+                  ]
+               },
                title: "$variations.vTitle",
                slug: 1,
                brand: 1,

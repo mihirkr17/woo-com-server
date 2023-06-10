@@ -75,7 +75,7 @@ const orderTab = new Schema({
          productID: String,
          title: String,
          slug: String,
-         image: String,
+         assets: Object,
          brand: String,
          baseAmount: Number,
          quantity: Number,
