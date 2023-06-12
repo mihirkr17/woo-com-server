@@ -1,5 +1,4 @@
 import { NextFunction, Request, Response } from "express";
-const Order = require("../../model/order.model");
 const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
 const apiResponse = require("../../errors/apiResponse");
@@ -10,6 +9,7 @@ const { buyer_order_email_template, seller_order_email_template } = require("../
 const { generateItemID, generateOrderID } = require("../../utils/generator");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const OrderTableModel = require("../../model/orderTable.model");
+const Order = require("../../model/order.model");
 
 
 
@@ -21,7 +21,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
 
       if (!req.body) throw new apiResponse.Api503Error("Service unavailable !");
 
-      const { variationID, productID, quantity, listingID, state, customerEmail, variantID } = req.body;
+      const { variationID, productID, quantity, listingID, state, customerEmail } = req.body;
 
       if (!variationID || !productID || !quantity || !listingID || !state || !customerEmail)
          throw new apiResponse.Api400Error("Required variationID, productID, quantity, listingID, state, customerEmail");
@@ -42,42 +42,35 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
          {
             $project: {
                _id: 0,
-               title: "$variations.vTitle",
-               slug: 1,
                variations: 1,
-               brand: 1,
-               assets: {
-                  $ifNull: [
-                     { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.variant.color"] }] },
-                     null
-                  ]
-               },
-               sku: "$variations.sku",
-               supplier: {
-                  email: '$supplier.email',
-                  id: "$supplier.id",
-                  store_name: "$supplier.store_name"
-               },
-               variant: {
-                  $arrayElemAt: [{
-                     $filter: {
-                        input: "$variations.variants",
-                        as: "variant",
-                        cond: { $eq: ["$$variant.variant_id", variantID] }
-                     }
-                  }, 0]
-               },
+               
+               supplier: 1,
                shipping: 1,
                packaged: 1,
-               baseAmount: { $multiply: ["$variations.pricing.sellingPrice", parseInt(quantity)] },
-               sellingPrice: "$variations.pricing.sellingPrice",
+               product: {
+                  title: "$variations.vTitle",
+                  slug: "$slug",
+                  brand: "$brand",
+                  sku: "$variations.sku",
+                  listing_id: "$items.listingID",
+                  variation_id: "$items.variationID",
+                  product_id: "$items.productID",
+                  assets: {
+                     $ifNull: [
+                        { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.variant.color"] }] },
+                        null
+                     ]
+                  },
+                  selling_price: "$variations.pricing.sellingPrice",
+                  base_amount: { $multiply: ["$variations.pricing.sellingPrice", parseInt(quantity)] },
+               },
             }
          },
          {
             $set: {
-               productID: productID,
-               listingID: listingID,
-               variationID: variationID,
+               "product.product_id": productID,
+               "product.listing_id": listingID,
+               "product.variation_id": variationID,
                quantity: quantity
             }
          },
@@ -89,29 +82,44 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
       if (typeof product === 'undefined' || !Array.isArray(product))
          throw new apiResponse.Api503Error("Service unavailable !");
 
-      let itemNumber = 1;
-      let sellerEmail = "";
-      let sellerStore = "";
-      let sellerID = "";
+      product = product[0];
+
       const productInfos: any[] = [];
 
-      product.forEach((p: any) => {
-         p["shippingCharge"] = p?.shipping?.isFree ? 0 : calculateShippingCost((p?.packaged?.volumetricWeight * p?.quantity), areaType);
-         p["itemID"] = "item" + (generateItemID() + (itemNumber++)).toString();
-         p["baseAmount"] = parseInt(p?.baseAmount + p?.shippingCharge);
-         sellerEmail = p?.supplier?.email;
-         sellerStore = p?.supplier?.store_name;
-         sellerID = p?.supplier?.id;
-         productInfos.push({
-            productID: p?.productID,
-            listingID: p?.listingID,
-            variationID: p?.variationID,
-            quantity: p?.quantity
-         })
-         return p;
-      });
+      product["shipping_charge"] = product?.shipping?.isFree ? 0 : calculateShippingCost((product?.packaged?.volumetricWeight * product?.quantity), areaType);
+      product["final_amount"] = parseInt(product?.product?.base_amount + product?.shipping_charge);
+      product["order_id"] = generateOrderID(product?.supplier?.id);
 
-      const totalAmount: number = product.reduce((p: number, n: any) => p + parseInt(n?.baseAmount), 0) || 0;
+      product["payment"] = {
+         status: "pending",
+         mode: "card"
+      };
+
+      product["order_placed_at"] = {
+         iso: new Date(timestamp),
+         time: new Date(timestamp).toLocaleTimeString(),
+         date: new Date(timestamp).toDateString(),
+         timestamp: timestamp
+      };
+
+      product["state"] = state;
+
+      product["customer"] = {
+         id: _uuid,
+         email,
+         shipping_address: defaultShippingAddress
+      }
+
+      product["order_status"] = "placed";
+
+      productInfos.push({
+         productID: product?.product?.product_id,
+         listingID: product?.product?.listing_id,
+         variationID: product?.product?.variation_id,
+         quantity: product?.quantity
+      })
+
+      const totalAmount: number = product.final_amount || 0;
 
       // creating payment intents here
       const { client_secret, metadata, id } = await stripe.paymentIntents.create({
@@ -119,46 +127,21 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
          currency: 'bdt',
          payment_method_types: ['card'],
          metadata: {
-            order_id: "opi_" + (Math.round(Math.random() * 99999999) + totalAmount).toString()
+            order_id: product?.order_id
          }
       });
 
 
       if (!client_secret) throw new apiResponse.Api400Error("Payment intent creation failed !");
 
-      const orderTable = new OrderTableModel({
-         orderID: generateOrderID(sellerID),
-         orderPaymentID: metadata?.order_id,
-         clientSecret: client_secret,
-         customerEmail: email,
-         customerID: _uuid,
-         seller: {
-            email: sellerEmail,
-            store: sellerStore
-         },
-         totalAmount,
-         paymentIntentID: id,
-         paymentStatus: "pending",
-         orderAT: {
-            iso: new Date(timestamp),
-            time: new Date(timestamp).toLocaleTimeString(),
-            date: new Date(timestamp).toDateString(),
-            timestamp
-         },
-         state,
-         shippingAddress: defaultShippingAddress,
-         areaType,
-         paymentMode: "card",
-         orderStatus: "placed",
-         items: product,
-      });
+      const orderTable = new Order(product);
 
       const result = await orderTable.save();
 
       await email_service({
-         to: sellerEmail,
+         to: product?.supplier?.email,
          subject: "New order confirmed",
-         html: seller_order_email_template(product, email, result?.orderID)
+         html: seller_order_email_template([product], email, [result?.orderID], totalAmount)
       });
 
       // after calculating total amount and order succeed then email sent to the buyer
@@ -175,6 +158,8 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
          totalAmount,
          clientSecret: client_secret,
          orderPaymentID: metadata?.order_id,
+         paymentIntentID: id,
+         orderIDs: [product?.order_id],
          productInfos
       });
    } catch (error: any) {

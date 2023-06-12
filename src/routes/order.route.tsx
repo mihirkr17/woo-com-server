@@ -23,7 +23,9 @@ try {
 
   router.get("/my-order/:email", verifyJWT, isRoleBuyer, myOrder);
   router.delete("/remove-order/:email/:orderID", verifyJWT, isRoleBuyer, removeOrder);
-  router.put("/cancel-my-order/:email", verifyJWT, isRoleBuyer, cancelMyOrder);
+
+  router.post("/cancel-my-order/:email", verifyJWT, isRoleBuyer, cancelMyOrder);
+
 } catch (error: any) {
   console.log(error?.message);
 }

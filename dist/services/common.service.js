@@ -18,6 +18,8 @@ const ShoppingCartModel = require("../model/shoppingCart.model");
 const cryptos = require("crypto");
 const apiResponse = require("../errors/apiResponse");
 const { generateTrackingID } = require("../utils/generator");
+const NCache = require("../utils/NodeCache");
+const Order = require("../model/order.model");
 module.exports.findUserByEmail = (email) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         return (yield UserModel.findOne({ $and: [{ email: email }, { accountStatus: 'active' }] }, {
@@ -46,7 +48,7 @@ module.exports.findUserByUUID = (uuid) => __awaiter(void 0, void 0, void 0, func
 });
 module.exports.order_status_updater = (obj) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { customerEmail, type, orderID, cancelReason, refundAT, sellerEmail, items } = obj;
+        const { customerEmail, type, orderID, cancelReason, refundAT, sellerEmail } = obj;
         let setQuery = {};
         const timestamp = Date.now();
         let timePlan = {
@@ -63,61 +65,63 @@ module.exports.order_status_updater = (obj) => __awaiter(void 0, void 0, void 0,
             //          { "seller.email": sellerEmail }]
             //    }, {
             //       $set: {
-            //          "items.$[i].trackingID": generateTrackingID()
+            //          "items.$[i].tracking_id": generateTrackingID()
             //       }
             //    },
             //       { arrayFilters: [{ "i.itemID": item?.itemID }], upsert: true });
             // }));
             setQuery = {
                 $set: {
-                    orderStatus: "dispatch",
-                    orderDispatchAT: timePlan,
-                    isDispatch: true,
-                    trackingID: generateTrackingID()
+                    order_status: "dispatch",
+                    order_dispatched_at: timePlan,
+                    is_dispatched: true,
+                    tracking_id: generateTrackingID()
                 }
             };
         }
         else if (type === "shipped") {
             setQuery = {
                 $set: {
-                    orderStatus: "shipped",
-                    orderShippedAT: timePlan,
-                    isShipped: true
+                    order_status: "shipped",
+                    order_shipped_at: timePlan,
+                    is_shipped: true
                 }
             };
         }
         else if (type === "completed") {
             setQuery = {
                 $set: {
-                    orderStatus: "completed",
-                    orderCompletedAT: timePlan,
-                    isCompleted: true
+                    order_status: "completed",
+                    is_completed_at: timePlan,
+                    is_completed: true
                 }
             };
         }
         else if (type === "canceled" && cancelReason) {
             setQuery = {
                 $set: {
-                    orderStatus: "canceled",
-                    cancelReason: cancelReason,
-                    orderCanceledAT: timePlan,
-                    isCanceled: true
+                    order_status: "canceled",
+                    cancel_reason: cancelReason,
+                    order_canceled_at: timePlan,
+                    is_canceled: true
                 }
             };
         }
         else if (type === "refunded" && refundAT) {
             setQuery = {
                 $set: {
-                    isRefunded: true,
-                    refundAT: refundAT,
-                    orderStatus: "refunded"
+                    is_refunded: true,
+                    refund_at: refundAT,
+                    order_status: "refunded"
                 }
             };
         }
-        return (yield OrderTable.findOneAndUpdate({
+        yield NCache.deleteCache(`${customerEmail}_myOrders`);
+        return (yield Order.findOneAndUpdate({
             $and: [
-                { customerEmail }, { orderID },
-                { "seller.email": sellerEmail }
+                { "customer.email": customerEmail },
+                { order_id: orderID },
+                { "supplier.email": sellerEmail }
             ]
         }, setQuery, { upsert: true })) ? true : false;
     }
@@ -280,6 +284,7 @@ module.exports.checkProductAvailability = (productID, variationID) => __awaiter(
 });
 module.exports.clearCart = (email) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        yield NCache.deleteCache(`${email}_cartProducts`);
         return yield ShoppingCartModel.findOneAndUpdate({ customerEmail: email }, {
             $set: { items: [] }
         });

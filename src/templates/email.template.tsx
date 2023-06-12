@@ -19,15 +19,15 @@ module.exports.buyer_order_email_template = (data: any, totalAmount: number) => 
          return (
             `<tr style="line-height: 30px; text-align: center; font-weight: bold; letter-spacing: 0.4px">
                            <td style="border: 1px solid #777">${ind++}</td>
-                           <td style="border: 1px solid #777">${item?.title}</td>
-                           <td style="border: 1px solid #777">$ ${item?.baseAmount}</td>
+                           <td style="border: 1px solid #777">${item?.product?.title}</td>
+                           <td style="border: 1px solid #777">$ ${item?.product?.base_amount}</td>
                            <td style="border: 1px solid #777">${item?.quantity}</td>
                         </tr>`
          )
       }) : `<tr style="line-height: 30px; text-align: center; font-weight: bold; letter-spacing: 0.4px"">
                   <td style="border: 1px solid #777;">${ind}</td>
-                  <td style="border: 1px solid #777;">${data?.title}</td>
-                  <td style="border: 1px solid #777;">$ ${data?.baseAmount}</td>
+                  <td style="border: 1px solid #777;">${data?.product?.title}</td>
+                  <td style="border: 1px solid #777;">$ ${data?.product?.base_amount}</td>
                   <td style="border: 1px solid #777;">${data?.quantity} Pcs</td>
             </tr>`
       }
@@ -49,20 +49,21 @@ module.exports.buyer_order_email_template = (data: any, totalAmount: number) => 
 
 
 
-module.exports.seller_order_email_template = (product: any, customerEmail: string, orderID: string) => {
+module.exports.seller_order_email_template = (product: any, customerEmail: string, orderIDs: any[], totalAmount: number) => {
    const timestamp = Date.now();
    const time = new Date(timestamp).toLocaleTimeString();
    const date = new Date(timestamp).toDateString();
    return (
       `<div>
          <h3 style="text-align: center">You have new order From ${customerEmail} At ${time}, ${date}</h3>
-         <p>Order ID: ${orderID}</p>
+         <p>Order ID: ${orderIDs.join(", ") ?? ""}</p>
+         <b>Total Amount : ${totalAmount}</b>
 
          <table style="border: 1px solid #777; width: 100%">
           <caption style="padding: 4px;">Order Details:</caption>
             <thead>
                <tr style="line-height: 34px; text-align: center; font-weight: bold; letter-spacing: 0.4px; background: cyan; color: black">
-                  <th style="border: 1px solid #777">Item ID</th>
+                  <th style="border: 1px solid #777">Order ID</th>
                   <th style="border: 1px solid #777">Product</th>
                   <th style="border: 1px solid #777">Qty</th>
                   <th style="border: 1px solid #777">SKU</th>
@@ -72,11 +73,11 @@ module.exports.seller_order_email_template = (product: any, customerEmail: strin
             <tbody>${Array.isArray(product) && product.map((item: any) => {
          return (
             `<tr style="line-height: 30px; text-align: center; font-weight: bold; letter-spacing: 0.4px">
-                  <td style="border: 1px solid #777">${item?.itemID}</td>
-                  <td style="border: 1px solid #777">${item?.title}</td>
+                  <td style="border: 1px solid #777">${item?.order_id}</td>
+                  <td style="border: 1px solid #777">${item?.product?.title}</td>
                   <td style="border: 1px solid #777">${item?.quantity}</td>
-                  <td style="border: 1px solid #777">${item?.sku}</td>
-                  <td style="border: 1px solid #777">$ ${item?.baseAmount}</td>
+                  <td style="border: 1px solid #777">${item?.product?.sku}</td>
+                  <td style="border: 1px solid #777">$ ${item?.product?.baseAmount}</td>
             </tr>`
          )
       })

@@ -76,7 +76,6 @@ const product_variation_template_engine = (body: any) => {
 
   return {
     vTitle: body?.vTitle,
-    images: body?.images,
     sku: body?.sku,
     variant: body?.variant || {},
     attrs: body?.attrs || {},

@@ -11,8 +11,59 @@ const OrderTableModel = require("../../model/orderTable.model");
 const { generateItemID, generateOrderID } = require("../../utils/generator");
 const email_service = require("../../services/email.service");
 const { buyer_order_email_template, seller_order_email_template } = require("../../templates/email.template");
+const Order = require("../../model/order.model");
+
+
+/**
+ * Handles the purchase of items from the cart and creates orders.
+ *
+ * @param {Request} req - The HTTP request object.
+ * @param {Response} res - The HTTP response object.
+ * @param {NextFunction} next - The next middleware function.
+ * @returns {Promise<Response>} The HTTP response indicating the status of the order creation.
+ * @throws {Api400Error} If required request body is missing.
+ * @throws {Api401Error} If the customer email is unauthorized.
+ * @throws {Api400Error} If the user is not found with the provided email.
+ * @throws {Api400Error} If the required shipping address is missing.
+ * @throws {Api400Error} If there are no items in the cart.
+ * @throws {Api503Error} If the service is unavailable.
+ * @throws {Api400Error} If the payment intent creation fails.
+ * @throws {Api400Error} If the order processing fails.
+ */
+
+async function createPaymentIntents(totalAmount: number, orderIDs: any[]) {
+   try {
+      // Creating payment intent after getting total amount of order items. 
+      const paymentIntents = await stripe.paymentIntents.create({
+         amount: (totalAmount * 100),
+         currency: 'bdt',
+         payment_method_types: ['card'],
+         metadata: {
+            order_id: orderIDs.join(", ")  //"opi_" + (Math.round(Math.random() * 99999999) + totalAmount).toString()
+         }
+      });
+
+      return paymentIntents;
+
+   } catch (e: any) {
+      switch (e.type) {
+         case 'StripeCardError':
+            throw new apiResponse.Api400Error(`A payment error occurred: ${e.message}`);
+            break;
+         case 'StripeInvalidRequestError':
+            console.log('An invalid request occurred.');
+            break;
+         default:
+            console.log('Another problem occurred, maybe unrelated to Stripe.');
+            break;
+      }
+   }
+}
 
 module.exports = async function CartPurchaseOrder(req: Request, res: Response, next: NextFunction) {
+
+
+
    try {
 
       const { email, _uuid } = req.decoded;
@@ -42,6 +93,8 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
          throw new apiResponse.Api400Error("Required shipping address !");
 
       const areaType = defaultAddress?.area_type;
+
+      let itemNumbers = 1;
 
       const cartItems = await ShoppingCart.aggregate([
          { $match: { customerEmail: email } },
@@ -74,13 +127,13 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
                                     { $gte: ["$$variation.available", "$items.quantity"] }
                                  ]
                               }
-           
+
                            }
                         }, 0]
                      },
                      {}
                   ]
-               }
+               },
             },
          },
          {
@@ -89,136 +142,122 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
                variations: 1,
                quantity: "$items.quantity",
                shipping: 1,
-               productID: "$items.productID",
                packaged: 1,
-               listingID: "$items.listingID",
-               variationID: "$items.variationID",
-               assets: {
-                  $ifNull: [
-                     { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.variant.color"] }] },
-                     null
-                  ]
-               },
-               title: "$variations.vTitle",
-               slug: 1,
-               brand: 1,
+            
                supplier: 1,
-               sku: "$variations.sku",
-               baseAmount: { $multiply: ["$variations.pricing.sellingPrice", '$items.quantity'] },
-               sellingPrice: "$variations.pricing.sellingPrice",
+               product: {
+                  title: "$variations.vTitle",
+                  slug: "$slug",
+                  brand: "$brand",
+                  sku: "$variations.sku",
+                  listing_id: "$items.listingID",
+                  variation_id: "$items.variationID",
+                  product_id: "$items.productID",
+                  assets: {
+                     $ifNull: [
+                        { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.variant.color"] }] },
+                        {}
+                     ]
+                  },
+                  selling_price: "$variations.pricing.sellingPrice",
+                  base_amount: { $multiply: ["$variations.pricing.sellingPrice", '$items.quantity'] }
+               },
+
             }
          },
          { $unset: ["variations", "items"] }
       ]);
 
 
+
       if (!cartItems || cartItems.length <= 0 || !Array.isArray(cartItems))
          throw new apiResponse.Api400Error("Nothing for purchase ! Please add product in your cart.");
 
       // adding order id tracking id in individual order items
-      let itemNumber = 1;
 
       const productInfos: any[] = [];
 
       let totalAmount: number = 0;
       const groupOrdersBySeller: any = {};
-
+      let orderIDs: any[] = []
 
       cartItems.forEach((item: any) => {
-         item["shippingCharge"] = item?.shipping?.isFree ? 0 : calculateShippingCost((item?.packaged?.volumetricWeight * item?.quantity), areaType);
-         item["itemID"] = "item" + (generateItemID() + (itemNumber++)).toString();
-         item["baseAmount"] = parseInt(item?.baseAmount + item?.shippingCharge);
 
-         totalAmount += item?.baseAmount;
+         item["shipping_charge"] = item?.shipping?.isFree ? 0 : calculateShippingCost((item?.packaged?.volumetricWeight * item?.quantity), areaType);
+         item["final_amount"] = parseInt(item?.product?.base_amount + item?.shipping_charge);
+         item["order_id"] = generateOrderID(item?.supplier?.id);
+
+         item["payment"] = {
+            status: "pending",
+            mode: "card"
+         };
+
+         item["order_placed_at"] = {
+            iso: new Date(timestamp),
+            time: new Date(timestamp).toLocaleTimeString(),
+            date: new Date(timestamp).toDateString(),
+            timestamp: timestamp
+         };
+
+         item["state"] = state;
+
+         item["customer"] = {
+            id: _uuid,
+            email,
+            shipping_address: defaultAddress
+         }
+
+         item["order_status"] = "placed";
+
+         totalAmount += item?.final_amount;
 
          productInfos.push({
-            productID: item?.productID,
-            listingID: item?.listingID,
-            variationID: item?.variationID,
+            productID: item?.product?.product_id,
+            listingID: item?.product?.listing_id,
+            variationID: item?.product?.variation_id,
             quantity: item?.quantity
          });
 
 
          if (!groupOrdersBySeller[item?.supplier?.email]) {
-            groupOrdersBySeller[item?.supplier?.email] = { items: [], store: "", sellerID: "" };
+            groupOrdersBySeller[item?.supplier?.email] = { items: [] };
          }
 
-         groupOrdersBySeller[item?.supplier?.email].store = item?.supplier?.store_name;
-         groupOrdersBySeller[item?.supplier?.email].sellerID = item?.supplier?.id;
          groupOrdersBySeller[item?.supplier?.email].items.push(item);
+         orderIDs.push(item?.order_id);
       });
 
       if (!totalAmount) throw new apiResponse.Api503Error("Service unavailable !");
 
 
+      // return res.status(200).send({ clgs: { cartItems, orderIDs, totalAmount, productInfos, groupOrdersBySeller } });
+
+
       // Creating payment intent after getting total amount of order items. 
-      const { client_secret, metadata, id } = await stripe.paymentIntents.create({
-         amount: (totalAmount * 100),
-         currency: 'bdt',
-         payment_method_types: ['card'],
-         metadata: {
-            order_id: "opi_" + (Math.round(Math.random() * 99999999) + totalAmount).toString()
-         }
-      });
+      const { client_secret, metadata, id } = await createPaymentIntents(totalAmount, orderIDs);
 
       if (!client_secret)
          throw new apiResponse.Api400Error("The payment intents failed. Please try again later or contact support if the problem persists.");
 
       // after order succeed then group the order item by seller email and send email to the seller
-      const orders: any[] = [];
+      // const orders: any[] = [];
+
+      await Order.insertMany(cartItems);
 
       // after successfully got order by seller as a object then loop it and trigger send email function inside for in loop
       for (const sEmail in groupOrdersBySeller) {
 
-         const { items, store, sellerID } = groupOrdersBySeller[sEmail]
+         const { items } = groupOrdersBySeller[sEmail]
 
          // calculate total amount of orders by seller;
-         const totalAmount: number = items.reduce((p: number, n: any) => p + parseInt(n?.baseAmount), 0) || 0;
-
-         // generate random order ids;
-         const orderID = generateOrderID(sellerID);
-
-         // then pushing them to orders variable;
-         orders.push({
-            orderID,
-            orderPaymentID: metadata?.order_id,
-            clientSecret: client_secret,
-            customerEmail: email,
-            customerID: _uuid,
-            seller: {
-               email: sEmail,
-               store
-            },
-            totalAmount,
-            paymentIntentID: id,
-            paymentStatus: "pending",
-            orderAT: {
-               iso: new Date(timestamp),
-               time: new Date(timestamp).toLocaleTimeString(),
-               date: new Date(timestamp).toDateString(),
-               timestamp: timestamp
-            },
-            state,
-            shippingAddress: defaultAddress,
-            areaType,
-            paymentMode: "card",
-            orderStatus: "placed",
-            items: items,
-         });
-
+         const totalAmount: number = items.reduce((p: number, n: any) => p + parseInt(n?.final_amount), 0) || 0;
 
          await email_service({
             to: sEmail,
             subject: "New order confirmed",
-            html: seller_order_email_template(items, email, orderID)
+            html: seller_order_email_template(items, email, orderIDs, totalAmount)
          });
       }
-
-
-      // finally insert orders to the database;
-      const result = await OrderTableModel.insertMany(orders);
-
-      if (!result || result.length <= 0) throw new apiResponse.Api400Error("Sorry order processing failed !");
 
       // after calculating total amount and order succeed then email sent to the buyer
       await email_service({
@@ -234,6 +273,8 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
          totalAmount,
          clientSecret: client_secret,
          orderPaymentID: metadata?.order_id,
+         paymentIntentID: id,
+         orderIDs,
          productInfos
       });
 

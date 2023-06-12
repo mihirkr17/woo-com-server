@@ -271,9 +271,9 @@ module.exports.single_purchase_pipe = (productID, listingID, variationID, quanti
                 savingAmount: {
                     $multiply: [{
                             $subtract: ["$variations.pricing.price", "$variations.pricing.sellingPrice"]
-                        }, '$items.quantity']
+                        }, quantity]
                 },
-                baseAmount: { $multiply: ["$variations.pricing.sellingPrice", '$items.quantity'] },
+                baseAmount: { $multiply: ["$variations.pricing.sellingPrice", quantity] },
                 sellingPrice: "$variations.pricing.sellingPrice",
                 paymentInfo: 1,
                 variant: "$variations.variant",

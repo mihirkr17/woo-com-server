@@ -8,8 +8,8 @@ const ShoppingCartModel = require("../model/shoppingCart.model");
 const cryptos = require("crypto");
 const apiResponse = require("../errors/apiResponse");
 const { generateTrackingID } = require("../utils/generator");
-
-
+const NCache = require("../utils/NodeCache");
+const Order = require("../model/order.model");
 
 module.exports.findUserByEmail = async (email: string) => {
    try {
@@ -46,7 +46,7 @@ module.exports.findUserByUUID = async (uuid: string) => {
 
 module.exports.order_status_updater = async (obj: any) => {
    try {
-      const { customerEmail, type, orderID, cancelReason, refundAT, sellerEmail, items } = obj;
+      const { customerEmail, type, orderID, cancelReason, refundAT, sellerEmail } = obj;
 
       let setQuery: any = {};
       const timestamp = Date.now();
@@ -67,7 +67,7 @@ module.exports.order_status_updater = async (obj: any) => {
          //          { "seller.email": sellerEmail }]
          //    }, {
          //       $set: {
-         //          "items.$[i].trackingID": generateTrackingID()
+         //          "items.$[i].tracking_id": generateTrackingID()
          //       }
          //    },
          //       { arrayFilters: [{ "i.itemID": item?.itemID }], upsert: true });
@@ -75,10 +75,10 @@ module.exports.order_status_updater = async (obj: any) => {
 
          setQuery = {
             $set: {
-               orderStatus: "dispatch",
-               orderDispatchAT: timePlan,
-               isDispatch: true,
-               trackingID: generateTrackingID()
+               order_status: "dispatch",
+               order_dispatched_at: timePlan,
+               is_dispatched: true,
+               tracking_id: generateTrackingID()
             }
          }
       }
@@ -86,9 +86,9 @@ module.exports.order_status_updater = async (obj: any) => {
       else if (type === "shipped") {
          setQuery = {
             $set: {
-               orderStatus: "shipped",
-               orderShippedAT: timePlan,
-               isShipped: true
+               order_status: "shipped",
+               order_shipped_at: timePlan,
+               is_shipped: true
             }
          }
       }
@@ -96,9 +96,9 @@ module.exports.order_status_updater = async (obj: any) => {
       else if (type === "completed") {
          setQuery = {
             $set: {
-               orderStatus: "completed",
-               orderCompletedAT: timePlan,
-               isCompleted: true
+               order_status: "completed",
+               is_completed_at: timePlan,
+               is_completed: true
             }
          }
       }
@@ -106,10 +106,10 @@ module.exports.order_status_updater = async (obj: any) => {
       else if (type === "canceled" && cancelReason) {
          setQuery = {
             $set: {
-               orderStatus: "canceled",
-               cancelReason: cancelReason,
-               orderCanceledAT: timePlan,
-               isCanceled: true
+               order_status: "canceled",
+               cancel_reason: cancelReason,
+               order_canceled_at: timePlan,
+               is_canceled: true
             }
          }
       }
@@ -117,17 +117,21 @@ module.exports.order_status_updater = async (obj: any) => {
       else if (type === "refunded" && refundAT) {
          setQuery = {
             $set: {
-               isRefunded: true,
-               refundAT: refundAT,
-               orderStatus: "refunded"
+               is_refunded: true,
+               refund_at: refundAT,
+               order_status: "refunded"
             }
          }
       }
 
-      return await OrderTable.findOneAndUpdate({
+      await NCache.deleteCache(`${customerEmail}_myOrders`);
+
+      return await Order.findOneAndUpdate({
          $and: [
-            { customerEmail }, { orderID },
-            { "seller.email": sellerEmail }]
+            { "customer.email": customerEmail },
+            { order_id: orderID },
+            { "supplier.email": sellerEmail }
+         ]
       }, setQuery,
          { upsert: true }) ? true : false;
 
@@ -324,6 +328,8 @@ module.exports.checkProductAvailability = async (productID: string, variationID:
 
 module.exports.clearCart = async (email: string) => {
    try {
+
+      await NCache.deleteCache(`${email}_cartProducts`);
       return await ShoppingCartModel.findOneAndUpdate({ customerEmail: email }, {
          $set: { items: [] }
       })

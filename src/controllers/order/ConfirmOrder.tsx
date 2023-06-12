@@ -1,7 +1,8 @@
 import { NextFunction, Request, Response } from "express";
 const { update_variation_stock_available, clearCart } = require("../../services/common.service");
 const apiResponse = require("../../errors/apiResponse");
-const OrderTableModel = require("../../model/orderTable.model");
+const Order = require("../../model/order.model");
+const NCache = require("../../utils/NodeCache");
 
 
 module.exports = async function confirmOrder(req: Request, res: Response, next: NextFunction) {
@@ -9,38 +10,49 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
 
       const { email } = req.decoded;
 
-      const { paymentMethodID, orderPaymentID, productInfos, orderState } = req.body as {
+      const { paymentMethodID, orderPaymentID, productInfos, orderState, orderIDs, paymentIntentID, clientSecret } = req.body as {
          paymentMethodID: any;
          orderPaymentID: string;
          productInfos: any[];
          orderState: string;
+         orderIDs: any[];
+         paymentIntentID: string;
+         clientSecret: string;
       };
 
       if (!req.body || typeof req.body !== "object" || !orderPaymentID || !productInfos)
          throw new apiResponse.Api503Error("Service unavailable !");
 
-      await OrderTableModel.updateMany({ $and: [{ orderPaymentID }] },
+      await Order.updateMany({ $and: [{ orderID: orderIDs }] },
          {
             $set: {
-               paymentMethodID,
-               paymentStatus: "paid"
+               "payment.method_id": paymentMethodID,
+               "payment.intent_id": paymentIntentID,
+               "payment.client_secret": clientSecret,
+               "payment.status": "paid"
             }
          }, {
       });
-      
 
-      const orderPromises: any = paymentMethodID && productInfos.map(async (item: any) => await update_variation_stock_available("dec", {
-         productID: item?.productID,
-         listingID: item?.listingID,
-         variationID: item?.variationID,
-         quantity: item?.quantity
-      }));
+      await NCache.deleteCache(`${email}_myOrders`);
 
-      await Promise.all(orderPromises);
+      if (paymentMethodID && clientSecret && productInfos) {
 
-      // after order confirmed then return response to the client
-      orderState === "byCart" && await clearCart(email);
-      return res.status(200).send({ message: "Order completed.", statusCode: 200, success: true });
+         const orderPromises: any = productInfos.map(async (item: any) => await update_variation_stock_available("dec", {
+            productID: item?.productID,
+            listingID: item?.listingID,
+            variationID: item?.variationID,
+            quantity: item?.quantity
+         }));
+
+         const result = await Promise.all(orderPromises);
+
+         if (result && orderState === "byCart") {
+            await clearCart(email);
+         }
+         // after order confirmed then return response to the client
+         return res.status(200).send({ message: "Order completed.", statusCode: 200, success: true });
+      }
 
    } catch (error: any) {
       next(error);

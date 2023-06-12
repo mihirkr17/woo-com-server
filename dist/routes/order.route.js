@@ -18,7 +18,7 @@ try {
     router.post("/confirm-order", verifyJWT, isRoleBuyer, ConfirmOrder);
     router.get("/my-order/:email", verifyJWT, isRoleBuyer, myOrder);
     router.delete("/remove-order/:email/:orderID", verifyJWT, isRoleBuyer, removeOrder);
-    router.put("/cancel-my-order/:email", verifyJWT, isRoleBuyer, cancelMyOrder);
+    router.post("/cancel-my-order/:email", verifyJWT, isRoleBuyer, cancelMyOrder);
 }
 catch (error) {
     console.log(error === null || error === void 0 ? void 0 : error.message);

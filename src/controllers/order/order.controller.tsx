@@ -1,9 +1,9 @@
 import { NextFunction, Request, Response } from "express";
-const OrderTableModel = require("../../model/orderTable.model");
-const { update_variation_stock_available } = require("../../services/common.service");
+const { update_variation_stock_available, order_status_updater } = require("../../services/common.service");
 const apiResponse = require("../../errors/apiResponse");
 const email_service = require("../../services/email.service");
 const NodeCache = require("../../utils/NodeCache");
+const Order = require("../../model/order.model");
 
 
 module.exports.myOrder = async (req: Request, res: Response, next: NextFunction) => {
@@ -22,7 +22,7 @@ module.exports.myOrder = async (req: Request, res: Response, next: NextFunction)
     if (cacheMyOrder) {
       orders = cacheMyOrder;
     } else {
-      orders = await OrderTableModel.find({ customerEmail: email }).sort({ _id: -1 });
+      orders = await Order.find({ "customer.email": email }).sort({ _id: -1 });
       NodeCache.saveCache(`${authEmail}_myOrders`, orders);
     }
 
@@ -37,7 +37,7 @@ module.exports.removeOrder = async (req: Request, res: Response, next: any) => {
 
     const { email, orderID } = req.params;
 
-    const result = await OrderTableModel.findOneAndDelete({ $and: [{ orderID }, { customerEmail: email }] });
+    const result = await Order.findOneAndDelete({ $and: [{ order_id: orderID }, { "customer.email": email }] });
 
     if (!result) throw new apiResponse.Api400Error("Order removed failed !");
 
@@ -52,60 +52,41 @@ module.exports.cancelMyOrder = async (req: Request, res: Response, next: NextFun
   try {
     const email = req.params.email;
 
-    const { cancelReason, orderID, orderItems } = req?.body;
+    const { cancelReason, orderID, product } = req?.body;
 
     if (!orderID || typeof orderID !== "string") throw new apiResponse.Api400Error("Required order ID !");
 
     if (!cancelReason || typeof cancelReason !== "string") throw new apiResponse.Api400Error("Required cancel reason !");
 
-    if (!orderItems || !Array.isArray(orderItems)) throw new apiResponse.Api400Error("Required order items information !");
+    if (!product) throw new apiResponse.Api400Error("Required order items information !");
 
-    const timestamp = Date.now();
+    // calling parallel api 
+    const [orderStatusResult, variationResult, emailSendingResult] = await Promise.all([
+      order_status_updater({ customerEmail: email, sellerEmail: product?.sellerEmail, orderID, type: "canceled", cancelReason }),
 
-    let timePlan = {
-      iso: new Date(timestamp),
-      time: new Date(timestamp).toLocaleTimeString(),
-      date: new Date(timestamp).toDateString(),
-      timestamp: timestamp
-    };
+      update_variation_stock_available("inc", product),
 
-    const updateOrderStatusResult = await OrderTableModel.findOneAndUpdate({ $and: [{ orderID }, { customerEmail: email }] }, {
-      $set: {
-        orderStatus: "canceled",
-        cancelReason: cancelReason,
-        orderCanceledAT: timePlan,
-        isCanceled: true
-      }
-    });
+      email_service({
+        to: email,
+        subject: "Order canceled confirm",
+        html: `
+          <h3>
+            Order canceled with ID : ${orderID}
+          </h3>
+          <br />
+          <p>Cancel Reason: ${cancelReason.replace(/[_+]/gi, " ")}</p>
+          <br />
+          <ul style="padding: 10px;">
+            <li style="margin: 5px;">
+              Title: ${product?.title}. <br />
+              Total: ${product?.finalAmount} Tk. <br />
+              Qty: ${product?.quantity} pcs.
+            </li>
+          </ul>`
+      })
+    ]);
 
-    if (!updateOrderStatusResult) throw new apiResponse.Api400Error("Order canceled request failed !");
-
-    await Promise.all(orderItems.map(async (item: any) => await update_variation_stock_available("inc", item)));
-
-    await email_service({
-      to: email,
-      subject: "Order canceled confirm",
-      html: `
-        <h3>
-          Order canceled with ID : ${orderID}
-        </h3>
-        <br />
-        <p>Cancel Reason: ${cancelReason.replace(/[_+]/gi, " ")}</p>
-        <br />
-        <ul style="padding: 10px;">
-          ${orderItems?.map((item: any) => {
-        return (
-          `<li style="margin: 5px;">
-            Title: ${item?.title}. <br />
-            Price: ${item?.baseAmount} USD. <br />
-            Qty: ${item?.quantity} pcs.
-          </li>`
-        )
-      })}
-        </ul>`
-    });
-
-    return res.status(200).send({ success: true, statusCode: 200, message: "Order canceled successfully" });
+    return orderStatusResult && res.status(200).send({ success: true, statusCode: 200, message: "Order canceled successfully" });
   } catch (error: any) {
     next(error);
   }

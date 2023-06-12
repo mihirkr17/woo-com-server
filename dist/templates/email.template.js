@@ -1,5 +1,6 @@
 "use strict";
 module.exports.buyer_order_email_template = (data, totalAmount) => {
+    var _a, _b;
     let ind = 1;
     return (`<div>
             <table style="padding: 5px 2px; border: 1px solid #777; width: 100%">
@@ -14,16 +15,17 @@ module.exports.buyer_order_email_template = (data, totalAmount) => {
                   </thead>
                   <tbody>
                   ${Array.isArray(data) ? data.map((item) => {
+        var _a, _b;
         return (`<tr style="line-height: 30px; text-align: center; font-weight: bold; letter-spacing: 0.4px">
                            <td style="border: 1px solid #777">${ind++}</td>
-                           <td style="border: 1px solid #777">${item === null || item === void 0 ? void 0 : item.title}</td>
-                           <td style="border: 1px solid #777">$ ${item === null || item === void 0 ? void 0 : item.baseAmount}</td>
+                           <td style="border: 1px solid #777">${(_a = item === null || item === void 0 ? void 0 : item.product) === null || _a === void 0 ? void 0 : _a.title}</td>
+                           <td style="border: 1px solid #777">$ ${(_b = item === null || item === void 0 ? void 0 : item.product) === null || _b === void 0 ? void 0 : _b.base_amount}</td>
                            <td style="border: 1px solid #777">${item === null || item === void 0 ? void 0 : item.quantity}</td>
                         </tr>`);
     }) : `<tr style="line-height: 30px; text-align: center; font-weight: bold; letter-spacing: 0.4px"">
                   <td style="border: 1px solid #777;">${ind}</td>
-                  <td style="border: 1px solid #777;">${data === null || data === void 0 ? void 0 : data.title}</td>
-                  <td style="border: 1px solid #777;">$ ${data === null || data === void 0 ? void 0 : data.baseAmount}</td>
+                  <td style="border: 1px solid #777;">${(_a = data === null || data === void 0 ? void 0 : data.product) === null || _a === void 0 ? void 0 : _a.title}</td>
+                  <td style="border: 1px solid #777;">$ ${(_b = data === null || data === void 0 ? void 0 : data.product) === null || _b === void 0 ? void 0 : _b.base_amount}</td>
                   <td style="border: 1px solid #777;">${data === null || data === void 0 ? void 0 : data.quantity} Pcs</td>
             </tr>`}
                   </tbody>
@@ -40,19 +42,21 @@ module.exports.buyer_order_email_template = (data, totalAmount) => {
             <br/>
          </div>`);
 };
-module.exports.seller_order_email_template = (product, customerEmail, orderID) => {
+module.exports.seller_order_email_template = (product, customerEmail, orderIDs, totalAmount) => {
+    var _a;
     const timestamp = Date.now();
     const time = new Date(timestamp).toLocaleTimeString();
     const date = new Date(timestamp).toDateString();
     return (`<div>
          <h3 style="text-align: center">You have new order From ${customerEmail} At ${time}, ${date}</h3>
-         <p>Order ID: ${orderID}</p>
+         <p>Order ID: ${(_a = orderIDs.join(", ")) !== null && _a !== void 0 ? _a : ""}</p>
+         <b>Total Amount : ${totalAmount}</b>
 
          <table style="border: 1px solid #777; width: 100%">
           <caption style="padding: 4px;">Order Details:</caption>
             <thead>
                <tr style="line-height: 34px; text-align: center; font-weight: bold; letter-spacing: 0.4px; background: cyan; color: black">
-                  <th style="border: 1px solid #777">Item ID</th>
+                  <th style="border: 1px solid #777">Order ID</th>
                   <th style="border: 1px solid #777">Product</th>
                   <th style="border: 1px solid #777">Qty</th>
                   <th style="border: 1px solid #777">SKU</th>
@@ -60,12 +64,13 @@ module.exports.seller_order_email_template = (product, customerEmail, orderID) =
                </tr>
             </thead>
             <tbody>${Array.isArray(product) && product.map((item) => {
+        var _a, _b, _c;
         return (`<tr style="line-height: 30px; text-align: center; font-weight: bold; letter-spacing: 0.4px">
-                  <td style="border: 1px solid #777">${item === null || item === void 0 ? void 0 : item.itemID}</td>
-                  <td style="border: 1px solid #777">${item === null || item === void 0 ? void 0 : item.title}</td>
+                  <td style="border: 1px solid #777">${item === null || item === void 0 ? void 0 : item.order_id}</td>
+                  <td style="border: 1px solid #777">${(_a = item === null || item === void 0 ? void 0 : item.product) === null || _a === void 0 ? void 0 : _a.title}</td>
                   <td style="border: 1px solid #777">${item === null || item === void 0 ? void 0 : item.quantity}</td>
-                  <td style="border: 1px solid #777">${item === null || item === void 0 ? void 0 : item.sku}</td>
-                  <td style="border: 1px solid #777">$ ${item === null || item === void 0 ? void 0 : item.baseAmount}</td>
+                  <td style="border: 1px solid #777">${(_b = item === null || item === void 0 ? void 0 : item.product) === null || _b === void 0 ? void 0 : _b.sku}</td>
+                  <td style="border: 1px solid #777">$ ${(_c = item === null || item === void 0 ? void 0 : item.product) === null || _c === void 0 ? void 0 : _c.baseAmount}</td>
             </tr>`);
     })}
             </tbody>

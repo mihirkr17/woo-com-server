@@ -58,7 +58,6 @@ const product_variation_template_engine = (body) => {
     }
     return {
         vTitle: body === null || body === void 0 ? void 0 : body.vTitle,
-        images: body === null || body === void 0 ? void 0 : body.images,
         sku: body === null || body === void 0 ? void 0 : body.sku,
         variant: (body === null || body === void 0 ? void 0 : body.variant) || {},
         attrs: (body === null || body === void 0 ? void 0 : body.attrs) || {},
