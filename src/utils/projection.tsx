@@ -31,6 +31,13 @@ module.exports.basicProductProject = {
    packageInfo: 1,
    rating: 1,
    ratingAverage: 1,
+   ratingCount: {
+      $reduce: {
+         input: "$rating",
+         initialValue: 0,
+         in: { $add: ["$$value", "$$this.count"] }
+      }
+   },
    _lid: 1,
    reviews: 1,
    _vrid: "$variations._vrid",

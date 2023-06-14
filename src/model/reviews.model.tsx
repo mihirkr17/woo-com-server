@@ -9,8 +9,6 @@ const reviewSchema = new Schema({
 
    order_id: { type: String, required: true },
 
-   order_item_id: { type: String, required: true },
-
    product_images: { type: Array },
 
    comments: { type: String, required: false },

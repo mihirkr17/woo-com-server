@@ -6,7 +6,6 @@ const reviewSchema = new mongoose_1.Schema({
     name: { type: String, required: true },
     customer_id: { type: String, required: true },
     order_id: { type: String, required: true },
-    order_item_id: { type: String, required: true },
     product_images: { type: Array },
     comments: { type: String, required: false },
     rating_point: { type: Number, required: true },

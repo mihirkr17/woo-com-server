@@ -45,7 +45,7 @@ function createPaymentIntents(totalAmount, orderIDs) {
                 currency: 'bdt',
                 payment_method_types: ['card'],
                 metadata: {
-                    order_id: orderIDs.join(", ") //"opi_" + (Math.round(Math.random() * 99999999) + totalAmount).toString()
+                    order_id: orderIDs.join(", ")
                 }
             });
             return paymentIntents;
@@ -72,6 +72,12 @@ module.exports = function CartPurchaseOrder(req, res, next) {
             const { email, _uuid } = req.decoded;
             // initialized current time stamp
             const timestamp = Date.now();
+            const timeObject = {
+                iso: new Date(timestamp),
+                time: new Date(timestamp).toLocaleTimeString(),
+                date: new Date(timestamp).toDateString(),
+                timestamp: timestamp
+            };
             if (!req.body || typeof req.body === "undefined")
                 throw new apiResponse.Api400Error("Required body !");
             // get state by body
@@ -87,7 +93,6 @@ module.exports = function CartPurchaseOrder(req, res, next) {
             if (!defaultAddress)
                 throw new apiResponse.Api400Error("Required shipping address !");
             const areaType = defaultAddress === null || defaultAddress === void 0 ? void 0 : defaultAddress.area_type;
-            let itemNumbers = 1;
             const cartItems = yield ShoppingCart.aggregate([
                 { $match: { customerEmail: email } },
                 { $unwind: { path: "$items" } },
@@ -160,11 +165,13 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                 throw new apiResponse.Api400Error("Nothing for purchase ! Please add product in your cart.");
             // adding order id tracking id in individual order items
             const productInfos = [];
+            let cartTotal = 0;
             let totalAmount = 0;
+            let shippingTotal = 0;
             const groupOrdersBySeller = {};
             let orderIDs = [];
             cartItems.forEach((item) => {
-                var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+                var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
                 item["shipping_charge"] = ((_a = item === null || item === void 0 ? void 0 : item.shipping) === null || _a === void 0 ? void 0 : _a.isFree) ? 0 : calculateShippingCost((((_b = item === null || item === void 0 ? void 0 : item.packaged) === null || _b === void 0 ? void 0 : _b.volumetricWeight) * (item === null || item === void 0 ? void 0 : item.quantity)), areaType);
                 item["final_amount"] = parseInt(((_c = item === null || item === void 0 ? void 0 : item.product) === null || _c === void 0 ? void 0 : _c.base_amount) + (item === null || item === void 0 ? void 0 : item.shipping_charge));
                 item["order_id"] = generateOrderID((_d = item === null || item === void 0 ? void 0 : item.supplier) === null || _d === void 0 ? void 0 : _d.id);
@@ -172,12 +179,7 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                     status: "pending",
                     mode: "card"
                 };
-                item["order_placed_at"] = {
-                    iso: new Date(timestamp),
-                    time: new Date(timestamp).toLocaleTimeString(),
-                    date: new Date(timestamp).toDateString(),
-                    timestamp: timestamp
-                };
+                item["order_placed_at"] = timeObject;
                 item["state"] = state;
                 item["customer"] = {
                     id: _uuid,
@@ -186,21 +188,22 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                 };
                 item["order_status"] = "placed";
                 totalAmount += item === null || item === void 0 ? void 0 : item.final_amount;
+                shippingTotal += item === null || item === void 0 ? void 0 : item.shipping_charge;
+                cartTotal += parseInt((_e = item === null || item === void 0 ? void 0 : item.product) === null || _e === void 0 ? void 0 : _e.base_amount);
                 productInfos.push({
-                    productID: (_e = item === null || item === void 0 ? void 0 : item.product) === null || _e === void 0 ? void 0 : _e.product_id,
-                    listingID: (_f = item === null || item === void 0 ? void 0 : item.product) === null || _f === void 0 ? void 0 : _f.listing_id,
-                    variationID: (_g = item === null || item === void 0 ? void 0 : item.product) === null || _g === void 0 ? void 0 : _g.variation_id,
+                    productID: (_f = item === null || item === void 0 ? void 0 : item.product) === null || _f === void 0 ? void 0 : _f.product_id,
+                    listingID: (_g = item === null || item === void 0 ? void 0 : item.product) === null || _g === void 0 ? void 0 : _g.listing_id,
+                    variationID: (_h = item === null || item === void 0 ? void 0 : item.product) === null || _h === void 0 ? void 0 : _h.variation_id,
                     quantity: item === null || item === void 0 ? void 0 : item.quantity
                 });
-                if (!groupOrdersBySeller[(_h = item === null || item === void 0 ? void 0 : item.supplier) === null || _h === void 0 ? void 0 : _h.email]) {
-                    groupOrdersBySeller[(_j = item === null || item === void 0 ? void 0 : item.supplier) === null || _j === void 0 ? void 0 : _j.email] = { items: [] };
+                if (!groupOrdersBySeller[(_j = item === null || item === void 0 ? void 0 : item.supplier) === null || _j === void 0 ? void 0 : _j.email]) {
+                    groupOrdersBySeller[(_k = item === null || item === void 0 ? void 0 : item.supplier) === null || _k === void 0 ? void 0 : _k.email] = { items: [] };
                 }
-                groupOrdersBySeller[(_k = item === null || item === void 0 ? void 0 : item.supplier) === null || _k === void 0 ? void 0 : _k.email].items.push(item);
+                groupOrdersBySeller[(_l = item === null || item === void 0 ? void 0 : item.supplier) === null || _l === void 0 ? void 0 : _l.email].items.push(item);
                 orderIDs.push(item === null || item === void 0 ? void 0 : item.order_id);
             });
             if (!totalAmount)
                 throw new apiResponse.Api503Error("Service unavailable !");
-            // return res.status(200).send({ clgs: { cartItems, orderIDs, totalAmount, productInfos, groupOrdersBySeller } });
             // Creating payment intent after getting total amount of order items. 
             const { client_secret, metadata, id } = yield createPaymentIntents(totalAmount, orderIDs);
             if (!client_secret)
@@ -223,7 +226,7 @@ module.exports = function CartPurchaseOrder(req, res, next) {
             yield email_service({
                 to: email,
                 subject: "Order confirmed",
-                html: buyer_order_email_template(cartItems, totalAmount)
+                html: buyer_order_email_template(cartItems, { timeObject, shippingAddress: defaultAddress, totalAmount, cartTotal, shippingTotal, email, state })
             });
             return res.status(200).send({
                 success: true,

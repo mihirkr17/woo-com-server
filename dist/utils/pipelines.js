@@ -336,3 +336,33 @@ module.exports.shopping_cart_pipe = (email) => {
         }
     ];
 };
+module.exports.get_review_product_details_pipe = (pid, vid) => {
+    return [
+        { $match: { _id: mongoDB.ObjectId(pid) } },
+        {
+            $addFields: {
+                variations: {
+                    $ifNull: [
+                        {
+                            $arrayElemAt: [
+                                {
+                                    $filter: {
+                                        input: "$variations",
+                                        as: "variant",
+                                        cond: {
+                                            $eq: ["$$variant._vrid", vid]
+                                        }
+                                    }
+                                },
+                                0
+                            ]
+                        },
+                        null
+                    ]
+                }
+            }
+        }, {
+            $project: basicProductProject
+        }
+    ];
+};

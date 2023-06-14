@@ -1,15 +1,17 @@
 import { NextFunction, Request, Response } from "express";
 const { ObjectId } = require("mongodb");
 const Product = require("../../model/product.model");
-const OrderTable = require("../../model/orderTable.model");
+const Order = require("../../model/order.model");
 const Review = require("../../model/reviews.model");
 const { Api400Error, Api401Error } = require("../../errors/apiResponse");
+const { get_review_product_details_pipe } = require("../../utils/pipelines");
 
+// adding product review and ratings
 module.exports.addProductRating = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { _uuid } = req.decoded;
 
-    const { orderID, itemID, productID, ratingWeight, productReview, name, reviewImage } = req?.body;
+    const { orderID, productID, ratingWeight, description, name, reviewImage } = req?.body;
 
     const [updatedProduct, newReview, orderUpdateResult] = await Promise.all([
 
@@ -66,28 +68,27 @@ module.exports.addProductRating = async (req: Request, res: Response, next: Next
         { new: true }
       ),
 
-      productReview && new Review({
+      description && new Review({
         product_id: productID,
         order_id: orderID,
         name,
         customer_id: _uuid,
-        order_item_id: itemID,
         product_images: reviewImage.slice(0, 5) ?? [],
-        comments: productReview,
+        comments: description,
         rating_point: parseInt(ratingWeight),
         verified_purchase: true,
         likes: [],
         review_at: new Date(Date.now())
       }).save(),
 
-      OrderTable.findOneAndUpdate(
-        { orderID },
+      Order.findOneAndUpdate(
+        { order_id: orderID },
         {
           $set: {
-            "items.$[i].isRated": true,
-          },
+            is_rated: true,
+          }
         },
-        { arrayFilters: [{ "i.itemID": itemID }], upsert: true }
+        { upsert: true }
       )
     ]);
 
@@ -209,6 +210,36 @@ module.exports.getMyReviews = async (req: Request, res: Response, next: NextFunc
     ]);
 
     return res.status(200).send({ success: true, statusCode: 200, reviews });
+
+  } catch (error: any) {
+    next(error);
+  }
+}
+
+
+
+module.exports.getProductDetails = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+
+    const { pid, vid, oid } = req?.query;
+
+    if (!pid || !vid || !oid) return next(new Api400Error("Required product and variation id and order id !"));
+
+    const getOrder = await Order.findOne({
+      $and: [
+        { order_id: oid },
+        { "product.product_id": pid },
+        { "product.variation_id": vid }
+      ]
+    });
+
+    if (!getOrder) return next(new Api400Error("Order not found !"));
+
+    let product = await Product.aggregate(get_review_product_details_pipe(pid, vid));
+
+    product = product[0];
+
+    return res.status(200).send({ success: true, statusCode: 200, response: product,  message: (getOrder?.is_rated) ? "You already review this product." : null })
 
   } catch (error: any) {
     next(error);

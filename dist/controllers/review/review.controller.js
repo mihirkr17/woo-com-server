@@ -11,14 +11,16 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const { ObjectId } = require("mongodb");
 const Product = require("../../model/product.model");
-const OrderTable = require("../../model/orderTable.model");
+const Order = require("../../model/order.model");
 const Review = require("../../model/reviews.model");
 const { Api400Error, Api401Error } = require("../../errors/apiResponse");
+const { get_review_product_details_pipe } = require("../../utils/pipelines");
+// adding product review and ratings
 module.exports.addProductRating = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
         const { _uuid } = req.decoded;
-        const { orderID, itemID, productID, ratingWeight, productReview, name, reviewImage } = req === null || req === void 0 ? void 0 : req.body;
+        const { orderID, productID, ratingWeight, description, name, reviewImage } = req === null || req === void 0 ? void 0 : req.body;
         const [updatedProduct, newReview, orderUpdateResult] = yield Promise.all([
             Product.findOneAndUpdate({ _id: ObjectId(productID) }, [
                 {
@@ -68,24 +70,23 @@ module.exports.addProductRating = (req, res, next) => __awaiter(void 0, void 0, 
                     }
                 }
             ], { new: true }),
-            productReview && new Review({
+            description && new Review({
                 product_id: productID,
                 order_id: orderID,
                 name,
                 customer_id: _uuid,
-                order_item_id: itemID,
                 product_images: (_a = reviewImage.slice(0, 5)) !== null && _a !== void 0 ? _a : [],
-                comments: productReview,
+                comments: description,
                 rating_point: parseInt(ratingWeight),
                 verified_purchase: true,
                 likes: [],
                 review_at: new Date(Date.now())
             }).save(),
-            OrderTable.findOneAndUpdate({ orderID }, {
+            Order.findOneAndUpdate({ order_id: orderID }, {
                 $set: {
-                    "items.$[i].isRated": true,
-                },
-            }, { arrayFilters: [{ "i.itemID": itemID }], upsert: true })
+                    is_rated: true,
+                }
+            }, { upsert: true })
         ]);
         return res.status(200).send({ success: true, statusCode: 200, message: "Thanks for your review !" });
     }
@@ -183,6 +184,28 @@ module.exports.getMyReviews = (req, res, next) => __awaiter(void 0, void 0, void
             }
         ]);
         return res.status(200).send({ success: true, statusCode: 200, reviews });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+module.exports.getProductDetails = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { pid, vid, oid } = req === null || req === void 0 ? void 0 : req.query;
+        if (!pid || !vid || !oid)
+            return next(new Api400Error("Required product and variation id and order id !"));
+        const getOrder = yield Order.findOne({
+            $and: [
+                { order_id: oid },
+                { "product.product_id": pid },
+                { "product.variation_id": vid }
+            ]
+        });
+        if (!getOrder)
+            return next(new Api400Error("Order not found !"));
+        let product = yield Product.aggregate(get_review_product_details_pipe(pid, vid));
+        product = product[0];
+        return res.status(200).send({ success: true, statusCode: 200, response: product, message: (getOrder === null || getOrder === void 0 ? void 0 : getOrder.is_rated) ? "You already review this product." : null });
     }
     catch (error) {
         next(error);

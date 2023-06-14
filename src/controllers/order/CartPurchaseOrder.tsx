@@ -39,7 +39,7 @@ async function createPaymentIntents(totalAmount: number, orderIDs: any[]) {
          currency: 'bdt',
          payment_method_types: ['card'],
          metadata: {
-            order_id: orderIDs.join(", ")  //"opi_" + (Math.round(Math.random() * 99999999) + totalAmount).toString()
+            order_id: orderIDs.join(", ")
          }
       });
 
@@ -61,16 +61,18 @@ async function createPaymentIntents(totalAmount: number, orderIDs: any[]) {
 }
 
 module.exports = async function CartPurchaseOrder(req: Request, res: Response, next: NextFunction) {
-
-
-
    try {
 
       const { email, _uuid } = req.decoded;
 
       // initialized current time stamp
       const timestamp: any = Date.now();
-
+      const timeObject = {
+         iso: new Date(timestamp),
+         time: new Date(timestamp).toLocaleTimeString(),
+         date: new Date(timestamp).toDateString(),
+         timestamp: timestamp
+      }
 
       if (!req.body || typeof req.body === "undefined")
          throw new apiResponse.Api400Error("Required body !");
@@ -93,8 +95,6 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
          throw new apiResponse.Api400Error("Required shipping address !");
 
       const areaType = defaultAddress?.area_type;
-
-      let itemNumbers = 1;
 
       const cartItems = await ShoppingCart.aggregate([
          { $match: { customerEmail: email } },
@@ -143,7 +143,7 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
                quantity: "$items.quantity",
                shipping: 1,
                packaged: 1,
-            
+
                supplier: 1,
                product: {
                   title: "$variations.vTitle",
@@ -177,14 +177,18 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
 
       const productInfos: any[] = [];
 
+      let cartTotal: number = 0;
       let totalAmount: number = 0;
+      let shippingTotal: number = 0;
       const groupOrdersBySeller: any = {};
       let orderIDs: any[] = []
 
       cartItems.forEach((item: any) => {
 
          item["shipping_charge"] = item?.shipping?.isFree ? 0 : calculateShippingCost((item?.packaged?.volumetricWeight * item?.quantity), areaType);
+
          item["final_amount"] = parseInt(item?.product?.base_amount + item?.shipping_charge);
+
          item["order_id"] = generateOrderID(item?.supplier?.id);
 
          item["payment"] = {
@@ -192,12 +196,7 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
             mode: "card"
          };
 
-         item["order_placed_at"] = {
-            iso: new Date(timestamp),
-            time: new Date(timestamp).toLocaleTimeString(),
-            date: new Date(timestamp).toDateString(),
-            timestamp: timestamp
-         };
+         item["order_placed_at"] = timeObject;
 
          item["state"] = state;
 
@@ -210,6 +209,10 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
          item["order_status"] = "placed";
 
          totalAmount += item?.final_amount;
+
+         shippingTotal += item?.shipping_charge;
+
+         cartTotal += parseInt(item?.product?.base_amount);
 
          productInfos.push({
             productID: item?.product?.product_id,
@@ -228,10 +231,6 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
       });
 
       if (!totalAmount) throw new apiResponse.Api503Error("Service unavailable !");
-
-
-      // return res.status(200).send({ clgs: { cartItems, orderIDs, totalAmount, productInfos, groupOrdersBySeller } });
-
 
       // Creating payment intent after getting total amount of order items. 
       const { client_secret, metadata, id } = await createPaymentIntents(totalAmount, orderIDs);
@@ -263,7 +262,7 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
       await email_service({
          to: email,
          subject: "Order confirmed",
-         html: buyer_order_email_template(cartItems, totalAmount)
+         html: buyer_order_email_template(cartItems, { timeObject, shippingAddress: defaultAddress, totalAmount, cartTotal, shippingTotal, email, state })
       });
 
       return res.status(200).send({
