@@ -15,29 +15,29 @@ const { ObjectId } = require("mongodb");
 const Review = require("../../model/reviews.model");
 /**
  * @controller      --> Fetch the single product information in product details page.
- * @required        --> [req.headers.authorization:email, req.query:productID, req.query:variationID, req.params:product slug]
+ * @required        --> [req.headers.authorization:email, req.query:productID, req.query:sku, req.params:product slug]
  * @request_method  --> GET
  */
 module.exports.fetchProductDetails = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
-      const { pId: productID, vId: variationID, oTracker } = req.query;
+      const { pId: productID, sku, oTracker } = req.query;
 
       if (!productID || typeof productID !== "string") throw new Api400Error("Invalid product id ");
 
-      if (!variationID || typeof variationID !== "string") throw new Api400Error("Invalid variation id ");
+      if (!sku || typeof sku !== "string") throw new Api400Error("Invalid sku");
 
       let productDetail: any;
 
       // Product Details
-      let cacheData = NodeCache.getCache(`${productID}_${variationID}`);
+      let cacheData = NodeCache.getCache(`${productID}_${sku}`);
 
       if (cacheData) {
          productDetail = cacheData;
 
       } else {
 
-         productDetail = await Product.aggregate(product_detail_pipe(productID, variationID));
+         productDetail = await Product.aggregate(product_detail_pipe(productID, sku));
 
          productDetail = productDetail[0];
 
@@ -48,11 +48,11 @@ module.exports.fetchProductDetails = async (req: Request, res: Response, next: N
 
          productDetail["policies"] = await PrivacyPolicy.findOne({}) ?? {};
 
-         NodeCache.saveCache(`${productID}_${variationID}`, productDetail);
+         NodeCache.saveCache(`${productID}_${sku}`, productDetail);
       }
 
       // Related products
-      const relatedProducts = await Product.aggregate(product_detail_relate_pipe(variationID, productDetail?.categories));
+      const relatedProducts = await Product.aggregate(product_detail_relate_pipe(sku, productDetail?.categories));
 
       // all success
       return res.status(200).send({
@@ -192,7 +192,7 @@ module.exports.purchaseProductController = async (req: Request, res: Response, n
 
       let user = await findUserByEmail(authEmail);
 
-      const { listingID, variationID, quantity, productID, customerEmail } = req?.body;
+      const { listingID, sku, quantity, productID, customerEmail } = req?.body;
 
       let defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
          user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
@@ -201,7 +201,7 @@ module.exports.purchaseProductController = async (req: Request, res: Response, n
 
       let newQuantity = parseInt(quantity);
 
-      let product = await Product.aggregate(single_purchase_pipe(productID, listingID, variationID, newQuantity));
+      let product = await Product.aggregate(single_purchase_pipe(productID, listingID, sku, newQuantity));
 
       if (product && typeof product !== 'undefined') {
          product = product[0];

@@ -41,7 +41,7 @@ module.exports = async function confirmOrder(req: Request, res: Response, next: 
          const orderPromises: any = productInfos.map(async (item: any) => await update_variation_stock_available("dec", {
             productID: item?.productID,
             listingID: item?.listingID,
-            variationID: item?.variationID,
+            sku: item?.sku,
             quantity: item?.quantity
          }));
 

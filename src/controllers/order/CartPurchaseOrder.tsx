@@ -120,10 +120,9 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
                               as: "variation",
                               cond: {
                                  $and: [
-                                    { $eq: ['$$variation._vrid', '$items.variationID'] },
+                                    { $eq: ['$$variation.sku', '$items.sku'] },
                                     { $eq: ['$$variation.stock', "in"] },
                                     { $eq: ["$status", "active"] },
-                                    { $eq: ["$save_as", "fulfilled"] },
                                     { $gte: ["$$variation.available", "$items.quantity"] }
                                  ]
                               }
@@ -146,21 +145,15 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
 
                supplier: 1,
                product: {
-                  title: "$variations.vTitle",
+                  title: 1,
                   slug: "$slug",
                   brand: "$brand",
                   sku: "$variations.sku",
                   listing_id: "$items.listingID",
-                  variation_id: "$items.variationID",
                   product_id: "$items.productID",
-                  assets: {
-                     $ifNull: [
-                        { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.variant.color"] }] },
-                        {}
-                     ]
-                  },
-                  selling_price: "$variations.pricing.sellingPrice",
-                  base_amount: { $multiply: ["$variations.pricing.sellingPrice", '$items.quantity'] }
+                  imageUrl: { $arrayElemAt: ["$variations.images", 0] },
+                  sellingPrice: "$variations.pricing.sellingPrice",
+                  baseAmount: { $multiply: ["$variations.pricing.sellingPrice", '$items.quantity'] }
                },
 
             }
@@ -189,7 +182,7 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
 
          item["final_amount"] = parseInt(item?.product?.base_amount + item?.shipping_charge);
 
-         item["order_id"] = generateOrderID(item?.supplier?.id);
+         item["order_id"] = generateOrderID(item?.supplier?.email);
 
          item["payment"] = {
             status: "pending",
@@ -217,7 +210,7 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
          productInfos.push({
             productID: item?.product?.product_id,
             listingID: item?.product?.listing_id,
-            variationID: item?.product?.variation_id,
+            sku: item?.product?.sku,
             quantity: item?.quantity
          });
 
@@ -230,7 +223,14 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
          orderIDs.push(item?.order_id);
       });
 
+
+
       if (!totalAmount) throw new apiResponse.Api503Error("Service unavailable !");
+
+
+      if (totalAmount >= 500) {
+         totalAmount = totalAmount - shippingTotal;
+      }
 
       // Creating payment intent after getting total amount of order items. 
       const { client_secret, metadata, id } = await createPaymentIntents(totalAmount, orderIDs);

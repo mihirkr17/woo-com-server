@@ -1,7 +1,7 @@
-module.exports.cartTemplate = (productID: String, listingID: String, variationID: String) => {
+module.exports.cartTemplate = (productID: String, listingID: String, sku: String) => {
    return {
       productID,
-      variationID,
+      sku,
       listingID,
       quantity: 1,
       addedAt: new Date()

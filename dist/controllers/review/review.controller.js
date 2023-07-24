@@ -191,19 +191,19 @@ module.exports.getMyReviews = (req, res, next) => __awaiter(void 0, void 0, void
 });
 module.exports.getProductDetails = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { pid, vid, oid } = req === null || req === void 0 ? void 0 : req.query;
-        if (!pid || !vid || !oid)
-            return next(new Api400Error("Required product and variation id and order id !"));
+        const { pid, sku, oid } = req === null || req === void 0 ? void 0 : req.query;
+        if (!pid || !sku || !oid)
+            return next(new Api400Error("Required product and sku and order id !"));
         const getOrder = yield Order.findOne({
             $and: [
                 { order_id: oid },
                 { "product.product_id": pid },
-                { "product.variation_id": vid }
+                { "product.sku": sku }
             ]
         });
         if (!getOrder)
             return next(new Api400Error("Order not found !"));
-        let product = yield Product.aggregate(get_review_product_details_pipe(pid, vid));
+        let product = yield Product.aggregate(get_review_product_details_pipe(pid, sku));
         product = product[0];
         return res.status(200).send({ success: true, statusCode: 200, response: product, message: (getOrder === null || getOrder === void 0 ? void 0 : getOrder.is_rated) ? "You already review this product." : null });
     }

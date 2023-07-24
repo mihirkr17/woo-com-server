@@ -10,7 +10,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const QueueProduct = require("../../model/queueProduct.model");
 const Product = require("../../model/product.model");
 const User = require("../../model/user.model");
 const email_service = require("../../services/email.service");
@@ -23,15 +22,16 @@ module.exports.getAdminController = (req, res, next) => __awaiter(void 0, void 0
         const pages = req.query.pages;
         const item = req.query.items;
         let queueProducts;
-        let countQueueProducts = yield QueueProduct.countDocuments({ isVerified: false, save_as: "queue" });
+        let countQueueProducts = yield Product.countDocuments({ status: "queue" });
         let newSellers = yield User.find({ $and: [{ isSeller: 'pending' }, { role: "SELLER" }] });
         const sellers = yield User.find({ $and: [{ isSeller: "fulfilled" }, { role: "SELLER" }] });
         const buyers = yield User.find({ $and: [{ idFor: "buy" }, { role: "BUYER" }] });
+        let cursor = yield Product.find({ isVerified: false, status: "queue" });
         if (pages || item) {
-            queueProducts = yield QueueProduct.find({ isVerified: false }).skip(parseInt(pages) > 0 ? ((pages - 1) * item) : 0).limit(item);
+            queueProducts = yield cursor.skip(parseInt(pages) > 0 ? ((pages - 1) * item) : 0).limit(item);
         }
         else {
-            queueProducts = yield QueueProduct.find({ isVerified: false });
+            queueProducts = yield cursor;
         }
         return res.status(200).send({ success: true, statusCode: 200, queueProducts, countQueueProducts, newSellers, sellers, buyers });
     }
@@ -47,18 +47,15 @@ module.exports.takeThisProductByAdminController = (req, res, next) => __awaiter(
         if (!listingID) {
             throw new Error("Listing ID required !");
         }
-        var queueProduct = yield QueueProduct.findOne({ _lid: listingID }, { __v: 0 });
-        if (!queueProduct) {
-            throw new Error("Sorry product not found !");
-        }
-        queueProduct.isVerified = true;
-        queueProduct.save_as = "draft";
-        queueProduct["verifyStatus"] = { verifiedBy: role, email: adminEmail, verifiedAt: new Date(Date.now()) };
-        let filter = { $and: [{ _id: ObjectId(queueProduct === null || queueProduct === void 0 ? void 0 : queueProduct._id) }, { _lid: queueProduct === null || queueProduct === void 0 ? void 0 : queueProduct._lid }] };
-        const result = yield Product.updateOne(filter, { $set: queueProduct }, { upsert: true });
+        const result = yield Product.updateOne({ $and: [{ _lid: listingID }, { status: "queue" }] }, {
+            $set: {
+                isVerified: true,
+                status: "active",
+                verifyStatus: { verifiedBy: role, email: adminEmail, verifiedAt: new Date(Date.now()) }
+            }
+        }, { upsert: true });
         if ((result === null || result === void 0 ? void 0 : result.upsertedCount) === 1) {
-            yield QueueProduct.deleteOne(filter);
-            return res.status(200).send({ success: true, statusCode: 200, message: "Product taken." });
+            return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully launched." });
         }
         else {
             return res.status(200).send({ success: false, statusCode: 200, message: "Product not taken !" });

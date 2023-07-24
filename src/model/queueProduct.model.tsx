@@ -32,7 +32,7 @@ var QueueProductSchema = new Schema({
 
    keywords: { type: Array, required: true },
 
-   meta_description: { type: String, required: true },
+   metaDescription: { type: String, required: true },
 
    highlights: { type: Array, required: false },
 
@@ -47,15 +47,9 @@ var QueueProductSchema = new Schema({
       code: { type: String, required: true }
    },
 
-   supplier: {
-      id: { type: String, required: true },
-      email: { type: String, required: true },
-      store_name: { type: String, required: true }
-   },
+   supplier: { type: Object, required: true },
 
-   save_as: { type: String, required: true, default: "queue" },
-
-   status: { type: String, required: true, default: "inactive" },
+   status: { type: String, required: true, default: "inQueue" },
 
    createdAt: { type: Date, default: Date.now },
 

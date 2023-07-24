@@ -34,7 +34,7 @@ module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, 
         }, {});
         let Filter = {};
         Filter["$and"] = [
-            { "supplier.store_name": storeName },
+            { "supplier.storeName": storeName },
             { status: "active" },
         ];
         let sortList = {};
@@ -68,7 +68,7 @@ module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, 
             { $match: Filter },
             {
                 $group: {
-                    _id: "$supplier.store_name",
+                    _id: "$supplier.storeName",
                     totalProduct: { $count: {} },
                 }
             },
@@ -79,7 +79,7 @@ module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, 
             {
                 $match: {
                     $and: [
-                        { "supplier.store_name": storeName },
+                        { "supplier.storeName": storeName },
                         { status: "active" }
                     ]
                 }
@@ -109,7 +109,7 @@ module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, 
             },
             {
                 $group: {
-                    _id: "$supplier.id",
+                    _id: "$supplier.email",
                     totalProduct: { $count: {} },
                     categories: { $push: { $last: "$categories" } },
                     brands: { $push: "$brand" },

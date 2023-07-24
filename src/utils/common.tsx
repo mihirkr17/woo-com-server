@@ -27,3 +27,26 @@ module.exports.calculatePopularityScore = (product: any) => {
 
    return (views * viewsWeight) + (ratingAverage * ratingWeight) + (sales * salesWeight);
 }
+
+
+module.exports.stockStatus = (available: any) => {
+   let stock: string;
+
+   available = parseInt(available) || 0;
+
+   if (available >= 0) {
+      stock = "in";
+   } else {
+      stock = "out";
+   }
+
+   return stock;
+}
+
+module.exports.calculateDiscount = (pricing: any) => {
+   const { price, sellingPrice } = pricing;
+
+   const discount: number = ((price - sellingPrice) / price);
+
+   return Math.floor(discount * 100);
+}

@@ -17,17 +17,17 @@ module.exports.addToWishlistHandler = async (req: Request, res: Response, next: 
       throw new apiResponse.Api400Error("Required body !");
     }
 
-    const { productID, variationID, listingID } = body;
+    const { productID, sku, listingID } = body;
 
     interface WImodel {
       productID: string;
       listingID: string;
-      variationID: string;
+      sku: string;
     }
 
     let model: WImodel = {
       productID,
-      variationID,
+      sku,
       listingID
     }
 
@@ -35,7 +35,7 @@ module.exports.addToWishlistHandler = async (req: Request, res: Response, next: 
 
     if (user) {
 
-      let existsProduct = (Array.isArray(user?.buyer?.wishlist) && user?.buyer?.wishlist.filter((e: any) => (e?.productID === body?.productID && e?.variationID === body?.variationID))) || [];
+      let existsProduct = (Array.isArray(user?.buyer?.wishlist) && user?.buyer?.wishlist.filter((e: any) => (e?.productID === body?.productID && e?.sku === body?.sku))) || [];
 
       if (existsProduct && existsProduct.length >= 1) {
         return res.status(200).send({ success: true, statusCode: 200, message: "Product Has Already In Your Wishlist" })

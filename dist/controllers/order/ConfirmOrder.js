@@ -34,7 +34,7 @@ module.exports = function confirmOrder(req, res, next) {
                     return yield update_variation_stock_available("dec", {
                         productID: item === null || item === void 0 ? void 0 : item.productID,
                         listingID: item === null || item === void 0 ? void 0 : item.listingID,
-                        variationID: item === null || item === void 0 ? void 0 : item.variationID,
+                        sku: item === null || item === void 0 ? void 0 : item.sku,
                         quantity: item === null || item === void 0 ? void 0 : item.quantity
                     });
                 }));

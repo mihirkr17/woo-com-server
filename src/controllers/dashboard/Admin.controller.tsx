@@ -1,7 +1,6 @@
 // Admin.controller.tsx
 
 import { NextFunction, Request, Response } from "express";
-const QueueProduct = require("../../model/queueProduct.model");
 const Product = require("../../model/product.model");
 const User = require("../../model/user.model");
 const email_service = require("../../services/email.service");
@@ -19,17 +18,19 @@ module.exports.getAdminController = async (req: Request, res: Response, next: Ne
       const item: any = req.query.items;
       let queueProducts: any;
 
-      let countQueueProducts = await QueueProduct.countDocuments({ isVerified: false, save_as: "queue" });
+      let countQueueProducts = await Product.countDocuments({ status: "queue" });
 
       let newSellers = await User.find({ $and: [{ isSeller: 'pending' }, { role: "SELLER" }] });
 
       const sellers = await User.find({ $and: [{ isSeller: "fulfilled" }, { role: "SELLER" }] });
       const buyers = await User.find({ $and: [{ idFor: "buy" }, { role: "BUYER" }] });
 
+      let cursor = await Product.find({ isVerified: false, status: "queue" });
+
       if (pages || item) {
-         queueProducts = await QueueProduct.find({ isVerified: false }).skip(parseInt(pages) > 0 ? ((pages - 1) * item) : 0).limit(item);
+         queueProducts = await cursor.skip(parseInt(pages) > 0 ? ((pages - 1) * item) : 0).limit(item);
       } else {
-         queueProducts = await QueueProduct.find({ isVerified: false });
+         queueProducts = await cursor;
       }
 
 
@@ -52,29 +53,22 @@ module.exports.takeThisProductByAdminController = async (req: Request, res: Resp
          throw new Error("Listing ID required !");
       }
 
-      var queueProduct = await QueueProduct.findOne({ _lid: listingID }, { __v: 0 });
-
-      if (!queueProduct) {
-         throw new Error("Sorry product not found !");
-      }
-
-      queueProduct.isVerified = true;
-      queueProduct.save_as = "draft";
-      queueProduct["verifyStatus"] = { verifiedBy: role, email: adminEmail, verifiedAt: new Date(Date.now()) };
-
-      let filter = { $and: [{ _id: ObjectId(queueProduct?._id) }, { _lid: queueProduct?._lid }] };
 
       const result = await Product.updateOne(
-         filter,
-         { $set: queueProduct },
+         { $and: [{ _lid: listingID }, { status: "queue" }] },
+         {
+            $set: {
+               isVerified: true,
+               status: "active",
+               verifyStatus: { verifiedBy: role, email: adminEmail, verifiedAt: new Date(Date.now()) }
+            }
+         },
          { upsert: true }
       );
 
       if (result?.upsertedCount === 1) {
 
-         await QueueProduct.deleteOne(filter);
-
-         return res.status(200).send({ success: true, statusCode: 200, message: "Product taken." });
+         return res.status(200).send({ success: true, statusCode: 200, message: "Product successfully launched." });
       } else {
          return res.status(200).send({ success: false, statusCode: 200, message: "Product not taken !" });
       }

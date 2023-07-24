@@ -10,6 +10,8 @@ module.exports.generateTrackingID = () => ("tri_" + (Math.round(Math.random() * 
 module.exports.generateOrderID = (id: string) => ("oi_" + cryPto.randomBytes(16).toString('hex').slice(0, 16) + id.slice(0, 4));
 
 
+module.exports.generateListingID = () => ("lid" + cryPto.randomBytes(16).toString('hex').slice(0, 16));
+
 module.exports.generateVerifyToken = () => (cryPto.randomBytes(16).toString('hex'));
 
 

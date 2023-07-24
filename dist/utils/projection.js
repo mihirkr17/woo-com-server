@@ -15,14 +15,9 @@ const discount = {
     }
 };
 module.exports.basicProductProject = {
-    title: "$variations.vTitle",
+    title: 1,
     slug: 1,
-    assets: {
-        $ifNull: [
-            { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.variant.color"] }] },
-            null
-        ]
-    },
+    imageUrl: { $arrayElemAt: ["$variations.images", 0] },
     brand: 1,
     score: 1,
     sales: 1,
@@ -40,7 +35,7 @@ module.exports.basicProductProject = {
     },
     _lid: 1,
     reviews: 1,
-    _vrid: "$variations._vrid",
+    sku: "$variations.sku",
     stock: "$variations.stock",
     variant: "$variations.variant",
     shipping: 1,
@@ -50,23 +45,16 @@ module.exports.shoppingCartProject = {
     cartID: "$_id",
     _id: 0,
     asset: 1,
-    title: "$variations.vTitle",
+    title: 1,
     slug: 1,
-    packaged: 1,
     listingID: "$items.listingID",
     productID: "$items.productID",
     customerEmail: 1,
-    variationID: "$items.variationID",
-    shipping: 1,
     brand: 1,
-    assets: {
-        $ifNull: [
-            { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.variant.color"] }] },
-            null
-        ]
-    },
+    shipping: "$shipping.isFree",
+    packaged: 1,
+    imageUrl: { $arrayElemAt: ["$variations.images", 0] },
     sku: "$variations.sku",
-    supplier: 1,
     quantity: "$items.quantity",
     savingAmount: { $multiply: [{ $subtract: ["$variations.pricing.price", "$variations.pricing.sellingPrice"] }, '$items.quantity'] },
     baseAmount: { $multiply: ["$variations.pricing.sellingPrice", '$items.quantity'] },

@@ -1,48 +1,6 @@
 import { Schema, model } from "mongoose";
 
 
-// interface IOrder {
-//    orderID: string;
-//    orderPaymentID: string;
-//    listingID: string;
-//    variationID: string;
-//    productID: string;
-//    customerEmail: string;
-//    customerID: string;
-//    title: string;
-//    slug: string;
-//    assets: object;
-//    brand: string;
-//    baseAmount: number;
-//    quantity: number;
-//    paymentMode: string;
-//    shippingAddress: object;
-//    shippingCharge: number;
-//    supplier: object;
-//    sellingPrice: number;
-//    state: string;
-//    sku: string;
-//    trackingID: string;
-//    isRated?: boolean;
-//    packaged: any,
-//    shipping: any,
-//    orderAT: object;
-//    orderStatus: string;
-//    orderPlacedAT: Date;
-//    orderShippedAT: Date;
-//    isShipped: boolean;
-//    cancelReason: string;
-//    orderCanceledAT: object;
-//    isCanceled: boolean;
-//    orderDispatchAT: object;
-//    isDispatch: boolean;
-//    orderCompletedAT: object;
-//    isCompleted: boolean;
-//    paymentStatus?: string;
-//    refund?: object;
-//    payment_data?: object
-// };
-
 var orderSchema = new Schema({
    order_id: String,
 
@@ -61,8 +19,6 @@ var orderSchema = new Schema({
    product: {
       listing_id: String,
 
-      variation_id: String,
-
       product_id: String,
 
       slug: String,
@@ -75,7 +31,7 @@ var orderSchema = new Schema({
 
       sku: String,
 
-      selling_price: Number,
+      sellingPrice: Number,
 
       base_amount: Number,
    },

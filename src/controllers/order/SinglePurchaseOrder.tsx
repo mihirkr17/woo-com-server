@@ -21,10 +21,10 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
 
       if (!req.body) throw new apiResponse.Api503Error("Service unavailable !");
 
-      const { variationID, productID, quantity, listingID, state, customerEmail } = req.body;
+      const { sku, productID, quantity, listingID, state, customerEmail } = req.body;
 
-      if (!variationID || !productID || !quantity || !listingID || !state || !customerEmail)
-         throw new apiResponse.Api400Error("Required variationID, productID, quantity, listingID, state, customerEmail");
+      if (!sku || !productID || !quantity || !listingID || !state || !customerEmail)
+         throw new apiResponse.Api400Error("Required sku, productID, quantity, listingID, state, customerEmail");
 
       const user = await findUserByEmail(email);
 
@@ -38,30 +38,29 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
       let product = await Product.aggregate([
          { $match: { $and: [{ _lid: listingID }, { _id: ObjectId(productID) }] } },
          { $unwind: { path: "$variations" } },
-         { $match: { $and: [{ 'variations._vrid': variationID }] } },
+         { $match: { $and: [{ 'variations.sku': sku }] } },
          {
             $project: {
                _id: 0,
                variations: 1,
-               
+
                supplier: 1,
                shipping: 1,
                packaged: 1,
                product: {
-                  title: "$variations.vTitle",
+                  title: 1,
                   slug: "$slug",
                   brand: "$brand",
                   sku: "$variations.sku",
                   listing_id: "$items.listingID",
-                  variation_id: "$items.variationID",
                   product_id: "$items.productID",
                   assets: {
                      $ifNull: [
-                        { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.variant.color"] }] },
+                        { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.brandColor"] }] },
                         null
                      ]
                   },
-                  selling_price: "$variations.pricing.sellingPrice",
+                  sellingPrice: "$variations.pricing.sellingPrice",
                   base_amount: { $multiply: ["$variations.pricing.sellingPrice", parseInt(quantity)] },
                },
             }
@@ -70,7 +69,6 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
             $set: {
                "product.product_id": productID,
                "product.listing_id": listingID,
-               "product.variation_id": variationID,
                quantity: quantity
             }
          },
@@ -88,7 +86,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
 
       product["shipping_charge"] = product?.shipping?.isFree ? 0 : calculateShippingCost((product?.packaged?.volumetricWeight * product?.quantity), areaType);
       product["final_amount"] = parseInt(product?.product?.base_amount + product?.shipping_charge);
-      product["order_id"] = generateOrderID(product?.supplier?.id);
+      product["order_id"] = generateOrderID(product?.supplier?.email);
 
       product["payment"] = {
          status: "pending",
@@ -115,7 +113,7 @@ module.exports = async function SinglePurchaseOrder(req: Request, res: Response,
       productInfos.push({
          productID: product?.product?.product_id,
          listingID: product?.product?.listing_id,
-         variationID: product?.product?.variation_id,
+         sku: product?.product?.sku,
          quantity: product?.quantity
       })
 

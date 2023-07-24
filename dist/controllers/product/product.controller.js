@@ -23,35 +23,35 @@ const { ObjectId } = require("mongodb");
 const Review = require("../../model/reviews.model");
 /**
  * @controller      --> Fetch the single product information in product details page.
- * @required        --> [req.headers.authorization:email, req.query:productID, req.query:variationID, req.params:product slug]
+ * @required        --> [req.headers.authorization:email, req.query:productID, req.query:sku, req.params:product slug]
  * @request_method  --> GET
  */
 module.exports.fetchProductDetails = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        const { pId: productID, vId: variationID, oTracker } = req.query;
+        const { pId: productID, sku, oTracker } = req.query;
         if (!productID || typeof productID !== "string")
             throw new Api400Error("Invalid product id ");
-        if (!variationID || typeof variationID !== "string")
-            throw new Api400Error("Invalid variation id ");
+        if (!sku || typeof sku !== "string")
+            throw new Api400Error("Invalid sku");
         let productDetail;
         // Product Details
-        let cacheData = NodeCache.getCache(`${productID}_${variationID}`);
+        let cacheData = NodeCache.getCache(`${productID}_${sku}`);
         if (cacheData) {
             productDetail = cacheData;
         }
         else {
-            productDetail = yield Product.aggregate(product_detail_pipe(productID, variationID));
+            productDetail = yield Product.aggregate(product_detail_pipe(productID, sku));
             productDetail = productDetail[0];
             if (oTracker) {
                 productDetail["productID"] = productDetail === null || productDetail === void 0 ? void 0 : productDetail._id;
                 yield updateProductInformation(productDetail, { actionType: "views" });
             }
             productDetail["policies"] = (_a = yield PrivacyPolicy.findOne({})) !== null && _a !== void 0 ? _a : {};
-            NodeCache.saveCache(`${productID}_${variationID}`, productDetail);
+            NodeCache.saveCache(`${productID}_${sku}`, productDetail);
         }
         // Related products
-        const relatedProducts = yield Product.aggregate(product_detail_relate_pipe(variationID, productDetail === null || productDetail === void 0 ? void 0 : productDetail.categories));
+        const relatedProducts = yield Product.aggregate(product_detail_relate_pipe(sku, productDetail === null || productDetail === void 0 ? void 0 : productDetail.categories));
         // all success
         return res.status(200).send({
             success: true,
@@ -155,12 +155,12 @@ module.exports.purchaseProductController = (req, res, next) => __awaiter(void 0,
     try {
         const authEmail = req.decoded.email;
         let user = yield findUserByEmail(authEmail);
-        const { listingID, variationID, quantity, productID, customerEmail } = req === null || req === void 0 ? void 0 : req.body;
+        const { listingID, sku, quantity, productID, customerEmail } = req === null || req === void 0 ? void 0 : req.body;
         let defaultShippingAddress = (Array.isArray((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress) &&
             ((_c = user === null || user === void 0 ? void 0 : user.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
         let areaType = defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type;
         let newQuantity = parseInt(quantity);
-        let product = yield Product.aggregate(single_purchase_pipe(productID, listingID, variationID, newQuantity));
+        let product = yield Product.aggregate(single_purchase_pipe(productID, listingID, sku, newQuantity));
         if (product && typeof product !== 'undefined') {
             product = product[0];
             product["customerEmail"] = customerEmail;

@@ -221,21 +221,21 @@ module.exports.getMyReviews = async (req: Request, res: Response, next: NextFunc
 module.exports.getProductDetails = async (req: Request, res: Response, next: NextFunction) => {
   try {
 
-    const { pid, vid, oid } = req?.query;
+    const { pid, sku, oid } = req?.query;
 
-    if (!pid || !vid || !oid) return next(new Api400Error("Required product and variation id and order id !"));
+    if (!pid || !sku || !oid) return next(new Api400Error("Required product and sku and order id !"));
 
     const getOrder = await Order.findOne({
       $and: [
         { order_id: oid },
         { "product.product_id": pid },
-        { "product.variation_id": vid }
+        { "product.sku": sku }
       ]
     });
 
     if (!getOrder) return next(new Api400Error("Order not found !"));
 
-    let product = await Product.aggregate(get_review_product_details_pipe(pid, vid));
+    let product = await Product.aggregate(get_review_product_details_pipe(pid, sku));
 
     product = product[0];
 

@@ -31,7 +31,7 @@ var QueueProductSchema = new mongoose_1.Schema({
     reviews: { type: Array, required: false, default: [] },
     ratingAverage: { type: Number, required: false, default: 0 },
     keywords: { type: Array, required: true },
-    meta_description: { type: String, required: true },
+    metaDescription: { type: String, required: true },
     highlights: { type: Array, required: false },
     specification: { type: Object, required: false, default: {} },
     description: { type: String, required: true },
@@ -40,13 +40,8 @@ var QueueProductSchema = new mongoose_1.Schema({
         hsn: { type: String, required: true },
         code: { type: String, required: true }
     },
-    supplier: {
-        id: { type: String, required: true },
-        email: { type: String, required: true },
-        store_name: { type: String, required: true }
-    },
-    save_as: { type: String, required: true, default: "queue" },
-    status: { type: String, required: true, default: "inactive" },
+    supplier: { type: Object, required: true },
+    status: { type: String, required: true, default: "inQueue" },
     createdAt: { type: Date, default: Date.now },
     packaged: { type: Object, required: true },
     modifiedAt: { type: Date, required: false, default: "" },

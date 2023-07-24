@@ -24,15 +24,15 @@ module.exports.addToWishlistHandler = (req, res, next) => __awaiter(void 0, void
         if (!body || typeof body === "undefined") {
             throw new apiResponse.Api400Error("Required body !");
         }
-        const { productID, variationID, listingID } = body;
+        const { productID, sku, listingID } = body;
         let model = {
             productID,
-            variationID,
+            sku,
             listingID
         };
         let user = yield findUserByEmail(verifiedEmail);
         if (user) {
-            let existsProduct = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.wishlist) && ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.wishlist.filter((e) => ((e === null || e === void 0 ? void 0 : e.productID) === (body === null || body === void 0 ? void 0 : body.productID) && (e === null || e === void 0 ? void 0 : e.variationID) === (body === null || body === void 0 ? void 0 : body.variationID))))) || [];
+            let existsProduct = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.wishlist) && ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.wishlist.filter((e) => ((e === null || e === void 0 ? void 0 : e.productID) === (body === null || body === void 0 ? void 0 : body.productID) && (e === null || e === void 0 ? void 0 : e.sku) === (body === null || body === void 0 ? void 0 : body.sku))))) || [];
             if (existsProduct && existsProduct.length >= 1) {
                 return res.status(200).send({ success: true, statusCode: 200, message: "Product Has Already In Your Wishlist" });
             }

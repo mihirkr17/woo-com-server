@@ -21,7 +21,7 @@ module.exports.store_products_pipe = (page, Filter, sortList) => {
         { $limit: 1 }
     ];
 };
-module.exports.product_detail_pipe = (productID, variationID) => {
+module.exports.product_detail_pipe = (productID, sku) => {
     return [
         { $match: { $and: [{ _id: mongoDB.ObjectId(productID) }, { status: "active" }] } },
         {
@@ -32,18 +32,26 @@ module.exports.product_detail_pipe = (productID, variationID) => {
                         as: "variation",
                         in: {
                             variant: "$$variation.variant",
-                            _vrid: "$$variation._vrid"
+                            sku: "$$variation.sku",
+                            brandColor: "$$variation.brandColor",
+                            images: {
+                                $cond: {
+                                    if: { $ifNull: ["$$variation.images", false] },
+                                    then: "$$variation.images",
+                                    else: null
+                                }
+                            }
                         }
                     }
                 },
-                variations: {
+                variation: {
                     $ifNull: [
                         {
                             $arrayElemAt: [{
                                     $filter: {
                                         input: "$variations",
                                         as: "variation",
-                                        cond: { $eq: ["$$variation._vrid", variationID] }
+                                        cond: { $eq: ["$$variation.sku", sku] }
                                     }
                                 }, 0]
                         },
@@ -55,19 +63,18 @@ module.exports.product_detail_pipe = (productID, variationID) => {
         {
             $lookup: {
                 from: 'users',
-                localField: 'supplier.id',
-                foreignField: '_uuid',
+                localField: 'supplier.email',
+                foreignField: 'email',
                 as: 'user'
             }
         },
         { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$user", 0] }, "$$ROOT"] } } },
         {
             $project: {
-                title: "$variations.vTitle",
+                title: 1,
                 slug: 1,
-                variations: 1,
                 swatch: 1,
-                store: 1,
+                variation: 1,
                 fulfilledBy: "$shipping.fulfilledBy",
                 specification: 1,
                 brand: 1,
@@ -76,13 +83,17 @@ module.exports.product_detail_pipe = (productID, variationID) => {
                 sales: 1,
                 views: 1,
                 categories: 1,
-                supplier: 1,
-                options: 1,
-                assets: {
-                    $ifNull: [
-                        { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.variant.color"] }] },
-                        null
-                    ]
+                supplier: {
+                    email: "$email",
+                    storeName: "$store.name",
+                    phones: "$store.phones"
+                },
+                imageUrls: {
+                    $cond: {
+                        if: { $ifNull: ["$variation.images", false] },
+                        then: "$variation.images",
+                        else: "$imageUrls"
+                    }
                 },
                 rating: 1,
                 ratingAverage: 1,
@@ -93,39 +104,29 @@ module.exports.product_detail_pipe = (productID, variationID) => {
                         in: { $add: ["$$value", "$$this.count"] }
                     }
                 },
-                save_as: 1,
                 createdAt: 1,
                 keywords: 1,
-                meta_description: 1,
+                metaDescription: 1,
                 description: 1,
                 manufacturer: 1,
                 highlights: 1,
-                pricing: "$variations.pricing",
+                pricing: "$variation.pricing",
                 isFreeShipping: "$shipping.isFree",
                 volumetricWeight: "$packaged.volumetricWeight",
                 weight: "$packaged.weight",
                 weightUnit: "$packaged.weightUnit",
                 _lid: 1
             }
-        },
-        {
-            $set: { "supplier.contact_numbers": "$store.phones", store: 0 }
         }
     ];
 };
-module.exports.product_detail_relate_pipe = (variationID, categories) => {
+module.exports.product_detail_relate_pipe = (sku, categories) => {
     return [
         { $match: { $and: [{ categories: { $in: categories } }, { status: "active" }] } },
         {
             $addFields: {
                 variations: {
-                    $arrayElemAt: [{
-                            $filter: {
-                                input: "$variations",
-                                as: "variation",
-                                cond: { $ne: ["$$variation._vrid", variationID] }
-                            }
-                        }, 0]
+                    $arrayElemAt: ["$variations", 0]
                 }
             }
         },
@@ -135,7 +136,7 @@ module.exports.product_detail_relate_pipe = (variationID, categories) => {
 };
 module.exports.home_store_product_pipe = (totalLimit) => {
     return [
-        { $match: { $and: [{ save_as: 'fulfilled' }, { status: "active" }] } },
+        { $match: { status: "active" } },
         {
             $addFields: {
                 variations: {
@@ -144,20 +145,19 @@ module.exports.home_store_product_pipe = (totalLimit) => {
             }
         },
         { $project: basicProductProject },
-        { $sort: { "variations._vrid": -1 } },
+        { $sort: { "variations.sku": -1 } },
         { $limit: totalLimit },
         { $sample: { size: totalLimit !== null && totalLimit !== void 0 ? totalLimit : 6 } }
     ];
 };
 module.exports.search_product_pipe = (q) => {
     return [
-        { $match: { $and: [{ save_as: "fulfilled" }, { status: "active" }] } },
+        { $match: { status: "active" } },
         { $unwind: { path: "$variations" } },
         {
             $match: {
                 $or: [
                     { title: { $regex: q, $options: "i" } },
-                    { "supplier.store_name": { $regex: q, $options: "i" } },
                     { brand: { $regex: q, $options: "i" } },
                     { categories: { $in: [q] } },
                 ],
@@ -165,12 +165,12 @@ module.exports.search_product_pipe = (q) => {
         },
         {
             $project: {
-                title: "$variations.vTitle",
+                title: 1,
                 categories: 1,
-                _vrid: "$variations._vrid",
+                sku: "$variations.sku",
                 assets: {
                     $ifNull: [
-                        { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.variant.color"] }] },
+                        { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.brandColor"] }] },
                         null
                     ]
                 },
@@ -229,9 +229,9 @@ module.exports.ctg_main_product_pipe = (category, filterByBrand, filterByPriceRa
         sorting
     ];
 };
-module.exports.single_purchase_pipe = (productID, listingID, variationID, quantity) => {
+module.exports.single_purchase_pipe = (productID, sku, quantity) => {
     return [
-        { $match: { $and: [{ _lid: listingID }, { status: "active" }] } },
+        { $match: { $and: [{ _id: mongoDB.ObjectId(productID) }, { status: "active" }] } },
         {
             $addFields: {
                 variations: {
@@ -240,7 +240,7 @@ module.exports.single_purchase_pipe = (productID, listingID, variationID, quanti
                                 input: "$variations",
                                 cond: {
                                     $and: [
-                                        { $eq: ['$$variation._vrid', variationID] },
+                                        { $eq: ['$$variation.sku', sku] },
                                         { $eq: ['$$variation.stock', "in"] },
                                         { $gte: ["$$variation.available", quantity] }
                                     ]
@@ -255,13 +255,13 @@ module.exports.single_purchase_pipe = (productID, listingID, variationID, quanti
         {
             $project: {
                 _id: 0,
-                title: "$variations.vTitle",
+                title: 1,
                 slug: 1,
                 brand: 1,
                 packaged: 1,
                 assets: {
                     $ifNull: [
-                        { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.variant.color"] }] },
+                        { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.brandColor"] }] },
                         null
                     ]
                 },
@@ -280,8 +280,6 @@ module.exports.single_purchase_pipe = (productID, listingID, variationID, quanti
                 available: "$variations.available",
                 stock: "$variations.stock",
                 productID,
-                listingID,
-                variationID,
                 quantity: 1
             }
         }, {
@@ -313,10 +311,9 @@ module.exports.shopping_cart_pipe = (email) => {
                                         input: "$variations",
                                         cond: {
                                             $and: [
-                                                { $eq: ['$$variation._vrid', '$items.variationID'] },
+                                                { $eq: ['$$variation.sku', '$items.sku'] },
                                                 { $eq: ['$$variation.stock', "in"] },
-                                                { $eq: ["$status", "active"] },
-                                                { $eq: ["$save_as", "fulfilled"] }
+                                                { $eq: ["$status", "active"] }
                                             ]
                                         },
                                         as: "variation"
@@ -336,7 +333,7 @@ module.exports.shopping_cart_pipe = (email) => {
         }
     ];
 };
-module.exports.get_review_product_details_pipe = (pid, vid) => {
+module.exports.get_review_product_details_pipe = (pid, sku) => {
     return [
         { $match: { _id: mongoDB.ObjectId(pid) } },
         {
@@ -350,7 +347,7 @@ module.exports.get_review_product_details_pipe = (pid, vid) => {
                                         input: "$variations",
                                         as: "variant",
                                         cond: {
-                                            $eq: ["$$variant._vrid", vid]
+                                            $eq: ["$$variant.sku", sku]
                                         }
                                     }
                                 },

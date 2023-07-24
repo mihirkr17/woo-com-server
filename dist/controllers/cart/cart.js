@@ -27,19 +27,19 @@ module.exports.addToCartHandler = (req, res, next) => __awaiter(void 0, void 0, 
         const body = req.body;
         if (!body || typeof body !== "object")
             throw new apiResponse.Api400Error("Required body !");
-        const { productID, variationID, listingID, action } = body;
-        if (!productID || !variationID || !listingID)
+        const { productID, sku, listingID, action } = body;
+        if (!productID || !sku || !listingID)
             throw new apiResponse.Api400Error("Required product id, listing id, variation id in body !");
-        const availableProduct = yield checkProductAvailability(productID, variationID);
+        const availableProduct = yield checkProductAvailability(productID, sku);
         if (!availableProduct)
             throw new apiResponse.Api404Error("Product is not available !");
-        const cartTemp = cartTemplate(productID, listingID, variationID);
+        const cartTemp = cartTemplate(productID, listingID, sku);
         if (action !== "toCart")
             throw new apiResponse.Api400Error("Required cart operation !");
         let existsProduct = yield ShoppingCart.findOne({ customerEmail: authEmail });
         if (existsProduct) {
             let items = (Array.isArray(existsProduct.items) && existsProduct.items) || [];
-            let isExist = items.some((e) => e.variationID === variationID);
+            let isExist = items.some((e) => e.sku === sku);
             if (isExist)
                 throw new apiResponse.Api400Error("Product has already in your cart !");
             existsProduct.items = [...items, cartTemp];
@@ -87,12 +87,12 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
         const areaType = (_c = defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type) !== null && _c !== void 0 ? _c : "";
         if (typeof cart === "object" && cart.length >= 1) {
             cart.forEach((p) => {
-                var _a, _b, _c;
-                if (((_a = p === null || p === void 0 ? void 0 : p.shipping) === null || _a === void 0 ? void 0 : _a.isFree) && ((_b = p === null || p === void 0 ? void 0 : p.shipping) === null || _b === void 0 ? void 0 : _b.isFree)) {
+                var _a;
+                if (p === null || p === void 0 ? void 0 : p.shipping) {
                     p["shippingCharge"] = 0;
                 }
                 else {
-                    p["shippingCharge"] = calculateShippingCost((((_c = p === null || p === void 0 ? void 0 : p.packaged) === null || _c === void 0 ? void 0 : _c.volumetricWeight) * (p === null || p === void 0 ? void 0 : p.quantity)), areaType);
+                    p["shippingCharge"] = calculateShippingCost((((_a = p === null || p === void 0 ? void 0 : p.packaged) === null || _a === void 0 ? void 0 : _a.volumetricWeight) * (p === null || p === void 0 ? void 0 : p.quantity)), areaType);
                 }
                 baseAmounts += p === null || p === void 0 ? void 0 : p.baseAmount;
                 totalQuantities += p === null || p === void 0 ? void 0 : p.quantity;
@@ -100,6 +100,10 @@ module.exports.getCartContext = (req, res, next) => __awaiter(void 0, void 0, vo
                 finalAmounts += (parseInt(p === null || p === void 0 ? void 0 : p.baseAmount) + (p === null || p === void 0 ? void 0 : p.shippingCharge));
                 savingAmounts += p === null || p === void 0 ? void 0 : p.savingAmount;
             });
+        }
+        if (finalAmounts >= 500) {
+            finalAmounts = finalAmounts - shippingFees;
+            shippingFees = -shippingFees;
         }
         return res.status(200).send({
             success: true, statusCode: 200, data: {
@@ -127,8 +131,8 @@ module.exports.updateCartProductQuantityController = (req, res, next) => __await
     try {
         const { email } = req.decoded;
         const { type } = (_d = req === null || req === void 0 ? void 0 : req.body) === null || _d === void 0 ? void 0 : _d.actionRequestContext;
-        const { productID, variationID, cartID, quantity } = (_f = (_e = req === null || req === void 0 ? void 0 : req.body) === null || _e === void 0 ? void 0 : _e.upsertRequest) === null || _f === void 0 ? void 0 : _f.cartContext;
-        if (!productID || !variationID || !cartID)
+        const { productID, sku, cartID, quantity } = (_f = (_e = req === null || req === void 0 ? void 0 : req.body) === null || _e === void 0 ? void 0 : _e.upsertRequest) === null || _f === void 0 ? void 0 : _f.cartContext;
+        if (!productID || !sku || !cartID)
             throw new apiResponse.Api400Error("Required product id, variation id, cart id !");
         if (!quantity || typeof quantity === "undefined")
             throw new apiResponse.Api400Error("Required quantity !");
@@ -136,7 +140,7 @@ module.exports.updateCartProductQuantityController = (req, res, next) => __await
             throw new apiResponse.Api400Error("Quantity can not greater than 5 and less than 1 !");
         if (type !== 'toCart')
             throw new apiResponse.Api404Error("Invalid cart context !");
-        const productAvailability = yield checkProductAvailability(productID, variationID);
+        const productAvailability = yield checkProductAvailability(productID, sku);
         if (!productAvailability || typeof productAvailability === "undefined" || productAvailability === null)
             throw new apiResponse.Api400Error("Product is available !");
         if (parseInt(quantity) >= ((_g = productAvailability === null || productAvailability === void 0 ? void 0 : productAvailability.variations) === null || _g === void 0 ? void 0 : _g.available)) {
@@ -145,8 +149,8 @@ module.exports.updateCartProductQuantityController = (req, res, next) => __await
         let getCart = NodeCache.getCache(`${email}_cartProducts`);
         // if cart has cache then some operation 
         if (getCart) {
-            let product = getCart.find((e) => (e === null || e === void 0 ? void 0 : e.variationID) === variationID);
-            let productIndex = getCart.findIndex((e) => (e === null || e === void 0 ? void 0 : e.variationID) === variationID);
+            let product = getCart.find((e) => (e === null || e === void 0 ? void 0 : e.sku) === sku);
+            let productIndex = getCart.findIndex((e) => (e === null || e === void 0 ? void 0 : e.sku) === sku);
             getCart[productIndex].quantity = quantity;
             getCart[productIndex].baseAmount = product.sellingPrice * quantity;
             getCart[productIndex].savingAmount = (product.price - product.sellingPrice);
@@ -154,7 +158,7 @@ module.exports.updateCartProductQuantityController = (req, res, next) => __await
         }
         const result = yield ShoppingCart.findOneAndUpdate({ $and: [{ customerEmail: email }, { _id: ObjectId(cartID) }] }, {
             $set: { "items.$[i].quantity": parseInt(quantity) }
-        }, { arrayFilters: [{ "i.variationID": variationID }], upsert: true });
+        }, { arrayFilters: [{ "i.sku": sku }], upsert: true });
         if (result)
             return res.status(200).send({ success: true, statusCode: 200, message: `Quantity updated to ${quantity}.` });
         throw new apiResponse.Api500Error("Failed to update quantity !");
@@ -170,23 +174,23 @@ module.exports.updateCartProductQuantityController = (req, res, next) => __await
  */
 module.exports.deleteCartItem = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { productID, variationID, cartTypes } = req.params;
+        const { productID, sku, cartTypes } = req.params;
         const { email } = req.decoded;
-        if (!variationID || !productID)
-            throw new apiResponse.Api400Error("Required product id & variation id !");
+        if (!sku || !productID)
+            throw new apiResponse.Api400Error("Required product id & sku !");
         if (!ObjectId.isValid(productID))
             throw new apiResponse.Api400Error("Product id is not valid !");
         if (cartTypes !== "toCart")
             throw new apiResponse.Api500Error("Invalid cart type !");
         let deleted = yield ShoppingCart.findOneAndUpdate({ customerEmail: email }, {
-            $pull: { items: { $and: [{ variationID }, { productID }] } }
+            $pull: { items: { $and: [{ sku }, { productID }] } }
         });
         if (!deleted)
-            throw new apiResponse.Api500Error(`Couldn't delete product with variation id ${variationID}!`);
+            throw new apiResponse.Api500Error(`Couldn't delete product with sku ${sku}!`);
         // getting cart items from cache
         let cartProductsInCache = NodeCache.getCache(`${email}_cartProducts`);
         if (cartProductsInCache) {
-            NodeCache.saveCache(`${email}_cartProducts`, Array.isArray(cartProductsInCache) && cartProductsInCache.filter((e) => (e === null || e === void 0 ? void 0 : e.variationID) !== variationID));
+            NodeCache.saveCache(`${email}_cartProducts`, Array.isArray(cartProductsInCache) && cartProductsInCache.filter((e) => (e === null || e === void 0 ? void 0 : e.sku) !== sku));
         }
         return res.status(200).send({ success: true, statusCode: 200, message: "Item removed successfully from your cart." });
     }

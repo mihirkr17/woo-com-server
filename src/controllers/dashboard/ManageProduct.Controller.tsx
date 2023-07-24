@@ -7,6 +7,7 @@ const User = require("../../model/user.model");
 const QueueProduct = require("../../model/queueProduct.model");
 const Product = require("../../model/product.model");
 const { product_variation_template_engine } = require("../../templates/product.template");
+const { generateListingID } = require("../../utils/generator");
 const { Api400Error, Api500Error } = require("../../errors/apiResponse");
 
 
@@ -18,15 +19,15 @@ module.exports.updateStockController = async (req: Request, res: Response, next:
 
       const { productID, variations } = req?.body;
 
-      if (!variations?._vrid || !variations?.available)
-         throw new Api400Error("Variation ID and unit required !");
+      if (!variations?.sku || !variations?.available)
+         throw new Api400Error("Product sku and unit required !");
 
 
       if (productID && storeName) {
          let stock = variations?.available <= 1 ? "out" : "in";
 
          const result = await Product.findOneAndUpdate(
-            { $and: [{ _id: ObjectId(productID) }, { 'supplier.store_name': storeName }] },
+            { $and: [{ _id: ObjectId(productID) }, { 'supplier.storeName': storeName }] },
             {
                $set: {
                   "variations.$[i].available": variations?.available,
@@ -34,7 +35,7 @@ module.exports.updateStockController = async (req: Request, res: Response, next:
                },
             },
             {
-               arrayFilters: [{ "i._vrid": variations?._vrid }]
+               arrayFilters: [{ "i.sku": variations?.sku }]
             }
          );
 
@@ -57,65 +58,28 @@ module.exports.updateStockController = async (req: Request, res: Response, next:
 // product variation controller
 module.exports.variationController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const { formType, requestFor } = req.query;
-
       let result: any;
 
-      if (!formType || formType === "") throw new Api400Error("Required form type !");
-
-      const { request } = req.body;
-
-      if (!req.body || !req.body.hasOwnProperty("request")) throw new Api400Error("Required request property in body !");
-
-      const { productID, variationID, variations } = request;
-
-      if (!productID) throw new Api400Error("Required product id !");
+      const { productID, variations, formType } = req.body;
 
       let model = product_variation_template_engine(variations);
 
-      let n = await Product.findOne({ _id: ObjectId(productID) });
-
-      let images = variations?.images;
-
-      let color = variations?.variant?.color;
-      let options = n?.options ?? {};
-
-      let index = n?.options.findIndex((e: any) => e?.color === color);
-
-      if (index !== -1) {
-         options.splice(index, 1);
-         options.push({ color, images });
-      } else {
-         options.push({ color, images })
-      }
-
       // Update variation
-      if (formType === 'update-variation' && requestFor === 'product_variations' && variationID) {
+      if (formType === 'update-variation') {
 
-         model['_vrid'] = variationID;
+         result = await Product.findOneAndUpdate(
+            { _id: ObjectId(productID) },
+            { $set: { 'variations.$[i]': model } },
+            { arrayFilters: [{ "i.sku": variations?.sku }] }
+         );
 
-         if (variationID && variationID !== "") {
-
-            // result = n?.variations.push(model)
-
-            result = await Product.findOneAndUpdate(
-               { _id: ObjectId(productID) },
-               { $set: { 'variations.$[i]': model, options } },
-               { arrayFilters: [{ "i._vrid": variationID }] }
-            );
-         }
       }
 
       // create new variation
       if (formType === 'new-variation') {
-         let newVariationID = "vi_" + Math.random().toString(36).toLowerCase().slice(2, 18);
-         model['_vrid'] = newVariationID;
-
-         // n?.variations.push(model);
-
          result = await Product.findOneAndUpdate(
             { _id: ObjectId(productID) },
-            { $push: { variations: model }, $set: options },
+            { $push: { variations: model } },
             { upsert: true }
          );
       }
@@ -126,7 +90,7 @@ module.exports.variationController = async (req: Request, res: Response, next: N
          message: (formType === 'update-variation' ? "Variation successfully updated." : "Welcome new variation added.")
       })
 
-      throw new Api400Error((formType === 'update-variation' ? "Variation update failed !" : "Can't added new variation !"));
+      throw new Api500Error((formType === 'update-variation' ? "Variation update failed !" : "Can't added new variation !"));
 
    } catch (error: any) {
       next(error);
@@ -149,13 +113,6 @@ module.exports.productControlController = async (req: Request, res: Response, ne
       if (actionFor === "status" && (["active", "inactive"].includes(actionType))) {
          filters = {
             $set: { status: actionType }
-         }
-      }
-
-
-      if (actionFor === "save_as" && (["fulfilled", "draft"].includes(actionType))) {
-         filters = {
-            $set: { save_as: actionType }
          }
       }
 
@@ -203,12 +160,11 @@ module.exports.viewAllProductsInDashboard = async (
 
       if (user.role === 'SELLER') {
          showFor = [
-            { "supplier.store_name": user?.store?.name },
-            { save_as: "fulfilled" },
+            { "supplier.storeName": user?.store?.name },
             { isVerified: true }
          ];
       } else {
-         showFor = [{ status: "active" }, { save_as: "fulfilled" }];
+         showFor = [{ status: "active" }];
       }
 
       page = parseInt(page) === 1 ? 0 : parseInt(page) - 1;
@@ -217,7 +173,7 @@ module.exports.viewAllProductsInDashboard = async (
          filters = '';
          src = [
             { title: { $regex: searchText, $options: "i" } },
-            { "supplier.store_name": { $regex: searchText, $options: "i" } },
+            { "supplier.storeName": { $regex: searchText, $options: "i" } },
          ]
       } else if (filters) {
          searchText = '';
@@ -235,19 +191,22 @@ module.exports.viewAllProductsInDashboard = async (
          },
          {
             $project: {
-               title: 1, slug: 1, categories: 1, pricing: 1,
-               variations: 1, brand: 1, _lid: 1,
+               title: 1, slug: 1,
+               categories: 1,
+               pricing: 1,
+               variations: 1,
+               brand: 1,
+               _lid: 1,
                packaged: 1,
-               save_as: 1,
+               status: 1,
                shipping: 1,
                keywords: 1,
-               meta_description: 1,
+               metaDescription: 1,
                specification: 1,
                description: 1,
                manufacturer: 1,
                options: 1,
                supplier: 1,
-               status: 1,
                totalVariation: { $cond: { if: { $isArray: "$variations" }, then: { $size: "$variations" }, else: 0 } }
             }
          },
@@ -261,18 +220,19 @@ module.exports.viewAllProductsInDashboard = async (
       draftProducts = await Product.aggregate([
          {
             $match: {
-               $and: [{ save_as: "draft" }, { "supplier.store_name": user?.store?.name }]
+               $and: [{ status: "inactive" }, { "supplier.storeName": user?.store?.name }]
             }
          },
          {
             $project: {
-               title: 1, slug: 1, categories: 1, pricing: 1,
+               title: 1, slug: 1, 
+               categories: 1, pricing: 1,
                images: 1, variations: 1, brand: 1, _lid: 1,
                packaged: 1,
-               save_as: 1,
+               status: 1,
                shipping: 1,
                keywords: 1,
-               meta_description: 1,
+               metaDescription: 1,
                options: 1,
                specification: 1,
                description: 1,
@@ -293,8 +253,7 @@ module.exports.viewAllProductsInDashboard = async (
          {
             $match: {
                $and: [
-                  { save_as: 'fulfilled' },
-                  user?.role === 'SELLER' && { "supplier.store_name": user?.store?.name },
+                  user?.role === 'SELLER' && { "supplier.storeName": user?.store?.name },
                   { status: 'inactive' }
                ]
             }
@@ -315,21 +274,21 @@ module.exports.viewAllProductsInDashboard = async (
 
 /**
 * @controller      --> Fetch the single product in product edit page.
-* @required        --> [req.query:seller, req.query:productID, req.query:variationID]
+* @required        --> [req.query:seller, req.query:productID, req.query:sku]
 * @request_method  --> GET
 */
 module.exports.getProductForSellerDSBController = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
       const productID = req.query.pid;
-      const variationID = req.query.vId;
+      const sku = req.query.sku;
       const storeName = req.query.storeName;
 
       let product;
 
       if (!storeName && typeof storeName === 'undefined' && !productID) return res.status(204).send();
 
-      if (variationID && typeof variationID === 'string') {
+      if (sku && typeof sku === 'string') {
          product = await Product.aggregate([
             {
                $match: { _id: ObjectId(productID) }
@@ -338,14 +297,14 @@ module.exports.getProductForSellerDSBController = async (req: Request, res: Resp
                $unwind: { path: "$variations" },
             },
             {
-               $match: { 'variations._vrid': variationID }
+               $match: { 'variations.sku': sku }
             }
          ]);
          product = product[0];
 
       } else {
          product = await Product.findOne({
-            $and: [{ _id: ObjectId(productID) }, { "supplier.store_name": storeName }],
+            $and: [{ _id: ObjectId(productID) }, { "supplier.storeName": storeName }],
          });
       }
 
@@ -374,7 +333,7 @@ module.exports.productListingController = async (
    try {
       const authEmail = req.decoded.email;
 
-      const { _lid, formTypes } = req.params;
+      const { formTypes } = req.params;
 
       const body = req.body;
 
@@ -388,38 +347,13 @@ module.exports.productListingController = async (
             .send({ success: false, statusCode: 401, error: "Unauthorized" });
       }
 
-      if (formTypes === "update" && _lid) {
-
-         model = product_listing_template_engine(body, {
-            email: authEmail,
-            id: user?._uuid,
-            store_name: user?.store?.name
-         });
-
-         model['modifiedAt'] = new Date(Date.now());
-
-         const result = await Product.findOneAndUpdate(
-            { _lid: _lid },
-            { $set: model },
-            { upsert: true }
-         );
-
-         if (!result) throw new Api400Error("Sorry, Product not found !");
-
-         return res.status(200).send({
-            success: true,
-            statusCode: 200,
-            message: "Product updated successfully.",
-         })
-
-      }
-
       if (formTypes === 'create') {
-         model = product_listing_template_engine(body, {
-            email: authEmail,
-            id: user?._uuid,
-            store_name: user?.store?.name
-         });
+
+         if (!body?.variation) {
+            throw new Api400Error("Required variation !");
+         }
+
+         model = product_listing_template_engine(body, authEmail);
 
          model["rating"] = [
             { weight: 5, count: 0 },
@@ -430,17 +364,19 @@ module.exports.productListingController = async (
          ];
 
          model["ratingAverage"] = 0;
-         model['reviews'] = [];
-         model['save_as'] = 'queue';
+         model['status'] = 'queue';
+         model["createdAt"] = new Date();
+         model["_lid"] = generateListingID();
+         model["isVerified"] = false;
 
-         let queueProduct = new QueueProduct(model);
+         let queueProduct = new Product(model);
          let results = await queueProduct.save();
 
          if (results) {
             return res.status(200).send({
                success: true,
                statusCode: 200,
-               message: "Data saved.",
+               message: "Product created successfully. It will take upto 24 hours to on live.",
             });
          }
       }
@@ -454,11 +390,10 @@ module.exports.productListingController = async (
 module.exports.deleteProductVariationController = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
-      const productID = req.params.productID;
-      const _vrid = req.params.vId;
-      const storeName = req.params.storeName;
+      const { productID, sku } = req.params;
+      const { email } = req?.decoded;
 
-      const product = await Product.findOne({ $and: [{ _id: ObjectId(productID) }, { "supplier.store_name": storeName }] });
+      const product = await Product.findOne({ $and: [{ _id: ObjectId(productID) }, { "supplier.email": email }] });
 
       if (!product) {
          return res.status(404).send({ success: false, statusCode: 404, error: 'Sorry! Product not found!!!' });
@@ -468,9 +403,9 @@ module.exports.deleteProductVariationController = async (req: Request, res: Resp
          return res.status(200).send({ success: false, statusCode: 200, message: "Please create another variation before delete this variation !" });
       }
 
-      const result = await Product.updateOne(
-         { $and: [{ _id: ObjectId(productID) }, { "supplier.store_name": storeName }] },
-         { $pull: { variations: { _vrid } } }
+      const result = await Product.findOneAndUpdate(
+         { $and: [{ _id: ObjectId(productID) }, { "supplier.email": email }] },
+         { $pull: { variations: { sku } } }
       );
 
       if (result) {
@@ -495,7 +430,7 @@ module.exports.deleteProductController = async (req: Request, res: Response, nex
          $and: [
             { _id: ObjectId(productID) },
             { _lid: listingID },
-            { 'supplier.store_name': storeName }
+            { 'supplier.storeName': storeName }
          ]
       });
 
@@ -532,7 +467,7 @@ module.exports.productFlashSaleController = async (req: Request, res: Response, 
 
       const fSale = body?.data?.fSale;
 
-      const product = await Product.findOne({ $and: [{ _id: ObjectId(productID) }, { _lid: listingID }, { "supplier.store_name": storeName }] });
+      const product = await Product.findOne({ $and: [{ _id: ObjectId(productID) }, { _lid: listingID }, { "supplier.storeName": storeName }] });
 
 
       if (!product) {
@@ -543,7 +478,7 @@ module.exports.productFlashSaleController = async (req: Request, res: Response, 
          {
             $and:
                [
-                  { _id: ObjectId(productID) }, { _lid: listingID }, { "supplier.store_name": storeName }
+                  { _id: ObjectId(productID) }, { _lid: listingID }, { "supplier.storeName": storeName }
                ]
          },
 
@@ -698,7 +633,7 @@ module.exports.queueProductsController = async (req: Request, res: Response, nex
 
       if (!storeName) throw new Api400Error("Required store name as a parameter !");
 
-      const queueProduct = await QueueProduct.find({ $and: [{ "supplier.email": email }, { "supplier.store_name": storeName }] }) || [];
+      const queueProduct = await QueueProduct.find({ $and: [{ "supplier.email": email }, { "supplier.storeName": storeName }] }) || [];
 
       let countQueue = queueProduct.length || 0;
 

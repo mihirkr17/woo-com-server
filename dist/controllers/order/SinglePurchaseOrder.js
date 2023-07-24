@@ -28,9 +28,9 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
             const timestamp = Date.now();
             if (!req.body)
                 throw new apiResponse.Api503Error("Service unavailable !");
-            const { variationID, productID, quantity, listingID, state, customerEmail } = req.body;
-            if (!variationID || !productID || !quantity || !listingID || !state || !customerEmail)
-                throw new apiResponse.Api400Error("Required variationID, productID, quantity, listingID, state, customerEmail");
+            const { sku, productID, quantity, listingID, state, customerEmail } = req.body;
+            if (!sku || !productID || !quantity || !listingID || !state || !customerEmail)
+                throw new apiResponse.Api400Error("Required sku, productID, quantity, listingID, state, customerEmail");
             const user = yield findUserByEmail(email);
             if (!user)
                 throw new apiResponse.Api503Error("Service unavailable !");
@@ -40,7 +40,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
             let product = yield Product.aggregate([
                 { $match: { $and: [{ _lid: listingID }, { _id: ObjectId(productID) }] } },
                 { $unwind: { path: "$variations" } },
-                { $match: { $and: [{ 'variations._vrid': variationID }] } },
+                { $match: { $and: [{ 'variations.sku': sku }] } },
                 {
                     $project: {
                         _id: 0,
@@ -49,20 +49,19 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                         shipping: 1,
                         packaged: 1,
                         product: {
-                            title: "$variations.vTitle",
+                            title: 1,
                             slug: "$slug",
                             brand: "$brand",
                             sku: "$variations.sku",
                             listing_id: "$items.listingID",
-                            variation_id: "$items.variationID",
                             product_id: "$items.productID",
                             assets: {
                                 $ifNull: [
-                                    { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.variant.color"] }] },
+                                    { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.brandColor"] }] },
                                     null
                                 ]
                             },
-                            selling_price: "$variations.pricing.sellingPrice",
+                            sellingPrice: "$variations.pricing.sellingPrice",
                             base_amount: { $multiply: ["$variations.pricing.sellingPrice", parseInt(quantity)] },
                         },
                     }
@@ -71,7 +70,6 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                     $set: {
                         "product.product_id": productID,
                         "product.listing_id": listingID,
-                        "product.variation_id": variationID,
                         quantity: quantity
                     }
                 },
@@ -85,7 +83,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
             const productInfos = [];
             product["shipping_charge"] = ((_c = product === null || product === void 0 ? void 0 : product.shipping) === null || _c === void 0 ? void 0 : _c.isFree) ? 0 : calculateShippingCost((((_d = product === null || product === void 0 ? void 0 : product.packaged) === null || _d === void 0 ? void 0 : _d.volumetricWeight) * (product === null || product === void 0 ? void 0 : product.quantity)), areaType);
             product["final_amount"] = parseInt(((_e = product === null || product === void 0 ? void 0 : product.product) === null || _e === void 0 ? void 0 : _e.base_amount) + (product === null || product === void 0 ? void 0 : product.shipping_charge));
-            product["order_id"] = generateOrderID((_f = product === null || product === void 0 ? void 0 : product.supplier) === null || _f === void 0 ? void 0 : _f.id);
+            product["order_id"] = generateOrderID((_f = product === null || product === void 0 ? void 0 : product.supplier) === null || _f === void 0 ? void 0 : _f.email);
             product["payment"] = {
                 status: "pending",
                 mode: "card"
@@ -106,7 +104,7 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
             productInfos.push({
                 productID: (_g = product === null || product === void 0 ? void 0 : product.product) === null || _g === void 0 ? void 0 : _g.product_id,
                 listingID: (_h = product === null || product === void 0 ? void 0 : product.product) === null || _h === void 0 ? void 0 : _h.listing_id,
-                variationID: (_j = product === null || product === void 0 ? void 0 : product.product) === null || _j === void 0 ? void 0 : _j.variation_id,
+                sku: (_j = product === null || product === void 0 ? void 0 : product.product) === null || _j === void 0 ? void 0 : _j.sku,
                 quantity: product === null || product === void 0 ? void 0 : product.quantity
             });
             const totalAmount = product.final_amount || 0;

@@ -117,10 +117,9 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                                                 as: "variation",
                                                 cond: {
                                                     $and: [
-                                                        { $eq: ['$$variation._vrid', '$items.variationID'] },
+                                                        { $eq: ['$$variation.sku', '$items.sku'] },
                                                         { $eq: ['$$variation.stock', "in"] },
                                                         { $eq: ["$status", "active"] },
-                                                        { $eq: ["$save_as", "fulfilled"] },
                                                         { $gte: ["$$variation.available", "$items.quantity"] }
                                                     ]
                                                 }
@@ -141,21 +140,15 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                         packaged: 1,
                         supplier: 1,
                         product: {
-                            title: "$variations.vTitle",
+                            title: 1,
                             slug: "$slug",
                             brand: "$brand",
                             sku: "$variations.sku",
                             listing_id: "$items.listingID",
-                            variation_id: "$items.variationID",
                             product_id: "$items.productID",
-                            assets: {
-                                $ifNull: [
-                                    { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.variant.color"] }] },
-                                    {}
-                                ]
-                            },
-                            selling_price: "$variations.pricing.sellingPrice",
-                            base_amount: { $multiply: ["$variations.pricing.sellingPrice", '$items.quantity'] }
+                            imageUrl: { $arrayElemAt: ["$variations.images", 0] },
+                            sellingPrice: "$variations.pricing.sellingPrice",
+                            baseAmount: { $multiply: ["$variations.pricing.sellingPrice", '$items.quantity'] }
                         },
                     }
                 },
@@ -174,7 +167,7 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                 var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
                 item["shipping_charge"] = ((_a = item === null || item === void 0 ? void 0 : item.shipping) === null || _a === void 0 ? void 0 : _a.isFree) ? 0 : calculateShippingCost((((_b = item === null || item === void 0 ? void 0 : item.packaged) === null || _b === void 0 ? void 0 : _b.volumetricWeight) * (item === null || item === void 0 ? void 0 : item.quantity)), areaType);
                 item["final_amount"] = parseInt(((_c = item === null || item === void 0 ? void 0 : item.product) === null || _c === void 0 ? void 0 : _c.base_amount) + (item === null || item === void 0 ? void 0 : item.shipping_charge));
-                item["order_id"] = generateOrderID((_d = item === null || item === void 0 ? void 0 : item.supplier) === null || _d === void 0 ? void 0 : _d.id);
+                item["order_id"] = generateOrderID((_d = item === null || item === void 0 ? void 0 : item.supplier) === null || _d === void 0 ? void 0 : _d.email);
                 item["payment"] = {
                     status: "pending",
                     mode: "card"
@@ -193,7 +186,7 @@ module.exports = function CartPurchaseOrder(req, res, next) {
                 productInfos.push({
                     productID: (_f = item === null || item === void 0 ? void 0 : item.product) === null || _f === void 0 ? void 0 : _f.product_id,
                     listingID: (_g = item === null || item === void 0 ? void 0 : item.product) === null || _g === void 0 ? void 0 : _g.listing_id,
-                    variationID: (_h = item === null || item === void 0 ? void 0 : item.product) === null || _h === void 0 ? void 0 : _h.variation_id,
+                    sku: (_h = item === null || item === void 0 ? void 0 : item.product) === null || _h === void 0 ? void 0 : _h.sku,
                     quantity: item === null || item === void 0 ? void 0 : item.quantity
                 });
                 if (!groupOrdersBySeller[(_j = item === null || item === void 0 ? void 0 : item.supplier) === null || _j === void 0 ? void 0 : _j.email]) {
@@ -204,6 +197,9 @@ module.exports = function CartPurchaseOrder(req, res, next) {
             });
             if (!totalAmount)
                 throw new apiResponse.Api503Error("Service unavailable !");
+            if (totalAmount >= 500) {
+                totalAmount = totalAmount - shippingTotal;
+            }
             // Creating payment intent after getting total amount of order items. 
             const { client_secret, metadata, id } = yield createPaymentIntents(totalAmount, orderIDs);
             if (!client_secret)

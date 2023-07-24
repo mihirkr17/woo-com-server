@@ -1,47 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = require("mongoose");
-// interface IOrder {
-//    orderID: string;
-//    orderPaymentID: string;
-//    listingID: string;
-//    variationID: string;
-//    productID: string;
-//    customerEmail: string;
-//    customerID: string;
-//    title: string;
-//    slug: string;
-//    assets: object;
-//    brand: string;
-//    baseAmount: number;
-//    quantity: number;
-//    paymentMode: string;
-//    shippingAddress: object;
-//    shippingCharge: number;
-//    supplier: object;
-//    sellingPrice: number;
-//    state: string;
-//    sku: string;
-//    trackingID: string;
-//    isRated?: boolean;
-//    packaged: any,
-//    shipping: any,
-//    orderAT: object;
-//    orderStatus: string;
-//    orderPlacedAT: Date;
-//    orderShippedAT: Date;
-//    isShipped: boolean;
-//    cancelReason: string;
-//    orderCanceledAT: object;
-//    isCanceled: boolean;
-//    orderDispatchAT: object;
-//    isDispatch: boolean;
-//    orderCompletedAT: object;
-//    isCompleted: boolean;
-//    paymentStatus?: string;
-//    refund?: object;
-//    payment_data?: object
-// };
 var orderSchema = new mongoose_1.Schema({
     order_id: String,
     customer: {
@@ -54,14 +13,13 @@ var orderSchema = new mongoose_1.Schema({
     tracking_id: String,
     product: {
         listing_id: String,
-        variation_id: String,
         product_id: String,
         slug: String,
         title: String,
         assets: Object,
         brand: String,
         sku: String,
-        selling_price: Number,
+        sellingPrice: Number,
         base_amount: Number,
     },
     quantity: Number,

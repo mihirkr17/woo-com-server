@@ -16,51 +16,33 @@ var ProductSchema = new mongoose_1.Schema({
         fulfilledBy: { type: String, required: true },
         procurementType: { type: String, required: true },
         procurementSLA: { type: String, required: true },
-        provider: { type: String, required: true },
         isFree: { type: Boolean }
     },
     rating: { type: Array, required: true },
-    reviews: { type: Array, required: true },
     ratingAverage: { type: Number, required: true, default: 0 },
     keywords: { type: Array, required: true },
-    meta_description: { type: String, required: true },
+    metaDescription: { type: String, required: true },
     highlights: { type: Array, required: false },
     specification: { type: Object, required: true },
     description: { type: String, required: true },
-    options: [
-        {
-            _id: false,
-            color: String,
-            images: Array
-        }
-    ],
     variations: { type: Array, required: true },
-    tax: {
-        hsn: { type: String, required: true },
-        code: { type: String, required: true }
-    },
-    supplier: {
-        id: { type: String, required: true },
-        email: { type: String, required: true },
-        store_name: { type: String, required: true }
-    },
+    supplier: { type: Object, required: true },
     warranty: {
         type: { type: String, required: false },
-        duration: { type: Number, required: false },
+        duration: { type: String, required: false },
         details: { type: String, required: false }
     },
-    save_as: { type: String, required: true, enum: ["fulfilled", "draft"] },
-    status: { type: String, required: true, enum: ["active", "inactive"], default: "inactive" },
+    status: { type: String, required: true, enum: ["active", "inactive", "queue", "draft"], default: "queue" },
     views: { type: Number },
     score: { type: Number },
     sales: { type: Number },
     createdAt: { type: Date, required: true },
     modifiedAt: { type: Date, required: false },
-    isVerified: { type: Boolean, required: true },
+    isVerified: { type: Boolean, required: false },
     verifyStatus: {
-        verifiedBy: { type: String, required: true },
-        email: { type: String, required: true },
-        verifiedAt: { type: Date, required: true }
+        verifiedBy: { type: String, required: false },
+        email: { type: String, required: false },
+        verifiedAt: { type: Date, required: false }
     }
 });
 const Product = (0, mongoose_1.model)('Product', ProductSchema, 'products');

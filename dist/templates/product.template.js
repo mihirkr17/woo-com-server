@@ -1,4 +1,25 @@
 "use strict";
+const { stockStatus, calculateDiscount } = require("../utils/common");
+function product_variation_template_engine(body) {
+    var _a, _b;
+    let available = parseInt(body === null || body === void 0 ? void 0 : body.available) || 0;
+    let price = parseInt((_a = body === null || body === void 0 ? void 0 : body.pricing) === null || _a === void 0 ? void 0 : _a.price);
+    let sellingPrice = parseInt((_b = body === null || body === void 0 ? void 0 : body.pricing) === null || _b === void 0 ? void 0 : _b.sellingPrice);
+    return {
+        sku: body === null || body === void 0 ? void 0 : body.sku,
+        variant: (body === null || body === void 0 ? void 0 : body.variant) || {},
+        brandColor: body === null || body === void 0 ? void 0 : body.brandColor,
+        attrs: (body === null || body === void 0 ? void 0 : body.attrs) || {},
+        images: body === null || body === void 0 ? void 0 : body.images,
+        pricing: {
+            price,
+            sellingPrice,
+            discount: calculateDiscount({ price, sellingPrice })
+        },
+        stock: stockStatus(available),
+        available,
+    };
+}
 const product_listing_template_engine = (body, supplier) => {
     let volumetricWeight = ((parseFloat(body === null || body === void 0 ? void 0 : body.packageHeight) * parseFloat(body === null || body === void 0 ? void 0 : body.packageLength) * parseFloat(body === null || body === void 0 ? void 0 : body.packageWidth)) / 5000).toFixed(1);
     volumetricWeight = parseFloat(volumetricWeight);
@@ -25,50 +46,18 @@ const product_listing_template_engine = (body, supplier) => {
             fulfilledBy: body === null || body === void 0 ? void 0 : body.fulfilledBy,
             procurementType: body === null || body === void 0 ? void 0 : body.procurementType,
             procurementSLA: body === null || body === void 0 ? void 0 : body.procurementSLA,
-            provider: body === null || body === void 0 ? void 0 : body.shippingProvider,
             isFree: body === null || body === void 0 ? void 0 : body.isFree
         },
-        tax: {
-            hsn: body === null || body === void 0 ? void 0 : body.taxHsn,
-            code: body === null || body === void 0 ? void 0 : body.taxCode
-        },
+        variations: [product_variation_template_engine(body === null || body === void 0 ? void 0 : body.variation)],
         manufacturer: {
             origin: body === null || body === void 0 ? void 0 : body.manufacturerOrigin,
             details: body === null || body === void 0 ? void 0 : body.manufacturerDetails,
         },
         warranty: body === null || body === void 0 ? void 0 : body.warranty,
         keywords: body === null || body === void 0 ? void 0 : body.keywords,
-        meta_description: body === null || body === void 0 ? void 0 : body.meta_description,
+        metaDescription: body === null || body === void 0 ? void 0 : body.metaDescription,
         specification: (body === null || body === void 0 ? void 0 : body.specification) || {},
         description: (body === null || body === void 0 ? void 0 : body.description) || ""
-    };
-};
-const product_variation_template_engine = (body) => {
-    let available = parseInt(body === null || body === void 0 ? void 0 : body.available) || 0;
-    let stock;
-    let price = parseInt(body === null || body === void 0 ? void 0 : body.price);
-    let sellingPrice = parseInt(body === null || body === void 0 ? void 0 : body.sellingPrice);
-    let discount = ((price - sellingPrice) / price);
-    discount = (discount * 100);
-    if (available && available >= 0) {
-        stock = "in";
-    }
-    else {
-        stock = "out";
-    }
-    return {
-        vTitle: body === null || body === void 0 ? void 0 : body.vTitle,
-        sku: body === null || body === void 0 ? void 0 : body.sku,
-        variant: (body === null || body === void 0 ? void 0 : body.variant) || {},
-        attrs: (body === null || body === void 0 ? void 0 : body.attrs) || {},
-        pricing: {
-            price,
-            sellingPrice,
-            discount: parseInt(discount),
-            currency: 'bdt'
-        },
-        stock,
-        available,
     };
 };
 module.exports = { product_listing_template_engine, product_variation_template_engine };

@@ -71,7 +71,6 @@ const orderTab = new Schema({
          _id: false,
          itemID: String,
          listingID: String,
-         variationID: String,
          productID: String,
          title: String,
          slug: String,
