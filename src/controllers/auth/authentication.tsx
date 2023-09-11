@@ -8,6 +8,7 @@ const email_service = require("../../services/email.service");
 const { verify_email_html_template } = require("../../templates/email.template");
 const { generateUUID, generateExpireTime, generateSixDigitNumber, generateJwtToken, generateUserDataToken } = require("../../utils/generator");
 const { validEmail, validPassword } = require("../../utils/validator");
+const Supplier = require("../../model/supplier.model");
 
 /**
  * @apiController --> Buyer Registration Controller
@@ -62,63 +63,6 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
    }
 };
 
-
-
-/**
- * @apiController --> Seller Registration Controller
- * @apiMethod --> POST
- * @apiRequired --> BODY
- */
-module.exports.sellerRegistrationController = async (req: Request, res: Response, next: NextFunction) => {
-   try {
-      let body = req.body;
-
-      const { email, phone, password, store } = body;
-
-      let existUser = await User.countDocuments({ $or: [{ email }, { phone }] });
-
-      if (existUser >= 1) {
-         throw new apiResponse.Api400Error("User already exists, Please try another phone number or email address !")
-      }
-
-      body['_uuid'] = "s" + generateUUID();
-      body['authProvider'] = 'system';
-      body['idFor'] = 'sell';
-      body["role"] = "SELLER";
-      body["contactEmail"] = email;
-      body['verificationCode'] = generateSixDigitNumber();
-      body['verificationExpiredAt'] = generateExpireTime();
-      body["accountStatus"] = "inactive";
-      body["store"] = store || {};
-      body["password"] = await bcrypt.hash(password, 10);
-      body["hasPassword"] = true;
-
-
-      const info = await email_service({
-         to: email,
-         subject: "Verify email address",
-         html: verify_email_html_template(body?.verificationCode)
-      });
-
-      if (!info?.response) throw new apiResponse.Api500Error("Sorry registration failed !");
-
-      let user = new User(body);
-      user.buyer = undefined;
-
-      const result = await user.save();
-
-      return res.status(200).send({
-         success: true,
-         statusCode: 200,
-         returnEmail: email,
-         verificationExpiredAt: result?.verificationExpiredAt,
-         message: "Thanks for your information. Verification code was sent to " + email + ". Please verify your account.",
-      });
-
-   } catch (error: any) {
-      next(error);
-   }
-};
 
 
 module.exports.generateNewVerificationCode = async (req: Request, res: Response, next: NextFunction) => {

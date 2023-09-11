@@ -101,6 +101,7 @@ var UserSchema = new Schema({
   authProvider: { type: String, enum: ['system', 'thirdParty'], default: 'system' },
 
   verificationCode: { type: String, default: undefined },
+  
   verificationExpiredAt: { type: Number, default: undefined },
 
   createdAt: { type: Date, default: Date.now }

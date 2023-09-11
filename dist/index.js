@@ -20,7 +20,7 @@ const dashboardRoutes = require("./routes/dashboard.route");
 const paymentRoutes = require("./routes/payment.route");
 const returnErrors = require("./errors/errors");
 const storeRoutes = require("./routes/store.route");
-const port = process.env.PORT || 9000;
+const port = process.env.PORT || 5000;
 const sanitizeUrl = require("@braintree/sanitize-url").sanitizeUrl;
 const allowedOrigins = ['http://localhost:3000', 'https://wookart.vercel.app', 'https://red-encouraging-shark.cyclic.app', 'http://localhost:9000'];
 const mongoUri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PWD}@cluster0.8bccj.mongodb.net/ecommerce-db?retryWrites=true&w=majority`;
@@ -49,7 +49,7 @@ mongoose.connect(mongoUri, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
     // serverApi: ServerApiVersion.v1,
-}).then(() => console.log("Connection Successful..."))
+}).then(() => console.log("Mongodb connected successfully..."))
     .catch((err) => console.log(err));
 // Routes declared here
 //Sanitizing URLs

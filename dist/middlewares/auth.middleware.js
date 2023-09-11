@@ -61,7 +61,7 @@ const isRoleOwnerOrAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0,
 const isRoleSeller = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const authRole = req.decoded.role;
-        if (authRole === 'SELLER') {
+        if (authRole === 'SUPPLIER') {
             next();
         }
         else {
@@ -105,7 +105,7 @@ const isRoleAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
 const isPermitForDashboard = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const authRole = req.decoded.role;
-        if (authRole === 'SELLER' || authRole === 'ADMIN' || authRole === 'OWNER') {
+        if (authRole === 'SUPPLIER' || authRole === 'ADMIN' || authRole === 'OWNER') {
             next();
         }
         else {
@@ -116,6 +116,26 @@ const isPermitForDashboard = (req, res, next) => __awaiter(void 0, void 0, void 
         next(error);
     }
 });
+function verifyEmailByJWT(req, res, next) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const token = req.query; // getting from query
+        // if token not present in cookies then return 401 unauthorized errors...
+        if (!token || typeof token === "undefined") {
+            throw new apiResponse.Api401Error('Required verification token !');
+        }
+        try {
+            jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
+                if (err)
+                    return res.status(401).json({ success: false, statusCode: 401, message: "Invalid token !" });
+                req.decoded = decoded;
+                next();
+            });
+        }
+        catch (error) {
+            throw error;
+        }
+    });
+}
 module.exports = {
     verifyJWT,
     isRoleOwnerOrAdmin,

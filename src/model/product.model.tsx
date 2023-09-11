@@ -41,7 +41,10 @@ var ProductSchema = new Schema({
 
    variations: { type: Array, required: true },
 
-   supplier: { type: Object, required: true },
+   supplier: {
+      storeId: { type: Schema.Types.ObjectId, ref: 'Supplier' },
+      storeName: { type: String, required: true }
+   },
 
    warranty: {
       type: { type: String, required: false },
@@ -49,7 +52,7 @@ var ProductSchema = new Schema({
       details: { type: String, required: false }
    },
 
-   status: { type: String, required: true, enum: ["active", "inactive", "queue", "draft"], default: "queue" },
+   status: { type: String, required: true, enum: ["Active", "Queue", "Draft"], default: "Queue" },
 
    views: { type: Number },
 

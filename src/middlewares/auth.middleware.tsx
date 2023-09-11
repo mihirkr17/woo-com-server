@@ -62,7 +62,7 @@ const isRoleSeller = async (req: Request, res: Response, next: NextFunction) => 
   try {
     const authRole = req.decoded.role;
 
-    if (authRole === 'SELLER') {
+    if (authRole === 'SUPPLIER') {
       next();
     } else {
       throw new apiResponse.Api403Error("Forbidden access !");
@@ -111,7 +111,7 @@ const isPermitForDashboard = async (req: Request, res: Response, next: NextFunct
 
     const authRole = req.decoded.role;
 
-    if (authRole === 'SELLER' || authRole === 'ADMIN' || authRole === 'OWNER') {
+    if (authRole === 'SUPPLIER' || authRole === 'ADMIN' || authRole === 'OWNER') {
       next();
     } else {
       throw new apiResponse.Api403Error("Forbidden access !");
@@ -119,6 +119,27 @@ const isPermitForDashboard = async (req: Request, res: Response, next: NextFunct
 
   } catch (error: any) {
     next(error);
+  }
+}
+
+
+async function verifyEmailByJWT(req: Request, res: Response, next: NextFunction) {
+  const token = req.query; // getting from query
+
+  // if token not present in cookies then return 401 unauthorized errors...
+  if (!token || typeof token === "undefined") {
+    throw new apiResponse.Api401Error('Required verification token !');
+  }
+
+  try {
+    jwt.verify(token, process.env.ACCESS_TOKEN, function (err: any, decoded: any) {
+      if (err) return res.status(401).json({ success: false, statusCode: 401, message: "Invalid token !" });
+      req.decoded = decoded;
+      next();
+    });
+
+  } catch (error: any) {
+    throw error;
   }
 }
 

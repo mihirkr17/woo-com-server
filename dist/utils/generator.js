@@ -47,3 +47,12 @@ module.exports.generateUserDataToken = (user) => {
     });
     return token;
 };
+module.exports.generateVerificationToken = (email) => {
+    const token = jwt.sign({
+        email
+    }, process.env.ACCESS_TOKEN, {
+        algorithm: "HS256",
+        expiresIn: "1h",
+    });
+    return token;
+};

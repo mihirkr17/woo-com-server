@@ -17,6 +17,7 @@ const email_service = require("../../services/email.service");
 const { verify_email_html_template } = require("../../templates/email.template");
 const { generateUUID, generateExpireTime, generateSixDigitNumber, generateJwtToken, generateUserDataToken } = require("../../utils/generator");
 const { validEmail, validPassword } = require("../../utils/validator");
+const Supplier = require("../../model/supplier.model");
 /**
  * @apiController --> Buyer Registration Controller
  * @apiMethod --> POST
@@ -56,52 +57,6 @@ module.exports.buyerRegistrationController = (req, res, next) => __awaiter(void 
             returnEmail: userResult === null || userResult === void 0 ? void 0 : userResult.email,
             verificationExpiredAt: userResult === null || userResult === void 0 ? void 0 : userResult.verificationExpiredAt,
             message: `Thanks for your information. Verification code was send to ${userResult === null || userResult === void 0 ? void 0 : userResult.email}`,
-        });
-    }
-    catch (error) {
-        next(error);
-    }
-});
-/**
- * @apiController --> Seller Registration Controller
- * @apiMethod --> POST
- * @apiRequired --> BODY
- */
-module.exports.sellerRegistrationController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        let body = req.body;
-        const { email, phone, password, store } = body;
-        let existUser = yield User.countDocuments({ $or: [{ email }, { phone }] });
-        if (existUser >= 1) {
-            throw new apiResponse.Api400Error("User already exists, Please try another phone number or email address !");
-        }
-        body['_uuid'] = "s" + generateUUID();
-        body['authProvider'] = 'system';
-        body['idFor'] = 'sell';
-        body["role"] = "SELLER";
-        body["contactEmail"] = email;
-        body['verificationCode'] = generateSixDigitNumber();
-        body['verificationExpiredAt'] = generateExpireTime();
-        body["accountStatus"] = "inactive";
-        body["store"] = store || {};
-        body["password"] = yield bcrypt.hash(password, 10);
-        body["hasPassword"] = true;
-        const info = yield email_service({
-            to: email,
-            subject: "Verify email address",
-            html: verify_email_html_template(body === null || body === void 0 ? void 0 : body.verificationCode)
-        });
-        if (!(info === null || info === void 0 ? void 0 : info.response))
-            throw new apiResponse.Api500Error("Sorry registration failed !");
-        let user = new User(body);
-        user.buyer = undefined;
-        const result = yield user.save();
-        return res.status(200).send({
-            success: true,
-            statusCode: 200,
-            returnEmail: email,
-            verificationExpiredAt: result === null || result === void 0 ? void 0 : result.verificationExpiredAt,
-            message: "Thanks for your information. Verification code was sent to " + email + ". Please verify your account.",
         });
     }
     catch (error) {

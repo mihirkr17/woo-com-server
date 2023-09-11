@@ -26,13 +26,16 @@ var ProductSchema = new mongoose_1.Schema({
     specification: { type: Object, required: true },
     description: { type: String, required: true },
     variations: { type: Array, required: true },
-    supplier: { type: Object, required: true },
+    supplier: {
+        storeId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Supplier' },
+        storeName: { type: String, required: true }
+    },
     warranty: {
         type: { type: String, required: false },
         duration: { type: String, required: false },
         details: { type: String, required: false }
     },
-    status: { type: String, required: true, enum: ["active", "inactive", "queue", "draft"], default: "queue" },
+    status: { type: String, required: true, enum: ["Active", "Queue", "Draft"], default: "Queue" },
     views: { type: Number },
     score: { type: Number },
     sales: { type: Number },

@@ -51,7 +51,7 @@ module.exports.seller_order_email_template = (product: any, customerEmail: strin
 
 
 
-module.exports.verify_email_html_template = (verifyToken: string, email: string) => {
+module.exports.verify_email_html_template = (verifyToken: string) => {
 
    return (
       `<div style="font-family: Helvetica,Arial,sans-serif;min-width:1000px;overflow:auto;line-height:2">
@@ -61,10 +61,13 @@ module.exports.verify_email_html_template = (verifyToken: string, email: string)
         </div>
         <p style="font-size:1.1em">Hi,</p>
 
-        <p>Thank you for choosing WooKart. Use the following OTP to complete your Sign Up procedures. OTP is valid for 5 minutes</p>
+        <p>Thank you for choosing WooKart. Click the following to complete your Verification.</p>
 
         <h2 style="background: #00466a;margin: 0 auto;width: max-content;padding: 0 10px;color: #fff;border-radius: 4px;">${verifyToken}</h2>
 
+        <br/>
+        <a href="${process.env.BACKEND_URL}api/v1/auth/verify-email?token=${verifyToken}">Verify Your Email</a>
+        <br/>
         <p style="font-size:0.9em;">Regards,<br />WooKart</p>
 
         <hr style="border:none;border-top:1px solid #eee" />

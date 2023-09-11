@@ -7,15 +7,18 @@ const AdminCTRL = require("../controllers/dashboard/Admin.controller");
 const ManageOrderCTRL = require("../controllers/dashboard/ManageOrdersController");
 const { variationMDL } = require("../middlewares/product.middleware");
 
+const { allProductsBySupplier, fetchSingleProduct,
+  updateProductStatusController, productListingController,
+  productVariationController, productDeleteController,
+  productVariationDeleteController, productUpdateController,
+  productStockUpdateController } = require("../controllers/dashboard/store.controller");
 try {
 
   router.get("/overview", verifyJWT, isPermitForDashboard, dashboardCTRL?.dashboardOverview);
 
   router.put("/seller/:storeName/product-control", verifyJWT, isRoleSeller, ManageProductCTRL?.productControlController);
 
-  router.put("/seller/:storeName/product/update-stock", verifyJWT, isRoleSeller, ManageProductCTRL.updateStockController);
 
-  router.put("/seller/products/set-product-variation", verifyJWT, isRoleSeller, variationMDL, ManageProductCTRL.variationController);
 
   router.put("/seller/:storeName/start-flash-sale", verifyJWT, isRoleSeller, ManageProductCTRL?.productFlashSaleController);
 
@@ -24,7 +27,7 @@ try {
   router.post("/store/:storeName/order/order-status-management", verifyJWT, isRoleSeller, ManageOrderCTRL.orderStatusManagement);
 
 
-  router.post('/seller/store/product/update-product/:paramsType', verifyJWT, isRoleSeller, ManageProductCTRL?.updateProductData);
+
 
 
   router.post("/verify-seller-account", verifyJWT, isRoleAdmin, AdminCTRL?.verifySellerAccountByAdmin);
@@ -35,7 +38,10 @@ try {
 
 
   // get controllers
-  router.get("/view-products", verifyJWT, isPermitForDashboard, ManageProductCTRL.viewAllProductsInDashboard);
+  router.get("/view-products", verifyJWT, isPermitForDashboard, allProductsBySupplier);
+
+  router.get("/fetch-one-product/:productId", verifyJWT, isPermitForDashboard, fetchSingleProduct);
+
 
   router.get("/admin/:uuid/provider", verifyJWT, isRoleAdmin, AdminCTRL?.getAdminController);
 
@@ -49,19 +55,27 @@ try {
   router.get("/seller/store/:storeName/in-queue-products", verifyJWT, isRoleSeller, ManageProductCTRL?.queueProductsController)
 
   /**
-* @requestMethod GET
 * @controller fetchSingleProductByPidController
 * @desc --> Fetch Single Product By Product ID
 * @required [pid -> query, ]
+* @RouteFor ->> SUPPLIER
 */
   router.get("/get-one-product-in-seller-dsb", verifyJWT, isRoleSeller, ManageProductCTRL.getProductForSellerDSBController);
 
   // post controllers
-  router.post("/seller/:storeName/product/listing/:formTypes", verifyJWT, isRoleSeller, ManageProductCTRL.productListingController);
+  router.post("/seller/:storeName/product/listing/:formTypes", verifyJWT, isRoleSeller, productListingController);
+
+  router.post("/supplier/product/update-status", verifyJWT, isRoleSeller, updateProductStatusController);
+
+  router.post('/seller/store/product/update-product/:paramsType', verifyJWT, isRoleSeller, productUpdateController);
+
+  // Put routes
+  router.put("/supplier/product/product-variation", verifyJWT, isRoleSeller, variationMDL, productVariationController);
+  router.put("/seller/:storeName/product/update-stock", verifyJWT, isRoleSeller, productStockUpdateController);
 
   // delete controller
-  router.delete("/seller/:storeName/product/delete-product-variation/:productID/:sku", verifyJWT, ManageProductCTRL.deleteProductVariationController);
-  router.delete("/:storeName/product/delete-product/:productID/:listingID", verifyJWT, isRoleSeller, ManageProductCTRL.deleteProductController);
+  router.delete("/seller/:storeName/product/delete-product-variation/:productId/:productSku", verifyJWT, isRoleSeller, productVariationDeleteController);
+  router.delete("/:storeName/product/delete-product/:productId", verifyJWT, isRoleSeller, productDeleteController);
 
 
 
