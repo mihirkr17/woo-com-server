@@ -2,7 +2,7 @@ import express, { Router } from "express";
 const router: Router = express.Router();
 
 const { verifyJWT, isRoleBuyer, } = require("../middlewares/auth.middleware");
-const { myOrder, removeOrder, cancelMyOrder } = require("../controllers/order/order.controller");
+const { myOrder, removeOrder, cancelMyOrder, orderDetails } = require("../controllers/order/order.controller");
 
 // set order controller
 const CartPurchaseOrder = require("../controllers/order/CartPurchaseOrder");
@@ -25,6 +25,8 @@ try {
   router.delete("/remove-order/:email/:orderID", verifyJWT, isRoleBuyer, removeOrder);
 
   router.post("/cancel-my-order/:email", verifyJWT, isRoleBuyer, cancelMyOrder);
+
+  router.get("/:orderId/:itemId/details", verifyJWT, isRoleBuyer, orderDetails);
 
 } catch (error: any) {
   console.log(error?.message);

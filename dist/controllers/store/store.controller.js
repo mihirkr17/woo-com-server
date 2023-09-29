@@ -35,7 +35,7 @@ module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, 
         let Filter = {};
         Filter["$and"] = [
             { "supplier.storeName": storeName },
-            { status: "active" },
+            { status: "Active" },
         ];
         let sortList = {};
         if (sorted === "lowest") {
@@ -80,7 +80,7 @@ module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, 
                 $match: {
                     $and: [
                         { "supplier.storeName": storeName },
-                        { status: "active" }
+                        { status: "Active" }
                     ]
                 }
             },

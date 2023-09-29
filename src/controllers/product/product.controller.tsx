@@ -4,7 +4,7 @@
 import { NextFunction, Request, Response } from "express";
 const Product = require("../../model/product.model");
 const { findUserByEmail, updateProductInformation } = require("../../services/common.service");
-const { calculateShippingCost, calculatePopularityScore } = require("../../utils/common");
+const { calculateShippingCost, calculatePopularityScore, cartContextCalculation } = require("../../utils/common");
 const { product_detail_pipe, product_detail_relate_pipe, home_store_product_pipe, search_product_pipe, single_purchase_pipe, ctg_filter_product_pipe, ctg_main_product_pipe } = require("../../utils/pipelines");
 const NodeCache = require("../../utils/NodeCache");
 const PrivacyPolicy = require("../../model/privacyPolicy.model");
@@ -37,16 +37,16 @@ module.exports.fetchProductDetails = async (req: Request, res: Response, next: N
 
       } else {
 
-         productDetail = await Product.aggregate(product_detail_pipe(productID, sku));
+         productDetail = await Product.aggregate(product_detail_pipe(productID, sku)).allowDiskUse(true);
 
          productDetail = productDetail[0];
 
+
          if (oTracker) {
-            productDetail["productID"] = productDetail?._id;
             await updateProductInformation(productDetail, { actionType: "views" });
          }
 
-         productDetail["policies"] = await PrivacyPolicy.findOne({}) ?? {};
+         // productDetail["policies"] = await PrivacyPolicy.findOne({}) ?? {};
 
          NodeCache.saveCache(`${productID}_${sku}`, productDetail);
       }
@@ -168,7 +168,7 @@ module.exports.fetchTopSellingProduct = async (req: Request, res: Response, next
       const seller: any = req.query.seller;
 
       let filterQuery: any = {
-         status: "active",
+         status: "Active",
       };
       if (seller) {
          filterQuery['SELLER'] = seller;
@@ -188,44 +188,36 @@ module.exports.fetchTopSellingProduct = async (req: Request, res: Response, next
 
 module.exports.purchaseProductController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const authEmail = req.decoded.email;
+      const { email, _id } = req.decoded;
 
-      let user = await findUserByEmail(authEmail);
+      let user = await findUserByEmail(email);
 
-      const { listingID, sku, quantity, productID, customerEmail } = req?.body;
+      const { sku, quantity, productId } = req?.body;
 
       let defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
          user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
 
-      let areaType = defaultShippingAddress?.area_type;
 
       let newQuantity = parseInt(quantity);
 
-      let product = await Product.aggregate(single_purchase_pipe(productID, listingID, sku, newQuantity));
+      let product = await Product.aggregate(single_purchase_pipe(productId, sku, newQuantity));
 
-      if (product && typeof product !== 'undefined') {
-         product = product[0];
-         product["customerEmail"] = customerEmail;
-
-         if (product?.shipping?.isFree && product?.shipping?.isFree) {
-            product["shippingCharge"] = 0;
-         } else {
-            product["shippingCharge"] = calculateShippingCost((product?.packaged?.volumetricWeight * product?.quantity), areaType);
-         }
-      }
+      const { amount, totalQuantity, shippingCost, finalAmount, savingAmount, discountShippingCost } = cartContextCalculation(product);
 
       return res.status(200).send({
          success: true, statusCode: 200, data: {
             module: {
-               product,
-               container_p: {
-                  baseAmounts: parseInt(product?.baseAmount),
-                  totalQuantities: product?.quantity,
-                  finalAmounts: (parseInt(product?.baseAmount) + product?.shippingCharge),
-                  shippingFees: product?.shippingCharge,
-                  savingAmounts: product?.savingAmount
+               cartItems: product,
+               cartCalculation: {
+                  amount,
+                  totalQuantity,
+                  finalAmount,
+                  shippingCost,
+                  savingAmount,
+                  discountShippingCost
                },
-               numberOfProducts: product.length || 0
+               numberOfProduct: product.length || 0,
+               defaultShippingAddress
             }
          }
       });

@@ -12,7 +12,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const Product = require("../../model/product.model");
 const { findUserByEmail, updateProductInformation } = require("../../services/common.service");
-const { calculateShippingCost, calculatePopularityScore } = require("../../utils/common");
+const { calculateShippingCost, calculatePopularityScore, cartContextCalculation } = require("../../utils/common");
 const { product_detail_pipe, product_detail_relate_pipe, home_store_product_pipe, search_product_pipe, single_purchase_pipe, ctg_filter_product_pipe, ctg_main_product_pipe } = require("../../utils/pipelines");
 const NodeCache = require("../../utils/NodeCache");
 const PrivacyPolicy = require("../../model/privacyPolicy.model");
@@ -27,7 +27,6 @@ const Review = require("../../model/reviews.model");
  * @request_method  --> GET
  */
 module.exports.fetchProductDetails = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     try {
         const { pId: productID, sku, oTracker } = req.query;
         if (!productID || typeof productID !== "string")
@@ -41,13 +40,12 @@ module.exports.fetchProductDetails = (req, res, next) => __awaiter(void 0, void 
             productDetail = cacheData;
         }
         else {
-            productDetail = yield Product.aggregate(product_detail_pipe(productID, sku));
+            productDetail = yield Product.aggregate(product_detail_pipe(productID, sku)).allowDiskUse(true);
             productDetail = productDetail[0];
             if (oTracker) {
-                productDetail["productID"] = productDetail === null || productDetail === void 0 ? void 0 : productDetail._id;
                 yield updateProductInformation(productDetail, { actionType: "views" });
             }
-            productDetail["policies"] = (_a = yield PrivacyPolicy.findOne({})) !== null && _a !== void 0 ? _a : {};
+            // productDetail["policies"] = await PrivacyPolicy.findOne({}) ?? {};
             NodeCache.saveCache(`${productID}_${sku}`, productDetail);
         }
         // Related products
@@ -138,7 +136,7 @@ module.exports.fetchTopSellingProduct = (req, res, next) => __awaiter(void 0, vo
     try {
         const seller = req.query.seller;
         let filterQuery = {
-            status: "active",
+            status: "Active",
         };
         if (seller) {
             filterQuery['SELLER'] = seller;
@@ -151,38 +149,30 @@ module.exports.fetchTopSellingProduct = (req, res, next) => __awaiter(void 0, vo
     }
 });
 module.exports.purchaseProductController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _b, _c, _d, _e, _f;
+    var _a, _b;
     try {
-        const authEmail = req.decoded.email;
-        let user = yield findUserByEmail(authEmail);
-        const { listingID, sku, quantity, productID, customerEmail } = req === null || req === void 0 ? void 0 : req.body;
-        let defaultShippingAddress = (Array.isArray((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress) &&
-            ((_c = user === null || user === void 0 ? void 0 : user.buyer) === null || _c === void 0 ? void 0 : _c.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
-        let areaType = defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type;
+        const { email, _id } = req.decoded;
+        let user = yield findUserByEmail(email);
+        const { sku, quantity, productId } = req === null || req === void 0 ? void 0 : req.body;
+        let defaultShippingAddress = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
+            ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
         let newQuantity = parseInt(quantity);
-        let product = yield Product.aggregate(single_purchase_pipe(productID, listingID, sku, newQuantity));
-        if (product && typeof product !== 'undefined') {
-            product = product[0];
-            product["customerEmail"] = customerEmail;
-            if (((_d = product === null || product === void 0 ? void 0 : product.shipping) === null || _d === void 0 ? void 0 : _d.isFree) && ((_e = product === null || product === void 0 ? void 0 : product.shipping) === null || _e === void 0 ? void 0 : _e.isFree)) {
-                product["shippingCharge"] = 0;
-            }
-            else {
-                product["shippingCharge"] = calculateShippingCost((((_f = product === null || product === void 0 ? void 0 : product.packaged) === null || _f === void 0 ? void 0 : _f.volumetricWeight) * (product === null || product === void 0 ? void 0 : product.quantity)), areaType);
-            }
-        }
+        let product = yield Product.aggregate(single_purchase_pipe(productId, sku, newQuantity));
+        const { amount, totalQuantity, shippingCost, finalAmount, savingAmount, discountShippingCost } = cartContextCalculation(product);
         return res.status(200).send({
             success: true, statusCode: 200, data: {
                 module: {
-                    product,
-                    container_p: {
-                        baseAmounts: parseInt(product === null || product === void 0 ? void 0 : product.baseAmount),
-                        totalQuantities: product === null || product === void 0 ? void 0 : product.quantity,
-                        finalAmounts: (parseInt(product === null || product === void 0 ? void 0 : product.baseAmount) + (product === null || product === void 0 ? void 0 : product.shippingCharge)),
-                        shippingFees: product === null || product === void 0 ? void 0 : product.shippingCharge,
-                        savingAmounts: product === null || product === void 0 ? void 0 : product.savingAmount
+                    cartItems: product,
+                    cartCalculation: {
+                        amount,
+                        totalQuantity,
+                        finalAmount,
+                        shippingCost,
+                        savingAmount,
+                        discountShippingCost
                     },
-                    numberOfProducts: product.length || 0
+                    numberOfProduct: product.length || 0,
+                    defaultShippingAddress
                 }
             }
         });

@@ -4,12 +4,13 @@ const apiResponse = require("../../errors/apiResponse");
 const email_service = require("../../services/email.service");
 const NodeCache = require("../../utils/NodeCache");
 const Order = require("../../model/order.model");
+const { ObjectId } = require("mongodb");
 
 
 module.exports.myOrder = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email } = req.params;
-    const { email: authEmail } = req.decoded;
+    const { email: authEmail, _id } = req.decoded;
 
     let orders: any[];
 
@@ -22,7 +23,18 @@ module.exports.myOrder = async (req: Request, res: Response, next: NextFunction)
     if (cacheMyOrder) {
       orders = cacheMyOrder;
     } else {
-      orders = await Order.find({ "customer.email": email }).sort({ _id: -1 });
+
+      orders = await Order.aggregate([
+        { $match: { customerId: ObjectId(_id) } },
+        { $unwind: { path: "$items" } },
+        { $replaceRoot: { newRoot: { $mergeObjects: ["$items", "$$ROOT"] } } },
+        {
+          $project: {
+            title: 1, itemId: 1, quantity: 1, imageUrl: 1, itemStatus: 1, sku: 1, amount: 1, attributes: 1, sellingPrice: 1, orderPlacedAt: 1,
+            orderShippedAt: 1, orderCanceledAt: 1, orderDispatchedAt: 1, isRefunded: 1
+          }
+        }
+      ]);
       NodeCache.saveCache(`${authEmail}_myOrders`, orders);
     }
 
@@ -93,3 +105,32 @@ module.exports.cancelMyOrder = async (req: Request, res: Response, next: NextFun
 };
 
 
+
+
+module.exports.orderDetails = async (req: Request, res: Response, next: NextFunction) => {
+
+  try {
+    const { email } = req?.decoded;
+
+    const { orderId, itemId } = req?.params;
+
+    if (!orderId || !itemId) throw new apiResponse.Api400Error("Required order id and item id !");
+
+    let order: any;
+
+    let orderDetailsInCache = NodeCache.getCache(`${email}_orderDetails`);
+
+    if (orderDetailsInCache) {
+      order = orderDetailsInCache;
+    } else {
+      order = await Order.findOne({ _id: ObjectId(orderId) });
+      NodeCache.saveCache(`${email}_orderDetails`, order);
+    }
+
+    if (!order) throw new apiResponse.Api404Error("Sorry order not found !");
+
+    return res.status(200).send({ success: true, statusCode: 200, order });
+  } catch (error: any) {
+    next(error);
+  }
+}

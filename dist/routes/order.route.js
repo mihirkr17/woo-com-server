@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const router = express_1.default.Router();
 const { verifyJWT, isRoleBuyer, } = require("../middlewares/auth.middleware");
-const { myOrder, removeOrder, cancelMyOrder } = require("../controllers/order/order.controller");
+const { myOrder, removeOrder, cancelMyOrder, orderDetails } = require("../controllers/order/order.controller");
 // set order controller
 const CartPurchaseOrder = require("../controllers/order/CartPurchaseOrder");
 const ConfirmOrder = require("../controllers/order/ConfirmOrder");
@@ -19,6 +19,7 @@ try {
     router.get("/my-order/:email", verifyJWT, isRoleBuyer, myOrder);
     router.delete("/remove-order/:email/:orderID", verifyJWT, isRoleBuyer, removeOrder);
     router.post("/cancel-my-order/:email", verifyJWT, isRoleBuyer, cancelMyOrder);
+    router.get("/:orderId/:itemId/details", verifyJWT, isRoleBuyer, orderDetails);
 }
 catch (error) {
     console.log(error === null || error === void 0 ? void 0 : error.message);

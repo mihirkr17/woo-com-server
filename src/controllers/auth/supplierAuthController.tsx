@@ -82,7 +82,7 @@ module.exports.supplierLoginController = async (req: Request, res: Response, nex
       if (!matchedPwd) throw new Api400Error("Password didn't matched !");
 
 
-      if (!verified || accountStatus === "inactive") {
+      if (!verified || accountStatus === "Inactive") {
 
          const verifyToken = generateVerificationToken(email);
 
@@ -131,7 +131,7 @@ module.exports.supplierLoginController = async (req: Request, res: Response, nex
 /**
  * @controller --> registration verify by token
  */
-module.exports.supplierEmailVerify = async (req: Request, res: Response, next: NextFunction) => {
+module.exports.supplierAccountVerifyByEmail = async (req: Request, res: Response, next: NextFunction) => {
    try {
       const { email } = req.decoded;
 
@@ -139,11 +139,11 @@ module.exports.supplierEmailVerify = async (req: Request, res: Response, next: N
 
       if (!supplier) throw new Api400Error(`Sorry account with ${email} not found`);
 
-      if (supplier.verified && supplier.accountStatus === "active")
+      if (supplier.verified && supplier.accountStatus === "Active")
          return res.status(200).send({ success: true, statusCode: 200, message: "Congratulation your account already verified" })
 
       supplier.verified = true;
-      supplier.accountStatus = "active";
+      supplier.accountStatus = "Active";
 
       await supplier.save();
 

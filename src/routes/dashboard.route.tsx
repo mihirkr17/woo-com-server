@@ -5,10 +5,10 @@ const dashboardCTRL = require("../controllers/dashboard/dashboardController");
 const ManageProductCTRL = require("../controllers/dashboard/ManageProduct.Controller");
 const AdminCTRL = require("../controllers/dashboard/Admin.controller");
 const ManageOrderCTRL = require("../controllers/dashboard/ManageOrdersController");
-const { variationMDL } = require("../middlewares/product.middleware");
+const { variationMDL, listingMDL } = require("../middlewares/product.middleware");
 
 const { allProductsBySupplier, fetchSingleProduct,
-  updateProductStatusController, productListingController,
+  productStatusUpdateController, productListingController,
   productVariationController, productDeleteController,
   productVariationDeleteController, productUpdateController,
   productStockUpdateController } = require("../controllers/dashboard/store.controller");
@@ -32,7 +32,7 @@ try {
 
   router.post("/verify-seller-account", verifyJWT, isRoleAdmin, AdminCTRL?.verifySellerAccountByAdmin);
 
-  router.post("/delete-seller-account-request", verifyJWT, isRoleAdmin, AdminCTRL?.deleteSellerAccountRequest);
+  router.post("/delete-supplier-account", verifyJWT, isRoleAdmin, AdminCTRL?.deleteSupplierAccount);
 
   router.post("/get-buyer-info", verifyJWT, isRoleAdmin, AdminCTRL?.getBuyerInfoByAdmin);
 
@@ -63,9 +63,9 @@ try {
   router.get("/get-one-product-in-seller-dsb", verifyJWT, isRoleSeller, ManageProductCTRL.getProductForSellerDSBController);
 
   // post controllers
-  router.post("/seller/:storeName/product/listing/:formTypes", verifyJWT, isRoleSeller, productListingController);
+  router.post("/supplier/product/new-listing", verifyJWT, isRoleSeller, listingMDL, productListingController);
 
-  router.post("/supplier/product/update-status", verifyJWT, isRoleSeller, updateProductStatusController);
+  router.post("/supplier/product/update-status", verifyJWT, isRoleSeller, productStatusUpdateController);
 
   router.post('/seller/store/product/update-product/:paramsType', verifyJWT, isRoleSeller, productUpdateController);
 

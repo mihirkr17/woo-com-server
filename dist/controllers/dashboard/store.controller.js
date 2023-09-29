@@ -19,21 +19,19 @@ const { generateListingID } = require("../../utils/generator");
 const { Api400Error, Api500Error, Api403Error, Api404Error } = require("../../errors/apiResponse");
 module.exports.allProductsBySupplier = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const authEmail = req.decoded.email;
-        const role = req.decoded.role;
+        const { _id } = req.decoded;
         let { p_search, p_category, p_status } = req === null || req === void 0 ? void 0 : req.query;
-        const user = yield Supplier.findOne({ $and: [{ email: authEmail }, { role }] });
+        const supplier = yield Supplier.findOne({ _id: ObjectId(_id) });
+        if (!supplier)
+            throw new Api403Error("Forbidden !");
         let item;
         let page;
         item = req.query.items;
         page = req.query.page;
         let products;
-        let showFor = [];
-        if (user.role === 'SUPPLIER') {
-            showFor = [
-                { "supplier.storeName": user === null || user === void 0 ? void 0 : user.storeName },
-                { "supplier.email": user === null || user === void 0 ? void 0 : user.email }
-            ];
+        let showFor = {};
+        if (supplier.role === 'SUPPLIER') {
+            showFor = { "supplier.storeId": ObjectId(_id) };
         }
         page = parseInt(page) === 1 ? 0 : parseInt(page) - 1;
         const queries = [];
@@ -51,11 +49,7 @@ module.exports.allProductsBySupplier = (req, res, next) => __awaiter(void 0, voi
             filters = { $and: queries };
         }
         products = yield Product.aggregate([
-            {
-                $match: {
-                    $and: showFor,
-                }
-            },
+            { $match: showFor },
             {
                 $addFields: {
                     totalVariation: { $cond: { if: { $isArray: "$variations" }, then: { $size: "$variations" }, else: 0 } }
@@ -68,6 +62,7 @@ module.exports.allProductsBySupplier = (req, res, next) => __awaiter(void 0, voi
                 $project: {
                     title: 1,
                     slug: 1,
+                    imageUrls: 1,
                     categories: 1,
                     variations: 1,
                     brand: 1,
@@ -80,13 +75,14 @@ module.exports.allProductsBySupplier = (req, res, next) => __awaiter(void 0, voi
                     totalVariation: 1
                 }
             },
+            { $sort: { _id: -1 } },
             {
                 $skip: page * parseInt(item)
             }, {
                 $limit: (parseInt(item))
             }
         ]);
-        const totalCount = yield Product.countDocuments({ $and: showFor });
+        const totalCount = yield Product.countDocuments(showFor);
         return res.status(200).send({
             success: true,
             statusCode: 200,
@@ -107,8 +103,9 @@ module.exports.fetchSingleProduct = (req, res, next) => __awaiter(void 0, void 0
         next(error);
     }
 });
-module.exports.updateProductStatusController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.productStatusUpdateController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        const { _id } = req === null || req === void 0 ? void 0 : req.decoded;
         const status = ["Active", "Draft"];
         const { productId, statusValue } = req === null || req === void 0 ? void 0 : req.body;
         if (!productId)
@@ -117,7 +114,9 @@ module.exports.updateProductStatusController = (req, res, next) => __awaiter(voi
             throw new Api400Error("Invalid product id !");
         if (!status.includes(statusValue))
             throw new Api400Error("Invalid status action !");
-        yield Product.findOneAndUpdate({ _id: ObjectId(productId) }, { status: statusValue });
+        const result = yield Product.findOneAndUpdate({ $and: [{ _id: ObjectId(productId) }, { "supplier.storeId": ObjectId(_id) }] }, { status: statusValue });
+        if (!result)
+            throw new Api400Error("Operation failed !");
         return res.status(200).send({ success: true, statusCode: 200, message: `Status updated to "${statusValue}"` });
     }
     catch (error) {
@@ -127,40 +126,21 @@ module.exports.updateProductStatusController = (req, res, next) => __awaiter(voi
 // Product listing
 module.exports.productListingController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const authEmail = req.decoded.email;
-        const { formTypes } = req.params;
+        const { email } = req.decoded;
         const body = req.body;
-        let model;
-        const supplier = yield Supplier.findOne({ $and: [{ email: authEmail }, { role: 'SUPPLIER' }] });
+        const supplier = yield Supplier.findOne({ email });
         if (!supplier)
             throw new Api403Error("Forbidden !");
-        if (formTypes === 'create') {
-            if (!(body === null || body === void 0 ? void 0 : body.variation)) {
-                throw new Api400Error("Required variation !");
-            }
-            model = product_listing_template_engine(body, { storeName: supplier === null || supplier === void 0 ? void 0 : supplier.storeName, storeId: supplier === null || supplier === void 0 ? void 0 : supplier._id });
-            model["rating"] = [
-                { weight: 5, count: 0 },
-                { weight: 4, count: 0 },
-                { weight: 3, count: 0 },
-                { weight: 2, count: 0 },
-                { weight: 1, count: 0 },
-            ];
-            model["ratingAverage"] = 0;
-            model['status'] = 'Queue';
-            model["createdAt"] = new Date();
-            model["_lid"] = generateListingID();
-            model["isVerified"] = false;
-            let product = new Product(model);
-            let results = yield product.save();
-            if (results) {
-                return res.status(200).send({
-                    success: true,
-                    statusCode: 200,
-                    message: "Product created successfully. It will take upto 24 hours to on live.",
-                });
-            }
-        }
+        const model = product_listing_template_engine(body, supplier === null || supplier === void 0 ? void 0 : supplier._id);
+        let product = new Product(model);
+        let result = yield product.save();
+        if (!result)
+            throw new Api500Error("Internal server error !");
+        return res.status(200).send({
+            success: true,
+            statusCode: 200,
+            message: "Product created successfully. It will take upto 24 hours to on live.",
+        });
     }
     catch (error) {
         next(error);
@@ -170,17 +150,18 @@ module.exports.productListingController = (req, res, next) => __awaiter(void 0, 
 module.exports.productVariationController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         let result;
+        const { _id } = req === null || req === void 0 ? void 0 : req.decoded;
         const { productId, variation, formType } = req.body;
         if (!ObjectId.isValid(productId))
             throw new Api400Error("Invalid product id !");
-        let model = product_variation_template_engine(variation);
+        const model = product_variation_template_engine(variation);
         // Update variation
         if (formType === 'update-variation') {
-            result = yield Product.findOneAndUpdate({ _id: ObjectId(productId) }, { $set: { 'variations.$[i]': model } }, { arrayFilters: [{ "i.sku": variation === null || variation === void 0 ? void 0 : variation.sku }] });
+            result = yield Product.findOneAndUpdate({ $and: [{ _id: ObjectId(productId) }, { "supplier.storeId": ObjectId(_id) }] }, { $set: { 'variations.$[i]': model } }, { arrayFilters: [{ "i.sku": variation === null || variation === void 0 ? void 0 : variation.sku }] });
         }
         // create new variation
         if (formType === 'new-variation') {
-            result = yield Product.findOneAndUpdate({ _id: ObjectId(productId) }, { $push: { variations: model } }, { upsert: true });
+            result = yield Product.findOneAndUpdate({ $and: [{ _id: ObjectId(productId) }, { "supplier.storeId": ObjectId(_id) }] }, { $push: { variations: model } }, { upsert: true });
         }
         if (result)
             return res.status(200).send({
@@ -225,13 +206,12 @@ module.exports.productDeleteController = (req, res, next) => __awaiter(void 0, v
 // delete product variation controller
 module.exports.productVariationDeleteController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { productId, productSku, storeName } = req.params;
+        const { productId, productSku } = req.params;
         const { _id } = req === null || req === void 0 ? void 0 : req.decoded;
         const product = yield Product.findOne({
             $and: [
                 { _id: ObjectId(productId) },
-                { "supplier.storeId": ObjectId(_id) },
-                { "supplier.storeName": storeName }
+                { "supplier.storeId": ObjectId(_id) }
             ]
         });
         if (!product)

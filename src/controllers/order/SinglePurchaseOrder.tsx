@@ -2,163 +2,71 @@ import { NextFunction, Request, Response } from "express";
 const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
 const apiResponse = require("../../errors/apiResponse");
-const { findUserByEmail, update_variation_stock_available } = require("../../services/common.service");
-const { calculateShippingCost } = require("../../utils/common");
+const { findUserByEmail, createPaymentIntents } = require("../../services/common.service");
 const email_service = require("../../services/email.service");
 const { buyer_order_email_template, seller_order_email_template } = require("../../templates/email.template");
-const { generateItemID, generateOrderID } = require("../../utils/generator");
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-const OrderTableModel = require("../../model/orderTable.model");
 const Order = require("../../model/order.model");
-
-
+const { cartContextCalculation } = require("../../utils/common");
+const { single_purchase_pipe } = require("../../utils/pipelines");
 
 module.exports = async function SinglePurchaseOrder(req: Request, res: Response, next: NextFunction) {
    try {
 
-      const { email, _uuid } = req.decoded;
+      const { email, _id } = req.decoded;
       const timestamp: any = Date.now();
 
       if (!req.body) throw new apiResponse.Api503Error("Service unavailable !");
 
-      const { sku, productID, quantity, listingID, state, customerEmail } = req.body;
+      const { sku, productId, quantity, session, paymentMethodId } = req.body;
 
-      if (!sku || !productID || !quantity || !listingID || !state || !customerEmail)
-         throw new apiResponse.Api400Error("Required sku, productID, quantity, listingID, state, customerEmail");
+      if (!sku || !productId || !quantity || !paymentMethodId)
+         throw new apiResponse.Api400Error("Required sku, product id, quantity, paymentMethodId");
 
       const user = await findUserByEmail(email);
 
       if (!user) throw new apiResponse.Api503Error("Service unavailable !")
 
-      const defaultShippingAddress = (Array.isArray(user?.buyer?.shippingAddress) &&
-         user?.buyer?.shippingAddress.filter((adr: any) => adr?.default_shipping_address === true)[0]);
+      const defaultAddress = user?.shippingAddress?.find((adr: any) => adr?.default_shipping_address === true);
 
-      const areaType = defaultShippingAddress?.area_type;
+      let item = await Product.aggregate(single_purchase_pipe(productId, sku, quantity));
 
-      let product = await Product.aggregate([
-         { $match: { $and: [{ _lid: listingID }, { _id: ObjectId(productID) }] } },
-         { $unwind: { path: "$variations" } },
-         { $match: { $and: [{ 'variations.sku': sku }] } },
-         {
-            $project: {
-               _id: 0,
-               variations: 1,
-
-               supplier: 1,
-               shipping: 1,
-               packaged: 1,
-               product: {
-                  title: 1,
-                  slug: "$slug",
-                  brand: "$brand",
-                  sku: "$variations.sku",
-                  listing_id: "$items.listingID",
-                  product_id: "$items.productID",
-                  assets: {
-                     $ifNull: [
-                        { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.brandColor"] }] },
-                        null
-                     ]
-                  },
-                  sellingPrice: "$variations.pricing.sellingPrice",
-                  base_amount: { $multiply: ["$variations.pricing.sellingPrice", parseInt(quantity)] },
-               },
-            }
-         },
-         {
-            $set: {
-               "product.product_id": productID,
-               "product.listing_id": listingID,
-               quantity: quantity
-            }
-         },
-         {
-            $unset: ["variations"]
-         }
-      ]);
-
-      if (typeof product === 'undefined' || !Array.isArray(product))
+      if (typeof item === 'undefined' || !Array.isArray(item))
          throw new apiResponse.Api503Error("Service unavailable !");
 
-      product = product[0];
+      const { finalAmount } = cartContextCalculation(item);
 
-      const productInfos: any[] = [];
+      let order = new Order({
+         state: "buy",
+         customerId: _id,
+         shippingAddress: defaultAddress,
+         orderStatus: "placed",
+         orderPlacedAt: new Date(timestamp),
+         paymentMode: "card",
+         paymentStatus: "pending",
+         items: item,
+         totalAmount: finalAmount
+      });
 
-      product["shipping_charge"] = product?.shipping?.isFree ? 0 : calculateShippingCost((product?.packaged?.volumetricWeight * product?.quantity), areaType);
-      product["final_amount"] = parseInt(product?.product?.base_amount + product?.shipping_charge);
-      product["order_id"] = generateOrderID(product?.supplier?.email);
+      const result = await order.save();
 
-      product["payment"] = {
-         status: "pending",
-         mode: "card"
-      };
+      const intent = await createPaymentIntents(finalAmount, result?._id.toString(), paymentMethodId, session, req?.ip, req.get("user-agent"));
 
-      product["order_placed_at"] = {
-         iso: new Date(timestamp),
-         time: new Date(timestamp).toLocaleTimeString(),
-         date: new Date(timestamp).toDateString(),
-         timestamp: timestamp
-      };
-
-      product["state"] = state;
-
-      product["customer"] = {
-         id: _uuid,
-         email,
-         shipping_address: defaultShippingAddress
+      // if payment success then change order payment status and save
+      if (intent?.id) {
+         order.paymentIntentId = intent?.id;
+         order.paymentStatus = "paid";
+         await order.save();
       }
 
-      product["order_status"] = "placed";
 
-      productInfos.push({
-         productID: product?.product?.product_id,
-         listingID: product?.product?.listing_id,
-         sku: product?.product?.sku,
-         quantity: product?.quantity
-      })
-
-      const totalAmount: number = product.final_amount || 0;
-
-      // creating payment intents here
-      const { client_secret, metadata, id } = await stripe.paymentIntents.create({
-         amount: (totalAmount * 100),
-         currency: 'bdt',
-         payment_method_types: ['card'],
-         metadata: {
-            order_id: product?.order_id
-         }
-      });
-
-
-      if (!client_secret) throw new apiResponse.Api400Error("Payment intent creation failed !");
-
-      const orderTable = new Order(product);
-
-      const result = await orderTable.save();
-
-      await email_service({
-         to: product?.supplier?.email,
-         subject: "New order confirmed",
-         html: seller_order_email_template([product], email, [result?.orderID], totalAmount)
-      });
-
-      // after calculating total amount and order succeed then email sent to the buyer
-      await email_service({
-         to: email,
-         subject: "Order confirmed",
-         html: buyer_order_email_template(product, totalAmount)
-      });
-
+      // after success return the response to the client
       return res.status(200).send({
          success: true,
          statusCode: 200,
-         message: "Order confirming soon..",
-         totalAmount,
-         clientSecret: client_secret,
-         orderPaymentID: metadata?.order_id,
-         paymentIntentID: id,
-         orderIDs: [product?.order_id],
-         productInfos
+         status: intent?.status,
+         paymentIntentId: intent?.id,
+         clientSecret: intent?.client_secret,
+         message: "Payment succeed and order has been placed."
       });
    } catch (error: any) {
       next(error)

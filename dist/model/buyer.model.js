@@ -100,5 +100,5 @@ UserSchema.methods.comparePassword = function (clientPassword) {
         }
     });
 };
-module.exports = model("User", UserSchema, "users");
-;
+var User = model("User", UserSchema, "users");
+module.exports = User;

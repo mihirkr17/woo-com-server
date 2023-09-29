@@ -10,8 +10,8 @@ const dashboardCTRL = require("../controllers/dashboard/dashboardController");
 const ManageProductCTRL = require("../controllers/dashboard/ManageProduct.Controller");
 const AdminCTRL = require("../controllers/dashboard/Admin.controller");
 const ManageOrderCTRL = require("../controllers/dashboard/ManageOrdersController");
-const { variationMDL } = require("../middlewares/product.middleware");
-const { allProductsBySupplier, fetchSingleProduct, updateProductStatusController, productListingController, productVariationController, productDeleteController, productVariationDeleteController, productUpdateController, productStockUpdateController } = require("../controllers/dashboard/store.controller");
+const { variationMDL, listingMDL } = require("../middlewares/product.middleware");
+const { allProductsBySupplier, fetchSingleProduct, productStatusUpdateController, productListingController, productVariationController, productDeleteController, productVariationDeleteController, productUpdateController, productStockUpdateController } = require("../controllers/dashboard/store.controller");
 try {
     router.get("/overview", verifyJWT, isPermitForDashboard, dashboardCTRL === null || dashboardCTRL === void 0 ? void 0 : dashboardCTRL.dashboardOverview);
     router.put("/seller/:storeName/product-control", verifyJWT, isRoleSeller, ManageProductCTRL === null || ManageProductCTRL === void 0 ? void 0 : ManageProductCTRL.productControlController);
@@ -19,7 +19,7 @@ try {
     router.put("/admin/take-this-product", verifyJWT, isRoleAdmin, AdminCTRL === null || AdminCTRL === void 0 ? void 0 : AdminCTRL.takeThisProductByAdminController);
     router.post("/store/:storeName/order/order-status-management", verifyJWT, isRoleSeller, ManageOrderCTRL.orderStatusManagement);
     router.post("/verify-seller-account", verifyJWT, isRoleAdmin, AdminCTRL === null || AdminCTRL === void 0 ? void 0 : AdminCTRL.verifySellerAccountByAdmin);
-    router.post("/delete-seller-account-request", verifyJWT, isRoleAdmin, AdminCTRL === null || AdminCTRL === void 0 ? void 0 : AdminCTRL.deleteSellerAccountRequest);
+    router.post("/delete-supplier-account", verifyJWT, isRoleAdmin, AdminCTRL === null || AdminCTRL === void 0 ? void 0 : AdminCTRL.deleteSupplierAccount);
     router.post("/get-buyer-info", verifyJWT, isRoleAdmin, AdminCTRL === null || AdminCTRL === void 0 ? void 0 : AdminCTRL.getBuyerInfoByAdmin);
     // get controllers
     router.get("/view-products", verifyJWT, isPermitForDashboard, allProductsBySupplier);
@@ -37,8 +37,8 @@ try {
   */
     router.get("/get-one-product-in-seller-dsb", verifyJWT, isRoleSeller, ManageProductCTRL.getProductForSellerDSBController);
     // post controllers
-    router.post("/seller/:storeName/product/listing/:formTypes", verifyJWT, isRoleSeller, productListingController);
-    router.post("/supplier/product/update-status", verifyJWT, isRoleSeller, updateProductStatusController);
+    router.post("/supplier/product/new-listing", verifyJWT, isRoleSeller, listingMDL, productListingController);
+    router.post("/supplier/product/update-status", verifyJWT, isRoleSeller, productStatusUpdateController);
     router.post('/seller/store/product/update-product/:paramsType', verifyJWT, isRoleSeller, productUpdateController);
     // Put routes
     router.put("/supplier/product/product-variation", verifyJWT, isRoleSeller, variationMDL, productVariationController);

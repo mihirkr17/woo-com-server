@@ -12,136 +12,58 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const Product = require("../../model/product.model");
 const { ObjectId } = require("mongodb");
 const apiResponse = require("../../errors/apiResponse");
-const { findUserByEmail, update_variation_stock_available } = require("../../services/common.service");
-const { calculateShippingCost } = require("../../utils/common");
+const { findUserByEmail, createPaymentIntents } = require("../../services/common.service");
 const email_service = require("../../services/email.service");
 const { buyer_order_email_template, seller_order_email_template } = require("../../templates/email.template");
-const { generateItemID, generateOrderID } = require("../../utils/generator");
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-const OrderTableModel = require("../../model/orderTable.model");
 const Order = require("../../model/order.model");
+const { cartContextCalculation } = require("../../utils/common");
+const { single_purchase_pipe } = require("../../utils/pipelines");
 module.exports = function SinglePurchaseOrder(req, res, next) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+    var _a;
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { email, _uuid } = req.decoded;
+            const { email, _id } = req.decoded;
             const timestamp = Date.now();
             if (!req.body)
                 throw new apiResponse.Api503Error("Service unavailable !");
-            const { sku, productID, quantity, listingID, state, customerEmail } = req.body;
-            if (!sku || !productID || !quantity || !listingID || !state || !customerEmail)
-                throw new apiResponse.Api400Error("Required sku, productID, quantity, listingID, state, customerEmail");
+            const { sku, productId, quantity, session, paymentMethodId } = req.body;
+            if (!sku || !productId || !quantity || !paymentMethodId)
+                throw new apiResponse.Api400Error("Required sku, product id, quantity, paymentMethodId");
             const user = yield findUserByEmail(email);
             if (!user)
                 throw new apiResponse.Api503Error("Service unavailable !");
-            const defaultShippingAddress = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
-                ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.filter((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true)[0]));
-            const areaType = defaultShippingAddress === null || defaultShippingAddress === void 0 ? void 0 : defaultShippingAddress.area_type;
-            let product = yield Product.aggregate([
-                { $match: { $and: [{ _lid: listingID }, { _id: ObjectId(productID) }] } },
-                { $unwind: { path: "$variations" } },
-                { $match: { $and: [{ 'variations.sku': sku }] } },
-                {
-                    $project: {
-                        _id: 0,
-                        variations: 1,
-                        supplier: 1,
-                        shipping: 1,
-                        packaged: 1,
-                        product: {
-                            title: 1,
-                            slug: "$slug",
-                            brand: "$brand",
-                            sku: "$variations.sku",
-                            listing_id: "$items.listingID",
-                            product_id: "$items.productID",
-                            assets: {
-                                $ifNull: [
-                                    { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.brandColor"] }] },
-                                    null
-                                ]
-                            },
-                            sellingPrice: "$variations.pricing.sellingPrice",
-                            base_amount: { $multiply: ["$variations.pricing.sellingPrice", parseInt(quantity)] },
-                        },
-                    }
-                },
-                {
-                    $set: {
-                        "product.product_id": productID,
-                        "product.listing_id": listingID,
-                        quantity: quantity
-                    }
-                },
-                {
-                    $unset: ["variations"]
-                }
-            ]);
-            if (typeof product === 'undefined' || !Array.isArray(product))
+            const defaultAddress = (_a = user === null || user === void 0 ? void 0 : user.shippingAddress) === null || _a === void 0 ? void 0 : _a.find((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true);
+            let item = yield Product.aggregate(single_purchase_pipe(productId, sku, quantity));
+            if (typeof item === 'undefined' || !Array.isArray(item))
                 throw new apiResponse.Api503Error("Service unavailable !");
-            product = product[0];
-            const productInfos = [];
-            product["shipping_charge"] = ((_c = product === null || product === void 0 ? void 0 : product.shipping) === null || _c === void 0 ? void 0 : _c.isFree) ? 0 : calculateShippingCost((((_d = product === null || product === void 0 ? void 0 : product.packaged) === null || _d === void 0 ? void 0 : _d.volumetricWeight) * (product === null || product === void 0 ? void 0 : product.quantity)), areaType);
-            product["final_amount"] = parseInt(((_e = product === null || product === void 0 ? void 0 : product.product) === null || _e === void 0 ? void 0 : _e.base_amount) + (product === null || product === void 0 ? void 0 : product.shipping_charge));
-            product["order_id"] = generateOrderID((_f = product === null || product === void 0 ? void 0 : product.supplier) === null || _f === void 0 ? void 0 : _f.email);
-            product["payment"] = {
-                status: "pending",
-                mode: "card"
-            };
-            product["order_placed_at"] = {
-                iso: new Date(timestamp),
-                time: new Date(timestamp).toLocaleTimeString(),
-                date: new Date(timestamp).toDateString(),
-                timestamp: timestamp
-            };
-            product["state"] = state;
-            product["customer"] = {
-                id: _uuid,
-                email,
-                shipping_address: defaultShippingAddress
-            };
-            product["order_status"] = "placed";
-            productInfos.push({
-                productID: (_g = product === null || product === void 0 ? void 0 : product.product) === null || _g === void 0 ? void 0 : _g.product_id,
-                listingID: (_h = product === null || product === void 0 ? void 0 : product.product) === null || _h === void 0 ? void 0 : _h.listing_id,
-                sku: (_j = product === null || product === void 0 ? void 0 : product.product) === null || _j === void 0 ? void 0 : _j.sku,
-                quantity: product === null || product === void 0 ? void 0 : product.quantity
+            const { finalAmount } = cartContextCalculation(item);
+            let order = new Order({
+                state: "buy",
+                customerId: _id,
+                shippingAddress: defaultAddress,
+                orderStatus: "placed",
+                orderPlacedAt: new Date(timestamp),
+                paymentMode: "card",
+                paymentStatus: "pending",
+                items: item,
+                totalAmount: finalAmount
             });
-            const totalAmount = product.final_amount || 0;
-            // creating payment intents here
-            const { client_secret, metadata, id } = yield stripe.paymentIntents.create({
-                amount: (totalAmount * 100),
-                currency: 'bdt',
-                payment_method_types: ['card'],
-                metadata: {
-                    order_id: product === null || product === void 0 ? void 0 : product.order_id
-                }
-            });
-            if (!client_secret)
-                throw new apiResponse.Api400Error("Payment intent creation failed !");
-            const orderTable = new Order(product);
-            const result = yield orderTable.save();
-            yield email_service({
-                to: (_k = product === null || product === void 0 ? void 0 : product.supplier) === null || _k === void 0 ? void 0 : _k.email,
-                subject: "New order confirmed",
-                html: seller_order_email_template([product], email, [result === null || result === void 0 ? void 0 : result.orderID], totalAmount)
-            });
-            // after calculating total amount and order succeed then email sent to the buyer
-            yield email_service({
-                to: email,
-                subject: "Order confirmed",
-                html: buyer_order_email_template(product, totalAmount)
-            });
+            const result = yield order.save();
+            const intent = yield createPaymentIntents(finalAmount, result === null || result === void 0 ? void 0 : result._id.toString(), paymentMethodId, session, req === null || req === void 0 ? void 0 : req.ip, req.get("user-agent"));
+            // if payment success then change order payment status and save
+            if (intent === null || intent === void 0 ? void 0 : intent.id) {
+                order.paymentIntentId = intent === null || intent === void 0 ? void 0 : intent.id;
+                order.paymentStatus = "paid";
+                yield order.save();
+            }
+            // after success return the response to the client
             return res.status(200).send({
                 success: true,
                 statusCode: 200,
-                message: "Order confirming soon..",
-                totalAmount,
-                clientSecret: client_secret,
-                orderPaymentID: metadata === null || metadata === void 0 ? void 0 : metadata.order_id,
-                paymentIntentID: id,
-                orderIDs: [product === null || product === void 0 ? void 0 : product.order_id],
-                productInfos
+                status: intent === null || intent === void 0 ? void 0 : intent.status,
+                paymentIntentId: intent === null || intent === void 0 ? void 0 : intent.id,
+                clientSecret: intent === null || intent === void 0 ? void 0 : intent.client_secret,
+                message: "Payment succeed and order has been placed."
             });
         }
         catch (error) {

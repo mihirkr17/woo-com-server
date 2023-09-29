@@ -139,7 +139,7 @@ async function verifyEmailByJWT(req: Request, res: Response, next: NextFunction)
     });
 
   } catch (error: any) {
-    throw error;
+    next(error);
   }
 }
 

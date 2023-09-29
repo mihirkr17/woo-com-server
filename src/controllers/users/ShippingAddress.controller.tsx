@@ -133,7 +133,7 @@ module.exports.selectShippingAddress = async (req: Request, res: Response, next:
          throw new apiResponse.Api404Error('User not found !');
       }
 
-      const shippingAddress = user?.buyer?.shippingAddress || [];
+      const shippingAddress = user?.shippingAddress || [];
 
       if (shippingAddress && shippingAddress.length > 0) {
 
@@ -141,8 +141,8 @@ module.exports.selectShippingAddress = async (req: Request, res: Response, next:
             { email: authEmail },
             {
                $set: {
-                  "buyer.shippingAddress.$[j].default_shipping_address": false,
-                  "buyer.shippingAddress.$[i].default_shipping_address": default_shipping_address,
+                  "shippingAddress.$[j].default_shipping_address": false,
+                  "shippingAddress.$[i].default_shipping_address": default_shipping_address,
                },
             },
             {

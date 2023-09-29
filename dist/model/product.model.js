@@ -2,11 +2,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = require("mongoose");
 var ProductSchema = new mongoose_1.Schema({
-    _lid: { type: String, required: true },
     title: { type: String, required: true },
     slug: { type: String, required: true },
     categories: { type: Array, required: true },
     brand: { type: String, required: true },
+    imageUrls: { type: Array, required: true },
     manufacturer: {
         origin: { type: String, required: true },
         details: { type: String, required: true }
@@ -14,7 +14,6 @@ var ProductSchema = new mongoose_1.Schema({
     packaged: { type: Object, required: true },
     shipping: {
         fulfilledBy: { type: String, required: true },
-        procurementType: { type: String, required: true },
         procurementSLA: { type: String, required: true },
         isFree: { type: Boolean }
     },
@@ -25,11 +24,16 @@ var ProductSchema = new mongoose_1.Schema({
     highlights: { type: Array, required: false },
     specification: { type: Object, required: true },
     description: { type: String, required: true },
-    variations: { type: Array, required: true },
-    supplier: {
-        storeId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Supplier' },
-        storeName: { type: String, required: true }
-    },
+    variations: [
+        {
+            sku: String,
+            attributes: Object,
+            available: Number,
+            stock: String,
+            pricing: Object
+        }
+    ],
+    supplierId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Supplier' },
     warranty: {
         type: { type: String, required: false },
         duration: { type: String, required: false },
@@ -42,11 +46,8 @@ var ProductSchema = new mongoose_1.Schema({
     createdAt: { type: Date, required: true },
     modifiedAt: { type: Date, required: false },
     isVerified: { type: Boolean, required: false },
-    verifyStatus: {
-        verifiedBy: { type: String, required: false },
-        email: { type: String, required: false },
-        verifiedAt: { type: Date, required: false }
-    }
+    verifiedBy: { type: String },
+    verifiedAt: { type: Date, required: false }
 });
 const Product = (0, mongoose_1.model)('Product', ProductSchema, 'products');
 module.exports = Product;

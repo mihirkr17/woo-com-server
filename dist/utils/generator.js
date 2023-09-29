@@ -22,6 +22,7 @@ module.exports.generateSixDigitNumber = () => {
 };
 module.exports.generateJwtToken = (userInfo) => {
     const token = jwt.sign({
+        _id: userInfo === null || userInfo === void 0 ? void 0 : userInfo._id,
         fullName: userInfo === null || userInfo === void 0 ? void 0 : userInfo.fullName,
         _uuid: userInfo === null || userInfo === void 0 ? void 0 : userInfo._uuid,
         email: userInfo === null || userInfo === void 0 ? void 0 : userInfo.email,
@@ -47,10 +48,8 @@ module.exports.generateUserDataToken = (user) => {
     });
     return token;
 };
-module.exports.generateVerificationToken = (email) => {
-    const token = jwt.sign({
-        email
-    }, process.env.ACCESS_TOKEN, {
+module.exports.generateVerificationToken = (obj) => {
+    const token = jwt.sign(obj, process.env.ACCESS_TOKEN, {
         algorithm: "HS256",
         expiresIn: "1h",
     });

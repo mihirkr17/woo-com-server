@@ -70,7 +70,7 @@ module.exports.supplierLoginController = (req, res, next) => __awaiter(void 0, v
         const matchedPwd = yield supplier.comparePassword(cPwd); //bcrypt.compare(cPwd, password);
         if (!matchedPwd)
             throw new Api400Error("Password didn't matched !");
-        if (!verified || accountStatus === "inactive") {
+        if (!verified || accountStatus === "Inactive") {
             const verifyToken = generateVerificationToken(email);
             const info = yield email_service({
                 to: email,
@@ -110,16 +110,16 @@ module.exports.supplierLoginController = (req, res, next) => __awaiter(void 0, v
 /**
  * @controller --> registration verify by token
  */
-module.exports.supplierEmailVerify = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.supplierAccountVerifyByEmail = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { email } = req.decoded;
         let supplier = yield Supplier.findOne({ email });
         if (!supplier)
             throw new Api400Error(`Sorry account with ${email} not found`);
-        if (supplier.verified && supplier.accountStatus === "active")
+        if (supplier.verified && supplier.accountStatus === "Active")
             return res.status(200).send({ success: true, statusCode: 200, message: "Congratulation your account already verified" });
         supplier.verified = true;
-        supplier.accountStatus = "active";
+        supplier.accountStatus = "Active";
         yield supplier.save();
         return res.status(200).send({ success: true, statusCode: 200, message: `Congrats! Account with ${email} verification complete.`, returnEmail: email });
     }

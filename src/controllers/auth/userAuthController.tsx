@@ -6,16 +6,16 @@ const apiResponse = require("../../errors/apiResponse");
 const bcrypt = require("bcrypt");
 const email_service = require("../../services/email.service");
 const { verify_email_html_template } = require("../../templates/email.template");
-const { generateUUID, generateExpireTime, generateSixDigitNumber, generateJwtToken, generateUserDataToken } = require("../../utils/generator");
+const { generateExpireTime, generateSixDigitNumber, generateJwtToken, generateUserDataToken,
+   generateVerificationToken } = require("../../utils/generator");
 const { validEmail, validPassword } = require("../../utils/validator");
-const Supplier = require("../../model/supplier.model");
 
 /**
  * @apiController --> Buyer Registration Controller
  * @apiMethod --> POST
  * @apiRequired --> BODY
  */
-module.exports.buyerRegistrationController = async (req: Request, res: Response, next: NextFunction) => {
+module.exports.userRegistrationController = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
       let body = req.body;
@@ -25,37 +25,21 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
       if (existUser >= 1)
          throw new apiResponse.Api400Error("User already exists, Please try another phone number or email address !");
 
-      body['_uuid'] = "b" + generateUUID();
-      body['verificationCode'] = generateSixDigitNumber();
-      body['verificationExpiredAt'] = generateExpireTime();
-      body["buyer"] = {};
-      body["dob"] = "";
-      body["password"] = await bcrypt.hash(body?.password, 10);
-      body["accountStatus"] = "inactive";
-      body["hasPassword"] = true;
-      body["contactEmail"] = body?.email;
-      body["idFor"] = "buy";
-      body["role"] = "BUYER";
       body["authProvider"] = "system";
+      const verifyToken = generateVerificationToken(body);
 
-      const [userResult, emailResult] = await Promise.all([
-         new User(body).save(),
-
-         email_service({
-            to: body?.email,
-            subject: "Verify email address",
-            html: verify_email_html_template(body?.verificationCode)
-         })
-      ])
+      const emailResult = await email_service({
+         to: body?.email,
+         subject: "Verify email address",
+         html: verify_email_html_template(verifyToken)
+      })
 
       if (!emailResult?.response) throw new apiResponse.Api400Error("Verification code not send to your email !");
 
       return res.status(200).send({
          success: true,
          statusCode: 200,
-         returnEmail: userResult?.email,
-         verificationExpiredAt: userResult?.verificationExpiredAt,
-         message: `Thanks for your information. Verification code was send to ${userResult?.email}`,
+         message: `Thanks for your information. Verification code was send to ${body?.email}`,
       });
 
    } catch (error: any) {
@@ -63,9 +47,93 @@ module.exports.buyerRegistrationController = async (req: Request, res: Response,
    }
 };
 
+/**
+ * @apiController --> All User Login Controller
+ * @apiMethod --> POST
+ * @apiRequired --> BODY
+ */
+module.exports.userLoginController = async (req: Request, res: Response, next: NextFunction) => {
+   try {
+
+      const { emailOrPhone, cPwd } = req.body;
+
+      let user = await User.findOne({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] }, { createdAt: 0, __v: 0 });
+
+      if (!user) throw new apiResponse.Api400Error(`User with ${emailOrPhone} not found!`);
+
+      const { email, verified, accountStatus } = user || {};
+
+      const matchedPwd = await user.comparePassword(cPwd);
+
+      if (!matchedPwd) throw new apiResponse.Api400Error("Password didn't matched !");
+
+      if (!verified || accountStatus === "Inactive") {
+         const verifyToken = generateVerificationToken(email);
+
+         const info = await email_service({
+            to: email,
+            subject: "Verify email address",
+            html: verify_email_html_template(verifyToken)
+         });
+
+         if (!info?.response) throw new apiResponse.Api500Error("Internal error !");
+
+         return res.status(200).send({
+            success: true,
+            statusCode: 200,
+            returnEmail: email,
+            message: `Verification code was sent to ${email}. Please verify your account.`,
+         });
+      }
+
+      const loginToken = generateJwtToken(user);
+      const userDataToken = generateUserDataToken(user);
+
+      if (!loginToken || !userDataToken) throw new apiResponse.Api400Error("Login failed due to internal issue !");
+
+      // if all operation success then return the response
+      return res.status(200).send({
+         success: true,
+         statusCode: 200,
+         name: "Login",
+         message: "Login success",
+         uuid: user?._uuid,
+         u_data: userDataToken,
+         token: loginToken,
+         role: user?.role
+      });
+
+   } catch (error: any) {
+      next(error);
+   }
+};
+
+module.exports.userAccountVerifyByEmail = async (req: Request, res: Response, next: NextFunction) => {
+   try {
+      const { email } = req.decoded;
+
+      let user = await User.findOne({ email });
+
+      if (!user) throw new Api400Error(`Sorry account with ${email} not found`);
+
+      if (user.verified && user.accountStatus === "Active")
+         return res.status(200).send({ success: true, statusCode: 200, message: "Congratulation your account already verified" })
+
+      user.verified = true;
+      user.accountStatus = "Active";
+
+      await user.save();
+
+      return res.status(200).send({ success: true, statusCode: 200, message: `Congrats! Account with ${email} verification complete.`, returnEmail: email });
+
+   } catch (error) {
+      next(error);
+   }
+}
 
 
-module.exports.generateNewVerificationCode = async (req: Request, res: Response, next: NextFunction) => {
+
+module.exports.generateNewVerifyToken = async (req: Request, res: Response, next: NextFunction) => {
    try {
       const { email } = req.query;
 
@@ -77,7 +145,7 @@ module.exports.generateNewVerificationCode = async (req: Request, res: Response,
 
       if (!user) throw new apiResponse.Api400Error("Sorry user not found !");
 
-      if (user?.verificationCode || user?.accountStatus === "inactive") {
+      if (user?.verificationCode || user?.accountStatus === "Inactive") {
 
          user.verificationCode = generateSixDigitNumber();
          user.verificationExpiredAt = generateExpireTime();
@@ -133,7 +201,7 @@ module.exports.userEmailVerificationController = async (req: Request, res: Respo
 
       user.verificationCode = undefined;
       user.verificationExpiredAt = undefined;
-      user.accountStatus = "active";
+      user.accountStatus = "Active";
 
       const result = await user.save();
 
@@ -145,71 +213,7 @@ module.exports.userEmailVerificationController = async (req: Request, res: Respo
 }
 
 
-/**
- * @apiController --> All User Login Controller
- * @apiMethod --> POST
- * @apiRequired --> BODY
- */
-module.exports.loginController = async (req: Request, res: Response, next: NextFunction) => {
-   try {
 
-      const { emailOrPhone, cPwd } = req.body;
-
-      let user = await User.findOne({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] }, { createdAt: 0, __v: 0 });
-
-      if (!user) throw new apiResponse.Api400Error(`User with ${emailOrPhone} not found!`);
-
-      const { email, verificationCode, accountStatus, password } = user || {};
-
-      const matchedPwd = await bcrypt.compare(cPwd, password);
-
-      if (!matchedPwd) throw new apiResponse.Api400Error("Password didn't matched !");
-
-      if (verificationCode || accountStatus === "inactive") {
-
-         user.verificationCode = generateSixDigitNumber();
-         user.verificationExpiredAt = generateExpireTime();
-
-         let updateUser = await user.save();
-
-         const info = await email_service({
-            to: email,
-            subject: "Verify email address",
-            html: verify_email_html_template(updateUser?.verificationCode)
-         });
-
-         if (!info?.response) throw new apiResponse.Api500Error("Internal error !");
-
-         return res.status(200).send({
-            success: true,
-            statusCode: 200,
-            returnEmail: updateUser?.email,
-            verificationExpiredAt: updateUser?.verificationExpiredAt,
-            message: `Verification code was sent to ${updateUser?.email}. Please verify your account.`,
-         });
-      }
-
-      const loginToken = generateJwtToken(user);
-      const userDataToken = generateUserDataToken(user);
-
-      if (!loginToken || !userDataToken) throw new apiResponse.Api400Error("Login failed due to internal issue !");
-
-      // if all operation success then return the response
-      return res.status(200).send({
-         success: true,
-         statusCode: 200,
-         name: "Login",
-         message: "Login success",
-         uuid: user?._uuid,
-         u_data: userDataToken,
-         token: loginToken,
-         role: user?.role
-      });
-
-   } catch (error: any) {
-      next(error);
-   }
-};
 
 
 /**

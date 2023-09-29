@@ -1,19 +1,15 @@
-const { stockStatus, calculateDiscount } = require("../utils/common");
+const { stockStatus, calculateDiscount, calculateVolumetricWeight } = require("../utils/common");
 
-function product_variation_template_engine(body: any) {
+function product_variation_template_engine({ available, pricing, attributes, sku }: any) {
 
-  let available: number = parseInt(body?.available) || 0;
+  let price = parseInt(pricing?.price);
 
-  let price = parseInt(body?.pricing?.price);
-
-  let sellingPrice = parseInt(body?.pricing?.sellingPrice);
+  let sellingPrice = parseInt(pricing?.sellingPrice);
 
   return {
-    sku: body?.sku,
-    variant: body?.variant || {},
-    brandColor: body?.brandColor,
-    attrs: body?.attrs || {},
-    images: body?.images,
+    sku,
+    attributes: attributes || {},
+
     pricing: {
       price,
       sellingPrice,
@@ -24,11 +20,12 @@ function product_variation_template_engine(body: any) {
   }
 }
 
-const product_listing_template_engine = (body: any, supplier: any) => {
+const product_listing_template_engine = (body: any, supplierId: any) => {
 
-  let volumetricWeight: any = ((parseFloat(body?.packageHeight) * parseFloat(body?.packageLength) * parseFloat(body?.packageWidth)) / 5000).toFixed(1);
-
-  volumetricWeight = parseFloat(volumetricWeight);
+  const packageHeight: number = parseFloat(body?.packageHeight);
+  const packageLength: number = parseFloat(body?.packageLength);
+  const packageWidth: number = parseFloat(body?.packageWidth);
+  const packageWeight: number = parseFloat(body?.packageWeight);
 
 
   return {
@@ -36,35 +33,41 @@ const product_listing_template_engine = (body: any, supplier: any) => {
 
     slug: body?.slug,
 
-    categories: [body?.category, body?.subCategory, body?.postCategory] || [],
+    imageUrls: body?.images || [],
 
-    brand: body?.brand,
+    categories: body?.categories.split("/") || [],
+
+    brand: body?.brand || "No Brand",
 
     highlights: body?.highlights || [],
 
-    supplier,
+    supplierId,
 
     packaged: {
       dimension: {
-        height: parseFloat(body?.packageHeight),
-        length: parseFloat(body?.packageLength),
-        width: parseFloat(body?.packageWidth)
+        height: packageHeight,
+        length: packageLength,
+        width: packageWidth
       },
-      weight: parseFloat(body?.packageWeight),
+      weight: packageWeight,
       weightUnit: 'kg',
       dimensionUnit: 'cm',
-      volumetricWeight,
+      volumetricWeight: calculateVolumetricWeight(packageHeight, packageLength, packageWidth),
       inTheBox: body?.inTheBox
     },
 
     shipping: {
       fulfilledBy: body?.fulfilledBy,
-      procurementType: body?.procurementType,
       procurementSLA: body?.procurementSLA,
       isFree: body?.isFree
     },
 
-    variations: [product_variation_template_engine(body?.variation)],
+    variations: [product_variation_template_engine({
+      attributes: body?.attributes,
+      sku: body?.sku,
+      available: parseInt(body?.available),
+      pricing: body?.pricing
+    })],
 
     manufacturer: {
       origin: body?.manufacturerOrigin,
@@ -79,7 +82,21 @@ const product_listing_template_engine = (body: any, supplier: any) => {
 
     specification: body?.specification || {},
 
-    description: body?.description || ""
+    description: body?.description || "",
+
+    rating: [
+      { weight: 5, count: 0 },
+      { weight: 4, count: 0 },
+      { weight: 3, count: 0 },
+      { weight: 2, count: 0 },
+      { weight: 1, count: 0 },
+    ],
+
+    ratingAverage: 0,
+
+    isVerified: false,
+
+    createdAt: new Date()
   }
 }
 

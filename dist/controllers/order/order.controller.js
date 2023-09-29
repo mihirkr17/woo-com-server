@@ -14,10 +14,11 @@ const apiResponse = require("../../errors/apiResponse");
 const email_service = require("../../services/email.service");
 const NodeCache = require("../../utils/NodeCache");
 const Order = require("../../model/order.model");
+const { ObjectId } = require("mongodb");
 module.exports.myOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { email } = req.params;
-        const { email: authEmail } = req.decoded;
+        const { email: authEmail, _id } = req.decoded;
         let orders;
         if (email !== authEmail) {
             return res.status(401).send();
@@ -27,7 +28,17 @@ module.exports.myOrder = (req, res, next) => __awaiter(void 0, void 0, void 0, f
             orders = cacheMyOrder;
         }
         else {
-            orders = yield Order.find({ "customer.email": email }).sort({ _id: -1 });
+            orders = yield Order.aggregate([
+                { $match: { customerId: ObjectId(_id) } },
+                { $unwind: { path: "$items" } },
+                { $replaceRoot: { newRoot: { $mergeObjects: ["$items", "$$ROOT"] } } },
+                {
+                    $project: {
+                        title: 1, itemId: 1, quantity: 1, imageUrl: 1, itemStatus: 1, sku: 1, amount: 1, attributes: 1, sellingPrice: 1, orderPlacedAt: 1,
+                        orderShippedAt: 1, orderCanceledAt: 1, orderDispatchedAt: 1, isRefunded: 1
+                    }
+                }
+            ]);
             NodeCache.saveCache(`${authEmail}_myOrders`, orders);
         }
         return res.status(200).send({ success: true, statusCode: 200, data: { module: { orders } } });
@@ -82,6 +93,29 @@ module.exports.cancelMyOrder = (req, res, next) => __awaiter(void 0, void 0, voi
             })
         ]);
         return orderStatusResult && res.status(200).send({ success: true, statusCode: 200, message: "Order canceled successfully" });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+module.exports.orderDetails = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { email } = req === null || req === void 0 ? void 0 : req.decoded;
+        const { orderId, itemId } = req === null || req === void 0 ? void 0 : req.params;
+        if (!orderId || !itemId)
+            throw new apiResponse.Api400Error("Required order id and item id !");
+        let order;
+        let orderDetailsInCache = NodeCache.getCache(`${email}_orderDetails`);
+        if (orderDetailsInCache) {
+            order = orderDetailsInCache;
+        }
+        else {
+            order = yield Order.findOne({ _id: ObjectId(orderId) });
+            NodeCache.saveCache(`${email}_orderDetails`, order);
+        }
+        if (!order)
+            throw new apiResponse.Api404Error("Sorry order not found !");
+        return res.status(200).send({ success: true, statusCode: 200, order });
     }
     catch (error) {
         next(error);

@@ -82,9 +82,15 @@ const supplierSchema = new Schema({
       postal_code: { type: String, required: true }
    },
 
+   location : {
+      type: String,
+      latitude: Number,
+      longitude: Number
+   },
+
    idFor: { type: String, default: "sell" },
 
-   accountStatus: { type: String, enum: ["active", "inactive", "blocked"], default: "inactive", },
+   accountStatus: { type: String, enum: ["Active", "Inactive", "Blocked"], default: "Inactive", },
 
    authProvider: { type: String, enum: ['system', 'thirdParty'], default: 'system' },
 
@@ -99,14 +105,11 @@ supplierSchema.pre("save", async function (next: any) {
    try {
       if (this.isModified("password")) {
          this.password = await bcrypt.hash(this.password, 10);
+         this.hasPassword = true;
       }
-
       this.authProvider = 'system';
-      this.role = "SUPPLIER";
-      this.idFor = "sell";
       this.contactEmail = this.email;
-      this.hasPassword = true;
-      this.accountStatus = "inactive";
+
       this.verified = false;
 
       next();

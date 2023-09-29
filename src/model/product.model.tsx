@@ -1,8 +1,7 @@
+
 import { Schema, model } from "mongoose";
 
 var ProductSchema = new Schema({
-   _lid: { type: String, required: true },
-
    title: { type: String, required: true },
 
    slug: { type: String, required: true },
@@ -10,6 +9,8 @@ var ProductSchema = new Schema({
    categories: { type: Array, required: true },
 
    brand: { type: String, required: true },
+
+   imageUrls: { type: Array, required: true },
 
    manufacturer: {
       origin: { type: String, required: true },
@@ -20,7 +21,6 @@ var ProductSchema = new Schema({
 
    shipping: {
       fulfilledBy: { type: String, required: true },
-      procurementType: { type: String, required: true },
       procurementSLA: { type: String, required: true },
       isFree: { type: Boolean }
    },
@@ -39,12 +39,17 @@ var ProductSchema = new Schema({
 
    description: { type: String, required: true },
 
-   variations: { type: Array, required: true },
+   variations: [
+      {
+         sku: String,
+         attributes: Object,
+         available: Number,
+         stock: String,
+         pricing: Object
+      }
+   ],
 
-   supplier: {
-      storeId: { type: Schema.Types.ObjectId, ref: 'Supplier' },
-      storeName: { type: String, required: true }
-   },
+   supplierId: { type: Schema.Types.ObjectId, ref: 'Supplier' },
 
    warranty: {
       type: { type: String, required: false },
@@ -66,13 +71,10 @@ var ProductSchema = new Schema({
 
    isVerified: { type: Boolean, required: false },
 
-   verifyStatus: {
-      verifiedBy: { type: String, required: false },
-      email: { type: String, required: false },
-      verifiedAt: { type: Date, required: false }
-   }
-});
+   verifiedBy: { type: String },
 
+   verifiedAt: { type: Date, required: false }
+});
 
 const Product = model('Product', ProductSchema, 'products');
 

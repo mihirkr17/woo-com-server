@@ -35,7 +35,7 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
 
       Filter["$and"] = [
          { "supplier.storeName": storeName },
-         { status: "active" },
+         { status: "Active" },
       ];
 
       let sortList: any = {};
@@ -88,7 +88,7 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
             $match: {
                $and: [
                   { "supplier.storeName": storeName },
-                  { status: "active" }
+                  { status: "Active" }
                ]
             }
          },

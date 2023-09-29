@@ -1,9 +1,8 @@
 "use strict";
-module.exports.cartTemplate = (productID, listingID, sku) => {
+module.exports.cartTemplate = (productId, sku) => {
     return {
-        productID,
+        productId,
         sku,
-        listingID,
         quantity: 1,
         addedAt: new Date()
     };

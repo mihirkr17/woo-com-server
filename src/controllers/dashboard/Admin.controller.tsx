@@ -3,9 +3,10 @@
 import { NextFunction, Request, Response } from "express";
 const Product = require("../../model/product.model");
 const User = require("../../model/user.model");
+const Supplier = require("../../model/supplier.model");
 const email_service = require("../../services/email.service");
-const apiResponse = require("../../errors/apiResponse");
 const Order = require("../../model/order.model");
+const { Api400Error, Api403Error, Api404Error, Api500Error } = require("../../errors/apiResponse");
 
 const { ObjectId } = require('mongodb');
 
@@ -18,14 +19,12 @@ module.exports.getAdminController = async (req: Request, res: Response, next: Ne
       const item: any = req.query.items;
       let queueProducts: any;
 
-      let countQueueProducts = await Product.countDocuments({ status: "queue" });
+      let countQueueProducts = await Product.countDocuments({ status: "Queue" });
 
-      let newSellers = await User.find({ $and: [{ isSeller: 'pending' }, { role: "SELLER" }] });
+      const suppliers = await Supplier.find();
+      const buyers = await User.find();
 
-      const sellers = await User.find({ $and: [{ isSeller: "fulfilled" }, { role: "SELLER" }] });
-      const buyers = await User.find({ $and: [{ idFor: "buy" }, { role: "BUYER" }] });
-
-      let cursor = await Product.find({ isVerified: false, status: "queue" });
+      let cursor = await Product.find({ isVerified: false, status: "Queue" });
 
       if (pages || item) {
          queueProducts = await cursor.skip(parseInt(pages) > 0 ? ((pages - 1) * item) : 0).limit(item);
@@ -34,7 +33,7 @@ module.exports.getAdminController = async (req: Request, res: Response, next: Ne
       }
 
 
-      return res.status(200).send({ success: true, statusCode: 200, queueProducts, countQueueProducts, newSellers, sellers, buyers });
+      return res.status(200).send({ success: true, statusCode: 200, queueProducts, countQueueProducts, suppliers, buyers });
    } catch (error: any) {
       next(error);
    }
@@ -44,23 +43,25 @@ module.exports.getAdminController = async (req: Request, res: Response, next: Ne
 
 module.exports.takeThisProductByAdminController = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const adminEmail: string = req.decoded.email;
-      const role: string = req.decoded.role;
+      const { role, email } = req?.decoded;
 
-      const { listingID } = req.body;
+      const { productId } = req.body;
 
-      if (!listingID) {
-         throw new Error("Listing ID required !");
+      if (role !== "ADMIN") throw new Api403Error("Forbidden !");
+
+      if (!productId) {
+         throw new Api403Error("Product ID required !");
       }
 
 
-      const result = await Product.updateOne(
-         { $and: [{ _lid: listingID }, { status: "queue" }] },
+      const result = await Product.findOneAndUpdate(
+         { $and: [{ _id: ObjectId(productId) }, { status: "Queue" }] },
          {
             $set: {
                isVerified: true,
-               status: "active",
-               verifyStatus: { verifiedBy: role, email: adminEmail, verifiedAt: new Date(Date.now()) }
+               status: "Active",
+               verifiedBy: email,
+               verifiedAt: new Date(Date.now())
             }
          },
          { upsert: true }
@@ -85,15 +86,15 @@ module.exports.verifySellerAccountByAdmin = async (req: Request, res: Response, 
 
       const { uuid, id, email } = req.body;
 
-      if (!uuid || typeof uuid === "undefined") throw new apiResponse.Api400Error("Required user unique id !");
+      if (!uuid || typeof uuid === "undefined") throw new Api400Error("Required user unique id !");
 
-      if (!id || typeof id === "undefined") throw new apiResponse.Api400Error("Required id !");
+      if (!id || typeof id === "undefined") throw new Api400Error("Required id !");
 
       const result = await User.findOneAndUpdate(
          { $and: [{ _id: ObjectId(id) }, { email }, { _uuid: uuid }, { isSeller: "pending" }] },
          {
             $set: {
-               accountStatus: "active",
+               accountStatus: "Active",
                isSeller: "fulfilled",
                becomeSellerAt: new Date()
             }
@@ -115,7 +116,7 @@ module.exports.verifySellerAccountByAdmin = async (req: Request, res: Response, 
          return res.status(200).send({ success: true, statusCode: 200, message: "Permission granted." });
       }
 
-      throw new apiResponse.Api500Error("Internal problem !");
+      throw new Api500Error("Internal problem !");
 
    } catch (error: any) {
       next(error);
@@ -123,22 +124,22 @@ module.exports.verifySellerAccountByAdmin = async (req: Request, res: Response, 
 }
 
 
-module.exports.deleteSellerAccountRequest = async (req: Request, res: Response, next: NextFunction) => {
+module.exports.deleteSupplierAccount = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
-      const { id, uuid, email } = req.body;
+      const { id, email } = req.body;
 
-      if (!uuid || typeof uuid === "undefined") throw new apiResponse.Api400Error("Required user unique id !");
+      if (!id || typeof id === "undefined") throw new Api400Error("Required id !");
 
-      if (!id || typeof id === "undefined") throw new apiResponse.Api400Error("Required id !");
+      if (!ObjectId.isValid(id)) throw new Api400Error("Invalid supplier id !");
 
-      const result = await User.deleteOne({ $and: [{ _id: ObjectId(id) }, { _uuid: uuid }, { email }] });
+      const result = await Supplier.deleteOne({ $and: [{ _id: ObjectId(id) }, { email }] });
 
       if (result) {
          return res.status(200).send({ success: true, statusCode: 200, message: "Account deleted successfully." });
       }
 
-      throw new apiResponse.Api500Error("Internal error !");
+      throw new Api500Error("Internal server error !");
    } catch (error: any) {
       next(error);
    }
@@ -165,7 +166,7 @@ module.exports.getBuyerInfoByAdmin = async (req: Request, res: Response, next: N
          })
       }
 
-      throw new apiResponse.Api404Error("Data not found !");
+      throw new Api404Error("Data not found !");
    } catch (error: any) {
       next(error);
    }

@@ -9,14 +9,14 @@ const { get_review_product_details_pipe } = require("../../utils/pipelines");
 // adding product review and ratings
 module.exports.addProductRating = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { _uuid } = req.decoded;
+    const { _id } = req.decoded;
 
-    const { orderID, productID, ratingWeight, description, name, reviewImage } = req?.body;
+    const { orderId, productId, ratingWeight, description, name, reviewImage } = req?.body;
 
     const [updatedProduct, newReview, orderUpdateResult] = await Promise.all([
 
       Product.findOneAndUpdate(
-        { _id: ObjectId(productID) },
+        { _id: ObjectId(productId) },
         [
           {
             $set: {
@@ -69,23 +69,23 @@ module.exports.addProductRating = async (req: Request, res: Response, next: Next
       ),
 
       description && new Review({
-        product_id: productID,
-        order_id: orderID,
+        productId: productId,
+        orderId: orderId,
         name,
-        customer_id: _uuid,
-        product_images: reviewImage.slice(0, 5) ?? [],
+        customerId: _id,
+        productImages: reviewImage.slice(0, 5) ?? [],
         comments: description,
-        rating_point: parseInt(ratingWeight),
-        verified_purchase: true,
+        ratingPoint: parseInt(ratingWeight),
+        verifiedPurchase: true,
         likes: [],
-        review_at: new Date(Date.now())
+        reviewAt: new Date(Date.now())
       }).save(),
 
       Order.findOneAndUpdate(
-        { order_id: orderID },
+        { _id: ObjectId(orderId) },
         {
           $set: {
-            is_rated: true,
+            isRated: true,
           }
         },
         { upsert: true }
@@ -103,11 +103,11 @@ module.exports.addProductRating = async (req: Request, res: Response, next: Next
 // get reviews in product detail page
 module.exports.getReviews = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { productID } = req.params;
+    const { productId } = req.params;
 
     let { page, sort } = req.query as { page: any, sort: string };
 
-    if (!productID) throw new Api400Error("Required product id !");
+    if (!productId) throw new Api400Error("Required product id !");
 
     page = page && parseInt(page);
 
@@ -115,9 +115,9 @@ module.exports.getReviews = async (req: Request, res: Response, next: NextFuncti
 
     let sortFilter = sort === "asc" ? { rating_point: 1 } : sort === "dsc" ? { rating_point: -1 } : { _id: -1 };
 
-    const result = await Review.find({ product_id: ObjectId(productID) }).sort(sortFilter).skip(page * 2).limit(2) ?? [];
+    const result = await Review.find({ productId: ObjectId(productId) }).sort(sortFilter).skip(page * 2).limit(2) ?? [];
 
-    const reviewCount = await Review.countDocuments({ product_id: ObjectId(productID) }) ?? 0;
+    const reviewCount = await Review.countDocuments({ productId: ObjectId(productId) }) ?? 0;
 
     res.status(200).send({ success: true, statusCode: 200, reviews: result, reviewCount });
 
@@ -169,42 +169,21 @@ module.exports.toggleVotingLike = async (req: Request, res: Response, next: Next
 module.exports.getMyReviews = async (req: Request, res: Response, next: NextFunction) => {
   try {
 
-    const { _uuid } = req.decoded;
-
-    const { uuid } = req.params;
-
-    if (_uuid !== uuid) return next(new Api401Error("Unauthorized access !"));
+    const { _id } = req.decoded;
 
     const reviews = await Review.aggregate([
-      { $match: { customer_id: uuid } },
+      { $match: { customerId: ObjectId(_id) } },
       {
         $lookup: {
-          from: 'order_table',
-          localField: 'order_id',
-          foreignField: 'orderID',
+          from: 'orders',
+          localField: 'orderId',
+          foreignField: '_id',
           as: 'order'
         }
       },
       { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$order", 0] }, "$$ROOT"] } } },
       { $unset: ["order"] },
       {
-        $set: {
-          item: {
-            $arrayElemAt: [
-              {
-                $filter: {
-                  input: "$items",
-                  as: "item",
-                  cond: { $eq: ["$$item.itemID", "$order_item_id"] }
-                }
-              },
-              0
-            ]
-          }
-        }
-      }, {
-        $unset: ["items"]
-      }, {
         $sort: { _id: -1 }
       }
     ]);
@@ -227,9 +206,9 @@ module.exports.getProductDetails = async (req: Request, res: Response, next: Nex
 
     const getOrder = await Order.findOne({
       $and: [
-        { order_id: oid },
-        { "product.product_id": pid },
-        { "product.sku": sku }
+        { _id: ObjectId(oid) },
+        { productId: ObjectId(pid) },
+        { sku: sku }
       ]
     });
 
@@ -239,7 +218,7 @@ module.exports.getProductDetails = async (req: Request, res: Response, next: Nex
 
     product = product[0];
 
-    return res.status(200).send({ success: true, statusCode: 200, response: product,  message: (getOrder?.is_rated) ? "You already review this product." : null })
+    return res.status(200).send({ success: true, statusCode: 200, response: product, message: (getOrder?.is_rated) ? "You already review this product." : null })
 
   } catch (error: any) {
     next(error);

@@ -20,9 +20,11 @@ const apiResponse = require("../errors/apiResponse");
 const { generateTrackingID } = require("../utils/generator");
 const NCache = require("../utils/NodeCache");
 const Order = require("../model/order.model");
+const Supplier = require("../model/supplier.model");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 module.exports.findUserByEmail = (email) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        return (yield UserModel.findOne({ $and: [{ email: email }, { accountStatus: 'active' }] }, {
+        return (yield UserModel.findOne({ $and: [{ email: email }, { accountStatus: 'Active' }] }, {
             password: 0,
             createdAt: 0,
             phonePrefixCode: 0,
@@ -35,7 +37,7 @@ module.exports.findUserByEmail = (email) => __awaiter(void 0, void 0, void 0, fu
 });
 module.exports.findUserByUUID = (uuid) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        return (yield UserModel.findOne({ $and: [{ _uuid: uuid }, { accountStatus: 'active' }] }, {
+        return (yield UserModel.findOne({ $and: [{ _uuid: uuid }, { accountStatus: 'Active' }] }, {
             password: 0,
             createdAt: 0,
             phonePrefixCode: 0,
@@ -149,65 +151,74 @@ module.exports.get_product_variation = (data) => __awaiter(void 0, void 0, void 
 });
 module.exports.update_variation_stock_available = (type, data) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        let available = 0;
         if (!type) {
-            return;
+            throw new Error("Required action !");
         }
-        if (!data) {
-            return;
+        if (!data || !Array.isArray(data)) {
+            throw new apiResponse.Api500Error("Required product id, sku, quantity !");
+            // throw new Error("Required product id, sku, quantity !");
         }
-        const { productID, sku, listingID, quantity } = data;
-        let variation = yield Product.aggregate([
-            { $match: { $and: [{ _lid: listingID }, { _id: mdb.ObjectId(productID) }] } },
-            { $unwind: { path: "$variations" } },
-            { $project: { variations: 1 } },
-            { $match: { $and: [{ "variations.sku": sku }] } },
-            { $replaceRoot: { newRoot: { $mergeObjects: ["$variations", "$$ROOT"] } } },
-            { $unset: ["variations"] }
-        ]);
-        variation = variation[0];
-        if (type === "inc") {
-            available = parseInt(variation === null || variation === void 0 ? void 0 : variation.available) + parseInt(quantity);
+        const bulkOperations = [];
+        for (const item of data) {
+            const filter = {
+                _id: mdb.ObjectId(item.productId),
+            };
+            const update = [
+                {
+                    $set: {
+                        variations: {
+                            $map: {
+                                input: '$variations',
+                                as: 'var',
+                                in: {
+                                    $cond: {
+                                        if: { $eq: ['$$var.sku', item.sku] },
+                                        then: {
+                                            $mergeObjects: [
+                                                '$$var',
+                                                {
+                                                    available: {
+                                                        $cond: {
+                                                            if: { $eq: [type, 'dec'] },
+                                                            then: { $max: [0, { $subtract: ['$$var.available', item.quantity] }] },
+                                                            else: { $add: ['$$var.available', item.quantity] },
+                                                        },
+                                                    },
+                                                    stock: {
+                                                        $cond: {
+                                                            if: { $lte: [{ $max: [0, { $subtract: ['$$var.available', item.quantity] }] }, 0] },
+                                                            then: 'out',
+                                                            else: '$$var.stock',
+                                                        },
+                                                    },
+                                                },
+                                            ],
+                                        },
+                                        else: '$$var',
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            ];
+            // Push an updateOne operation into the bulkOperations array
+            bulkOperations.push({
+                updateOne: {
+                    filter,
+                    update,
+                },
+            });
         }
-        else if (type === "dec") {
-            available = parseInt(variation === null || variation === void 0 ? void 0 : variation.available) - parseInt(quantity);
-        }
-        let stock = available <= 0 ? "out" : "in";
-        return (yield Product.findOneAndUpdate({ $and: [{ _id: mdb.ObjectId(productID) }, { _lid: listingID }] }, {
-            $set: {
-                "variations.$[i].available": available,
-                "variations.$[i].stock": stock
-            }
-        }, { arrayFilters: [{ "i.sku": sku }] })) || null;
+        // Execute the bulkWrite operation with the update operations
+        return yield Product.bulkWrite(bulkOperations);
     }
     catch (error) {
-        return error === null || error === void 0 ? void 0 : error.message;
+        throw error;
     }
 });
-module.exports.getSellerInformationByID = (uuid) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        let result = yield UserModel.aggregate([
-            { $match: { _uuid: uuid } },
-            {
-                $project: {
-                    email: 1,
-                    fullName: 1,
-                    contactEmail: 1,
-                    dob: 1,
-                    gender: 1,
-                    phone: 1,
-                    phonePrefixCode: 1,
-                    taxId: "$seller.taxId",
-                    address: "$seller.address",
-                    storeInfos: "$seller.storeInfos"
-                }
-            }
-        ]);
-        return result[0] || null;
-    }
-    catch (error) {
-        return error;
-    }
+module.exports.getSupplierInformationByID = (uuid) => __awaiter(void 0, void 0, void 0, function* () {
+    return yield Supplier.findOne({ _id: mdb.ObjectId(uuid) }, { password: 0 });
 });
 module.exports.is_product = (productID, sku) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -239,7 +250,7 @@ module.exports.productCounter = (sellerInfo) => __awaiter(void 0, void 0, void 0
             });
         }
         let totalProducts = yield cps();
-        let inactiveProducts = yield cps("inactive");
+        let inactiveProducts = yield cps("Inactive");
         const setData = yield UserModel.updateOne({ $and: [{ _uuid: sellerInfo === null || sellerInfo === void 0 ? void 0 : sellerInfo._uuid }, { role: 'SELLER' }] }, {
             $set: {
                 "store.info.numOfProduct": totalProducts,
@@ -269,19 +280,12 @@ module.exports.checkProductAvailability = (productID, sku) => __awaiter(void 0, 
     product = product[0];
     return product;
 });
-module.exports.clearCart = (email) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        yield NCache.deleteCache(`${email}_cartProducts`);
-        return yield ShoppingCartModel.findOneAndUpdate({ customerEmail: email }, {
-            $set: { items: [] }
-        });
-    }
-    catch (error) {
-        return error;
-    }
+module.exports.clearCart = (customerId, customerEmail) => __awaiter(void 0, void 0, void 0, function* () {
+    yield NCache.deleteCache(`${customerEmail}_cartProducts`);
+    return yield ShoppingCartModel.deleteMany({ customerId: mdb.ObjectId(customerId) });
 });
 module.exports.updateProductInformation = (product, option) => __awaiter(void 0, void 0, void 0, function* () {
-    const { productID, views, ratingAverage, sales } = product;
+    const { _id, views, ratingAverage, sales } = product;
     let viewsWeight = 0.4;
     let ratingWeight = 0.5;
     let salesWeight = 0.3;
@@ -289,7 +293,7 @@ module.exports.updateProductInformation = (product, option) => __awaiter(void 0,
     let totalSales = (option === null || option === void 0 ? void 0 : option.actionType) === "sales" ? (sales !== null && sales !== void 0 ? sales : 0) + 1 : (sales !== null && sales !== void 0 ? sales : 0);
     let score = (totalViews * viewsWeight) + (ratingAverage * ratingWeight) + (totalSales * salesWeight);
     try {
-        yield Product.findOneAndUpdate({ $and: [{ _id: mdb.ObjectId(productID) }, { status: "active" }] }, {
+        yield Product.findOneAndUpdate({ $and: [{ _id: mdb.ObjectId(_id) }, { status: "Active" }] }, {
             $set: {
                 views: totalViews,
                 score: score
@@ -300,4 +304,28 @@ module.exports.updateProductInformation = (product, option) => __awaiter(void 0,
     catch (error) {
         return error;
     }
+});
+module.exports.createPaymentIntents = (totalAmount, orderId, paymentMethodId, session, ip, userAgent) => __awaiter(void 0, void 0, void 0, function* () {
+    const paymentIntent = yield stripe.paymentIntents.create({
+        amount: (totalAmount * 100),
+        currency: 'bdt',
+        metadata: {
+            order_id: orderId
+        },
+        confirm: true,
+        automatic_payment_methods: { enabled: true },
+        payment_method: paymentMethodId,
+        return_url: 'https://example.com/order/123/complete',
+        use_stripe_sdk: true,
+        mandate_data: {
+            customer_acceptance: {
+                type: "online",
+                online: {
+                    ip_address: ip,
+                    user_agent: userAgent //req.get("user-agent"),
+                },
+            },
+        },
+    }, { idempotencyKey: session });
+    return paymentIntent;
 });

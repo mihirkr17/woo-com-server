@@ -90,7 +90,6 @@ module.exports.updateShippingAddress = (req, res, next) => __awaiter(void 0, voi
     }
 });
 module.exports.selectShippingAddress = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     try {
         const authEmail = req.decoded.email;
         let { addrsID, default_shipping_address } = req.body;
@@ -101,12 +100,12 @@ module.exports.selectShippingAddress = (req, res, next) => __awaiter(void 0, voi
         if (!user && typeof user !== "object") {
             throw new apiResponse.Api404Error('User not found !');
         }
-        const shippingAddress = ((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) || [];
+        const shippingAddress = (user === null || user === void 0 ? void 0 : user.shippingAddress) || [];
         if (shippingAddress && shippingAddress.length > 0) {
             const result = yield User.findOneAndUpdate({ email: authEmail }, {
                 $set: {
-                    "buyer.shippingAddress.$[j].default_shipping_address": false,
-                    "buyer.shippingAddress.$[i].default_shipping_address": default_shipping_address,
+                    "shippingAddress.$[j].default_shipping_address": false,
+                    "shippingAddress.$[i].default_shipping_address": default_shipping_address,
                 },
             }, {
                 arrayFilters: [{ "j.addrsID": { $ne: addrsID } }, { "i.addrsID": addrsID }],

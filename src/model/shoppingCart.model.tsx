@@ -2,8 +2,12 @@ import { Schema, model } from "mongoose";
 
 
 const ShoppingCart = model("ShoppingCart", new Schema({
-   customerEmail: { type: String, required: true },
-   items: { type: Array }
+
+   productId: { type: Schema.Types.ObjectId, ref: 'Product' },
+   customerId: { type: Schema.Types.ObjectId, ref: 'User' },
+   sku: { type: String, required: true },
+   quantity: { type: Number, default: 1 },
+   addedAt: { type: Date }
 }), "shoppingCarts");
 
 module.exports = ShoppingCart;

@@ -1,21 +1,21 @@
 import { Schema, model } from "mongoose";
 
 const reviewSchema = new Schema({
-   product_id: { type: String, required: true },
+   productId: { type: Schema.Types.ObjectId, required: true },
 
    name: { type: String, required: true },
 
-   customer_id: { type: String, required: true },
+   customerId: { type: Schema.Types.ObjectId, required: true },
 
-   order_id: { type: String, required: true },
+   orderId: { type: Schema.Types.ObjectId, required: true },
 
-   product_images: { type: Array },
+   productImages: { type: Array },
 
    comments: { type: String, required: false },
 
-   rating_point: { type: Number, required: true },
+   ratingPoint: { type: Number, required: true },
 
-   verified_purchase: Boolean,
+   verifiedPurchase: Boolean,
 
    likes: Array,
 
@@ -25,7 +25,7 @@ const reviewSchema = new Schema({
       replied_at: Date
    },
 
-   review_at: { type: Date }
+   reviewAt: { type: Date }
 });
 
 const Review = model("reviews", reviewSchema, "reviews");

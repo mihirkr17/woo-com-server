@@ -132,7 +132,7 @@ function verifyEmailByJWT(req, res, next) {
             });
         }
         catch (error) {
-            throw error;
+            next(error);
         }
     });
 }

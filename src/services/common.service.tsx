@@ -10,11 +10,13 @@ const apiResponse = require("../errors/apiResponse");
 const { generateTrackingID } = require("../utils/generator");
 const NCache = require("../utils/NodeCache");
 const Order = require("../model/order.model");
+const Supplier = require("../model/supplier.model");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 module.exports.findUserByEmail = async (email: string) => {
    try {
       return await UserModel.findOne(
-         { $and: [{ email: email }, { accountStatus: 'active' }] },
+         { $and: [{ email: email }, { accountStatus: 'Active' }] },
          {
             password: 0,
             createdAt: 0,
@@ -31,7 +33,7 @@ module.exports.findUserByEmail = async (email: string) => {
 module.exports.findUserByUUID = async (uuid: string) => {
    try {
       return await UserModel.findOne(
-         { $and: [{ _uuid: uuid }, { accountStatus: 'active' }] },
+         { $and: [{ _uuid: uuid }, { accountStatus: 'Active' }] },
          {
             password: 0,
             createdAt: 0,
@@ -163,81 +165,86 @@ module.exports.get_product_variation = async (data: any) => {
 };
 
 
-module.exports.update_variation_stock_available = async (type: string, data: any) => {
+module.exports.update_variation_stock_available = async (type: string, data: any[]) => {
    try {
 
-      let available: number = 0;
-
       if (!type) {
-         return;
+         throw new Error("Required action !");
       }
 
-      if (!data) {
-         return;
+      if (!data || !Array.isArray(data)) {
+
+         throw new apiResponse.Api500Error("Required product id, sku, quantity !");
+         // throw new Error("Required product id, sku, quantity !");
       }
 
-      const { productID, sku, listingID, quantity } = data;
+      const bulkOperations = [];
 
-      let variation = await Product.aggregate([
-         { $match: { $and: [{ _lid: listingID }, { _id: mdb.ObjectId(productID) }] } },
-         { $unwind: { path: "$variations" } },
-         { $project: { variations: 1 } },
-         { $match: { $and: [{ "variations.sku": sku }] } },
-         { $replaceRoot: { newRoot: { $mergeObjects: ["$variations", "$$ROOT"] } } },
-         { $unset: ["variations"] }
-      ]);
+      for (const item of data) {
 
-      variation = variation[0];
+         const filter = {
+            _id: mdb.ObjectId(item.productId),
+         };
 
-      if (type === "inc") {
-         available = parseInt(variation?.available) + parseInt(quantity);
-      } else if (type === "dec") {
-         available = parseInt(variation?.available) - parseInt(quantity);
+         const update = [
+            {
+               $set: {
+                  variations: {
+                     $map: {
+                        input: '$variations',
+                        as: 'var',
+                        in: {
+                           $cond: {
+                              if: { $eq: ['$$var.sku', item.sku] },
+                              then: {
+                                 $mergeObjects: [
+                                    '$$var', // Preserve existing fields
+                                    {
+                                       available: {
+                                          $cond: {
+                                             if: { $eq: [type, 'dec'] },
+                                             then: { $max: [0, { $subtract: ['$$var.available', item.quantity] }] },
+                                             else: { $add: ['$$var.available', item.quantity] },
+                                          },
+                                       },
+                                       stock: {
+                                          $cond: {
+                                             if: { $lte: [{ $max: [0, { $subtract: ['$$var.available', item.quantity] }] }, 0] },
+                                             then: 'out',
+                                             else: '$$var.stock',
+                                          },
+                                       },
+                                    },
+                                 ],
+                              },
+                              else: '$$var',
+                           },
+                        },
+                     },
+                  },
+               },
+            },
+         ];
+
+         // Push an updateOne operation into the bulkOperations array
+         bulkOperations.push({
+            updateOne: {
+               filter,
+               update,
+            },
+         });
       }
 
-      let stock: string = available <= 0 ? "out" : "in";
-
-      return await Product.findOneAndUpdate(
-         { $and: [{ _id: mdb.ObjectId(productID) }, { _lid: listingID }] },
-         {
-            $set: {
-               "variations.$[i].available": available,
-               "variations.$[i].stock": stock
-            }
-         },
-         { arrayFilters: [{ "i.sku": sku }] }
-      ) || null;
+      // Execute the bulkWrite operation with the update operations
+      return await Product.bulkWrite(bulkOperations);
    } catch (error: any) {
-      return error?.message;
+      throw error;
    }
 }
 
 
-module.exports.getSellerInformationByID = async (uuid: string) => {
-   try {
-      let result = await UserModel.aggregate([
-         { $match: { _uuid: uuid } },
-         {
-            $project: {
-               email: 1,
-               fullName: 1,
-               contactEmail: 1,
-               dob: 1,
-               gender: 1,
-               phone: 1,
-               phonePrefixCode: 1,
-               taxId: "$seller.taxId",
-               address: "$seller.address",
-               storeInfos: "$seller.storeInfos"
-            }
-         }
-      ]);
-
-      return result[0] || null;
-
-   } catch (error: any) {
-      return error;
-   }
+module.exports.getSupplierInformationByID = async (uuid: string) => {
+   return await Supplier.findOne({ _id: mdb.ObjectId(uuid) }, { password: 0 });
 }
 
 
@@ -274,7 +281,7 @@ module.exports.productCounter = async (sellerInfo: any) => {
       let totalProducts: Number = await cps();
 
 
-      let inactiveProducts: Number = await cps("inactive");
+      let inactiveProducts: Number = await cps("Inactive");
 
       const setData = await UserModel.updateOne({ $and: [{ _uuid: sellerInfo?._uuid }, { role: 'SELLER' }] }, {
          $set: {
@@ -312,22 +319,15 @@ module.exports.checkProductAvailability = async (productID: string, sku: String)
 };
 
 
-module.exports.clearCart = async (email: string) => {
-   try {
-
-      await NCache.deleteCache(`${email}_cartProducts`);
-      return await ShoppingCartModel.findOneAndUpdate({ customerEmail: email }, {
-         $set: { items: [] }
-      })
-   } catch (error: any) {
-      return error;
-   }
+module.exports.clearCart = async (customerId: string, customerEmail: string) => {
+   await NCache.deleteCache(`${customerEmail}_cartProducts`);
+   return await ShoppingCartModel.deleteMany({ customerId: mdb.ObjectId(customerId) });
 }
 
 
 module.exports.updateProductInformation = async (product: any, option: any) => {
 
-   const { productID, views, ratingAverage, sales } = product;
+   const { _id, views, ratingAverage, sales } = product;
 
    let viewsWeight = 0.4;
    let ratingWeight = 0.5;
@@ -339,7 +339,7 @@ module.exports.updateProductInformation = async (product: any, option: any) => {
    let score = (totalViews * viewsWeight) + (ratingAverage * ratingWeight) + (totalSales * salesWeight);
 
    try {
-      await Product.findOneAndUpdate({ $and: [{ _id: mdb.ObjectId(productID) }, { status: "active" }] }, {
+      await Product.findOneAndUpdate({ $and: [{ _id: mdb.ObjectId(_id) }, { status: "Active" }] }, {
          $set: {
             views: totalViews,
             score: score
@@ -350,4 +350,32 @@ module.exports.updateProductInformation = async (product: any, option: any) => {
    } catch (error: any) {
       return error;
    }
+}
+
+
+module.exports.createPaymentIntents = async (totalAmount: number, orderId: string, paymentMethodId: string, session: string, ip: any, userAgent: any) => {
+
+   const paymentIntent = await stripe.paymentIntents.create({
+      amount: (totalAmount * 100),
+      currency: 'bdt',
+      metadata: {
+         order_id: orderId
+      },
+      confirm: true,
+      automatic_payment_methods: { enabled: true },
+      payment_method: paymentMethodId, // the PaymentMethod ID sent by your client
+      return_url: 'https://example.com/order/123/complete',
+      use_stripe_sdk: true,
+      mandate_data: {
+         customer_acceptance: {
+            type: "online",
+            online: {
+               ip_address: ip,
+               user_agent: userAgent //req.get("user-agent"),
+            },
+         },
+      },
+   }, { idempotencyKey: session });
+
+   return paymentIntent;
 }

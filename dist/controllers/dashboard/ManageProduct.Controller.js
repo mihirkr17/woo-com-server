@@ -11,12 +11,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const { ObjectId } = require("mongodb");
-const { product_listing_template_engine } = require("../../templates/product.template");
 const User = require("../../model/user.model");
 const QueueProduct = require("../../model/queueProduct.model");
 const Product = require("../../model/product.model");
-const { product_variation_template_engine } = require("../../templates/product.template");
-const { generateListingID } = require("../../utils/generator");
 const { Api400Error, Api500Error } = require("../../errors/apiResponse");
 module.exports.productControlController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -26,7 +23,7 @@ module.exports.productControlController = (req, res, next) => __awaiter(void 0, 
         if (!listingID || !productID)
             throw new Api400Error("Required product id and listing id !");
         let filters;
-        if (actionFor === "status" && (["active", "inactive"].includes(actionType))) {
+        if (actionFor === "status" && (["Active", "Inactive"].includes(actionType))) {
             filters = {
                 $set: { status: actionType }
             };
@@ -59,14 +56,14 @@ module.exports.viewAllProductsInDashboard = (req, res, next) => __awaiter(void 0
         let inactiveProduct;
         let showFor;
         let src = [];
-        if (user.role === 'SELLER') {
+        if (user.role === 'SUPPLIER') {
             showFor = [
                 { "supplier.storeName": (_a = user === null || user === void 0 ? void 0 : user.store) === null || _a === void 0 ? void 0 : _a.name },
                 { isVerified: true }
             ];
         }
         else {
-            showFor = [{ status: "active" }];
+            showFor = [{ status: "Active" }];
         }
         page = parseInt(page) === 1 ? 0 : parseInt(page) - 1;
         if (searchText) {
@@ -120,7 +117,7 @@ module.exports.viewAllProductsInDashboard = (req, res, next) => __awaiter(void 0
         draftProducts = yield Product.aggregate([
             {
                 $match: {
-                    $and: [{ status: "inactive" }, { "supplier.storeName": (_b = user === null || user === void 0 ? void 0 : user.store) === null || _b === void 0 ? void 0 : _b.name }]
+                    $and: [{ status: "Inactive" }, { "supplier.storeName": (_b = user === null || user === void 0 ? void 0 : user.store) === null || _b === void 0 ? void 0 : _b.name }]
                 }
             },
             {
@@ -152,8 +149,8 @@ module.exports.viewAllProductsInDashboard = (req, res, next) => __awaiter(void 0
             {
                 $match: {
                     $and: [
-                        (user === null || user === void 0 ? void 0 : user.role) === 'SELLER' && { "supplier.storeName": (_c = user === null || user === void 0 ? void 0 : user.store) === null || _c === void 0 ? void 0 : _c.name },
-                        { status: 'inactive' }
+                        (user === null || user === void 0 ? void 0 : user.role) === 'SUPPLIER' && { "supplier.storeName": (_c = user === null || user === void 0 ? void 0 : user.store) === null || _c === void 0 ? void 0 : _c.name },
+                        { status: 'Inactive' }
                     ]
                 }
             }

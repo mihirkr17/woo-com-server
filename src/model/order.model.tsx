@@ -2,90 +2,144 @@ import { Schema, model } from "mongoose";
 
 
 var orderSchema = new Schema({
-   order_id: String,
 
-   customer: {
-      id: { type: String, required: true },
-      email: { type: String, required: true },
-      shipping_address: Object
-   },
+   customerId: { type: Schema.Types.ObjectId, required: true },
 
-   supplier: Object,
+   shippingAddress: { type: Object, required: true },
 
-   state: String,
+   state: { type: String },
 
-   tracking_id: String,
+   items: [{
 
-   product: {
-      listing_id: String,
+      _id: false,
 
-      product_id: String,
+      trackingId: { type: String },
 
-      slug: String,
+      productId: { type: Schema.Types.ObjectId, required: true },
 
-      title: String,
+      itemId: { type: Number, required: true },
 
-      assets: Object,
+      supplierId: { type: Schema.Types.ObjectId, required: true },
 
-      brand: String,
+      supplierEmail: { type: String, required: true },
 
-      sku: String,
+      storeName: { type: String, required: true },
 
-      sellingPrice: Number,
+      title: { type: String, required: true },
 
-      base_amount: Number,
-   },
+      imageUrl: String,
 
-   quantity: Number,
+      brand: { type: String, required: true },
 
-   shipping_charge: Number,
+      sku: { type: String, required: true },
 
-   final_amount: Number,
+      attributes: { type: Object },
 
-   packaged: { type: Object, required: true },
+      sellingPrice: { type: Number, required: true },
 
-   shipping: { type: Object, required: true },
+      amount: { type: Number, required: true },
 
-   order_status: {
+      quantity: { type: Number, required: true },
+
+      itemStatus: { type: String, enum: ["placed", "shipped", "canceled", "dispatch", "refunded", "completed"], default: "placed" },
+
+      isRated: { type: Boolean, required: false },
+
+      cancelReason: String,
+   }],
+
+   totalAmount: { type: Number, required: true },
+
+   orderStatus: {
       type: String,
       enum: ["placed", "shipped", "canceled", "dispatch", "refunded", "completed"],
       default: 'placed'
    },
 
-   payment: {
-      mode: { type: String, required: false, enum: ["card", "cod"] },
-      client_secret: { type: String, required: false, default: undefined },
-      intent_id: { type: String, required: false },
-      method_id: { type: String, required: false },
-      status: { type: String, required: false, enum: ["success", "failed", "pending"] },
-   },
+   paymentMode: { type: String, required: false, enum: ["card", "cod"] },
 
-   cancel_reason: String,
+   paymentIntentId: { type: String, required: false },
+
+   paymentStatus: { type: String, required: false, enum: ["paid", "unpaid", "pending"] },
 
    refund: { type: Object, required: false },
 
-   order_placed_at: Object,
+   orderPlacedAt: Date,
 
-   order_shipped_at: Object,
+   orderShippedAt: Date,
 
-   order_completed_at: Object,
+   orderCompletedAt: Date,
 
-   order_canceled_at: Object,
+   orderCanceledAt: Date,
 
-   order_dispatched_at: Object,
+   orderDispatchedAt: Date,
 
-   is_rated: { type: Boolean, required: false },
-
-   is_canceled: Boolean,
-
-   is_completed: Boolean,
-
-   is_shipped: Boolean,
-
-   is_dispatched: { type: Boolean, required: false },
-
-   is_refunded: Boolean
+   isRefunded: Boolean
 });
 
-const Order = model("Order", orderSchema, "orders");
-module.exports = Order;
+
+
+var splitOrderSchema = new Schema({
+   _id: { type: Schema.Types.ObjectId, required: true },
+
+   customerId: { type: Schema.Types.ObjectId, required: true },
+
+   shippingAddress: { type: Object, required: true },
+
+   state: { type: String },
+
+   trackingId: { type: String },
+
+   productId: { type: Schema.Types.ObjectId, required: true },
+
+   supplierId: { type: Schema.Types.ObjectId, required: true },
+
+   title: { type: String, required: true },
+
+   imageUrl: String,
+
+   brand: { type: String, required: true },
+
+   sku: { type: String, required: true },
+
+   sellingPrice: { type: Number, required: true },
+
+   quantity: { type: Number, required: true },
+
+   amount: { type: Number, required: true },
+
+   orderStatus: {
+      type: String,
+      enum: ["placed", "shipped", "canceled", "dispatch", "refunded", "completed"],
+      default: 'placed'
+   },
+
+   paymentMode: { type: String, required: false, enum: ["card", "cod"] },
+
+   paymentStatus: { type: String, required: false, enum: ["paid", "unpaid", "pending"], default: "pending" },
+
+   paymentMethodId: { type: String, required: false },
+
+   paymentIntentId: { type: String, required: true },
+
+   cancelReason: String,
+
+   refund: { type: Object, required: false },
+
+   orderPlacedAt: Date,
+
+   orderShippedAt: Date,
+
+   orderCompletedAt: Date,
+
+   orderCanceledAt: Date,
+
+   orderDispatchedAt: Date,
+
+   isRated: { type: Boolean, required: false },
+
+   isRefunded: Boolean
+});
+
+
+module.exports = model("Order", orderSchema, "orders");

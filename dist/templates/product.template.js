@@ -1,16 +1,11 @@
 "use strict";
-const { stockStatus, calculateDiscount } = require("../utils/common");
-function product_variation_template_engine(body) {
-    var _a, _b;
-    let available = parseInt(body === null || body === void 0 ? void 0 : body.available) || 0;
-    let price = parseInt((_a = body === null || body === void 0 ? void 0 : body.pricing) === null || _a === void 0 ? void 0 : _a.price);
-    let sellingPrice = parseInt((_b = body === null || body === void 0 ? void 0 : body.pricing) === null || _b === void 0 ? void 0 : _b.sellingPrice);
+const { stockStatus, calculateDiscount, calculateVolumetricWeight } = require("../utils/common");
+function product_variation_template_engine({ available, pricing, attributes, sku }) {
+    let price = parseInt(pricing === null || pricing === void 0 ? void 0 : pricing.price);
+    let sellingPrice = parseInt(pricing === null || pricing === void 0 ? void 0 : pricing.sellingPrice);
     return {
-        sku: body === null || body === void 0 ? void 0 : body.sku,
-        variant: (body === null || body === void 0 ? void 0 : body.variant) || {},
-        brandColor: body === null || body === void 0 ? void 0 : body.brandColor,
-        attrs: (body === null || body === void 0 ? void 0 : body.attrs) || {},
-        images: body === null || body === void 0 ? void 0 : body.images,
+        sku,
+        attributes: attributes || {},
         pricing: {
             price,
             sellingPrice,
@@ -20,35 +15,42 @@ function product_variation_template_engine(body) {
         available,
     };
 }
-const product_listing_template_engine = (body, supplier) => {
-    let volumetricWeight = ((parseFloat(body === null || body === void 0 ? void 0 : body.packageHeight) * parseFloat(body === null || body === void 0 ? void 0 : body.packageLength) * parseFloat(body === null || body === void 0 ? void 0 : body.packageWidth)) / 5000).toFixed(1);
-    volumetricWeight = parseFloat(volumetricWeight);
+const product_listing_template_engine = (body, supplierId) => {
+    const packageHeight = parseFloat(body === null || body === void 0 ? void 0 : body.packageHeight);
+    const packageLength = parseFloat(body === null || body === void 0 ? void 0 : body.packageLength);
+    const packageWidth = parseFloat(body === null || body === void 0 ? void 0 : body.packageWidth);
+    const packageWeight = parseFloat(body === null || body === void 0 ? void 0 : body.packageWeight);
     return {
         title: body === null || body === void 0 ? void 0 : body.title,
         slug: body === null || body === void 0 ? void 0 : body.slug,
-        categories: [body === null || body === void 0 ? void 0 : body.category, body === null || body === void 0 ? void 0 : body.subCategory, body === null || body === void 0 ? void 0 : body.postCategory] || [],
-        brand: body === null || body === void 0 ? void 0 : body.brand,
+        imageUrls: (body === null || body === void 0 ? void 0 : body.images) || [],
+        categories: (body === null || body === void 0 ? void 0 : body.categories.split("/")) || [],
+        brand: (body === null || body === void 0 ? void 0 : body.brand) || "No Brand",
         highlights: (body === null || body === void 0 ? void 0 : body.highlights) || [],
-        supplier,
+        supplierId,
         packaged: {
             dimension: {
-                height: parseFloat(body === null || body === void 0 ? void 0 : body.packageHeight),
-                length: parseFloat(body === null || body === void 0 ? void 0 : body.packageLength),
-                width: parseFloat(body === null || body === void 0 ? void 0 : body.packageWidth)
+                height: packageHeight,
+                length: packageLength,
+                width: packageWidth
             },
-            weight: parseFloat(body === null || body === void 0 ? void 0 : body.packageWeight),
+            weight: packageWeight,
             weightUnit: 'kg',
             dimensionUnit: 'cm',
-            volumetricWeight,
+            volumetricWeight: calculateVolumetricWeight(packageHeight, packageLength, packageWidth),
             inTheBox: body === null || body === void 0 ? void 0 : body.inTheBox
         },
         shipping: {
             fulfilledBy: body === null || body === void 0 ? void 0 : body.fulfilledBy,
-            procurementType: body === null || body === void 0 ? void 0 : body.procurementType,
             procurementSLA: body === null || body === void 0 ? void 0 : body.procurementSLA,
             isFree: body === null || body === void 0 ? void 0 : body.isFree
         },
-        variations: [product_variation_template_engine(body === null || body === void 0 ? void 0 : body.variation)],
+        variations: [product_variation_template_engine({
+                attributes: body === null || body === void 0 ? void 0 : body.attributes,
+                sku: body === null || body === void 0 ? void 0 : body.sku,
+                available: parseInt(body === null || body === void 0 ? void 0 : body.available),
+                pricing: body === null || body === void 0 ? void 0 : body.pricing
+            })],
         manufacturer: {
             origin: body === null || body === void 0 ? void 0 : body.manufacturerOrigin,
             details: body === null || body === void 0 ? void 0 : body.manufacturerDetails,
@@ -57,7 +59,17 @@ const product_listing_template_engine = (body, supplier) => {
         keywords: body === null || body === void 0 ? void 0 : body.keywords,
         metaDescription: body === null || body === void 0 ? void 0 : body.metaDescription,
         specification: (body === null || body === void 0 ? void 0 : body.specification) || {},
-        description: (body === null || body === void 0 ? void 0 : body.description) || ""
+        description: (body === null || body === void 0 ? void 0 : body.description) || "",
+        rating: [
+            { weight: 5, count: 0 },
+            { weight: 4, count: 0 },
+            { weight: 3, count: 0 },
+            { weight: 2, count: 0 },
+            { weight: 1, count: 0 },
+        ],
+        ratingAverage: 0,
+        isVerified: false,
+        createdAt: new Date()
     };
 };
 module.exports = { product_listing_template_engine, product_variation_template_engine };

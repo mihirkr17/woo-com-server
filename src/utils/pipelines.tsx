@@ -26,7 +26,7 @@ module.exports.store_products_pipe = (page: any, Filter: any, sortList: any) => 
 
 module.exports.product_detail_pipe = (productID: string, sku: string) => {
    return [
-      { $match: { $and: [{ _id: mongoDB.ObjectId(productID) }, { status: "active" }] } },
+      { $match: { $and: [{ _id: mongoDB.ObjectId(productID) }, { status: "Active" }] } },
       {
          $addFields: {
             swatch: {
@@ -34,16 +34,8 @@ module.exports.product_detail_pipe = (productID: string, sku: string) => {
                   input: "$variations",
                   as: "variation",
                   in: {
-                     variant: "$$variation.variant",
+                     attributes: "$$variation.attributes",
                      sku: "$$variation.sku",
-                     brandColor: "$$variation.brandColor",
-                     images: {
-                        $cond: {
-                           if : {$ifNull: ["$$variation.images", false]},
-                           then: "$$variation.images",
-                           else: null
-                        }
-                     }
                   }
                }
             },
@@ -65,13 +57,13 @@ module.exports.product_detail_pipe = (productID: string, sku: string) => {
       },
       {
          $lookup: {
-            from: 'users',
-            localField: 'supplier.email',
-            foreignField: 'email',
-            as: 'user'
+            from: 'suppliers',
+            localField: 'supplierId',
+            foreignField: '_id',
+            as: 'store'
          }
       },
-      { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$user", 0] }, "$$ROOT"] } } },
+      { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$store", 0] }, "$$ROOT"] } } },
       {
          $project: {
             title: 1,
@@ -86,18 +78,10 @@ module.exports.product_detail_pipe = (productID: string, sku: string) => {
             sales: 1,
             views: 1,
             categories: 1,
-            supplier: {
-               email: "$email",
-               storeName: "$store.name",
-               phones: "$store.phones"
-            },
-            imageUrls: {
-               $cond: {
-                  if: { $ifNull: ["$variation.images", false] },
-                  then: "$variation.images",
-                  else: "$imageUrls"
-               }
-            },
+            supplierId: 1,
+            storeName: 1,
+            supplierPhone: "$phone",
+            imageUrls: 1,
             rating: 1,
             ratingAverage: 1,
             ratingCount: {
@@ -107,28 +91,24 @@ module.exports.product_detail_pipe = (productID: string, sku: string) => {
                   in: { $add: ["$$value", "$$this.count"] }
                }
             },
-            createdAt: 1,
-            keywords: 1,
             metaDescription: 1,
             description: 1,
             manufacturer: 1,
             highlights: 1,
             pricing: "$variation.pricing",
-            isFreeShipping: "$shipping.isFree",
+            isShippingFree: "$shipping.isFree",
             volumetricWeight: "$packaged.volumetricWeight",
             weight: "$packaged.weight",
-            weightUnit: "$packaged.weightUnit",
-            _lid: 1
+            weightUnit: "$packaged.weightUnit"
          }
       }
    ]
 }
 
 
-
 module.exports.product_detail_relate_pipe = (sku: string, categories: any[]) => {
    return [
-      { $match: { $and: [{ categories: { $in: categories } }, { status: "active" }] } },
+      { $match: { $and: [{ categories: { $in: categories } }, { status: "Active" }] } },
       {
          $addFields: {
             variations: {
@@ -144,7 +124,7 @@ module.exports.product_detail_relate_pipe = (sku: string, categories: any[]) => 
 
 module.exports.home_store_product_pipe = (totalLimit: number) => {
    return [
-      { $match: { status: "active" } },
+      { $match: { $and: [{ status: "Active" }, { isVerified: true }] } },
       {
          $addFields: {
             variations: {
@@ -162,7 +142,7 @@ module.exports.home_store_product_pipe = (totalLimit: number) => {
 
 module.exports.search_product_pipe = (q: any) => {
    return [
-      { $match: { status: "active" } },
+      { $match: { status: "Active" } },
       { $unwind: { path: "$variations" } },
       {
          $match: {
@@ -178,14 +158,8 @@ module.exports.search_product_pipe = (q: any) => {
             title: 1,
             categories: 1,
             sku: "$variations.sku",
-            assets: {
-               $ifNull: [
-                  { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.brandColor"] }] },
-                  null
-               ]
-            },
-            slug: 1,
-            _lid: 1
+            imageUrl: { $arrayElemAt: ["$imageUrls", 0] },
+            slug: 1
          },
       },
    ]
@@ -245,112 +219,116 @@ module.exports.ctg_main_product_pipe = (category: any, filterByBrand: string, fi
 }
 
 
-module.exports.single_purchase_pipe = (productID: string, sku: string, quantity: number) => {
+module.exports.single_purchase_pipe = (productId: string, sku: string, quantity: number) => {
 
    return [
-      { $match: { $and: [{ _id: mongoDB.ObjectId(productID) }, { status: "active" }] } },
+      { $match: { $and: [{ _id: mongoDB.ObjectId(productId) }, { status: "Active" }] } },
+      {
+         $lookup: {
+            from: 'suppliers',
+            localField: "supplierId",
+            foreignField: "_id",
+            as: "supplier"
+         }
+      },
+      { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$supplier", 0] }, "$$ROOT"] } } },
+      { $unset: ["supplier"] },
       {
          $addFields: {
-            variations: {
+            variation: {
                $arrayElemAt: [{
                   $filter: {
                      input: "$variations",
-                     cond: {
-                        $and: [
-                           { $eq: ['$$variation.sku', sku] },
-                           { $eq: ['$$variation.stock', "in"] },
-                           { $gte: ["$$variation.available", quantity] }
-                        ]
-                     },
+                     cond: { $eq: ['$$variation.sku', sku] },
                      as: "variation"
                   }
                }, 0]
-            },
-            quantity
+            }
          },
       },
       {
-         $project: {
-            _id: 0,
-            title: 1,
-            slug: 1,
-            brand: 1,
-            packaged: 1,
-            assets: {
-               $ifNull: [
-                  { $arrayElemAt: ["$options", { $indexOfArray: ["$options.color", "$variations.brandColor"] }] },
-                  null
+         $match: {
+            $expr: {
+               $and: [
+                  { $eq: ['$variation.stock', 'in'] },
+                  { $gte: ['$variation.available', quantity] }
                ]
-            },
-            sku: "$variations.sku",
-            supplier: 1,
-            shipping: 1,
-            savingAmount: {
-               $multiply: [{
-                  $subtract: ["$variations.pricing.price", "$variations.pricing.sellingPrice"]
-               }, quantity]
-            },
-            baseAmount: { $multiply: ["$variations.pricing.sellingPrice", quantity] },
-            sellingPrice: "$variations.pricing.sellingPrice",
-            paymentInfo: 1,
-            variant: "$variations.variant",
-            available: "$variations.available",
-            stock: "$variations.stock",
-            productID,
-            quantity: 1
+            }
          }
-      }, {
-         $unset: ["variations"]
+      },
+      {
+         $project: {
+            productId: "$_id",
+            _id: 0,
+            shipping: 1,
+            packaged: 1,
+            supplierId: 1,
+            supplierEmail: "$email",
+            storeName: 1,
+            title: 1,
+            brand: 1,
+            sku: "$variation.sku",
+            imageUrl: { $arrayElemAt: ["$imageUrls", 0] },
+            sellingPrice: "$variation.pricing.sellingPrice",
+            amount: { $multiply: ["$variation.pricing.sellingPrice", quantity] },
+            savingAmount: { $multiply: [{ $subtract: ["$variation.pricing.price", "$variation.pricing.sellingPrice"] }, quantity] },
+            price: "$variation.pricing.price",
+            attributes: "$variation.attributes",
+            available: "$variation.available",
+            stock: "$variation.stock"
+         }
+      },
+      {
+         $set: {
+            quantity,
+            itemId: Math.round(Math.random() * 9999999999)
+         }
       }
    ]
 }
 
 
-
-module.exports.shopping_cart_pipe = (email: string) => {
+module.exports.shopping_cart_pipe = (customerId: string) => {
    return [
-      { $match: { customerEmail: email } },
-      { $unwind: { path: "$items" } },
+      { $match: { customerId: mongoDB.ObjectId(customerId) } },
       {
          $lookup: {
             from: 'products',
-            localField: "items.listingID",
-            foreignField: "_lid",
+            localField: "productId",
+            foreignField: "_id",
             as: "main_product"
          }
       },
       { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$main_product", 0] }, "$$ROOT"] } } },
-      { $project: { main_product: 0 } },
+      { $unset: ["main_product"] },
+      {
+         $lookup: {
+            from: 'suppliers',
+            localField: "supplierId",
+            foreignField: "_id",
+            as: "supplier"
+         }
+      },
+      { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$supplier", 0] }, "$$ROOT"] } } },
+      { $unset: ["supplier"] },
       {
          $addFields: {
-            variations: {
-               $ifNull: [
+            variation: {
+               $arrayElemAt: [
                   {
-                     $arrayElemAt: [{
-                        $filter: {
-                           input: "$variations",
-                           cond: {
-                              $and: [
-                                 { $eq: ['$$variation.sku', '$items.sku'] },
-                                 { $eq: ['$$variation.stock', "in"] },
-                                 { $eq: ["$status", "active"] }
-                              ]
-                           },
-                           as: "variation"
-                        }
-                     }, 0]
+                     $filter: {
+                        input: '$variations',
+                        as: 'variation',
+                        cond: { $eq: ["$$variation.sku", "$sku"] },
+                     },
                   },
-                  {}
-               ]
-            }
+                  0
+               ],
+            },
          },
       },
-      {
-         $project: shoppingCartProject
-      },
-      {
-         $unset: ["variations", "items"]
-      }
+      { $match: { 'variation.stock': 'in' } },
+      { $project: shoppingCartProject }
    ]
 }
 

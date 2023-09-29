@@ -74,8 +74,13 @@ const supplierSchema = new Schema({
         landmark: { type: String, required: true },
         postal_code: { type: String, required: true }
     },
+    location: {
+        type: String,
+        latitude: Number,
+        longitude: Number
+    },
     idFor: { type: String, default: "sell" },
-    accountStatus: { type: String, enum: ["active", "inactive", "blocked"], default: "inactive", },
+    accountStatus: { type: String, enum: ["Active", "Inactive", "Blocked"], default: "Inactive", },
     authProvider: { type: String, enum: ['system', 'thirdParty'], default: 'system' },
     verified: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
@@ -86,13 +91,10 @@ supplierSchema.pre("save", function (next) {
         try {
             if (this.isModified("password")) {
                 this.password = yield bcrypt.hash(this.password, 10);
+                this.hasPassword = true;
             }
             this.authProvider = 'system';
-            this.role = "SUPPLIER";
-            this.idFor = "sell";
             this.contactEmail = this.email;
-            this.hasPassword = true;
-            this.accountStatus = "inactive";
             this.verified = false;
             next();
         }

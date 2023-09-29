@@ -37,6 +37,7 @@ module.exports.generateSixDigitNumber = () => {
 
 module.exports.generateJwtToken = (userInfo: any) => {
    const token = jwt.sign({
+      _id: userInfo?._id,
       fullName: userInfo?.fullName,
       _uuid: userInfo?._uuid,
       email: userInfo?.email,
@@ -69,10 +70,9 @@ module.exports.generateUserDataToken = (user: any) => {
 }
 
 
-module.exports.generateVerificationToken = (email: string) => {
-   const token = jwt.sign({
-      email
-   }, process.env.ACCESS_TOKEN, {
+module.exports.generateVerificationToken = (obj: any) => {
+
+   const token = jwt.sign(obj, process.env.ACCESS_TOKEN, {
       algorithm: "HS256",
       expiresIn: "1h",
    });

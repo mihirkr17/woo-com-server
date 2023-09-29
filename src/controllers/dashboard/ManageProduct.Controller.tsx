@@ -2,12 +2,9 @@
 
 import { NextFunction, Request, Response } from "express";
 const { ObjectId } = require("mongodb");
-const { product_listing_template_engine } = require("../../templates/product.template");
 const User = require("../../model/user.model");
 const QueueProduct = require("../../model/queueProduct.model");
 const Product = require("../../model/product.model");
-const { product_variation_template_engine } = require("../../templates/product.template");
-const { generateListingID } = require("../../utils/generator");
 const { Api400Error, Api500Error } = require("../../errors/apiResponse");
 
 
@@ -23,7 +20,7 @@ module.exports.productControlController = async (req: Request, res: Response, ne
 
       let filters: any;
 
-      if (actionFor === "status" && (["active", "inactive"].includes(actionType))) {
+      if (actionFor === "status" && (["Active", "Inactive"].includes(actionType))) {
          filters = {
             $set: { status: actionType }
          }
@@ -71,13 +68,13 @@ module.exports.viewAllProductsInDashboard = async (
       let showFor: any[];
       let src: any[] = [];
 
-      if (user.role === 'SELLER') {
+      if (user.role === 'SUPPLIER') {
          showFor = [
             { "supplier.storeName": user?.store?.name },
             { isVerified: true }
          ];
       } else {
-         showFor = [{ status: "active" }];
+         showFor = [{ status: "Active" }];
       }
 
       page = parseInt(page) === 1 ? 0 : parseInt(page) - 1;
@@ -133,7 +130,7 @@ module.exports.viewAllProductsInDashboard = async (
       draftProducts = await Product.aggregate([
          {
             $match: {
-               $and: [{ status: "inactive" }, { "supplier.storeName": user?.store?.name }]
+               $and: [{ status: "Inactive" }, { "supplier.storeName": user?.store?.name }]
             }
          },
          {
@@ -166,8 +163,8 @@ module.exports.viewAllProductsInDashboard = async (
          {
             $match: {
                $and: [
-                  user?.role === 'SELLER' && { "supplier.storeName": user?.store?.name },
-                  { status: 'inactive' }
+                  user?.role === 'SUPPLIER' && { "supplier.storeName": user?.store?.name },
+                  { status: 'Inactive' }
                ]
             }
          }

@@ -17,12 +17,13 @@ module.exports.allProductsBySupplier = async (
    next: NextFunction
 ) => {
    try {
-      const authEmail = req.decoded.email;
-      const role = req.decoded.role;
+      const { _id } = req.decoded as { _id: string };
 
       let { p_search, p_category, p_status } = req?.query;
 
-      const user = await Supplier.findOne({ $and: [{ email: authEmail }, { role }] });
+      const supplier = await Supplier.findOne({ _id: ObjectId(_id) });
+
+      if (!supplier) throw new Api403Error("Forbidden !");
 
       let item: any;
       let page: any;
@@ -30,14 +31,11 @@ module.exports.allProductsBySupplier = async (
       page = req.query.page;
       let products: any;
 
-      let showFor: any[] = [];
+      let showFor: any = {};
 
 
-      if (user.role === 'SUPPLIER') {
-         showFor = [
-            { "supplier.storeName": user?.storeName },
-            { "supplier.email": user?.email }
-         ];
+      if (supplier.role === 'SUPPLIER') {
+         showFor = { "supplier.storeId": ObjectId(_id) }
       }
 
       page = parseInt(page) === 1 ? 0 : parseInt(page) - 1;
@@ -64,12 +62,7 @@ module.exports.allProductsBySupplier = async (
       }
 
       products = await Product.aggregate([
-         {
-            $match: {
-               $and: showFor,
-            }
-         },
-
+         { $match: showFor },
          {
             $addFields: {
                totalVariation: { $cond: { if: { $isArray: "$variations" }, then: { $size: "$variations" }, else: 0 } }
@@ -82,6 +75,7 @@ module.exports.allProductsBySupplier = async (
             $project: {
                title: 1,
                slug: 1,
+               imageUrls: 1,
                categories: 1,
                variations: 1,
                brand: 1,
@@ -94,6 +88,7 @@ module.exports.allProductsBySupplier = async (
                totalVariation: 1
             }
          },
+         { $sort: { _id: -1 } },
          {
             $skip: page * parseInt(item)
          }, {
@@ -101,7 +96,7 @@ module.exports.allProductsBySupplier = async (
          }
       ]);
 
-      const totalCount = await Product.countDocuments({ $and: showFor });
+      const totalCount = await Product.countDocuments(showFor);
 
       return res.status(200).send({
          success: true,
@@ -126,8 +121,10 @@ module.exports.fetchSingleProduct = async (req: Request, res: Response, next: Ne
    }
 }
 
-module.exports.updateProductStatusController = async (req: Request, res: Response, next: NextFunction) => {
+module.exports.productStatusUpdateController = async (req: Request, res: Response, next: NextFunction) => {
    try {
+
+      const { _id } = req?.decoded;
 
       const status = ["Active", "Draft"];
 
@@ -139,7 +136,9 @@ module.exports.updateProductStatusController = async (req: Request, res: Respons
 
       if (!status.includes(statusValue)) throw new Api400Error("Invalid status action !");
 
-      await Product.findOneAndUpdate({ _id: ObjectId(productId) }, { status: statusValue });
+      const result = await Product.findOneAndUpdate({ $and: [{ _id: ObjectId(productId) }, { "supplier.storeId": ObjectId(_id) }] }, { status: statusValue });
+
+      if (!result) throw new Api400Error("Operation failed !");
 
       return res.status(200).send({ success: true, statusCode: 200, message: `Status updated to "${statusValue}"` });
    } catch (error: any) {
@@ -154,51 +153,27 @@ module.exports.productListingController = async (
    next: NextFunction
 ) => {
    try {
-      const authEmail = req.decoded.email;
-
-      const { formTypes } = req.params;
+      const { email } = req.decoded as { email: string };
 
       const body = req.body;
 
-      let model;
-
-      const supplier = await Supplier.findOne({ $and: [{ email: authEmail }, { role: 'SUPPLIER' }] });
+      const supplier = await Supplier.findOne({ email });
 
       if (!supplier) throw new Api403Error("Forbidden !");
 
-      if (formTypes === 'create') {
+      const model = product_listing_template_engine(body, supplier?._id);
 
-         if (!body?.variation) {
-            throw new Api400Error("Required variation !");
-         }
+      let product = new Product(model);
+      let result = await product.save();
 
-         model = product_listing_template_engine(body, { storeName: supplier?.storeName, storeId: supplier?._id });
+      if (!result) throw new Api500Error("Internal server error !");
 
-         model["rating"] = [
-            { weight: 5, count: 0 },
-            { weight: 4, count: 0 },
-            { weight: 3, count: 0 },
-            { weight: 2, count: 0 },
-            { weight: 1, count: 0 },
-         ];
+      return res.status(200).send({
+         success: true,
+         statusCode: 200,
+         message: "Product created successfully. It will take upto 24 hours to on live.",
+      });
 
-         model["ratingAverage"] = 0;
-         model['status'] = 'Queue';
-         model["createdAt"] = new Date();
-         model["_lid"] = generateListingID();
-         model["isVerified"] = false;
-
-         let product = new Product(model);
-         let results = await product.save();
-
-         if (results) {
-            return res.status(200).send({
-               success: true,
-               statusCode: 200,
-               message: "Product created successfully. It will take upto 24 hours to on live.",
-            });
-         }
-      }
    } catch (error: any) {
       next(error);
    }
@@ -209,17 +184,18 @@ module.exports.productVariationController = async (req: Request, res: Response, 
    try {
       let result: any;
 
-      const { productId, variation, formType } = req.body;
+      const { _id } = req?.decoded;
+      const { productId, variation, formType } = req.body as { formType: string, variation: Record<string, any>, productId: string };
 
       if (!ObjectId.isValid(productId)) throw new Api400Error("Invalid product id !");
 
-      let model = product_variation_template_engine(variation);
+      const model = product_variation_template_engine(variation);
 
       // Update variation
       if (formType === 'update-variation') {
 
          result = await Product.findOneAndUpdate(
-            { _id: ObjectId(productId) },
+            { $and: [{ _id: ObjectId(productId) }, { "supplier.storeId": ObjectId(_id) }] },
             { $set: { 'variations.$[i]': model } },
             { arrayFilters: [{ "i.sku": variation?.sku }] }
          );
@@ -229,7 +205,7 @@ module.exports.productVariationController = async (req: Request, res: Response, 
       // create new variation
       if (formType === 'new-variation') {
          result = await Product.findOneAndUpdate(
-            { _id: ObjectId(productId) },
+            { $and: [{ _id: ObjectId(productId) }, { "supplier.storeId": ObjectId(_id) }] },
             { $push: { variations: model } },
             { upsert: true }
          );
@@ -285,14 +261,14 @@ module.exports.productDeleteController = async (req: Request, res: Response, nex
 module.exports.productVariationDeleteController = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
-      const { productId, productSku, storeName } = req.params as { productId: string, productSku: string, storeName: string };
-      const { _id } = req?.decoded as { email: string, _id: string };
+      const { productId, productSku } = req.params as { productId: string, productSku: string };
+      const { _id } = req?.decoded as { _id: string };
 
       const product = await Product.findOne({
          $and: [
             { _id: ObjectId(productId) },
-            { "supplier.storeId": ObjectId(_id) },
-            { "supplier.storeName": storeName }]
+            { "supplier.storeId": ObjectId(_id) }
+         ]
       });
 
       if (!product)

@@ -19,10 +19,10 @@ const { get_review_product_details_pipe } = require("../../utils/pipelines");
 module.exports.addProductRating = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        const { _uuid } = req.decoded;
-        const { orderID, productID, ratingWeight, description, name, reviewImage } = req === null || req === void 0 ? void 0 : req.body;
+        const { _id } = req.decoded;
+        const { orderId, productId, ratingWeight, description, name, reviewImage } = req === null || req === void 0 ? void 0 : req.body;
         const [updatedProduct, newReview, orderUpdateResult] = yield Promise.all([
-            Product.findOneAndUpdate({ _id: ObjectId(productID) }, [
+            Product.findOneAndUpdate({ _id: ObjectId(productId) }, [
                 {
                     $set: {
                         rating: {
@@ -71,20 +71,20 @@ module.exports.addProductRating = (req, res, next) => __awaiter(void 0, void 0, 
                 }
             ], { new: true }),
             description && new Review({
-                product_id: productID,
-                order_id: orderID,
+                productId: productId,
+                orderId: orderId,
                 name,
-                customer_id: _uuid,
-                product_images: (_a = reviewImage.slice(0, 5)) !== null && _a !== void 0 ? _a : [],
+                customerId: _id,
+                productImages: (_a = reviewImage.slice(0, 5)) !== null && _a !== void 0 ? _a : [],
                 comments: description,
-                rating_point: parseInt(ratingWeight),
-                verified_purchase: true,
+                ratingPoint: parseInt(ratingWeight),
+                verifiedPurchase: true,
                 likes: [],
-                review_at: new Date(Date.now())
+                reviewAt: new Date(Date.now())
             }).save(),
-            Order.findOneAndUpdate({ order_id: orderID }, {
+            Order.findOneAndUpdate({ _id: ObjectId(orderId) }, {
                 $set: {
-                    is_rated: true,
+                    isRated: true,
                 }
             }, { upsert: true })
         ]);
@@ -99,15 +99,15 @@ module.exports.addProductRating = (req, res, next) => __awaiter(void 0, void 0, 
 module.exports.getReviews = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _b, _c;
     try {
-        const { productID } = req.params;
+        const { productId } = req.params;
         let { page, sort } = req.query;
-        if (!productID)
+        if (!productId)
             throw new Api400Error("Required product id !");
         page = page && parseInt(page);
         page = typeof page === "number" && page === 1 ? 0 : page - 1;
         let sortFilter = sort === "asc" ? { rating_point: 1 } : sort === "dsc" ? { rating_point: -1 } : { _id: -1 };
-        const result = (_b = yield Review.find({ product_id: ObjectId(productID) }).sort(sortFilter).skip(page * 2).limit(2)) !== null && _b !== void 0 ? _b : [];
-        const reviewCount = (_c = yield Review.countDocuments({ product_id: ObjectId(productID) })) !== null && _c !== void 0 ? _c : 0;
+        const result = (_b = yield Review.find({ productId: ObjectId(productId) }).sort(sortFilter).skip(page * 2).limit(2)) !== null && _b !== void 0 ? _b : [];
+        const reviewCount = (_c = yield Review.countDocuments({ productId: ObjectId(productId) })) !== null && _c !== void 0 ? _c : 0;
         res.status(200).send({ success: true, statusCode: 200, reviews: result, reviewCount });
     }
     catch (error) {
@@ -146,40 +146,20 @@ module.exports.toggleVotingLike = (req, res, next) => __awaiter(void 0, void 0, 
 //  get customer reviews in user account
 module.exports.getMyReviews = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { _uuid } = req.decoded;
-        const { uuid } = req.params;
-        if (_uuid !== uuid)
-            return next(new Api401Error("Unauthorized access !"));
+        const { _id } = req.decoded;
         const reviews = yield Review.aggregate([
-            { $match: { customer_id: uuid } },
+            { $match: { customerId: ObjectId(_id) } },
             {
                 $lookup: {
-                    from: 'order_table',
-                    localField: 'order_id',
-                    foreignField: 'orderID',
+                    from: 'orders',
+                    localField: 'orderId',
+                    foreignField: '_id',
                     as: 'order'
                 }
             },
             { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$order", 0] }, "$$ROOT"] } } },
             { $unset: ["order"] },
             {
-                $set: {
-                    item: {
-                        $arrayElemAt: [
-                            {
-                                $filter: {
-                                    input: "$items",
-                                    as: "item",
-                                    cond: { $eq: ["$$item.itemID", "$order_item_id"] }
-                                }
-                            },
-                            0
-                        ]
-                    }
-                }
-            }, {
-                $unset: ["items"]
-            }, {
                 $sort: { _id: -1 }
             }
         ]);
@@ -196,9 +176,9 @@ module.exports.getProductDetails = (req, res, next) => __awaiter(void 0, void 0,
             return next(new Api400Error("Required product and sku and order id !"));
         const getOrder = yield Order.findOne({
             $and: [
-                { order_id: oid },
-                { "product.product_id": pid },
-                { "product.sku": sku }
+                { _id: ObjectId(oid) },
+                { productId: ObjectId(pid) },
+                { sku: sku }
             ]
         });
         if (!getOrder)
