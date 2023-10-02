@@ -195,9 +195,9 @@ module.exports.ctg_filter_product_pipe = (category: any) => {
 }
 
 
-module.exports.ctg_main_product_pipe = (category: any, filterByBrand: string, filterByPriceRange: any, sorting: any) => {
+module.exports.ctg_main_product_pipe = (filters: any, filterByPriceRange: any, sorting: any) => {
    return [
-      { $match: { categories: { $all: category } } },
+      { $match: filters },
       {
          $addFields: {
             variations: {
@@ -211,7 +211,6 @@ module.exports.ctg_main_product_pipe = (category: any, filterByBrand: string, fi
             },
          },
       },
-      { $match: filterByBrand },
       { $project: basicProductProject },
       { $match: filterByPriceRange },
       sorting

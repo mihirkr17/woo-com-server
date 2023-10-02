@@ -71,6 +71,24 @@ module.exports.productsByCategoryController = (req, res, next) => __awaiter(void
         const { brand, sorted, price_range } = req.body;
         let newBrand = brand && brand.split("~");
         let category = (categories && categories.toString().split(",")) || [];
+        const queries = [];
+        if (brand) {
+            queries.push({ brand: { $regex: brand, $options: "i" } });
+        }
+        // if (sorted === "lowest") {
+        //    queries.push({ $sort: { "pricing.sellingPrice": 1 } });
+        // } else if (sorted === "highest") {
+        //    queries.push({ $sort: { "pricing.sellingPrice": -1 } });
+        // } else {
+        //    queries.push({ $sort: { "variations.modifiedAt": 1 } });
+        // }
+        if (category) {
+            queries.push({ categories: { $all: category } });
+        }
+        let filters = {};
+        if (queries.length >= 1) {
+            filters = { $and: queries };
+        }
         let sorting = {};
         if (sorted === "lowest") {
             sorting = { $sort: { "pricing.sellingPrice": 1 } };
@@ -86,7 +104,7 @@ module.exports.productsByCategoryController = (req, res, next) => __awaiter(void
             "pricing.sellingPrice": { $lte: parseInt(price_range) }
         } : {};
         const filterData = (yield Product.aggregate(ctg_filter_product_pipe(category))) || [];
-        const products = (yield Product.aggregate(ctg_main_product_pipe(category, filterByBrand, filterByPriceRange, sorting))) || [];
+        const products = (yield Product.aggregate(ctg_main_product_pipe(filters, filterByPriceRange, sorting))) || [];
         return products ? res.status(200).send({ success: true, statusCode: 200, products, filterData })
             : res.status(404).send({
                 success: false,
