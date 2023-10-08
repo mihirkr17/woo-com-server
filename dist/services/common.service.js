@@ -50,103 +50,62 @@ module.exports.findUserByUUID = (uuid) => __awaiter(void 0, void 0, void 0, func
 });
 module.exports.order_status_updater = (obj) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { customerEmail, type, orderID, cancelReason, refundAT, sellerEmail } = obj;
+        const { customerEmail, customerId, type, orderID, cancelReason, refundAT } = obj;
         let setQuery = {};
         const timestamp = Date.now();
-        let timePlan = {
-            iso: new Date(timestamp),
-            time: new Date(timestamp).toLocaleTimeString(),
-            date: new Date(timestamp).toDateString(),
-            timestamp: timestamp
-        };
         if (type === "dispatch") {
-            // await Promise.all(items.map(async (item: any) => {
-            //    return await OrderTable.findOneAndUpdate({
-            //       $and: [
-            //          { customerEmail }, { orderID },
-            //          { "seller.email": sellerEmail }]
-            //    }, {
-            //       $set: {
-            //          "items.$[i].tracking_id": generateTrackingID()
-            //       }
-            //    },
-            //       { arrayFilters: [{ "i.itemID": item?.itemID }], upsert: true });
-            // }));
             setQuery = {
                 $set: {
-                    order_status: "dispatch",
-                    order_dispatched_at: timePlan,
-                    is_dispatched: true,
-                    tracking_id: generateTrackingID()
+                    orderStatus: "dispatch",
+                    orderDispatchedAt: new Date(timestamp),
+                    trackingId: generateTrackingID()
                 }
             };
         }
         else if (type === "shipped") {
             setQuery = {
                 $set: {
-                    order_status: "shipped",
-                    order_shipped_at: timePlan,
-                    is_shipped: true
+                    orderStatus: "shipped",
+                    orderShippedAt: new Date(timestamp)
                 }
             };
         }
         else if (type === "completed") {
             setQuery = {
                 $set: {
-                    order_status: "completed",
-                    is_completed_at: timePlan,
-                    is_completed: true
+                    orderStatus: "completed",
+                    orderCompletedAt: new Date(timestamp)
                 }
             };
         }
         else if (type === "canceled" && cancelReason) {
             setQuery = {
                 $set: {
-                    order_status: "canceled",
-                    cancel_reason: cancelReason,
-                    order_canceled_at: timePlan,
-                    is_canceled: true
+                    orderStatus: "canceled",
+                    cancelReason: cancelReason,
+                    orderCanceledAt: new Date(timestamp)
                 }
             };
         }
         else if (type === "refunded" && refundAT) {
             setQuery = {
                 $set: {
-                    is_refunded: true,
-                    refund_at: refundAT,
-                    order_status: "refunded"
+                    isRefunded: true,
+                    refundAt: refundAT,
+                    orderStatus: "refunded"
                 }
             };
         }
         yield NCache.deleteCache(`${customerEmail}_myOrders`);
         return (yield Order.findOneAndUpdate({
             $and: [
-                { "customer.email": customerEmail },
-                { order_id: orderID },
-                { "supplier.email": sellerEmail }
+                { customerId: customerId },
+                { orderId: orderID }
             ]
         }, setQuery, { upsert: true })) ? true : false;
     }
     catch (error) {
         return error === null || error === void 0 ? void 0 : error.message;
-    }
-});
-module.exports.get_product_variation = (data) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        let variation = yield Product.aggregate([
-            { $match: { $and: [{ _lid: data === null || data === void 0 ? void 0 : data.listingID }, { _id: mdb.ObjectId(data === null || data === void 0 ? void 0 : data.productID) }] } },
-            { $unwind: { path: "$variations" } },
-            { $project: { variations: 1 } },
-            { $match: { $and: [{ "variations.sku": data === null || data === void 0 ? void 0 : data.sku }] } },
-            { $replaceRoot: { newRoot: { $mergeObjects: ["$variations", "$$ROOT"] } } },
-            { $unset: ["variations"] }
-        ]);
-        if (variation) {
-            return variation[0];
-        }
-    }
-    catch (error) {
-        return error;
     }
 });
 module.exports.update_variation_stock_available = (type, data) => __awaiter(void 0, void 0, void 0, function* () {
@@ -220,50 +179,6 @@ module.exports.update_variation_stock_available = (type, data) => __awaiter(void
 module.exports.getSupplierInformationByID = (uuid) => __awaiter(void 0, void 0, void 0, function* () {
     return yield Supplier.findOne({ _id: mdb.ObjectId(uuid) }, { password: 0 });
 });
-module.exports.is_product = (productID, sku) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        return (yield Product.countDocuments({
-            $and: [
-                { _id: mdb.ObjectId(productID) },
-                { variations: { $elemMatch: { sku } } }
-            ]
-        })) || 0;
-    }
-    catch (error) {
-        return error;
-    }
-});
-module.exports.productCounter = (sellerInfo) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        function cps(saveAs = "") {
-            return __awaiter(this, void 0, void 0, function* () {
-                let f;
-                if (sellerInfo) {
-                    f = {
-                        "supplier.email": sellerInfo === null || sellerInfo === void 0 ? void 0 : sellerInfo.email
-                    };
-                }
-                else {
-                    f = {};
-                }
-                return yield Product.countDocuments(f);
-            });
-        }
-        let totalProducts = yield cps();
-        let inactiveProducts = yield cps("Inactive");
-        const setData = yield UserModel.updateOne({ $and: [{ _uuid: sellerInfo === null || sellerInfo === void 0 ? void 0 : sellerInfo._uuid }, { role: 'SELLER' }] }, {
-            $set: {
-                "store.info.numOfProduct": totalProducts,
-                "store.info.inactiveProducts": inactiveProducts
-            }
-        }, {});
-        if (setData)
-            return true;
-    }
-    catch (error) {
-        return error;
-    }
-});
 module.exports.checkProductAvailability = (productID, sku) => __awaiter(void 0, void 0, void 0, function* () {
     let product = yield Product.aggregate([
         { $match: { _id: mdb.ObjectId(productID) } },
@@ -284,48 +199,69 @@ module.exports.clearCart = (customerId, customerEmail) => __awaiter(void 0, void
     yield NCache.deleteCache(`${customerEmail}_cartProducts`);
     return yield ShoppingCartModel.deleteMany({ customerId: mdb.ObjectId(customerId) });
 });
-module.exports.updateProductInformation = (product, option) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.updateProductPerform = (product, actionType) => __awaiter(void 0, void 0, void 0, function* () {
     const { _id, views, ratingAverage, sales } = product;
     let viewsWeight = 0.4;
     let ratingWeight = 0.5;
     let salesWeight = 0.3;
-    let totalViews = (option === null || option === void 0 ? void 0 : option.actionType) === "views" ? ((views !== null && views !== void 0 ? views : 0) + 1) : (views !== null && views !== void 0 ? views : 0);
-    let totalSales = (option === null || option === void 0 ? void 0 : option.actionType) === "sales" ? (sales !== null && sales !== void 0 ? sales : 0) + 1 : (sales !== null && sales !== void 0 ? sales : 0);
-    let score = (totalViews * viewsWeight) + (ratingAverage * ratingWeight) + (totalSales * salesWeight);
     try {
-        yield Product.findOneAndUpdate({ $and: [{ _id: mdb.ObjectId(_id) }, { status: "Active" }] }, {
-            $set: {
-                views: totalViews,
-                score: score
+        return yield Product.findOneAndUpdate({ $and: [{ _id: mdb.ObjectId(_id) }, { status: "Active" }] }, [
+            {
+                $set: {
+                    views: actionType === "views" ? { $add: [{ $ifNull: ["$views", 0] }, 1] } : "$views",
+                    sales: actionType === "sales" ? { $add: [{ $ifNull: ["$sales", 0] }, 1] } : "$sales",
+                    score: {
+                        $add: [
+                            { $multiply: ["$views", viewsWeight] },
+                            { $multiply: [{ $ifNull: ["$ratingAverage", 0] }, ratingWeight] },
+                            { $multiply: [{ $ifNull: ["$sales", 0] }, salesWeight] },
+                        ]
+                    },
+                },
             }
-        }, { upsert: true });
-        return { request: "Request success..." };
+        ], { upsert: true, new: true });
     }
     catch (error) {
-        return error;
+        console.log(error);
     }
+    // let totalViews = actionType === "views" ? views + 1 : views;
+    // let totalSales = actionType === "sales" ? sales + 1 : sales;
+    // let score = (totalViews * viewsWeight) + (ratingAverage * ratingWeight) + (totalSales * salesWeight);
+    // try {
+    //    return await Product.findOneAndUpdate({ $and: [{ _id: mdb.ObjectId(_id) }, { status: "Active" }] }, {
+    //       $set: {
+    //          views: totalViews,
+    //          score: score
+    //       }
+    //    }, { upsert: true });
+    // } catch (error: any) {
+    // }
 });
 module.exports.createPaymentIntents = (totalAmount, orderId, paymentMethodId, session, ip, userAgent) => __awaiter(void 0, void 0, void 0, function* () {
-    const paymentIntent = yield stripe.paymentIntents.create({
-        amount: (totalAmount * 100),
-        currency: 'bdt',
-        metadata: {
-            order_id: orderId
-        },
-        confirm: true,
-        automatic_payment_methods: { enabled: true },
-        payment_method: paymentMethodId,
-        return_url: 'https://example.com/order/123/complete',
-        use_stripe_sdk: true,
-        mandate_data: {
-            customer_acceptance: {
-                type: "online",
-                online: {
-                    ip_address: ip,
-                    user_agent: userAgent //req.get("user-agent"),
+    try {
+        const paymentIntent = yield stripe.paymentIntents.create({
+            amount: (totalAmount * 100),
+            currency: 'bdt',
+            metadata: {
+                order_id: orderId
+            },
+            confirm: true,
+            automatic_payment_methods: { enabled: true },
+            payment_method: paymentMethodId,
+            return_url: 'https://example.com/order/123/complete',
+            use_stripe_sdk: true,
+            mandate_data: {
+                customer_acceptance: {
+                    type: "online",
+                    online: {
+                        ip_address: ip,
+                        user_agent: userAgent //req.get("user-agent"),
+                    },
                 },
             },
-        },
-    }, { idempotencyKey: session });
-    return paymentIntent;
+        }, { idempotencyKey: session });
+        return paymentIntent;
+    }
+    catch (error) {
+    }
 });

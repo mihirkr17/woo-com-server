@@ -11,13 +11,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const Product = require("../../model/product.model");
-const { findUserByEmail, updateProductInformation } = require("../../services/common.service");
+const { findUserByEmail, updateProductPerform } = require("../../services/common.service");
 const { calculateShippingCost, calculatePopularityScore, cartContextCalculation } = require("../../utils/common");
 const { product_detail_pipe, product_detail_relate_pipe, home_store_product_pipe, search_product_pipe, single_purchase_pipe, ctg_filter_product_pipe, ctg_main_product_pipe } = require("../../utils/pipelines");
 const NodeCache = require("../../utils/NodeCache");
 const PrivacyPolicy = require("../../model/privacyPolicy.model");
 const { Api400Error } = require("../../errors/apiResponse");
-const { validEmail } = require("../../utils/validator");
 const User = require("../../model/user.model");
 const { ObjectId } = require("mongodb");
 const Review = require("../../model/reviews.model");
@@ -43,7 +42,13 @@ module.exports.fetchProductDetails = (req, res, next) => __awaiter(void 0, void 
             productDetail = yield Product.aggregate(product_detail_pipe(productID, sku)).allowDiskUse(true);
             productDetail = productDetail[0];
             if (oTracker) {
-                yield updateProductInformation(productDetail, { actionType: "views" });
+                yield updateProductPerform({
+                    _id: productID,
+                    sku: sku,
+                    views: (productDetail === null || productDetail === void 0 ? void 0 : productDetail.views) || 0,
+                    ratingAverage: (productDetail === null || productDetail === void 0 ? void 0 : productDetail.ratingAverage) || 0,
+                    sales: (productDetail === null || productDetail === void 0 ? void 0 : productDetail.sales) || 0
+                }, "views");
             }
             // productDetail["policies"] = await PrivacyPolicy.findOne({}) ?? {};
             NodeCache.saveCache(`${productID}_${sku}`, productDetail);
@@ -54,7 +59,7 @@ module.exports.fetchProductDetails = (req, res, next) => __awaiter(void 0, void 
         return res.status(200).send({
             success: true,
             statusCode: 200,
-            data: { product: productDetail !== null && productDetail !== void 0 ? productDetail : {}, relatedProducts: relatedProducts !== null && relatedProducts !== void 0 ? relatedProducts : [], }
+            data: { product: productDetail || {}, relatedProducts: relatedProducts || [], }
         });
     }
     catch (error) {
@@ -67,27 +72,18 @@ module.exports.fetchProductDetails = (req, res, next) => __awaiter(void 0, void 
  */
 module.exports.productsByCategoryController = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { categories } = req.query;
-        const { brand, sorted, price_range } = req.body;
-        let newBrand = brand && brand.split("~");
-        let category = (categories && categories.toString().split(",")) || [];
+        const { price_range, queries: qq } = req.body;
+        const { brand, ctg, sorted, filters } = qq;
         const queries = [];
         if (brand) {
-            queries.push({ brand: { $regex: brand, $options: "i" } });
+            queries.push({ brand: { $regex: new RegExp(brand === null || brand === void 0 ? void 0 : brand.split(",").join('|'), 'i') } });
         }
-        // if (sorted === "lowest") {
-        //    queries.push({ $sort: { "pricing.sellingPrice": 1 } });
-        // } else if (sorted === "highest") {
-        //    queries.push({ $sort: { "pricing.sellingPrice": -1 } });
-        // } else {
-        //    queries.push({ $sort: { "variations.modifiedAt": 1 } });
-        // }
-        if (category) {
-            queries.push({ categories: { $all: category } });
+        if (ctg) {
+            queries.push({ categories: { $all: ctg } });
         }
-        let filters = {};
+        let filterOption = {};
         if (queries.length >= 1) {
-            filters = { $and: queries };
+            filterOption = { $and: queries };
         }
         let sorting = {};
         if (sorted === "lowest") {
@@ -97,14 +93,10 @@ module.exports.productsByCategoryController = (req, res, next) => __awaiter(void
             sorting = { $sort: { "pricing.sellingPrice": -1 } };
         }
         else {
-            sorting = { $sort: { "variations.modifiedAt": 1 } };
+            sorting = { $sort: { score: 1 } };
         }
-        let filterByBrand = newBrand ? { brand: { $in: newBrand } } : {};
-        let filterByPriceRange = price_range ? {
-            "pricing.sellingPrice": { $lte: parseInt(price_range) }
-        } : {};
-        const filterData = (yield Product.aggregate(ctg_filter_product_pipe(category))) || [];
-        const products = (yield Product.aggregate(ctg_main_product_pipe(filters, filterByPriceRange, sorting))) || [];
+        const filterData = (yield Product.aggregate(ctg_filter_product_pipe(ctg))) || [];
+        const products = (yield Product.aggregate(ctg_main_product_pipe(filterOption, sorting))) || [];
         return products ? res.status(200).send({ success: true, statusCode: 200, products, filterData })
             : res.status(404).send({
                 success: false,
@@ -152,14 +144,14 @@ module.exports.homeStoreController = (req, res, next) => __awaiter(void 0, void 
 });
 module.exports.fetchTopSellingProduct = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const seller = req.query.seller;
+        const sid = req.query.sid;
         let filterQuery = {
             status: "Active",
         };
-        if (seller) {
-            filterQuery['SELLER'] = seller;
+        if (sid) {
+            filterQuery['supplierId'] = ObjectId(sid);
         }
-        const result = yield Product.find(filterQuery).sort({ "stockInfo.sold": -1 }).limit(6).toArray();
+        const result = yield Product.find(filterQuery).sort({ sales: -1 }).limit(6).toArray();
         return res.status(200).send(result);
     }
     catch (error) {

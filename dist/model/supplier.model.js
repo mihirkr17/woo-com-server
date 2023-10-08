@@ -63,9 +63,6 @@ const supplierSchema = new Schema({
     },
     dob: { type: String, required: true },
     taxID: { type: String, required: false },
-    numOfProducts: { type: Number, required: false },
-    productInFulfilled: { type: Number, required: false },
-    productInDraft: { type: Number, required: false },
     address: {
         country: { type: String, required: true },
         division: { type: String, required: true },

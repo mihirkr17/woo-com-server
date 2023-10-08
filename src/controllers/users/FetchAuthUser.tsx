@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-const { productCounter, findUserByEmail } = require("../../services/common.service");
+const { findUserByEmail } = require("../../services/common.service");
 const apiResponse = require("../../errors/apiResponse");
 const { generateUserDataToken } = require("../../utils/generator");
 

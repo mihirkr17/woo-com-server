@@ -12,11 +12,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const Product = require("../../model/product.model");
 const { Api400Error } = require("../../errors/apiResponse");
 const { store_products_pipe } = require("../../utils/pipelines");
+const { ObjectId } = require("mongodb");
 module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     try {
         const { storeName } = req === null || req === void 0 ? void 0 : req.params;
-        const { page, sorted } = req.query;
+        const { page, sorted, id } = req.query;
         const filters = (_a = req.query) === null || _a === void 0 ? void 0 : _a.filters;
         const regex = /[<>{}|\\^%]/g;
         if (typeof storeName !== "string")
@@ -34,7 +35,7 @@ module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, 
         }, {});
         let Filter = {};
         Filter["$and"] = [
-            { "supplier.storeName": storeName },
+            { supplierId: ObjectId(id) },
             { status: "Active" },
         ];
         let sortList = {};
@@ -68,7 +69,7 @@ module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, 
             { $match: Filter },
             {
                 $group: {
-                    _id: "$supplier.storeName",
+                    _id: "$supplierId",
                     totalProduct: { $count: {} },
                 }
             },
@@ -77,19 +78,27 @@ module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, 
         filteringProductTotal = filteringProductTotal[0];
         let storeInfo = yield Product.aggregate([
             {
-                $match: {
-                    $and: [
-                        { "supplier.storeName": storeName },
-                        { status: "Active" }
-                    ]
-                }
+                $match: { $and: [{ status: "Active" }, { supplierId: ObjectId(id) }] }
             },
             {
                 $project: {
-                    supplier: 1,
-                    pricing: 1,
+                    variation: {
+                        $ifNull: [
+                            {
+                                $arrayElemAt: [{
+                                        $filter: {
+                                            input: "$variations",
+                                            as: "vars",
+                                            cond: { $eq: ["$$vars.stock", "in"] }
+                                        }
+                                    }, 0]
+                            },
+                            {}
+                        ]
+                    },
                     rating: 1,
                     categories: 1,
+                    supplierId: 1,
                     brand: 1,
                     totalMulti: {
                         $reduce: {
@@ -108,8 +117,17 @@ module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, 
                 }
             },
             {
+                $lookup: {
+                    from: 'suppliers',
+                    localField: "supplierId",
+                    foreignField: '_id',
+                    as: 'supplier'
+                }
+            },
+            { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$supplier", 0] }, "$$ROOT"] } } },
+            {
                 $group: {
-                    _id: "$supplier.email",
+                    _id: "$storeName",
                     totalProduct: { $count: {} },
                     categories: { $push: { $last: "$categories" } },
                     brands: { $push: "$brand" },
@@ -118,18 +136,10 @@ module.exports.getStore = (req, res, next) => __awaiter(void 0, void 0, void 0, 
                 }
             },
             {
-                $lookup: {
-                    from: 'users',
-                    localField: "_id",
-                    foreignField: '_uuid',
-                    as: 'user'
-                }
-            },
-            { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$user", 0] }, "$$ROOT"] } } },
-            {
                 $project: {
-                    store: 1,
-                    _id: 0,
+                    storeName: 1,
+                    supplier: 1,
+                    _id: 1,
                     totalProduct: 1,
                     brands: 1,
                     categories: 1,

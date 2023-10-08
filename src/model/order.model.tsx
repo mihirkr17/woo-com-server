@@ -9,11 +9,11 @@ var orderSchema = new Schema({
 
    state: { type: String },
 
+   trackingId: { type: String },
+
    items: [{
 
       _id: false,
-
-      trackingId: { type: String },
 
       productId: { type: Schema.Types.ObjectId, required: true },
 

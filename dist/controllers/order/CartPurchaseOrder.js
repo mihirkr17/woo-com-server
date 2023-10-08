@@ -10,8 +10,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const { startSession } = require('mongoose');
 const { Api400Error, Api500Error } = require("../../errors/apiResponse");
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const ShoppingCart = require("../../model/shoppingCart.model");
 const { findUserByEmail, createPaymentIntents, clearCart, update_variation_stock_available } = require("../../services/common.service");
 const { cartContextCalculation } = require("../../utils/common");
@@ -22,6 +22,8 @@ const { shopping_cart_pipe } = require("../../utils/pipelines");
 module.exports = function CartPurchaseOrder(req, res, next) {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
+        const session = yield startSession();
+        session.startTransaction();
         try {
             const { email, _id } = req.decoded;
             // initialized current time stamp
@@ -29,7 +31,7 @@ module.exports = function CartPurchaseOrder(req, res, next) {
             if (!req.body || typeof req.body === "undefined")
                 throw new Api400Error("Required body !");
             // get state by body
-            const { state, paymentMethodId, session } = req.body;
+            const { state, paymentMethodId, session: paymentSessionId } = req.body;
             if (!paymentMethodId)
                 throw new Api500Error("Required payment method id !");
             // finding user by email;
@@ -79,7 +81,7 @@ module.exports = function CartPurchaseOrder(req, res, next) {
             if (!(result === null || result === void 0 ? void 0 : result._id))
                 throw new Api500Error("Sorry! Order not placed.");
             // creating payment throw payment intent
-            const intent = yield createPaymentIntents(finalAmount, result === null || result === void 0 ? void 0 : result._id.toString(), paymentMethodId, session, req === null || req === void 0 ? void 0 : req.ip, req.get("user-agent"));
+            const intent = yield createPaymentIntents(finalAmount, result === null || result === void 0 ? void 0 : result._id.toString(), paymentMethodId, paymentSessionId, req === null || req === void 0 ? void 0 : req.ip, req.get("user-agent"));
             // if payment success then change order payment status and save
             if (intent === null || intent === void 0 ? void 0 : intent.id) {
                 order.paymentIntentId = intent === null || intent === void 0 ? void 0 : intent.id;
@@ -92,6 +94,8 @@ module.exports = function CartPurchaseOrder(req, res, next) {
             ]);
             if (!orderResult)
                 throw new Api500Error("Internal server error !");
+            yield session.commitTransaction();
+            session.endSession();
             // after success return the response to the client
             return res.status(200).send({
                 success: true,
@@ -103,7 +107,8 @@ module.exports = function CartPurchaseOrder(req, res, next) {
             });
         }
         catch (error) {
-            console.log(error === null || error === void 0 ? void 0 : error.name);
+            yield session.abortTransaction();
+            session.endSession();
             next(error);
         }
     });

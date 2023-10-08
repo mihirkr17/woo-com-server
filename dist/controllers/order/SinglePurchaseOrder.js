@@ -9,10 +9,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const { startSession } = require("mongoose");
 const Product = require("../../model/product.model");
-const { ObjectId } = require("mongodb");
 const apiResponse = require("../../errors/apiResponse");
-const { findUserByEmail, createPaymentIntents } = require("../../services/common.service");
+const { findUserByEmail, createPaymentIntents, update_variation_stock_available } = require("../../services/common.service");
 const email_service = require("../../services/email.service");
 const { buyer_order_email_template, seller_order_email_template } = require("../../templates/email.template");
 const Order = require("../../model/order.model");
@@ -21,12 +21,14 @@ const { single_purchase_pipe } = require("../../utils/pipelines");
 module.exports = function SinglePurchaseOrder(req, res, next) {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
+        const session = yield startSession();
+        session.startTransaction();
         try {
             const { email, _id } = req.decoded;
             const timestamp = Date.now();
             if (!req.body)
                 throw new apiResponse.Api503Error("Service unavailable !");
-            const { sku, productId, quantity, session, paymentMethodId } = req.body;
+            const { sku, productId, quantity, session: paymentSessionId, paymentMethodId } = req.body;
             if (!sku || !productId || !quantity || !paymentMethodId)
                 throw new apiResponse.Api400Error("Required sku, product id, quantity, paymentMethodId");
             const user = yield findUserByEmail(email);
@@ -49,13 +51,20 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
                 totalAmount: finalAmount
             });
             const result = yield order.save();
-            const intent = yield createPaymentIntents(finalAmount, result === null || result === void 0 ? void 0 : result._id.toString(), paymentMethodId, session, req === null || req === void 0 ? void 0 : req.ip, req.get("user-agent"));
+            const intent = yield createPaymentIntents(finalAmount, result === null || result === void 0 ? void 0 : result._id.toString(), paymentMethodId, paymentSessionId, req === null || req === void 0 ? void 0 : req.ip, req.get("user-agent"));
             // if payment success then change order payment status and save
             if (intent === null || intent === void 0 ? void 0 : intent.id) {
                 order.paymentIntentId = intent === null || intent === void 0 ? void 0 : intent.id;
                 order.paymentStatus = "paid";
-                yield order.save();
             }
+            const [orderResult, updateInventoryResult] = yield Promise.all([
+                order.save(),
+                update_variation_stock_available("dec", item)
+            ]);
+            if (!orderResult)
+                throw new Api500Error("Internal server error !");
+            yield session.commitTransaction();
+            session.endSession();
             // after success return the response to the client
             return res.status(200).send({
                 success: true,
@@ -67,6 +76,8 @@ module.exports = function SinglePurchaseOrder(req, res, next) {
             });
         }
         catch (error) {
+            yield session.abortTransaction();
+            session.endSession();
             next(error);
         }
     });

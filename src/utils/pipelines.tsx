@@ -32,10 +32,11 @@ module.exports.product_detail_pipe = (productID: string, sku: string) => {
             swatch: {
                $map: {
                   input: "$variations",
-                  as: "variation",
+                  as: "vars",
                   in: {
-                     attributes: "$$variation.attributes",
-                     sku: "$$variation.sku",
+                     attributes: "$$vars.attributes",
+                     sku: "$$vars.sku",
+                     stock: "$$vars.stock"
                   }
                }
             },
@@ -45,8 +46,8 @@ module.exports.product_detail_pipe = (productID: string, sku: string) => {
                      $arrayElemAt: [{
                         $filter: {
                            input: "$variations",
-                           as: "variation",
-                           cond: { $eq: ["$$variation.sku", sku] }
+                           as: "vars",
+                           cond: { $eq: ["$$vars.sku", sku] }
                         }
                      }, 0]
                   },
@@ -96,7 +97,6 @@ module.exports.product_detail_pipe = (productID: string, sku: string) => {
             manufacturer: 1,
             highlights: 1,
             pricing: "$variation.pricing",
-            isShippingFree: "$shipping.isFree",
             volumetricWeight: "$packaged.volumetricWeight",
             weight: "$packaged.weight",
             weightUnit: "$packaged.weightUnit"
@@ -112,7 +112,7 @@ module.exports.product_detail_relate_pipe = (sku: string, categories: any[]) => 
       {
          $addFields: {
             variations: {
-               $arrayElemAt: ["$variations", 0]
+               $ifNull: [{ $arrayElemAt: ["$variations", { $floor: { $multiply: [{ $rand: {} }, { $size: "$variations" }] } }] }, {}]
             }
          }
       },
@@ -195,7 +195,7 @@ module.exports.ctg_filter_product_pipe = (category: any) => {
 }
 
 
-module.exports.ctg_main_product_pipe = (filters: any, filterByPriceRange: any, sorting: any) => {
+module.exports.ctg_main_product_pipe = (filters: any, sorting: any) => {
    return [
       { $match: filters },
       {
@@ -212,7 +212,6 @@ module.exports.ctg_main_product_pipe = (filters: any, filterByPriceRange: any, s
          },
       },
       { $project: basicProductProject },
-      { $match: filterByPriceRange },
       sorting
    ]
 }

@@ -29,10 +29,11 @@ module.exports.product_detail_pipe = (productID, sku) => {
                 swatch: {
                     $map: {
                         input: "$variations",
-                        as: "variation",
+                        as: "vars",
                         in: {
-                            attributes: "$$variation.attributes",
-                            sku: "$$variation.sku",
+                            attributes: "$$vars.attributes",
+                            sku: "$$vars.sku",
+                            stock: "$$vars.stock"
                         }
                     }
                 },
@@ -42,8 +43,8 @@ module.exports.product_detail_pipe = (productID, sku) => {
                             $arrayElemAt: [{
                                     $filter: {
                                         input: "$variations",
-                                        as: "variation",
-                                        cond: { $eq: ["$$variation.sku", sku] }
+                                        as: "vars",
+                                        cond: { $eq: ["$$vars.sku", sku] }
                                     }
                                 }, 0]
                         },
@@ -93,7 +94,6 @@ module.exports.product_detail_pipe = (productID, sku) => {
                 manufacturer: 1,
                 highlights: 1,
                 pricing: "$variation.pricing",
-                isShippingFree: "$shipping.isFree",
                 volumetricWeight: "$packaged.volumetricWeight",
                 weight: "$packaged.weight",
                 weightUnit: "$packaged.weightUnit"
@@ -107,7 +107,7 @@ module.exports.product_detail_relate_pipe = (sku, categories) => {
         {
             $addFields: {
                 variations: {
-                    $arrayElemAt: ["$variations", 0]
+                    $ifNull: [{ $arrayElemAt: ["$variations", { $floor: { $multiply: [{ $rand: {} }, { $size: "$variations" }] } }] }, {}]
                 }
             }
         },
@@ -182,7 +182,7 @@ module.exports.ctg_filter_product_pipe = (category) => {
         }
     ];
 };
-module.exports.ctg_main_product_pipe = (filters, filterByPriceRange, sorting) => {
+module.exports.ctg_main_product_pipe = (filters, sorting) => {
     return [
         { $match: filters },
         {
@@ -199,7 +199,6 @@ module.exports.ctg_main_product_pipe = (filters, filterByPriceRange, sorting) =>
             },
         },
         { $project: basicProductProject },
-        { $match: filterByPriceRange },
         sorting
     ];
 };

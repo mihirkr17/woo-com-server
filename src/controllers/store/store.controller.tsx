@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 const Product = require("../../model/product.model");
 const { Api400Error } = require("../../errors/apiResponse");
 const { store_products_pipe } = require("../../utils/pipelines");
+const { ObjectId } = require("mongodb");
 
 
 
@@ -10,7 +11,7 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
    try {
 
       const { storeName } = req?.params;
-      const { page, sorted } = req.query;
+      const { page, sorted, id } = req.query;
       const filters: any = req.query?.filters;
 
       const regex = /[<>{}|\\^%]/g;
@@ -34,7 +35,7 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
       let Filter: any = {};
 
       Filter["$and"] = [
-         { "supplier.storeName": storeName },
+         { supplierId: ObjectId(id) },
          { status: "Active" },
       ];
 
@@ -74,7 +75,7 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
          { $match: Filter },
          {
             $group: {
-               _id: "$supplier.storeName",
+               _id: "$supplierId",
                totalProduct: { $count: {} },
             }
          },
@@ -85,20 +86,27 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
 
       let storeInfo = await Product.aggregate([
          {
-            $match: {
-               $and: [
-                  { "supplier.storeName": storeName },
-                  { status: "Active" }
-               ]
-            }
+            $match: { $and: [{ status: "Active" }, { supplierId: ObjectId(id) }] }
          },
-
          {
             $project: {
-               supplier: 1,
-               pricing: 1,
+               variation: {
+                  $ifNull: [
+                     {
+                        $arrayElemAt: [{
+                           $filter: {
+                              input: "$variations",
+                              as: "vars",
+                              cond: { $eq: ["$$vars.stock", "in"] }
+                           }
+                        }, 0]
+                     },
+                     {}
+                  ]
+               },
                rating: 1,
                categories: 1,
+               supplierId: 1,
                brand: 1,
                totalMulti: {
                   $reduce: {
@@ -117,8 +125,17 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
             }
          },
          {
+            $lookup: {
+               from: 'suppliers',
+               localField: "supplierId",
+               foreignField: '_id',
+               as: 'supplier'
+            }
+         },
+         { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$supplier", 0] }, "$$ROOT"] } } },
+         {
             $group: {
-               _id: "$supplier.email",
+               _id: "$storeName",
                totalProduct: { $count: {} },
                categories: { $push: { $last: "$categories" } },
                brands: { $push: "$brand" },
@@ -126,19 +143,12 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
                totalRatingMulti: { $sum: "$totalMulti" }
             }
          },
-         {
-            $lookup: {
-               from: 'users',
-               localField: "_id",
-               foreignField: '_uuid',
-               as: 'user'
-            }
-         },
-         { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$user", 0] }, "$$ROOT"] } } },
+
          {
             $project: {
-               store: 1,
-               _id: 0,
+               storeName: 1,
+               supplier: 1,
+               _id: 1,
                totalProduct: 1,
                brands: 1,
                categories: 1,
@@ -155,6 +165,7 @@ module.exports.getStore = async (req: Request, res: Response, next: NextFunction
       ]);
 
       storeInfo = storeInfo[0];
+
 
       return res.status(200).send({
          success: true, statusCode: 200, data: {

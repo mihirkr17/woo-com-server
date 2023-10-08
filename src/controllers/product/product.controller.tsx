@@ -3,13 +3,12 @@
 
 import { NextFunction, Request, Response } from "express";
 const Product = require("../../model/product.model");
-const { findUserByEmail, updateProductInformation } = require("../../services/common.service");
+const { findUserByEmail, updateProductPerform } = require("../../services/common.service");
 const { calculateShippingCost, calculatePopularityScore, cartContextCalculation } = require("../../utils/common");
 const { product_detail_pipe, product_detail_relate_pipe, home_store_product_pipe, search_product_pipe, single_purchase_pipe, ctg_filter_product_pipe, ctg_main_product_pipe } = require("../../utils/pipelines");
 const NodeCache = require("../../utils/NodeCache");
 const PrivacyPolicy = require("../../model/privacyPolicy.model");
 const { Api400Error } = require("../../errors/apiResponse");
-const { validEmail } = require("../../utils/validator");
 const User = require("../../model/user.model");
 const { ObjectId } = require("mongodb");
 const Review = require("../../model/reviews.model");
@@ -43,7 +42,13 @@ module.exports.fetchProductDetails = async (req: Request, res: Response, next: N
 
 
          if (oTracker) {
-            await updateProductInformation(productDetail, { actionType: "views" });
+            await updateProductPerform({
+               _id: productID,
+               sku: sku,
+               views: productDetail?.views || 0,
+               ratingAverage: productDetail?.ratingAverage || 0,
+               sales: productDetail?.sales || 0
+            }, "views");
          }
 
          // productDetail["policies"] = await PrivacyPolicy.findOne({}) ?? {};
@@ -58,7 +63,7 @@ module.exports.fetchProductDetails = async (req: Request, res: Response, next: N
       return res.status(200).send({
          success: true,
          statusCode: 200,
-         data: { product: productDetail ?? {}, relatedProducts: relatedProducts ?? [], }
+         data: { product: productDetail || {}, relatedProducts: relatedProducts || [], }
       });
 
    } catch (error: any) {
@@ -74,38 +79,26 @@ module.exports.fetchProductDetails = async (req: Request, res: Response, next: N
 module.exports.productsByCategoryController = async (req: Request, res: Response, next: any) => {
    try {
 
-      const { categories } = req.query;
-      const { brand, sorted, price_range } = req.body;
 
+      const { price_range, queries: qq } = req.body;
 
-      let newBrand = brand && brand.split("~");
-
-      let category: String[] =
-         (categories && categories.toString().split(",")) || [];
+      const { brand, ctg, sorted, filters } = qq;
 
       const queries: any = [];
 
       if (brand) {
-         queries.push({ brand: { $regex: brand, $options: "i" } });
+         queries.push({ brand: { $regex: new RegExp(brand?.split(",").join('|'), 'i') } });
       }
 
-      // if (sorted === "lowest") {
-      //    queries.push({ $sort: { "pricing.sellingPrice": 1 } });
-      // } else if (sorted === "highest") {
-      //    queries.push({ $sort: { "pricing.sellingPrice": -1 } });
-      // } else {
-      //    queries.push({ $sort: { "variations.modifiedAt": 1 } });
-      // }
-
-      if (category) {
-         queries.push({ categories: { $all: category } });
+      if (ctg) {
+         queries.push({ categories: { $all: ctg } });
       }
 
 
-      let filters = {};
+      let filterOption = {};
 
       if (queries.length >= 1) {
-         filters = { $and: queries }
+         filterOption = { $and: queries }
       }
 
       let sorting = {};
@@ -115,18 +108,15 @@ module.exports.productsByCategoryController = async (req: Request, res: Response
       } else if (sorted === "highest") {
          sorting = { $sort: { "pricing.sellingPrice": -1 } }
       } else {
-         sorting = { $sort: { "variations.modifiedAt": 1 } }
+         sorting = { $sort: { score: 1 } }
       }
 
-      let filterByBrand = newBrand ? { brand: { $in: newBrand } } : {}
 
-      let filterByPriceRange = price_range ? {
-         "pricing.sellingPrice": { $lte: parseInt(price_range) }
-      } : {}
 
-      const filterData = await Product.aggregate(ctg_filter_product_pipe(category)) || [];
 
-      const products = await Product.aggregate(ctg_main_product_pipe(filters, filterByPriceRange, sorting)) || [];
+      const filterData = await Product.aggregate(ctg_filter_product_pipe(ctg)) || [];
+
+      const products = await Product.aggregate(ctg_main_product_pipe(filterOption, sorting)) || [];
 
 
       return products ? res.status(200).send({ success: true, statusCode: 200, products, filterData })
@@ -191,16 +181,16 @@ module.exports.homeStoreController = async (req: Request, res: Response, next: N
 module.exports.fetchTopSellingProduct = async (req: Request, res: Response, next: NextFunction) => {
    try {
 
-      const seller: any = req.query.seller;
+      const sid: any = req.query.sid;
 
       let filterQuery: any = {
          status: "Active",
       };
-      if (seller) {
-         filterQuery['SELLER'] = seller;
+      if (sid) {
+         filterQuery['supplierId'] = ObjectId(sid);
       }
 
-      const result = await Product.find(filterQuery).sort({ "stockInfo.sold": -1 }).limit(6).toArray();
+      const result = await Product.find(filterQuery).sort({ sales: -1 }).limit(6).toArray();
 
       return res.status(200).send(result);
 

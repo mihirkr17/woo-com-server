@@ -1,9 +1,9 @@
 
 // src/controllers/order/CartPurchaseOrder.tsx
 
+const { startSession } = require('mongoose');
 import { NextFunction, Request, Response } from "express";
 const { Api400Error, Api500Error } = require("../../errors/apiResponse");
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const ShoppingCart = require("../../model/shoppingCart.model");
 const { findUserByEmail, createPaymentIntents, clearCart, update_variation_stock_available } = require("../../services/common.service");
 const { cartContextCalculation } = require("../../utils/common");
@@ -15,6 +15,10 @@ const { shopping_cart_pipe } = require("../../utils/pipelines");
 
 
 module.exports = async function CartPurchaseOrder(req: Request, res: Response, next: NextFunction) {
+
+   const session = await startSession();
+   session.startTransaction();
+
    try {
 
       const { email, _id } = req.decoded;
@@ -26,7 +30,7 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
          throw new Api400Error("Required body !");
 
       // get state by body
-      const { state, paymentMethodId, session } = req.body;
+      const { state, paymentMethodId, session: paymentSessionId } = req.body;
 
       if (!paymentMethodId) throw new Api500Error("Required payment method id !");
 
@@ -95,7 +99,7 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
       if (!result?._id) throw new Api500Error("Sorry! Order not placed.");
 
       // creating payment throw payment intent
-      const intent = await createPaymentIntents(finalAmount, result?._id.toString(), paymentMethodId, session, req?.ip, req.get("user-agent"));
+      const intent = await createPaymentIntents(finalAmount, result?._id.toString(), paymentMethodId, paymentSessionId, req?.ip, req.get("user-agent"));
 
       // if payment success then change order payment status and save
       if (intent?.id) {
@@ -111,7 +115,8 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
 
       if (!orderResult) throw new Api500Error("Internal server error !");
 
-
+      await session.commitTransaction();
+      session.endSession();
       // after success return the response to the client
       return res.status(200).send({
          success: true,
@@ -123,8 +128,8 @@ module.exports = async function CartPurchaseOrder(req: Request, res: Response, n
       });
 
    } catch (error: any) {
-
-      console.log(error?.name);
+      await session.abortTransaction();
+      session.endSession();
       next(error);
    }
 };

@@ -48,39 +48,18 @@ module.exports.findUserByUUID = async (uuid: string) => {
 
 module.exports.order_status_updater = async (obj: any) => {
    try {
-      const { customerEmail, type, orderID, cancelReason, refundAT, sellerEmail } = obj;
+      const { customerEmail, customerId, type, orderID, cancelReason, refundAT } = obj;
 
       let setQuery: any = {};
       const timestamp = Date.now();
 
-      let timePlan = {
-         iso: new Date(timestamp),
-         time: new Date(timestamp).toLocaleTimeString(),
-         date: new Date(timestamp).toDateString(),
-         timestamp: timestamp
-      };
-
       if (type === "dispatch") {
-         // await Promise.all(items.map(async (item: any) => {
-
-         //    return await OrderTable.findOneAndUpdate({
-         //       $and: [
-         //          { customerEmail }, { orderID },
-         //          { "seller.email": sellerEmail }]
-         //    }, {
-         //       $set: {
-         //          "items.$[i].tracking_id": generateTrackingID()
-         //       }
-         //    },
-         //       { arrayFilters: [{ "i.itemID": item?.itemID }], upsert: true });
-         // }));
 
          setQuery = {
             $set: {
-               order_status: "dispatch",
-               order_dispatched_at: timePlan,
-               is_dispatched: true,
-               tracking_id: generateTrackingID()
+               orderStatus: "dispatch",
+               orderDispatchedAt: new Date(timestamp),
+               trackingId: generateTrackingID()
             }
          }
       }
@@ -88,9 +67,8 @@ module.exports.order_status_updater = async (obj: any) => {
       else if (type === "shipped") {
          setQuery = {
             $set: {
-               order_status: "shipped",
-               order_shipped_at: timePlan,
-               is_shipped: true
+               orderStatus: "shipped",
+               orderShippedAt: new Date(timestamp)
             }
          }
       }
@@ -98,9 +76,8 @@ module.exports.order_status_updater = async (obj: any) => {
       else if (type === "completed") {
          setQuery = {
             $set: {
-               order_status: "completed",
-               is_completed_at: timePlan,
-               is_completed: true
+               orderStatus: "completed",
+               orderCompletedAt: new Date(timestamp)
             }
          }
       }
@@ -108,10 +85,9 @@ module.exports.order_status_updater = async (obj: any) => {
       else if (type === "canceled" && cancelReason) {
          setQuery = {
             $set: {
-               order_status: "canceled",
-               cancel_reason: cancelReason,
-               order_canceled_at: timePlan,
-               is_canceled: true
+               orderStatus: "canceled",
+               cancelReason: cancelReason,
+               orderCanceledAt: new Date(timestamp)
             }
          }
       }
@@ -119,9 +95,9 @@ module.exports.order_status_updater = async (obj: any) => {
       else if (type === "refunded" && refundAT) {
          setQuery = {
             $set: {
-               is_refunded: true,
-               refund_at: refundAT,
-               order_status: "refunded"
+               isRefunded: true,
+               refundAt: refundAT,
+               orderStatus: "refunded"
             }
          }
       }
@@ -130,9 +106,8 @@ module.exports.order_status_updater = async (obj: any) => {
 
       return await Order.findOneAndUpdate({
          $and: [
-            { "customer.email": customerEmail },
-            { order_id: orderID },
-            { "supplier.email": sellerEmail }
+            { customerId: customerId },
+            { orderId: orderID }
          ]
       }, setQuery,
          { upsert: true }) ? true : false;
@@ -141,28 +116,6 @@ module.exports.order_status_updater = async (obj: any) => {
       return error?.message;
    }
 }
-
-
-module.exports.get_product_variation = async (data: any) => {
-   try {
-
-      let variation = await Product.aggregate([
-         { $match: { $and: [{ _lid: data?.listingID }, { _id: mdb.ObjectId(data?.productID) }] } },
-         { $unwind: { path: "$variations" } },
-         { $project: { variations: 1 } },
-         { $match: { $and: [{ "variations.sku": data?.sku }] } },
-         { $replaceRoot: { newRoot: { $mergeObjects: ["$variations", "$$ROOT"] } } },
-         { $unset: ["variations"] }
-      ]);
-
-      if (variation) {
-         return variation[0];
-      }
-
-   } catch (error: any) {
-      return error;
-   }
-};
 
 
 module.exports.update_variation_stock_available = async (type: string, data: any[]) => {
@@ -248,56 +201,6 @@ module.exports.getSupplierInformationByID = async (uuid: string) => {
 }
 
 
-module.exports.is_product = async (productID: string, sku: string) => {
-   try {
-      return await Product.countDocuments({
-         $and: [
-            { _id: mdb.ObjectId(productID) },
-            { variations: { $elemMatch: { sku } } }
-         ]
-      }) || 0;
-   } catch (error: any) {
-      return error;
-   }
-}
-
-
-module.exports.productCounter = async (sellerInfo: any) => {
-   try {
-
-      async function cps(saveAs: string = "") {
-         let f;
-
-         if (sellerInfo) {
-            f = {
-               "supplier.email": sellerInfo?.email
-            }
-         } else {
-            f = {};
-         }
-         return await Product.countDocuments(f);
-      }
-
-      let totalProducts: Number = await cps();
-
-
-      let inactiveProducts: Number = await cps("Inactive");
-
-      const setData = await UserModel.updateOne({ $and: [{ _uuid: sellerInfo?._uuid }, { role: 'SELLER' }] }, {
-         $set: {
-            "store.info.numOfProduct": totalProducts,
-            "store.info.inactiveProducts": inactiveProducts
-         }
-      }, {});
-
-      if (setData) return true;
-
-   } catch (error: any) {
-      return error;
-   }
-}
-
-
 module.exports.checkProductAvailability = async (productID: string, sku: String) => {
 
    let product = await Product.aggregate([
@@ -325,57 +228,87 @@ module.exports.clearCart = async (customerId: string, customerEmail: string) => 
 }
 
 
-module.exports.updateProductInformation = async (product: any, option: any) => {
+module.exports.updateProductPerform = async (product: any, actionType: string) => {
 
-   const { _id, views, ratingAverage, sales } = product;
+   const { _id, views, ratingAverage, sales } = product as { _id: string, views: number, ratingAverage: number, sales: number };
 
    let viewsWeight = 0.4;
    let ratingWeight = 0.5;
    let salesWeight = 0.3;
 
-   let totalViews = option?.actionType === "views" ? ((views ?? 0) + 1) : (views ?? 0);
-   let totalSales = option?.actionType === "sales" ? (sales ?? 0) + 1 : (sales ?? 0);
-
-   let score = (totalViews * viewsWeight) + (ratingAverage * ratingWeight) + (totalSales * salesWeight);
-
    try {
-      await Product.findOneAndUpdate({ $and: [{ _id: mdb.ObjectId(_id) }, { status: "Active" }] }, {
-         $set: {
-            views: totalViews,
-            score: score
-         }
-      }, { upsert: true });
+      return await Product.findOneAndUpdate(
+         { $and: [{ _id: mdb.ObjectId(_id) }, { status: "Active" }] },
+         [
+            {
+               $set: {
+                  views: actionType === "views" ? { $add: [{ $ifNull: ["$views", 0] }, 1] } : "$views",
+                  sales: actionType === "sales" ? { $add: [{ $ifNull: ["$sales", 0] }, 1] } : "$sales",
+                  score: {
+                     $add: [
+                        { $multiply: ["$views", viewsWeight] },
+                        { $multiply: [{ $ifNull: ["$ratingAverage", 0] }, ratingWeight] },
+                        { $multiply: [{ $ifNull: ["$sales", 0] }, salesWeight] },
+                     ]
 
-      return { request: "Request success..." };
+                  },
+               },
+            }
+         ],
+         { upsert: true, new: true }
+      );
    } catch (error: any) {
-      return error;
+      console.log(error);
    }
+
+   // let totalViews = actionType === "views" ? views + 1 : views;
+
+   // let totalSales = actionType === "sales" ? sales + 1 : sales;
+
+   // let score = (totalViews * viewsWeight) + (ratingAverage * ratingWeight) + (totalSales * salesWeight);
+
+
+
+   // try {
+   //    return await Product.findOneAndUpdate({ $and: [{ _id: mdb.ObjectId(_id) }, { status: "Active" }] }, {
+   //       $set: {
+   //          views: totalViews,
+   //          score: score
+   //       }
+   //    }, { upsert: true });
+   // } catch (error: any) {
+
+   // }
 }
 
 
 module.exports.createPaymentIntents = async (totalAmount: number, orderId: string, paymentMethodId: string, session: string, ip: any, userAgent: any) => {
 
-   const paymentIntent = await stripe.paymentIntents.create({
-      amount: (totalAmount * 100),
-      currency: 'bdt',
-      metadata: {
-         order_id: orderId
-      },
-      confirm: true,
-      automatic_payment_methods: { enabled: true },
-      payment_method: paymentMethodId, // the PaymentMethod ID sent by your client
-      return_url: 'https://example.com/order/123/complete',
-      use_stripe_sdk: true,
-      mandate_data: {
-         customer_acceptance: {
-            type: "online",
-            online: {
-               ip_address: ip,
-               user_agent: userAgent //req.get("user-agent"),
+   try {
+      const paymentIntent = await stripe.paymentIntents.create({
+         amount: (totalAmount * 100),
+         currency: 'bdt',
+         metadata: {
+            order_id: orderId
+         },
+         confirm: true,
+         automatic_payment_methods: { enabled: true },
+         payment_method: paymentMethodId, // the PaymentMethod ID sent by your client
+         return_url: 'https://example.com/order/123/complete',
+         use_stripe_sdk: true,
+         mandate_data: {
+            customer_acceptance: {
+               type: "online",
+               online: {
+                  ip_address: ip,
+                  user_agent: userAgent //req.get("user-agent"),
+               },
             },
          },
-      },
-   }, { idempotencyKey: session });
+      }, { idempotencyKey: session });
 
-   return paymentIntent;
+      return paymentIntent;
+   } catch (error: any) {
+
+   }
 }

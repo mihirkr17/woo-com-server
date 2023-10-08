@@ -13,8 +13,8 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 module.exports = function RetrievePaymentIntent(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const intentID = req.params.intentID;
-            const paymentIntent = yield stripe.paymentIntents.retrieve(intentID);
+            const { intentId } = req.params;
+            const paymentIntent = yield stripe.paymentIntents.retrieve(intentId);
             return res.status(200).send(paymentIntent);
         }
         catch (error) {

@@ -5,9 +5,9 @@ var orderSchema = new mongoose_1.Schema({
     customerId: { type: mongoose_1.Schema.Types.ObjectId, required: true },
     shippingAddress: { type: Object, required: true },
     state: { type: String },
+    trackingId: { type: String },
     items: [{
             _id: false,
-            trackingId: { type: String },
             productId: { type: mongoose_1.Schema.Types.ObjectId, required: true },
             itemId: { type: Number, required: true },
             supplierId: { type: mongoose_1.Schema.Types.ObjectId, required: true },

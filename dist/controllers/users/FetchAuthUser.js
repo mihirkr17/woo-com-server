@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const { productCounter, findUserByEmail } = require("../../services/common.service");
+const { findUserByEmail } = require("../../services/common.service");
 const apiResponse = require("../../errors/apiResponse");
 const { generateUserDataToken } = require("../../utils/generator");
 module.exports = function FetchAuthUser(req, res, next) {
