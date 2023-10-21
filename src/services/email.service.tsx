@@ -2,7 +2,13 @@ const nodemailer = require("nodemailer");
 const { google } = require("googleapis");
 const OAuth2 = google.auth.OAuth2;
 
-module.exports = async function email_service(option: any) {
+
+/**
+ * 
+ * @param option 
+ * @returns 
+ */
+async function smtpSender(option: any) {
    try {
       const { to, subject, html } = option;
 
@@ -42,3 +48,5 @@ module.exports = async function email_service(option: any) {
       return error;
    }
 }
+
+module.exports = smtpSender;

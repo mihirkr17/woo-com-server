@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const router = express_1.default.Router();
 const { verifyJWT } = require("../middlewares/auth.middleware");
-const { privacyPolicy, updatePolicy } = require("../controllers/policy/policy.controller");
+const { privacyPolicy, updatePolicy } = require("../controllers/policy.controller");
 try {
     router.get("/privacy-policy", privacyPolicy);
     router.put("/update-policy/:policyId", verifyJWT, updatePolicy);

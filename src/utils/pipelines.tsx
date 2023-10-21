@@ -330,7 +330,7 @@ module.exports.shopping_cart_pipe = (customerId: string) => {
    ]
 }
 
-module.exports.get_review_product_details_pipe = (pid: string, sku: string) => {
+module.exports.product_detail_review_pipe = (pid: string, sku: string) => {
    return [
       { $match: { _id: mongoDB.ObjectId(pid) } },
       {

@@ -12,8 +12,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 const mdb = require("mongodb");
 const Product = require("../model/product.model");
 const UserModel = require("../model/user.model");
-const OrderModel = require("../model/order.model");
-const OrderTable = require("../model/orderTable.model");
 const ShoppingCartModel = require("../model/shoppingCart.model");
 const cryptos = require("crypto");
 const apiResponse = require("../errors/apiResponse");
@@ -24,31 +22,34 @@ const Supplier = require("../model/supplier.model");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 module.exports.findUserByEmail = (email) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        return (yield UserModel.findOne({ $and: [{ email: email }, { accountStatus: 'Active' }] }, {
+        return yield UserModel.findOne({ $and: [{ email: email }, { accountStatus: 'Active' }] }, {
             password: 0,
             createdAt: 0,
             phonePrefixCode: 0,
             becomeSellerAt: 0
-        })) || null;
+        });
     }
     catch (error) {
-        return error;
+        throw error;
     }
 });
-module.exports.findUserByUUID = (uuid) => __awaiter(void 0, void 0, void 0, function* () {
+/**
+ * @params {id} user _id
+ */
+module.exports.findUserById = (id) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        return (yield UserModel.findOne({ $and: [{ _uuid: uuid }, { accountStatus: 'Active' }] }, {
+        return yield UserModel.findOne({ $and: [{ _id: mdb.ObjectId(id) }, { accountStatus: 'Active' }] }, {
             password: 0,
             createdAt: 0,
             phonePrefixCode: 0,
             becomeSellerAt: 0
-        })) || null;
+        });
     }
     catch (error) {
-        return error;
+        throw error;
     }
 });
-module.exports.order_status_updater = (obj) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.orderStatusUpdater = (obj) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { customerEmail, customerId, type, orderID, cancelReason, refundAT } = obj;
         let setQuery = {};
@@ -105,18 +106,15 @@ module.exports.order_status_updater = (obj) => __awaiter(void 0, void 0, void 0,
         }, setQuery, { upsert: true })) ? true : false;
     }
     catch (error) {
-        return error === null || error === void 0 ? void 0 : error.message;
+        throw error;
     }
 });
-module.exports.update_variation_stock_available = (type, data) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.productStockUpdater = (type, data) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        if (!type) {
+        if (!type)
             throw new Error("Required action !");
-        }
-        if (!data || !Array.isArray(data)) {
+        if (!data || !Array.isArray(data))
             throw new apiResponse.Api500Error("Required product id, sku, quantity !");
-            // throw new Error("Required product id, sku, quantity !");
-        }
         const bulkOperations = [];
         for (const item of data) {
             const filter = {
@@ -177,29 +175,44 @@ module.exports.update_variation_stock_available = (type, data) => __awaiter(void
     }
 });
 module.exports.getSupplierInformationByID = (uuid) => __awaiter(void 0, void 0, void 0, function* () {
-    return yield Supplier.findOne({ _id: mdb.ObjectId(uuid) }, { password: 0 });
+    try {
+        return yield Supplier.findOne({ _id: mdb.ObjectId(uuid) }, { password: 0 });
+    }
+    catch (error) {
+        throw error;
+    }
 });
 module.exports.checkProductAvailability = (productID, sku) => __awaiter(void 0, void 0, void 0, function* () {
-    let product = yield Product.aggregate([
-        { $match: { _id: mdb.ObjectId(productID) } },
-        { $unwind: { path: "$variations" } },
-        {
-            $project: {
-                sku: "$variations.sku",
-                available: "$variations.available",
-                stock: "$variations.stock"
-            }
-        },
-        { $match: { $and: [{ sku }, { available: { $gte: 1 } }, { stock: 'in' }] } }
-    ]);
-    product = product[0];
-    return product;
+    try {
+        let product = yield Product.aggregate([
+            { $match: { _id: mdb.ObjectId(productID) } },
+            { $unwind: { path: "$variations" } },
+            {
+                $project: {
+                    sku: "$variations.sku",
+                    available: "$variations.available",
+                    stock: "$variations.stock"
+                }
+            },
+            { $match: { $and: [{ sku }, { available: { $gte: 1 } }, { stock: 'in' }] } }
+        ]);
+        product = product[0];
+        return product;
+    }
+    catch (error) {
+        throw error;
+    }
 });
 module.exports.clearCart = (customerId, customerEmail) => __awaiter(void 0, void 0, void 0, function* () {
-    yield NCache.deleteCache(`${customerEmail}_cartProducts`);
-    return yield ShoppingCartModel.deleteMany({ customerId: mdb.ObjectId(customerId) });
+    try {
+        yield NCache.deleteCache(`${customerEmail}_cartProducts`);
+        return yield ShoppingCartModel.deleteMany({ customerId: mdb.ObjectId(customerId) });
+    }
+    catch (error) {
+        throw error;
+    }
 });
-module.exports.updateProductPerform = (product, actionType) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.updateProductPerformance = (product, actionType) => __awaiter(void 0, void 0, void 0, function* () {
     const { _id, views, ratingAverage, sales } = product;
     let viewsWeight = 0.4;
     let ratingWeight = 0.5;
@@ -222,20 +235,8 @@ module.exports.updateProductPerform = (product, actionType) => __awaiter(void 0,
         ], { upsert: true, new: true });
     }
     catch (error) {
-        console.log(error);
+        throw error;
     }
-    // let totalViews = actionType === "views" ? views + 1 : views;
-    // let totalSales = actionType === "sales" ? sales + 1 : sales;
-    // let score = (totalViews * viewsWeight) + (ratingAverage * ratingWeight) + (totalSales * salesWeight);
-    // try {
-    //    return await Product.findOneAndUpdate({ $and: [{ _id: mdb.ObjectId(_id) }, { status: "Active" }] }, {
-    //       $set: {
-    //          views: totalViews,
-    //          score: score
-    //       }
-    //    }, { upsert: true });
-    // } catch (error: any) {
-    // }
 });
 module.exports.createPaymentIntents = (totalAmount, orderId, paymentMethodId, session, ip, userAgent) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -263,5 +264,6 @@ module.exports.createPaymentIntents = (totalAmount, orderId, paymentMethodId, se
         return paymentIntent;
     }
     catch (error) {
+        throw error;
     }
 });

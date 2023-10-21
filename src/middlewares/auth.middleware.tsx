@@ -58,7 +58,7 @@ const isRoleOwnerOrAdmin = async (req: Request, res: Response, next: NextFunctio
 };
 
 // verify seller
-const isRoleSeller = async (req: Request, res: Response, next: NextFunction) => {
+const isSupplier = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authRole = req.decoded.role;
 
@@ -73,25 +73,21 @@ const isRoleSeller = async (req: Request, res: Response, next: NextFunction) => 
 };
 
 // verify seller
-const isRoleBuyer = async (req: Request, res: Response, next: NextFunction) => {
+const isBuyer = (req: Request, res: Response, next: NextFunction) => {
 
-  try {
-    const authRole = req.decoded.role;
+  const authRole = req.decoded.role;
 
-    if (authRole === "BUYER") {
-      next();
-    } else {
-      throw new apiResponse.Api403Error("Forbidden access !");
-    }
-  } catch (error: any) {
-    next(error);
+  if (authRole === "BUYER") {
+    next();
+  } else {
+    throw new apiResponse.Api403Error("Forbidden access !");
   }
 };
 
 
 
 // admin authorization
-const isRoleAdmin = async (req: Request, res: Response, next: NextFunction) => {
+const isAdmin = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authRole: String = req.decoded.role;
 
@@ -124,7 +120,7 @@ const isPermitForDashboard = async (req: Request, res: Response, next: NextFunct
 
 
 async function verifyEmailByJWT(req: Request, res: Response, next: NextFunction) {
-  const token = req.query; // getting from query
+  const { token } = req.query; // getting from query
 
   // if token not present in cookies then return 401 unauthorized errors...
   if (!token || typeof token === "undefined") {
@@ -146,8 +142,9 @@ async function verifyEmailByJWT(req: Request, res: Response, next: NextFunction)
 module.exports = {
   verifyJWT,
   isRoleOwnerOrAdmin,
-  isRoleSeller,
-  isRoleBuyer,
-  isRoleAdmin,
-  isPermitForDashboard
+  isSupplier,
+  isBuyer,
+  isAdmin,
+  isPermitForDashboard,
+  verifyEmailByJWT
 };

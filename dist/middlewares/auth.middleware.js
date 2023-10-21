@@ -58,7 +58,7 @@ const isRoleOwnerOrAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0,
     }
 });
 // verify seller
-const isRoleSeller = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+const isSupplier = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const authRole = req.decoded.role;
         if (authRole === 'SUPPLIER') {
@@ -73,22 +73,17 @@ const isRoleSeller = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
     }
 });
 // verify seller
-const isRoleBuyer = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const authRole = req.decoded.role;
-        if (authRole === "BUYER") {
-            next();
-        }
-        else {
-            throw new apiResponse.Api403Error("Forbidden access !");
-        }
+const isBuyer = (req, res, next) => {
+    const authRole = req.decoded.role;
+    if (authRole === "BUYER") {
+        next();
     }
-    catch (error) {
-        next(error);
+    else {
+        throw new apiResponse.Api403Error("Forbidden access !");
     }
-});
+};
 // admin authorization
-const isRoleAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+const isAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const authRole = req.decoded.role;
         if (authRole === 'ADMIN') {
@@ -118,7 +113,7 @@ const isPermitForDashboard = (req, res, next) => __awaiter(void 0, void 0, void 
 });
 function verifyEmailByJWT(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
-        const token = req.query; // getting from query
+        const { token } = req.query; // getting from query
         // if token not present in cookies then return 401 unauthorized errors...
         if (!token || typeof token === "undefined") {
             throw new apiResponse.Api401Error('Required verification token !');
@@ -139,8 +134,9 @@ function verifyEmailByJWT(req, res, next) {
 module.exports = {
     verifyJWT,
     isRoleOwnerOrAdmin,
-    isRoleSeller,
-    isRoleBuyer,
-    isRoleAdmin,
-    isPermitForDashboard
+    isSupplier,
+    isBuyer,
+    isAdmin,
+    isPermitForDashboard,
+    verifyEmailByJWT
 };

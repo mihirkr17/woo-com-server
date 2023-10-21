@@ -5,42 +5,31 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const router = express_1.default.Router();
-const shippingAddressController = require("../controllers/users/ShippingAddress.controller");
-const userCTRL = require("../controllers/users/users");
-const FetchAuthUser = require("../controllers/users/FetchAuthUser");
+const usersCTRL = require("../controllers/users.controller");
 // Middleware
-const { verifyJWT, isRoleOwnerOrAdmin } = require("../middlewares/auth.middleware");
-try {
-    /**
-     * @api {get} /fetch the authorize user data
-     * @apiDescription this endpoint will display all the information about one individual user data
-     * @apiPermission for any authorize user who logged in.
-     * @apiHeaders {String} authorization --> user email address required.
-     * @apiParams no params required.
-     * @apiSuccess {one particular user object data}
-     */
-    router.get("/fau", verifyJWT, FetchAuthUser);
-    /**
-     * @api {put} /sign in the user
-     * @apiDescription this endpoint will save the currently login or sign up user data to the database with role
-     * @apiPermission for any one who trying to sign up or sign in.
-     * @apiHeaders {String} authorization --> user email address required.
-     * @apiBody {String} displayName of user required.
-     * @apiParams no params required.
-     * @apiSuccess sending success message.
-     */
-    router.put("/update-profile-data", verifyJWT, userCTRL.updateProfileDataController);
-    router.put("/make-admin/:userId", verifyJWT, isRoleOwnerOrAdmin, userCTRL.makeAdminController);
-    router.put("/demote-to-user/:userId", verifyJWT, isRoleOwnerOrAdmin, userCTRL.demoteToUser);
-    router.get("/manage-user", userCTRL.manageUsersController);
-    router.get("/check-seller-request", userCTRL.checkSellerRequestController);
-    // Shipping address route
-    router.post("/shipping-address", verifyJWT, shippingAddressController.createShippingAddress);
-    router.put("/shipping-address", verifyJWT, shippingAddressController.updateShippingAddress);
-    router.post("/shipping-address-select", verifyJWT, shippingAddressController.selectShippingAddress);
-    router.delete("/shipping-address-delete/:addrsID", verifyJWT, shippingAddressController.deleteShippingAddress);
-}
-catch (error) {
-    console.log(error === null || error === void 0 ? void 0 : error.message);
-}
+const { verifyJWT } = require("../middlewares/auth.middleware");
+/**
+ * @api {get} /fetch the authorize user data
+ * @apiDescription this endpoint will display all the information about one individual user data
+ * @apiPermission for any authorize user who logged in.
+ * @apiHeaders {String} authorization --> user email address required.
+ * @apiParams no params required.
+ * @apiSuccess {one particular user object data}
+ */
+router.get("/fau", verifyJWT, usersCTRL === null || usersCTRL === void 0 ? void 0 : usersCTRL.fetchAuthUser);
+/**
+ * @api {put} /sign in the user
+ * @apiDescription this endpoint will save the currently login or sign up user data to the database with role
+ * @apiPermission for any one who trying to sign up or sign in.
+ * @apiHeaders {String} authorization --> user email address required.
+ * @apiBody {String} displayName of user required.
+ * @apiParams no params required.
+ * @apiSuccess sending success message.
+ */
+router.put("/update-profile-data", verifyJWT, usersCTRL.updateProfileData);
+// Shipping address route
+router.post("/shipping-address", verifyJWT, usersCTRL.createShippingAddress);
+router.put("/shipping-address", verifyJWT, usersCTRL.updateShippingAddress);
+router.post("/shipping-address-select", verifyJWT, usersCTRL.selectShippingAddress);
+router.delete("/shipping-address-delete/:addrsID", verifyJWT, usersCTRL.deleteShippingAddress);
 module.exports = router;

@@ -2,8 +2,6 @@
 const mdb = require("mongodb");
 const Product = require("../model/product.model");
 const UserModel = require("../model/user.model");
-const OrderModel = require("../model/order.model");
-const OrderTable = require("../model/orderTable.model");
 const ShoppingCartModel = require("../model/shoppingCart.model");
 const cryptos = require("crypto");
 const apiResponse = require("../errors/apiResponse");
@@ -23,30 +21,33 @@ module.exports.findUserByEmail = async (email: string) => {
             phonePrefixCode: 0,
             becomeSellerAt: 0
          }
-      ) || null;
+      );
    } catch (error: any) {
-      return error;
+      throw error;
    }
 }
 
 
-module.exports.findUserByUUID = async (uuid: string) => {
+/**
+ * @params {id} user _id
+ */
+module.exports.findUserById = async (id: string) => {
    try {
       return await UserModel.findOne(
-         { $and: [{ _uuid: uuid }, { accountStatus: 'Active' }] },
+         { $and: [{ _id: mdb.ObjectId(id) }, { accountStatus: 'Active' }] },
          {
             password: 0,
             createdAt: 0,
             phonePrefixCode: 0,
             becomeSellerAt: 0
          }
-      ) || null;
+      );
    } catch (error: any) {
-      return error;
+      throw error;
    }
 }
 
-module.exports.order_status_updater = async (obj: any) => {
+module.exports.orderStatusUpdater = async (obj: any) => {
    try {
       const { customerEmail, customerId, type, orderID, cancelReason, refundAT } = obj;
 
@@ -113,23 +114,21 @@ module.exports.order_status_updater = async (obj: any) => {
          { upsert: true }) ? true : false;
 
    } catch (error: any) {
-      return error?.message;
+      throw error;
    }
 }
 
 
-module.exports.update_variation_stock_available = async (type: string, data: any[]) => {
+module.exports.productStockUpdater = async (type: string, data: any[]) => {
    try {
 
-      if (!type) {
+      if (!type)
          throw new Error("Required action !");
-      }
 
-      if (!data || !Array.isArray(data)) {
 
+      if (!data || !Array.isArray(data))
          throw new apiResponse.Api500Error("Required product id, sku, quantity !");
-         // throw new Error("Required product id, sku, quantity !");
-      }
+
 
       const bulkOperations = [];
 
@@ -197,38 +196,50 @@ module.exports.update_variation_stock_available = async (type: string, data: any
 
 
 module.exports.getSupplierInformationByID = async (uuid: string) => {
-   return await Supplier.findOne({ _id: mdb.ObjectId(uuid) }, { password: 0 });
+   try {
+      return await Supplier.findOne({ _id: mdb.ObjectId(uuid) }, { password: 0 });
+   } catch (error) {
+      throw error;
+   }
 }
 
 
 module.exports.checkProductAvailability = async (productID: string, sku: String) => {
+   try {
 
-   let product = await Product.aggregate([
-      { $match: { _id: mdb.ObjectId(productID) } },
-      { $unwind: { path: "$variations" } },
-      {
-         $project: {
-            sku: "$variations.sku",
-            available: "$variations.available",
-            stock: "$variations.stock"
-         }
-      },
-      { $match: { $and: [{ sku }, { available: { $gte: 1 } }, { stock: 'in' }] } }
-   ]);
+      let product = await Product.aggregate([
+         { $match: { _id: mdb.ObjectId(productID) } },
+         { $unwind: { path: "$variations" } },
+         {
+            $project: {
+               sku: "$variations.sku",
+               available: "$variations.available",
+               stock: "$variations.stock"
+            }
+         },
+         { $match: { $and: [{ sku }, { available: { $gte: 1 } }, { stock: 'in' }] } }
+      ]);
 
-   product = product[0];
+      product = product[0];
 
-   return product;
+      return product;
+   } catch (error: any) {
+      throw error;
+   }
 };
 
 
 module.exports.clearCart = async (customerId: string, customerEmail: string) => {
-   await NCache.deleteCache(`${customerEmail}_cartProducts`);
-   return await ShoppingCartModel.deleteMany({ customerId: mdb.ObjectId(customerId) });
+   try {
+      await NCache.deleteCache(`${customerEmail}_cartProducts`);
+      return await ShoppingCartModel.deleteMany({ customerId: mdb.ObjectId(customerId) });
+   } catch (error) {
+      throw error;
+   }
 }
 
 
-module.exports.updateProductPerform = async (product: any, actionType: string) => {
+module.exports.updateProductPerformance = async (product: any, actionType: string) => {
 
    const { _id, views, ratingAverage, sales } = product as { _id: string, views: number, ratingAverage: number, sales: number };
 
@@ -258,27 +269,8 @@ module.exports.updateProductPerform = async (product: any, actionType: string) =
          { upsert: true, new: true }
       );
    } catch (error: any) {
-      console.log(error);
+      throw error;
    }
-
-   // let totalViews = actionType === "views" ? views + 1 : views;
-
-   // let totalSales = actionType === "sales" ? sales + 1 : sales;
-
-   // let score = (totalViews * viewsWeight) + (ratingAverage * ratingWeight) + (totalSales * salesWeight);
-
-
-
-   // try {
-   //    return await Product.findOneAndUpdate({ $and: [{ _id: mdb.ObjectId(_id) }, { status: "Active" }] }, {
-   //       $set: {
-   //          views: totalViews,
-   //          score: score
-   //       }
-   //    }, { upsert: true });
-   // } catch (error: any) {
-
-   // }
 }
 
 
@@ -309,6 +301,6 @@ module.exports.createPaymentIntents = async (totalAmount: number, orderId: strin
 
       return paymentIntent;
    } catch (error: any) {
-
+      throw error;
    }
 }

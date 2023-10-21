@@ -311,7 +311,7 @@ module.exports.shopping_cart_pipe = (customerId) => {
         { $project: shoppingCartProject }
     ];
 };
-module.exports.get_review_product_details_pipe = (pid, sku) => {
+module.exports.product_detail_review_pipe = (pid, sku) => {
     return [
         { $match: { _id: mongoDB.ObjectId(pid) } },
         {

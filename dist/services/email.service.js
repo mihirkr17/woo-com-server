@@ -11,7 +11,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 const nodemailer = require("nodemailer");
 const { google } = require("googleapis");
 const OAuth2 = google.auth.OAuth2;
-module.exports = function email_service(option) {
+/**
+ *
+ * @param option
+ * @returns
+ */
+function smtpSender(option) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const { to, subject, html } = option;
@@ -45,4 +50,5 @@ module.exports = function email_service(option) {
             return error;
         }
     });
-};
+}
+module.exports = smtpSender;

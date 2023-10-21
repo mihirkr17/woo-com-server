@@ -5,8 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const router = express_1.default.Router();
-const { verifyJWT, isRoleBuyer } = require("../middlewares/auth.middleware");
-const productCTRL = require("../controllers/product/product.controller");
+const productCTRL = require("../controllers/products.controller");
 try {
     /**
      * @apiRoutes /api/product
@@ -14,7 +13,7 @@ try {
     router.get("/search-products/:q", productCTRL.searchProducts);
     router.get("/fetch-single-product/:product_slug", productCTRL.fetchProductDetails);
     router.get("/store/:limits", productCTRL.homeStoreController);
-    router.post("/purchase", verifyJWT, isRoleBuyer, productCTRL === null || productCTRL === void 0 ? void 0 : productCTRL.purchaseProductController);
+    router.get(`/:storeName`, productCTRL === null || productCTRL === void 0 ? void 0 : productCTRL.getStore);
     /**
       * @requestMethod GET
       * @controller productsByCategoryController

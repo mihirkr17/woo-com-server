@@ -16,14 +16,16 @@ const orderRoutes = require("./routes/order.route");
 const reviewRoutes = require("./routes/review.route");
 const policyRoutes = require("./routes/policy.route");
 const wishlistRoutes = require("./routes/wishlist.route");
-const dashboardRoutes = require("./routes/dashboard.route");
 const paymentRoutes = require("./routes/payment.route");
 const returnErrors = require("./errors/errors");
-const storeRoutes = require("./routes/store.route");
+const supplierRoutes = require("./routes/supplier.route");
+const purchaseRoutes = require("./routes/purchase.route");
+const adminRoutes = require("./routes/admin.route");
 const port = process.env.PORT || 5000;
 const sanitizeUrl = require("@braintree/sanitize-url").sanitizeUrl;
 const allowedOrigins = ['http://localhost:3000', 'https://wookart.vercel.app', 'https://red-encouraging-shark.cyclic.app', 'http://localhost:9000'];
 const mongoUri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PWD}@cluster0.8bccj.mongodb.net/ecommerce-db?retryWrites=true&w=majority`;
+const path = require("path");
 // Server setup
 const app = (0, express_1.default)();
 // middleware functions
@@ -31,19 +33,18 @@ const app = (0, express_1.default)();
 app.use(cors({
     // origin: "*",
     origin: function (origin, callback) {
-        if (!origin)
+        if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
             return callback(null, true);
-        if (!allowedOrigins.includes(origin)) {
-            return callback(new Error('The CORS policy for this site does not allow access from the specified origin.'), false);
         }
-        return callback(null, true);
+        return callback(new Error('The CORS policy for this site does not allow access from the specified origin.'), false);
     },
-    methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
+    methods: ["GET", "POST", "DELETE", "PUT", "PATCH"],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
 }));
 app.use(cookieParser());
 app.use(express_1.default.json());
+app.use(express_1.default.static(path.join(__dirname, "../public")));
 // Set up default mongoose connection
 mongoose.connect(mongoUri, {
     useNewUrlParser: true,
@@ -59,19 +60,23 @@ app.use((req, res, next) => {
     next();
 });
 app.get("/", (req, res) => {
-    res.status(200).send("WooKart Server is running perfectly...");
+    return res.sendFile('index');
 });
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/product", productRoutes);
-app.use("/api/v1/store", storeRoutes);
-app.use("/api/v1/dashboard", dashboardRoutes);
+app.use("/api/v1/supplier", supplierRoutes);
 app.use("/api/v1/cart", cartRoutes);
 app.use("/api/v1/order", orderRoutes);
 app.use("/api/v1/review", reviewRoutes);
 app.use("/api/v1/policy", policyRoutes);
 app.use("/api/v1/wishlist", wishlistRoutes);
 app.use("/api/v1/payment", paymentRoutes);
+app.use("/api/v1/purchase", purchaseRoutes);
+app.use("/api/v1/admin", adminRoutes);
+app.get("*", (req, res) => {
+    return res.sendFile(path.join(__dirname, "../public", "index.html"));
+});
 app.use(returnErrors);
 // Start server
 const server = app.listen(port, () => {
