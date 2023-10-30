@@ -1,20 +1,22 @@
 import { NextFunction, Request, Response } from "express";
 const User = require("../model/user.model");
+const { Buyer } = require("../model/usersmeta.model");
 const { findUserByEmail } = require("../services/common.service");
 const apiResponse = require("../errors/apiResponse");
 const { generateUserDataToken } = require("../utils/generator");
+const { ObjectId } = require("mongodb");
 
 interface IShippingAddress {
-  addrsID: string;
+  id: string;
   name: string;
   division: string;
   city: string;
   area: string;
-  area_type: string;
+  areaType: string;
   landmark: string;
-  phone_number: string;
-  postal_code: string;
-  default_shipping_address: boolean;
+  phoneNumber: string;
+  postalCode: string;
+  active: boolean;
 }
 
 async function createShippingAddress(
@@ -23,7 +25,7 @@ async function createShippingAddress(
   next: NextFunction
 ) {
   try {
-    const userEmail: string = req.decoded.email;
+    const { _id } = req.decoded;
 
     let body: any = req.body;
 
@@ -47,21 +49,21 @@ async function createShippingAddress(
     } = body;
 
     let shippingAddressModel: IShippingAddress = {
-      addrsID: "spi_" + Math.floor(Math.random() * 100000000).toString(),
+      id: "spi_" + Math.floor(Math.random() * 100000000).toString(),
       name,
       division,
       city,
       area,
-      area_type,
+      areaType: area_type,
       landmark,
-      phone_number,
-      postal_code,
-      default_shipping_address: default_shipping_address || false,
+      phoneNumber: phone_number,
+      postalCode: postal_code,
+      active: default_shipping_address || false,
     };
 
-    const result = await User.findOneAndUpdate(
-      { email: userEmail },
-      { $push: { "buyer.shippingAddress": shippingAddressModel } },
+    const result = await Buyer.findOneAndUpdate(
+      { userId: ObjectId(_id) },
+      { $push: { shippingAddress: shippingAddressModel } },
       { upsert: true }
     );
 
@@ -109,16 +111,16 @@ async function updateShippingAddress(
     if (!addrsID) throw new apiResponse.Api400Error("Required address id !");
 
     let shippingAddressModel: IShippingAddress = {
-      addrsID,
+      id: addrsID,
       name,
       division,
       city,
       area,
-      area_type,
+      areaType: area_type,
       landmark,
-      phone_number,
-      postal_code,
-      default_shipping_address,
+      phoneNumber: phone_number,
+      postalCode: postal_code,
+      active: default_shipping_address,
     };
 
     const result = await User.findOneAndUpdate(
@@ -315,11 +317,33 @@ async function fetchAuthUser(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+async function fetchAddressBook(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const { _id } = req?.decoded;
+
+    const buyer = await Buyer.findOne({ userId: ObjectId(_id) });
+
+    return res.status(200).json({
+      success: true,
+      statusCode: 200,
+      message: "Data received.",
+      data: buyer,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   createShippingAddress,
   updateShippingAddress,
   selectShippingAddress,
   deleteShippingAddress,
   updateProfileData,
-  fetchAuthUser
+  fetchAuthUser,
+  fetchAddressBook,
 };

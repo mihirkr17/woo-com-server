@@ -26,6 +26,8 @@ router.get("/fau", verifyJWT, usersCTRL?.fetchAuthUser);
  * @apiSuccess sending success message.
  */
 
+router.get("/buyer/address-book", verifyJWT, usersCTRL?.fetchAddressBook);
+
 router.put("/update-profile-data", verifyJWT, usersCTRL.updateProfileData);
 // Shipping address route
 router.post("/shipping-address", verifyJWT, usersCTRL.createShippingAddress);

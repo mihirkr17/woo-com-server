@@ -26,6 +26,7 @@ router.get("/fau", verifyJWT, usersCTRL === null || usersCTRL === void 0 ? void 
  * @apiParams no params required.
  * @apiSuccess sending success message.
  */
+router.get("/buyer/address-book", verifyJWT, usersCTRL === null || usersCTRL === void 0 ? void 0 : usersCTRL.fetchAddressBook);
 router.put("/update-profile-data", verifyJWT, usersCTRL.updateProfileData);
 // Shipping address route
 router.post("/shipping-address", verifyJWT, usersCTRL.createShippingAddress);

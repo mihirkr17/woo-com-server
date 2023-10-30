@@ -16,16 +16,24 @@ const returnErrors = require("./errors/errors");
 const supplierRoutes = require("./routes/supplier.route");
 const purchaseRoutes = require("./routes/purchase.route");
 const adminRoutes = require("./routes/admin.route");
-const port = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5000;
 const sanitizeUrl = require("@braintree/sanitize-url").sanitizeUrl;
 const allowedOrigins = ['http://localhost:3000', 'https://wookart.vercel.app', 'https://red-encouraging-shark.cyclic.app', 'http://localhost:9000'];
-const mongoUri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PWD}@cluster0.8bccj.mongodb.net/ecommerce-db?retryWrites=true&w=majority`;
+// const mongoUri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PWD}@cluster0.8bccj.mongodb.net/ecommerce-db?retryWrites=true&w=majority`;
 const path = require("path");
 // Server setup
 const app: Express = express();
-
+const environments = process.env.NODE_ENV || 'development';
 // middleware functions
 
+const baseConfig: any = {
+  development: {
+    appUri: process.env.BACKEND_URL_LOCAL
+  },
+  production: {
+    appUri: process.env.BACKEND_URL,
+  },
+};
 
 // Cors policy
 app.use(
@@ -52,7 +60,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "../public")));
 
 // Set up default mongoose connection
-mongoose.connect(mongoUri, {
+mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
   // serverApi: ServerApiVersion.v1,
@@ -63,6 +71,7 @@ mongoose.connect(mongoUri, {
 
 //Sanitizing URLs
 app.use((req: any, res: any, next: NextFunction) => {
+  req.appUri = baseConfig[environments].appUri;
   req.url = sanitizeUrl(req.url);
   req.originalUrl = sanitizeUrl(req.originalUrl);
   next();
@@ -71,7 +80,6 @@ app.use((req: any, res: any, next: NextFunction) => {
 app.get("/", (req: Request, res: Response) => {
   return res.sendFile('index');
 });
-
 
 
 app.use("/api/v1/auth", authRoutes);
@@ -93,8 +101,8 @@ app.get("*", (req: Request, res: Response) => {
 app.use(returnErrors);
 
 // Start server
-const server = app.listen(port, () => {
-  console.log(`Running port is ${port}`);
+const server = app.listen(PORT, () => {
+  console.log(`Running port is ${PORT}`);
 });
 
 // close the server if unhandleable error has come to the server

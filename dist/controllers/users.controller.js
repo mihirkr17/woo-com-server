@@ -10,13 +10,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const User = require("../model/user.model");
+const { Buyer } = require("../model/usersmeta.model");
 const { findUserByEmail } = require("../services/common.service");
 const apiResponse = require("../errors/apiResponse");
 const { generateUserDataToken } = require("../utils/generator");
+const { ObjectId } = require("mongodb");
 function createShippingAddress(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const userEmail = req.decoded.email;
+            const { _id } = req.decoded;
             let body = req.body;
             if (!body || typeof body !== "object")
                 throw new apiResponse.Api400Error("Required body !");
@@ -25,18 +27,18 @@ function createShippingAddress(req, res, next) {
             }
             const { name, division, city, area, area_type, landmark, phone_number, postal_code, default_shipping_address, } = body;
             let shippingAddressModel = {
-                addrsID: "spi_" + Math.floor(Math.random() * 100000000).toString(),
+                id: "spi_" + Math.floor(Math.random() * 100000000).toString(),
                 name,
                 division,
                 city,
                 area,
-                area_type,
+                areaType: area_type,
                 landmark,
-                phone_number,
-                postal_code,
-                default_shipping_address: default_shipping_address || false,
+                phoneNumber: phone_number,
+                postalCode: postal_code,
+                active: default_shipping_address || false,
             };
-            const result = yield User.findOneAndUpdate({ email: userEmail }, { $push: { "buyer.shippingAddress": shippingAddressModel } }, { upsert: true });
+            const result = yield Buyer.findOneAndUpdate({ userId: ObjectId(_id) }, { $push: { shippingAddress: shippingAddressModel } }, { upsert: true });
             if (!result)
                 throw new apiResponse.Api500Error("Operation failed !");
             return res.status(200).send({
@@ -64,16 +66,16 @@ function updateShippingAddress(req, res, next) {
             if (!addrsID)
                 throw new apiResponse.Api400Error("Required address id !");
             let shippingAddressModel = {
-                addrsID,
+                id: addrsID,
                 name,
                 division,
                 city,
                 area,
-                area_type,
+                areaType: area_type,
                 landmark,
-                phone_number,
-                postal_code,
-                default_shipping_address,
+                phoneNumber: phone_number,
+                postalCode: postal_code,
+                active: default_shipping_address,
             };
             const result = yield User.findOneAndUpdate({ email: userEmail }, {
                 $set: {
@@ -218,11 +220,29 @@ function fetchAuthUser(req, res, next) {
         }
     });
 }
+function fetchAddressBook(req, res, next) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const { _id } = req === null || req === void 0 ? void 0 : req.decoded;
+            const buyer = yield Buyer.findOne({ userId: ObjectId(_id) });
+            return res.status(200).json({
+                success: true,
+                statusCode: 200,
+                message: "Data received.",
+                data: buyer,
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    });
+}
 module.exports = {
     createShippingAddress,
     updateShippingAddress,
     selectShippingAddress,
     deleteShippingAddress,
     updateProfileData,
-    fetchAuthUser
+    fetchAuthUser,
+    fetchAddressBook,
 };

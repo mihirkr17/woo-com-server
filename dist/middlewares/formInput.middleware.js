@@ -12,19 +12,19 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const { Api400Error } = require("../errors/apiResponse");
 const { validPassword, validEmail, validString } = require("../utils/validator");
 module.exports.loginMDL = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    const { emailOrPhone, cPwd } = req.body;
+    const { email, password } = req.body;
     try {
-        if (!emailOrPhone)
-            throw new Api400Error("Required email or phone number !");
-        if (!validString(emailOrPhone))
+        if (!email)
+            throw new Api400Error("Required email address !");
+        if (!validString(email))
             throw new Api400Error("Invalid string type !");
-        if (!cPwd)
+        if (!password)
             throw new Api400Error("Required password !");
-        if (typeof cPwd !== "string")
+        if (typeof password !== "string")
             throw new Api400Error("Password should be string !");
-        if (!validPassword(cPwd))
+        if (!validPassword(password))
             throw new Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
-        if (cPwd.length < 5 || cPwd.length > 8)
+        if (password.length < 5 || password.length > 8)
             throw new Api400Error("Password length should be 5 to 8 characters !");
         next();
     }

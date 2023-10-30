@@ -43,33 +43,111 @@ module.exports.seller_order_email_template = (product, customerEmail, orderIDs, 
          </table>
       </div>`);
 };
-module.exports.verify_email_html_template = (verifyToken) => {
-    return (`<div style="font-family: Helvetica,Arial,sans-serif;min-width:1000px;overflow:auto;line-height:2">
-      <div style="margin:50px auto;width:70%;padding:20px 0">
-        <div style="border-bottom:1px solid #eee">
-          <a href="" style="font-size:1.4em;color: #00466a;text-decoration:none;font-weight:600">WooKart</a>
-        </div>
-        <p style="font-size:1.1em">Hi,</p>
+module.exports.verify_email_html_template = (verifyToken, fullName, appUri) => {
+    return (`
+      <table border="0" cellspacing="0" cellpadding="0">
+   <tbody>
+      <tr>
+         <td>
+            <p
+               style="text-align:left;color:#333333;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;margin:0px;padding:0;margin-top:10px;font-weight:bold">
+               Dear ${fullName}
+            </p>
+         </td>
+      </tr>
+      <tr>
+         <td>
+            <p
+               style="text-align:left;color:#333333;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;margin:0px;padding:0;margin-top:10px;font-weight:normal">
+               Thank you for applying for a WooKart account.
+               <br>
+               To help us confirm it’s you, please verify your email address.
+            </p>
+         </td>
+      </tr>
+      <tr>
+         <td>
+               <a style="display:block; width: 160px;border:6px solid rgb(239,239,239);margin: 20px 0;padding:12px 10px; text-decoration:none;font-family:Arial,Helvetica,sans-serif;color:#fff;background:#ff4800;text-align:center"
+                  href="${appUri}api/v1/auth/verify-email?token=${verifyToken}">
+                  <span
+                     style="text-decoration:none!important;color:#fff;font-size:16px;line-height:28px;text-align:center;display:block">
+                     &nbsp;&nbsp;VERIFY MY EMAIL&nbsp;&nbsp;
+                  </span>
+               </a>
+         </td>
+      </tr>
+      <tr>
+         <td>
+  
+         <p
+            style="text-align:left;color:#333333;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;margin:0px;padding:0;margin-top:10px;font-weight:normal">
+            If you were not expecting this email, or you think you received it in error,
+         </p>
 
-        <p>Thank you for choosing WooKart. Click the following to complete your Verification.</p>
+         <br><br>
+         <p
+            style="text-align:left;color:#333333;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;margin:0px;padding:0;margin-top:10px;font-weight:normal">
+            Thank you <br>
+            The WooKart Team
+         </p>
+         </td>
+      </tr>
+   </tbody>
+</table>
+      `);
+};
+module.exports.send_six_digit_otp_template = (otp, fullName) => {
+    return (`
+      <table border="0" cellspacing="0" cellpadding="0">
+   <tbody>
+      <tr>
+         <td>
+            <p
+               style="text-align:left;color:#333333;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;margin:0px;padding:0;margin-top:10px;font-weight:bold">
+               Dear ${fullName}
+            </p>
+         </td>
+      </tr>
+      <tr>
+         <td>
+            <p
+               style="text-align:left;color:#333333;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;margin:0px;padding:0;margin-top:10px;font-weight:normal">
+               Thank you for applying for a WooKart account.
+               <br>
+               To help us confirm it’s you, Your Otp.
+            </p>
+         </td>
+      </tr>
+      <tr>
+         <td>
+               <p style="display:block; width: 160px;border:6px solid rgb(239,239,239);margin: 20px 0;padding:12px 10px; text-decoration:none;font-family:Arial,Helvetica,sans-serif;color:#fff;background:#ff4800;text-align:center"
+                 >
+                  <span
+                     style="text-decoration:none!important;color:#fff;font-size:16px;line-height:28px;text-align:center;display:block">
+                     &nbsp;&nbsp;W- ${otp}&nbsp;&nbsp;
+                  </span>
+               </p>
+         </td>
+      </tr>
+      <tr>
+         <td>
+  
+         <p
+            style="text-align:left;color:#333333;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;margin:0px;padding:0;margin-top:10px;font-weight:normal">
+            If you were not expecting this email, or you think you received it in error,
+         </p>
 
-        <h2 style="background: #00466a;margin: 0 auto;width: max-content;padding: 0 10px;color: #fff;border-radius: 4px;">${verifyToken}</h2>
-
-        <br/>
-        <a href="${process.env.BACKEND_URL}api/v1/auth/verify-email?token=${verifyToken}">Verify Your Email</a>
-        <br/>
-        <p style="font-size:0.9em;">Regards,<br />WooKart</p>
-
-        <hr style="border:none;border-top:1px solid #eee" />
-
-        <div style="float:right;padding:8px 0;color:#aaa;font-size:0.8em;line-height:1;font-weight:300">
-          <p>WooKart Inc</p>
-          <p>Lalmonirhat, 5510</p>
-          <p>Bangladesh</p>
-        </div>
-
-      </div>
-    </div>`);
+         <br><br>
+         <p
+            style="text-align:left;color:#333333;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;margin:0px;padding:0;margin-top:10px;font-weight:normal">
+            Thank you <br>
+            The WooKart Team
+         </p>
+         </td>
+      </tr>
+   </tbody>
+</table>
+      `);
 };
 module.exports.buyer_order_email_template = (data, option) => {
     var _a, _b, _c, _d, _e, _f, _g, _h;

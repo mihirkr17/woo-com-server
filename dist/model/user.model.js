@@ -20,7 +20,6 @@ let { Schema, model } = mongoose_1.default;
 const validator = require("validator");
 // user schema design
 var UserSchema = new Schema({
-    _uuid: { type: String },
     fullName: { type: String, required: true },
     email: {
         type: String,
@@ -42,34 +41,18 @@ var UserSchema = new Schema({
     },
     role: {
         type: String,
-        default: "BUYER"
+        enum: ["BUYER", "SUPPLIER", "ADMIN"]
     },
     gender: {
         type: String, required: true, enum: ["Male", "Female", "Others"]
     },
     dob: { type: String, required: false },
-    taxID: { type: String, required: false },
-    defaultShippingAddress: { type: Object, required: false },
-    wishlist: { type: Array, required: false },
-    shippingAddress: [
-        {
-            _id: false,
-            addrsID: { type: String, required: false },
-            name: { type: String, default: "", required: false },
-            division: { type: String, default: "", required: false },
-            city: { type: String, default: "", required: false },
-            area: { type: String, default: "", required: false },
-            area_type: { type: String, default: "", required: false },
-            landmark: { type: String, default: "", required: false },
-            phone_number: { type: String, default: "", required: false },
-            postal_code: { type: String, default: "", required: false },
-            default_shipping_address: { type: Boolean, required: false }
-        }
-    ],
     idFor: { type: String, default: "buy" },
     accountStatus: { type: String, enum: ["Active", "Inactive", "Blocked"], default: "Inactive", },
     authProvider: { type: String, enum: ['system', 'thirdParty'], default: 'system' },
     verified: { type: Boolean, default: false },
+    otp: { type: String, default: undefined },
+    otpExTime: { type: Date, default: undefined },
     createdAt: { type: Date, default: Date.now }
 });
 UserSchema.pre("save", function (next) {
@@ -79,9 +62,11 @@ UserSchema.pre("save", function (next) {
                 this.password = yield bcrypt.hash(this.password, 10);
                 this.hasPassword = true;
             }
+            if (this.isModified("verified")) {
+                this.verified = this.verified;
+            }
             this.authProvider = 'system';
             this.contactEmail = this.email;
-            this.verified = false;
             next();
         }
         catch (error) {

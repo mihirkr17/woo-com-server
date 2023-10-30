@@ -10,8 +10,6 @@ const validator = require("validator");
 
 // user schema design
 var UserSchema = new Schema({
-  _uuid: { type: String },
-
   fullName: { type: String, required: true },
 
   email: {
@@ -39,7 +37,7 @@ var UserSchema = new Schema({
 
   role: {
     type: String,
-    default: "BUYER"
+    enum: ["BUYER", "SUPPLIER", "ADMIN"]
   },
 
   gender: {
@@ -48,28 +46,6 @@ var UserSchema = new Schema({
 
   dob: { type: String, required: false },
 
-  taxID: { type: String, required: false },
-
-  defaultShippingAddress: { type: Object, required: false },
-
-  wishlist: { type: Array, required: false },
-
-  shippingAddress: [
-    {
-      _id: false,
-      addrsID: { type: String, required: false },
-      name: { type: String, default: "", required: false },
-      division: { type: String, default: "", required: false },
-      city: { type: String, default: "", required: false },
-      area: { type: String, default: "", required: false },
-      area_type: { type: String, default: "", required: false },
-      landmark: { type: String, default: "", required: false },
-      phone_number: { type: String, default: "", required: false },
-      postal_code: { type: String, default: "", required: false },
-      default_shipping_address: { type: Boolean, required: false }
-    }
-  ],
-
   idFor: { type: String, default: "buy" },
 
   accountStatus: { type: String, enum: ["Active", "Inactive", "Blocked"], default: "Inactive", },
@@ -77,6 +53,10 @@ var UserSchema = new Schema({
   authProvider: { type: String, enum: ['system', 'thirdParty'], default: 'system' },
 
   verified: { type: Boolean, default: false },
+
+  otp: { type: String, default: undefined },
+
+  otpExTime: { type: Date, default: undefined },
 
   createdAt: { type: Date, default: Date.now }
 });
@@ -90,10 +70,13 @@ UserSchema.pre("save", async function (next: any) {
       this.hasPassword = true;
     }
 
+    if (this.isModified("verified")) {
+      this.verified = this.verified;
+    }
+
     this.authProvider = 'system';
     this.contactEmail = this.email;
 
-    this.verified = false;
 
     next();
   } catch (error: any) {
@@ -105,9 +88,9 @@ UserSchema.pre("save", async function (next: any) {
 // compare client password
 UserSchema.methods.comparePassword = async function (clientPassword: string) {
   try {
-     return await bcrypt.compare(clientPassword, this.password);
+    return await bcrypt.compare(clientPassword, this.password);
   } catch (error) {
-     throw error;
+    throw error;
   }
 };
 
