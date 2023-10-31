@@ -54,8 +54,6 @@ var UserSchema = new Schema({
 
   verified: { type: Boolean, default: false },
 
-  ip: Array,
-
   devices: Array,
 
   otp: { type: String, default: undefined },
