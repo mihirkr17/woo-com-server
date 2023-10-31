@@ -36,7 +36,7 @@ function loginSystem(req, res, next) {
             let user = yield User.findOne({ email: inputEmail }); //findUserByEmail(inputEmail);
             if (!user)
                 throw new Api400Error(`User with ${inputEmail} not found!`);
-            const { email, verified, accountStatus, fullName } = user || {};
+            const { email, verified, accountStatus, fullName, devices } = user || {};
             const matchedPwd = yield user.comparePassword(inputPassword);
             if (!matchedPwd)
                 throw new Api400Error("Password didn't matched !");
@@ -63,6 +63,15 @@ function loginSystem(req, res, next) {
             const userDataToken = generateUserDataToken(user);
             if (!loginToken || !userDataToken)
                 throw new Error("Login failed due to internal issue !");
+            const newDevice = {
+                userAgent: req.get("user-agent"),
+                ipAddress: req.ip,
+            };
+            let filterDevice = (devices &&
+                devices.filter((item) => (item === null || item === void 0 ? void 0 : item.ipAddress) !== (newDevice === null || newDevice === void 0 ? void 0 : newDevice.ipAddress))) ||
+                [];
+            user.devices = [...filterDevice, newDevice];
+            yield user.save();
             // if all operation success then return the response
             return res.status(200).send({
                 success: true,

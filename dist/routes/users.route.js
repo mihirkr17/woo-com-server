@@ -27,10 +27,10 @@ router.get("/fau", verifyJWT, usersCTRL === null || usersCTRL === void 0 ? void 
  * @apiSuccess sending success message.
  */
 router.get("/buyer/address-book", verifyJWT, usersCTRL === null || usersCTRL === void 0 ? void 0 : usersCTRL.fetchAddressBook);
-router.put("/update-profile-data", verifyJWT, usersCTRL.updateProfileData);
+router.put("/buyer/update-profile-data", verifyJWT, usersCTRL.updateProfileData);
 // Shipping address route
-router.post("/shipping-address", verifyJWT, usersCTRL.createShippingAddress);
-router.put("/shipping-address", verifyJWT, usersCTRL.updateShippingAddress);
-router.post("/shipping-address-select", verifyJWT, usersCTRL.selectShippingAddress);
-router.delete("/shipping-address-delete/:addrsID", verifyJWT, usersCTRL.deleteShippingAddress);
+router.post("/buyer/shipping-address", verifyJWT, usersCTRL.createShippingAddress);
+router.put("/buyer/shipping-address", verifyJWT, usersCTRL.updateShippingAddress);
+router.post("/buyer/shipping-address-select", verifyJWT, usersCTRL.selectShippingAddress);
+router.delete("/buyer/shipping-address-delete/:id", verifyJWT, usersCTRL.deleteShippingAddress);
 module.exports = router;

@@ -5,7 +5,6 @@ const usersCTRL = require("../controllers/users.controller");
 // Middleware
 const { verifyJWT } = require("../middlewares/auth.middleware");
 
-
 /**
  * @api {get} /fetch the authorize user data
  * @apiDescription this endpoint will display all the information about one individual user data
@@ -28,13 +27,31 @@ router.get("/fau", verifyJWT, usersCTRL?.fetchAuthUser);
 
 router.get("/buyer/address-book", verifyJWT, usersCTRL?.fetchAddressBook);
 
-router.put("/update-profile-data", verifyJWT, usersCTRL.updateProfileData);
+router.put(
+  "/buyer/update-profile-data",
+  verifyJWT,
+  usersCTRL.updateProfileData
+);
 // Shipping address route
-router.post("/shipping-address", verifyJWT, usersCTRL.createShippingAddress);
-router.put("/shipping-address", verifyJWT, usersCTRL.updateShippingAddress);
-router.post("/shipping-address-select", verifyJWT, usersCTRL.selectShippingAddress);
-router.delete("/shipping-address-delete/:addrsID", verifyJWT, usersCTRL.deleteShippingAddress);
-
-
+router.post(
+  "/buyer/shipping-address",
+  verifyJWT,
+  usersCTRL.createShippingAddress
+);
+router.put(
+  "/buyer/shipping-address",
+  verifyJWT,
+  usersCTRL.updateShippingAddress
+);
+router.post(
+  "/buyer/shipping-address-select",
+  verifyJWT,
+  usersCTRL.selectShippingAddress
+);
+router.delete(
+  "/buyer/shipping-address-delete/:id",
+  verifyJWT,
+  usersCTRL.deleteShippingAddress
+);
 
 module.exports = router;

@@ -10,37 +10,39 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const User = require("../model/user.model");
-const { Buyer } = require("../model/usersmeta.model");
+const { BuyerMeta } = require("../model/usersmeta.model");
 const { findUserByEmail } = require("../services/common.service");
-const apiResponse = require("../errors/apiResponse");
+const { Api400Error, Api404Error } = require("../errors/apiResponse");
 const { generateUserDataToken } = require("../utils/generator");
 const { ObjectId } = require("mongodb");
+const NCache = require("../utils/NodeCache");
 function createShippingAddress(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const { _id } = req.decoded;
             let body = req.body;
             if (!body || typeof body !== "object")
-                throw new apiResponse.Api400Error("Required body !");
+                throw new Api400Error("Required body !");
             if (!Object.values(body).some((e) => e !== null && e !== "")) {
-                throw new apiResponse.Api400Error("Required all fields !");
+                throw new Api400Error("Required all fields !");
             }
-            const { name, division, city, area, area_type, landmark, phone_number, postal_code, default_shipping_address, } = body;
+            const { name, division, city, area, areaType, landmark, phoneNumber, postalCode, } = body;
             let shippingAddressModel = {
                 id: "spi_" + Math.floor(Math.random() * 100000000).toString(),
                 name,
                 division,
                 city,
                 area,
-                areaType: area_type,
+                areaType,
                 landmark,
-                phoneNumber: phone_number,
-                postalCode: postal_code,
-                active: default_shipping_address || false,
+                phoneNumber,
+                postalCode,
+                active: false,
             };
-            const result = yield Buyer.findOneAndUpdate({ userId: ObjectId(_id) }, { $push: { shippingAddress: shippingAddressModel } }, { upsert: true });
+            const result = yield BuyerMeta.findOneAndUpdate({ userId: ObjectId(_id) }, { $push: { shippingAddress: shippingAddressModel } }, { upsert: true });
             if (!result)
-                throw new apiResponse.Api500Error("Operation failed !");
+                throw new Error("Operation failed !");
+            NCache.deleteCache(`${_id}_shippingAddress`);
             return res.status(200).send({
                 success: true,
                 statusCode: 200,
@@ -55,41 +57,41 @@ function createShippingAddress(req, res, next) {
 function updateShippingAddress(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const userEmail = req.decoded.email;
+            const { _id } = req.decoded;
             const body = req.body;
             if (!body || typeof body !== "object")
-                throw new apiResponse.Api400Error("Required body !");
+                throw new Api400Error("Required body !");
             if (!Object.values(body).some((e) => e !== null && e !== "")) {
-                throw new apiResponse.Api400Error("Required all fields !");
+                throw new Api400Error("Required all fields !");
             }
-            const { addrsID, name, division, city, area, area_type, landmark, phone_number, postal_code, default_shipping_address, } = body;
-            if (!addrsID)
-                throw new apiResponse.Api400Error("Required address id !");
+            const { id, name, division, city, area, areaType, landmark, phoneNumber, postalCode, active, } = body;
+            if (!id)
+                throw new Api400Error("Required address id !");
             let shippingAddressModel = {
-                id: addrsID,
+                id,
                 name,
                 division,
                 city,
                 area,
-                areaType: area_type,
+                areaType,
                 landmark,
-                phoneNumber: phone_number,
-                postalCode: postal_code,
-                active: default_shipping_address,
+                phoneNumber,
+                postalCode,
+                active,
             };
-            const result = yield User.findOneAndUpdate({ email: userEmail }, {
+            const result = yield BuyerMeta.findOneAndUpdate({ userId: ObjectId(_id) }, {
                 $set: {
-                    "buyer.shippingAddress.$[i]": shippingAddressModel,
+                    "shippingAddress.$[i]": shippingAddressModel,
                 },
-            }, { arrayFilters: [{ "i.addrsID": addrsID }] });
-            if (result) {
-                return res.status(200).send({
-                    success: true,
-                    statusCode: 200,
-                    message: "Shipping address updated.",
-                });
-            }
-            throw new apiResponse.Api500Error("Failed to update shipping address.");
+            }, { arrayFilters: [{ "i.id": id }] });
+            if (!result)
+                throw new Error("Failed to update shipping address.");
+            NCache.deleteCache(`${_id}_shippingAddress`);
+            return res.status(200).send({
+                success: true,
+                statusCode: 200,
+                message: "Shipping address updated.",
+            });
         }
         catch (error) {
             next(error);
@@ -99,37 +101,28 @@ function updateShippingAddress(req, res, next) {
 function selectShippingAddress(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const authEmail = req.decoded.email;
-            let { addrsID, default_shipping_address } = req.body;
-            if (!addrsID || typeof addrsID !== "string")
-                throw new apiResponse.Api400Error("Required address id !");
-            default_shipping_address = default_shipping_address === true ? false : true;
-            const user = yield findUserByEmail(authEmail);
-            if (!user && typeof user !== "object") {
-                throw new apiResponse.Api404Error("User not found !");
-            }
-            const shippingAddress = (user === null || user === void 0 ? void 0 : user.shippingAddress) || [];
-            if (shippingAddress && shippingAddress.length > 0) {
-                const result = yield User.findOneAndUpdate({ email: authEmail }, {
-                    $set: {
-                        "shippingAddress.$[j].default_shipping_address": false,
-                        "shippingAddress.$[i].default_shipping_address": default_shipping_address,
-                    },
-                }, {
-                    arrayFilters: [
-                        { "j.addrsID": { $ne: addrsID } },
-                        { "i.addrsID": addrsID },
-                    ],
-                    multi: true,
-                });
-                if (!result)
-                    throw new apiResponse.Api500Error("Server error !");
-                return res.status(200).send({
-                    success: true,
-                    statusCode: 200,
-                    message: "Default shipping address selected.",
-                });
-            }
+            const { _id } = req.decoded;
+            let { id, active } = req.body;
+            if (!id || typeof id !== "string")
+                throw new Api400Error("Required address id !");
+            active = active === true ? false : true;
+            const result = yield BuyerMeta.findOneAndUpdate({ userId: ObjectId(_id) }, {
+                $set: {
+                    "shippingAddress.$[j].active": false,
+                    "shippingAddress.$[i].active": active,
+                },
+            }, {
+                arrayFilters: [{ "j.id": { $ne: id } }, { "i.id": id }],
+                multi: true,
+            });
+            if (!result)
+                throw new Error("Server error !");
+            NCache.deleteCache(`${_id}_shippingAddress`);
+            return res.status(200).send({
+                success: true,
+                statusCode: 200,
+                message: "Default shipping address selected.",
+            });
         }
         catch (error) {
             next(error);
@@ -139,17 +132,20 @@ function selectShippingAddress(req, res, next) {
 function deleteShippingAddress(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const email = req.decoded.email;
-            let addrsID = req.params.addrsID;
-            if (!addrsID || typeof addrsID !== "string")
-                throw new apiResponse.Api400Error("Required address id !");
-            const result = yield User.findOneAndUpdate({ email: email }, { $pull: { "buyer.shippingAddress": { addrsID } } });
-            if (result)
-                return res.status(200).send({
-                    success: true,
-                    statusCode: 200,
-                    message: "Address deleted successfully.",
-                });
+            const { _id } = req.decoded;
+            let id = req.params.id;
+            if (!id || typeof id !== "string")
+                throw new Api400Error("Required address id !");
+            const result = yield BuyerMeta.findOneAndUpdate({ userId: ObjectId(_id) }, { $pull: { shippingAddress: { id } } });
+            if (!result)
+                throw new Error("Internal issue !");
+            NCache.deleteCache(`${_id}_shippingAddress`);
+            return res.status(200).send({
+                success: true,
+                statusCode: 200,
+                message: "Address deleted successfully.",
+                data: {},
+            });
         }
         catch (error) {
             next(error);
@@ -168,18 +164,18 @@ function updateProfileData(req, res, next) {
             const { userEmail } = req.query;
             const body = req.body;
             if (userEmail !== email) {
-                throw new apiResponse.Api400Error("Invalid email address !");
+                throw new Api400Error("Invalid email address !");
             }
             if (!body || typeof body === "undefined") {
-                throw new apiResponse.Api400Error("Required body with request !");
+                throw new Api400Error("Required body with request !");
             }
             const { fullName, dob, gender } = body;
             if (!fullName || typeof fullName !== "string")
-                throw new apiResponse.Api400Error("Required full name !");
+                throw new Api400Error("Required full name !");
             if (!dob || typeof dob !== "string")
-                throw new apiResponse.Api400Error("Required date of birth !");
+                throw new Api400Error("Required date of birth !");
             if (!gender || typeof gender !== "string")
-                throw new apiResponse.Api400Error("Required gender !");
+                throw new Api400Error("Required gender !");
             let profileModel = {
                 fullName,
                 dob,
@@ -204,10 +200,10 @@ function fetchAuthUser(req, res, next) {
             // const ipAddress = req.socket?.remoteAddress;
             let user = yield findUserByEmail(authEmail);
             if (!user || typeof user !== "object")
-                throw new apiResponse.Api404Error("User not found !");
+                throw new Api404Error("User not found !");
             const userDataToken = generateUserDataToken(user);
             if (!userDataToken)
-                throw new apiResponse.Api500Error("Internal issue !");
+                throw new Error("Internal issue !");
             return res.status(200).send({
                 success: true,
                 statusCode: 200,
@@ -220,16 +216,34 @@ function fetchAuthUser(req, res, next) {
         }
     });
 }
+/**
+ *
+ * @param req
+ * @param res
+ * @param next
+ * @returns
+ */
 function fetchAddressBook(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const { _id } = req === null || req === void 0 ? void 0 : req.decoded;
-            const buyer = yield Buyer.findOne({ userId: ObjectId(_id) });
+            let shippingAddress = [];
+            const buyerDataInCache = NCache.getCache(`${_id}_shippingAddress`);
+            if (buyerDataInCache) {
+                shippingAddress = buyerDataInCache;
+            }
+            else {
+                const buyerMeta = yield BuyerMeta.findOne({ userId: ObjectId(_id) });
+                shippingAddress = buyerMeta === null || buyerMeta === void 0 ? void 0 : buyerMeta.shippingAddress;
+                NCache.saveCache(`${_id}_shippingAddress`, shippingAddress);
+            }
             return res.status(200).json({
                 success: true,
                 statusCode: 200,
                 message: "Data received.",
-                data: buyer,
+                data: {
+                    shippingAddress,
+                },
             });
         }
         catch (error) {

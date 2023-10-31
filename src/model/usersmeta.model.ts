@@ -60,5 +60,5 @@ const buyerSchema = new Schema({
   ],
 });
 
-const Buyer = model("Buyer", buyerSchema, "buyers");
-module.exports = { MyStore, Buyer };
+const BuyerMeta = model("Buyer", buyerSchema, "buyers");
+module.exports = { MyStore, BuyerMeta };

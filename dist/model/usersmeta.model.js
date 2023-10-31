@@ -55,5 +55,5 @@ const buyerSchema = new mongoose_1.Schema({
         },
     ],
 });
-const Buyer = (0, mongoose_1.model)("Buyer", buyerSchema, "buyers");
-module.exports = { MyStore, Buyer };
+const BuyerMeta = (0, mongoose_1.model)("Buyer", buyerSchema, "buyers");
+module.exports = { MyStore, BuyerMeta };

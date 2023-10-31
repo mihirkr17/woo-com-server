@@ -5,6 +5,7 @@ declare global {
     interface Request {
       decoded: any;
       appUri: string;
+      device: any;
     }
   }
 }

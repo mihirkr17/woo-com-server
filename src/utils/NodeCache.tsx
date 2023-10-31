@@ -11,6 +11,7 @@ class NodeCache {
   }
 
   getCache(key: any) {
+
     let gC = cache.get(key);
 
     if (typeof gC === "undefined") {

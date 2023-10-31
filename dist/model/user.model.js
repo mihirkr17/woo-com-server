@@ -51,6 +51,8 @@ var UserSchema = new Schema({
     accountStatus: { type: String, enum: ["Active", "Inactive", "Blocked"], default: "Inactive", },
     authProvider: { type: String, enum: ['system', 'thirdParty'], default: 'system' },
     verified: { type: Boolean, default: false },
+    ip: Array,
+    devices: Array,
     otp: { type: String, default: undefined },
     otpExTime: { type: Date, default: undefined },
     createdAt: { type: Date, default: Date.now }

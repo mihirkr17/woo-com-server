@@ -46,7 +46,7 @@ async function loginSystem(req: Request, res: Response, next: NextFunction) {
 
     if (!user) throw new Api400Error(`User with ${inputEmail} not found!`);
 
-    const { email, verified, accountStatus, fullName } = user || {};
+    const { email, verified, accountStatus, fullName, devices } = user || {};
 
     const matchedPwd = await user.comparePassword(inputPassword);
 
@@ -80,6 +80,21 @@ async function loginSystem(req: Request, res: Response, next: NextFunction) {
 
     if (!loginToken || !userDataToken)
       throw new Error("Login failed due to internal issue !");
+
+    const newDevice = {
+      userAgent: req.get("user-agent"),
+      ipAddress: req.ip,
+    };
+
+    let filterDevice =
+      (devices &&
+        devices.filter(
+          (item: any) => item?.ipAddress !== newDevice?.ipAddress
+        )) ||
+      [];
+
+    user.devices = [...filterDevice, newDevice];
+    await user.save();
 
     // if all operation success then return the response
     return res.status(200).send({
