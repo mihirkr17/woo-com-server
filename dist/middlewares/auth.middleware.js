@@ -73,9 +73,9 @@ const isSupplier = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
     }
 });
 // verify seller
-const isBuyer = (req, res, next) => {
+const isCustomer = (req, res, next) => {
     const authRole = req.decoded.role;
-    if (authRole === "BUYER") {
+    if (authRole === "CUSTOMER") {
         next();
     }
     else {
@@ -135,7 +135,7 @@ module.exports = {
     verifyJWT,
     isRoleOwnerOrAdmin,
     isSupplier,
-    isBuyer,
+    isCustomer,
     isAdmin,
     isPermitForDashboard,
     verifyEmailByJWT

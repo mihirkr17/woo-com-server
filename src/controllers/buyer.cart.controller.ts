@@ -1,45 +1,46 @@
 import { NextFunction, Request, Response } from "express";
 const ShoppingCart = require("../model/shoppingCart.model");
 const { shopping_cart_pipe } = require("../utils/pipelines");
-const {
-  findUserByEmail,
-  checkProductAvailability,
-} = require("../services/common.service");
+const User = require("../model/user.model");
+const Customer = require("../model/customer.model");
 const { cartContextCalculation } = require("../utils/common");
-const apiResponse = require("../errors/apiResponse");
+const { Api400Error, Api404Error } = require("../errors/apiResponse");
 const { ObjectId } = require("mongodb");
 const NodeCache = require("../utils/NodeCache");
+const ProductService = require("../services/ProductService");
+const { isProduct } = new ProductService();
 
 /**
- * @apiController --> ADD PRODUCT IN CART
- * @apiMethod --> POST
+ *
+ * @param req
+ * @param res
+ * @param next
+ * @returns
  */
-module.exports.addToCartHandler = async (
+async function addToCartSystem(
   req: Request,
   res: Response,
   next: NextFunction
-) => {
+) {
   try {
     const { _id, email }: any = req.decoded;
     const body = req.body;
 
     if (!body || typeof body !== "object")
-      throw new apiResponse.Api400Error("Required body !");
+      throw new Api400Error("Required body !");
 
     const { productId, sku, action, quantity } = body;
 
     if (!productId || !sku)
-      throw new apiResponse.Api400Error(
+      throw new Api400Error(
         "Required product id, listing id, variation id in body !"
       );
 
-    const availableProduct = await checkProductAvailability(productId, sku);
+    const availableProduct = await isProduct(productId, sku);
 
-    if (!availableProduct)
-      throw new apiResponse.Api404Error("Product is not available !");
+    if (!availableProduct) throw new Api404Error("Product is not available !");
 
-    if (action !== "toCart")
-      throw new apiResponse.Api400Error("Required cart operation !");
+    if (action !== "toCart") throw new Api400Error("Required cart operation !");
 
     let existsProduct = await ShoppingCart.findOne({
       $and: [
@@ -68,7 +69,7 @@ module.exports.addToCartHandler = async (
 
     NodeCache.deleteCache(`${email}_cartProducts`);
 
-    if (!result) throw new apiResponse.Api500Error("Internal Server Error !");
+    if (!result) throw new Error("Internal Server Error !");
 
     return res.status(200).send({
       success: true,
@@ -78,22 +79,26 @@ module.exports.addToCartHandler = async (
   } catch (error: any) {
     next(error);
   }
-};
+}
 
-module.exports.getCartContext = async (
+/**
+ *
+ * @param req
+ * @param res
+ * @param next
+ * @returns
+ */
+async function getCartContextSystem(
   req: Request,
   res: Response,
   next: NextFunction
-) => {
+) {
   try {
     const { email, _id } = req.decoded;
 
     let cart: any[];
 
-    let user = await findUserByEmail(email);
-
-    if (!user || user?.role !== "BUYER")
-      throw new apiResponse.Api401Error("Permission denied !");
+    let user = await Customer.findOne({ userId: ObjectId(_id) });
 
     const cartData = NodeCache.getCache(`${email}_cartProducts`);
 
@@ -105,7 +110,6 @@ module.exports.getCartContext = async (
       await NodeCache.saveCache(`${email}_cartProducts`, cart);
     }
 
-    // console.log(shopping_cart_pipe(_id));
     const {
       amount,
       totalQuantity,
@@ -115,7 +119,7 @@ module.exports.getCartContext = async (
       discountShippingCost,
     } = cartContextCalculation(cart);
 
-    const defaultShippingAddress = user?.buyer?.shippingAddress?.find(
+    const defaultShippingAddress = user?.shippingAddress?.find(
       (adr: any) => adr.default_shipping_address === true
     );
 
@@ -141,13 +145,20 @@ module.exports.getCartContext = async (
   } catch (error: any) {
     next(error);
   }
-};
+}
 
-module.exports.updateCartProductQuantityController = async (
+/**
+ *
+ * @param req
+ * @param res
+ * @param next
+ * @returns
+ */
+async function updateCartProductQuantitySystem(
   req: Request,
   res: Response,
   next: NextFunction
-) => {
+) {
   try {
     const { email, _id } = req.decoded;
 
@@ -157,29 +168,26 @@ module.exports.updateCartProductQuantityController = async (
       req?.body?.upsertRequest?.cartContext;
 
     if (!productID || !sku || !cartID)
-      throw new apiResponse.Api400Error(
-        "Required product id, variation id, cart id !"
-      );
+      throw new Api400Error("Required product id, variation id, cart id !");
 
     if (!quantity || typeof quantity === "undefined")
-      throw new apiResponse.Api400Error("Required quantity !");
+      throw new Api400Error("Required quantity !");
 
     if (quantity > 5 || quantity <= 0)
-      throw new apiResponse.Api400Error(
+      throw new Api400Error(
         "Quantity can not greater than 5 and less than 1 !"
       );
 
-    if (type !== "toCart")
-      throw new apiResponse.Api404Error("Invalid cart context !");
+    if (type !== "toCart") throw new Api404Error("Invalid cart context !");
 
-    const productAvailability = await checkProductAvailability(productID, sku);
+    const productAvailability = await isProduct(productID, sku);
 
     if (
       !productAvailability ||
       typeof productAvailability === "undefined" ||
       productAvailability === null
     )
-      throw new apiResponse.Api400Error("Product is available !");
+      throw new Api400Error("Product is available !");
 
     if (parseInt(quantity) >= productAvailability?.variations?.available) {
       return res.status(200).send({
@@ -228,22 +236,24 @@ module.exports.updateCartProductQuantityController = async (
         message: `Quantity updated to ${quantity}.`,
       });
 
-    throw new apiResponse.Api500Error("Failed to update quantity !");
+    throw new Error("Failed to update quantity !");
   } catch (error: any) {
     next(error);
   }
-};
+}
 
 /**
- * @apiController --> DELETE PRODUCT FROM CART
- * @apiMethod --> DELETE
- * @apiRequired --> product id & variation id
+ *
+ * @param req
+ * @param res
+ * @param next
+ * @returns
  */
-module.exports.deleteCartItem = async (
+async function deleteCartItemSystem(
   req: Request,
   res: Response,
   next: NextFunction
-) => {
+) {
   try {
     const { productID, sku, cartTypes } = req.params as {
       productID: string;
@@ -254,13 +264,12 @@ module.exports.deleteCartItem = async (
     const { email, _id } = req.decoded;
 
     if (!sku || !productID)
-      throw new apiResponse.Api400Error("Required product id & sku !");
+      throw new Api400Error("Required product id & sku !");
 
     if (!ObjectId.isValid(productID))
-      throw new apiResponse.Api400Error("Product id is not valid !");
+      throw new Api400Error("Product id is not valid !");
 
-    if (cartTypes !== "toCart")
-      throw new apiResponse.Api500Error("Invalid cart type !");
+    if (cartTypes !== "toCart") throw new Error("Invalid cart type !");
 
     let deleted = await ShoppingCart.findOneAndDelete({
       $and: [
@@ -270,10 +279,7 @@ module.exports.deleteCartItem = async (
       ],
     });
 
-    if (!deleted)
-      throw new apiResponse.Api500Error(
-        `Couldn't delete product with sku ${sku}!`
-      );
+    if (!deleted) throw new Error(`Couldn't delete product with sku ${sku}!`);
 
     // getting cart items from cache
     NodeCache.deleteCache(`${email}_cartProducts`);
@@ -286,4 +292,11 @@ module.exports.deleteCartItem = async (
   } catch (error: any) {
     next(error);
   }
+}
+
+module.exports = {
+  addToCartSystem,
+  getCartContextSystem,
+  updateCartProductQuantitySystem,
+  deleteCartItemSystem,
 };

@@ -6,7 +6,7 @@ const {
 const apiResponse = require("../errors/apiResponse");
 const smtpSender = require("../services/email.service");
 const NodeCache = require("../utils/NodeCache");
-const Order = require("../model/order.model");
+const { Order, OrderItems } = require("../model/order.model");
 const { ObjectId } = require("mongodb");
 
 async function myOrder(req: Request, res: Response, next: NextFunction) {
@@ -27,18 +27,27 @@ async function myOrder(req: Request, res: Response, next: NextFunction) {
     } else {
       orders = await Order.aggregate([
         { $match: { customerId: ObjectId(_id) } },
-        { $unwind: { path: "$items" } },
-        { $replaceRoot: { newRoot: { $mergeObjects: ["$items", "$$ROOT"] } } },
+        {
+          $lookup: {
+            from: "orderItems",
+            localField: "_id",
+            foreignField: "orderId",
+            as: "items",
+          },
+        },
+        // { $unwind: { path: "$items" } },
+        // { $replaceRoot: { newRoot: { $mergeObjects: ["$items", "$$ROOT"] } } },
         {
           $project: {
+            items: 1,
             title: 1,
-            itemId: 1,
             quantity: 1,
             imageUrl: 1,
             itemStatus: 1,
             sku: 1,
             amount: 1,
             attributes: 1,
+            orderStatus: 1,
             sellingPrice: 1,
             orderPlacedAt: 1,
             orderShippedAt: 1,
@@ -48,6 +57,8 @@ async function myOrder(req: Request, res: Response, next: NextFunction) {
           },
         },
       ]);
+
+      let orderItems = await OrderItems.find();
       NodeCache.saveCache(`${authEmail}_myOrders`, orders);
     }
 

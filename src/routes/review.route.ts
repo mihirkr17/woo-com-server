@@ -1,6 +1,6 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
-const { verifyJWT, isBuyer } = require("../middlewares/auth.middleware");
+const { verifyJWT, isCustomer } = require("../middlewares/auth.middleware");
 const { addProductRating, getReviews, getMyReviews, toggleVotingLike, getProductDetails } = require("../controllers/buyer.review.controller");
 
 
@@ -23,7 +23,7 @@ router.post("/add-product-rating", verifyJWT, addProductRating);
 
 router.get("/product-review/:productID", getReviews);
 
-router.get("/my-reviews/:uuid", verifyJWT, isBuyer, getMyReviews)
+router.get("/my-reviews/:uuid", verifyJWT, isCustomer, getMyReviews)
 
 router.post("/toggle-vote", verifyJWT, toggleVotingLike);
 

@@ -12,7 +12,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const Product = require("../model/product.model");
 const User = require("../model/user.model");
-const Supplier = require("../model/supplier.model");
+const Store = require("../model/store.model");
 const smtpSender = require("../services/email.service");
 const Order = require("../model/order.model");
 const { Api400Error, Api403Error, Api404Error, Api500Error, } = require("../errors/apiResponse");
@@ -29,8 +29,8 @@ function adminOverview(req, res, next) {
             const item = req.query.items;
             let queueProducts;
             let countQueueProducts = yield Product.countDocuments({ status: "Queue" });
-            const suppliers = yield Supplier.find();
-            const buyers = yield User.find();
+            const suppliers = yield User.find({ role: "SUPPLIER" });
+            const customers = yield User.find({ role: "CUSTOMER" });
             let cursor = yield Product.find({ isVerified: false, status: "Queue" });
             if (pages || item) {
                 queueProducts = yield cursor
@@ -46,7 +46,7 @@ function adminOverview(req, res, next) {
                 queueProducts,
                 countQueueProducts,
                 suppliers,
-                buyers,
+                customers,
             });
         }
         catch (error) {
@@ -146,16 +146,15 @@ function deleteSupplierAccount(req, res, next) {
                 throw new Api400Error("Required id !");
             if (!ObjectId.isValid(id))
                 throw new Api400Error("Invalid supplier id !");
-            const result = yield Supplier.deleteOne({
+            yield User.deleteOne({
                 $and: [{ _id: ObjectId(id) }, { email }],
             });
-            if (result) {
-                return res.status(200).send({
-                    success: true,
-                    statusCode: 200,
-                    message: "Account deleted successfully.",
-                });
-            }
+            yield Store.deleteOne({ userId: ObjectId(id) });
+            return res.status(200).send({
+                success: true,
+                statusCode: 200,
+                message: "Account deleted successfully.",
+            });
             throw new Api500Error("Internal server error !");
         }
         catch (error) {
@@ -213,7 +212,7 @@ function allBuyers(req, res, next) {
                 filter = [
                     {
                         $match: {
-                            $and: [{ idFor: "buy" }, { role: "BUYER" }],
+                            $and: [{ idFor: "buy" }, { role: "CUSTOMER" }],
                             $or: [{ email: { $regex: search, $options: "mi" } }],
                         },
                     },
@@ -223,7 +222,7 @@ function allBuyers(req, res, next) {
                 filter = [
                     {
                         $match: {
-                            $and: [{ idFor: "buy" }, { role: "BUYER" }],
+                            $and: [{ idFor: "buy" }, { role: "CUSTOMER" }],
                         },
                     },
                     { $skip: page * item || 0 },
@@ -231,7 +230,7 @@ function allBuyers(req, res, next) {
                 ];
                 totalBuyerCount =
                     (yield User.countDocuments({
-                        $and: [{ idFor: "buy" }, { role: "BUYER" }],
+                        $and: [{ idFor: "buy" }, { role: "CUSTOMER" }],
                     })) || 0;
             }
             const buyers = (yield User.aggregate(filter)) || [];

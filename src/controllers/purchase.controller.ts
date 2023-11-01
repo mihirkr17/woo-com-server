@@ -7,7 +7,7 @@ const {
 } = require("../utils/pipelines");
 const { cartContextCalculation } = require("../utils/common");
 const { startSession } = require("mongoose");
-const Order = require("../model/order.model");
+const { Order, OrderItems } = require("../model/order.model");
 const ShoppingCart = require("../model/shoppingCart.model");
 const {
   findUserByEmail,
@@ -24,6 +24,8 @@ const {
 } = require("../errors/apiResponse");
 
 const Product = require("../model/product.model");
+const Customer = require("../model/customer.model");
+const { ObjectId } = require("mongodb");
 
 async function initializedOneForPurchase(
   req: Request,
@@ -98,17 +100,19 @@ async function purchaseCart(req: Request, res: Response, next: NextFunction) {
     // get state by body
     const { state, paymentMethodId, session: paymentSessionId } = req.body;
 
-    if (!paymentMethodId) throw new Api500Error("Required payment method id !");
+    if (state !== "CART") throw new Api400Error("Invalid state !");
+
+    if (!paymentMethodId) throw new Api400Error("Required payment method id !");
 
     // finding user by email;
-    const user = await findUserByEmail(email);
+    const user = await Customer.findOne({ userId: ObjectId(_id) });
 
     if (!user)
       throw new Api400Error(`Sorry, User not found with this ${email}`);
 
     // getting default shipping address from user data;
     const defaultAddress = user?.shippingAddress?.find(
-      (adr: any) => adr?.default_shipping_address === true
+      (adr: any) => adr?.active === true
     );
 
     if (!defaultAddress) throw new Api400Error("Required shipping address !");
@@ -122,6 +126,23 @@ async function purchaseCart(req: Request, res: Response, next: NextFunction) {
 
     const { finalAmount } = cartContextCalculation(cartItems);
 
+    // creating order instance
+    let order = new Order({
+      customerId: _id,
+      shippingAddress: defaultAddress,
+      orderStatus: "placed",
+      state,
+      orderPlacedAt: new Date(timestamp),
+      paymentMode: "card",
+      paymentStatus: "pending",
+      totalAmount: finalAmount,
+    });
+
+    // saving order into db
+    const result = await order.save();
+
+    if (!result?._id) throw new Error("Sorry! Order not placed.");
+
     const productInfos: any[] = [];
 
     const groupOrdersBySeller: any = {};
@@ -133,7 +154,8 @@ async function purchaseCart(req: Request, res: Response, next: NextFunction) {
     cartItems.forEach((item: any) => {
       itemId++;
 
-      item["itemId"] = itemId;
+      item["_id"] = new ObjectId();
+      item["orderId"] = result?._id;
 
       productInfos.push({
         productId: item?.productId,
@@ -148,23 +170,7 @@ async function purchaseCart(req: Request, res: Response, next: NextFunction) {
       groupOrdersBySeller[item?.supplierEmail].items.push(item);
     });
 
-    // creating order instance
-    let order = new Order({
-      customerId: _id,
-      shippingAddress: defaultAddress,
-      orderStatus: "placed",
-      state,
-      orderPlacedAt: new Date(timestamp),
-      paymentMode: "card",
-      paymentStatus: "pending",
-      items: cartItems,
-      totalAmount: finalAmount,
-    });
-
-    // saving order into db
-    const result = await order.save();
-
-    if (!result?._id) throw new Api500Error("Sorry! Order not placed.");
+    await OrderItems.insertMany(cartItems);
 
     // creating payment throw payment intent
     const intent = await createPaymentIntents(

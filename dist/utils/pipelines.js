@@ -55,8 +55,8 @@ module.exports.product_detail_pipe = (productID, sku) => {
         },
         {
             $lookup: {
-                from: 'suppliers',
-                localField: 'supplierId',
+                from: 'stores',
+                localField: 'storeId',
                 foreignField: '_id',
                 as: 'store'
             }
@@ -76,9 +76,9 @@ module.exports.product_detail_pipe = (productID, sku) => {
                 sales: 1,
                 views: 1,
                 categories: 1,
-                supplierId: 1,
-                storeName: 1,
-                supplierPhone: "$phone",
+                storeId: 1,
+                storeTitle: 1,
+                supplierPhone: "$contactPhone",
                 imageUrls: 1,
                 rating: 1,
                 ratingAverage: 1,
@@ -207,14 +207,14 @@ module.exports.single_purchase_pipe = (productId, sku, quantity) => {
         { $match: { $and: [{ _id: mongoDB.ObjectId(productId) }, { status: "Active" }] } },
         {
             $lookup: {
-                from: 'suppliers',
-                localField: "supplierId",
+                from: 'store',
+                localField: "storeId",
                 foreignField: "_id",
-                as: "supplier"
+                as: "store"
             }
         },
-        { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$supplier", 0] }, "$$ROOT"] } } },
-        { $unset: ["supplier"] },
+        { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$store", 0] }, "$$ROOT"] } } },
+        { $unset: ["store"] },
         {
             $addFields: {
                 variation: {
@@ -244,9 +244,9 @@ module.exports.single_purchase_pipe = (productId, sku, quantity) => {
                 _id: 0,
                 shipping: 1,
                 packaged: 1,
-                supplierId: 1,
-                supplierEmail: "$email",
-                storeName: 1,
+                storeId: 1,
+                supplierEmail: "$contactEmail",
+                storeTitle: 1,
                 title: 1,
                 brand: 1,
                 sku: "$variation.sku",
@@ -283,14 +283,14 @@ module.exports.shopping_cart_pipe = (customerId) => {
         { $unset: ["main_product"] },
         {
             $lookup: {
-                from: 'suppliers',
-                localField: "supplierId",
+                from: 'stores',
+                localField: "storeId",
                 foreignField: "_id",
-                as: "supplier"
+                as: "store"
             }
         },
-        { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$supplier", 0] }, "$$ROOT"] } } },
-        { $unset: ["supplier"] },
+        { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$store", 0] }, "$$ROOT"] } } },
+        { $unset: ["store"] },
         {
             $addFields: {
                 variation: {

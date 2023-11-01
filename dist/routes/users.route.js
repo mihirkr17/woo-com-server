@@ -16,7 +16,7 @@ const { verifyJWT } = require("../middlewares/auth.middleware");
  * @apiParams no params required.
  * @apiSuccess {one particular user object data}
  */
-router.get("/fau", verifyJWT, usersCTRL === null || usersCTRL === void 0 ? void 0 : usersCTRL.fetchAuthUser);
+router.get("/fau", verifyJWT, usersCTRL === null || usersCTRL === void 0 ? void 0 : usersCTRL.fetchAuthUserSystem);
 /**
  * @api {put} /sign in the user
  * @apiDescription this endpoint will save the currently login or sign up user data to the database with role
@@ -26,11 +26,12 @@ router.get("/fau", verifyJWT, usersCTRL === null || usersCTRL === void 0 ? void 
  * @apiParams no params required.
  * @apiSuccess sending success message.
  */
-router.get("/buyer/address-book", verifyJWT, usersCTRL === null || usersCTRL === void 0 ? void 0 : usersCTRL.fetchAddressBook);
-router.put("/buyer/update-profile-data", verifyJWT, usersCTRL.updateProfileData);
+router.get("/customer/address-book", verifyJWT, usersCTRL === null || usersCTRL === void 0 ? void 0 : usersCTRL.fetchAddressBookSystem);
+router.put("/customer/update-profile-data", verifyJWT, usersCTRL.updateProfileDataSystem);
 // Shipping address route
-router.post("/buyer/shipping-address", verifyJWT, usersCTRL.createShippingAddress);
-router.put("/buyer/shipping-address", verifyJWT, usersCTRL.updateShippingAddress);
-router.post("/buyer/shipping-address-select", verifyJWT, usersCTRL.selectShippingAddress);
-router.delete("/buyer/shipping-address-delete/:id", verifyJWT, usersCTRL.deleteShippingAddress);
+router.post("/customer/shipping-address", verifyJWT, usersCTRL.createShippingAddressSystem);
+router.put("/customer/shipping-address", verifyJWT, usersCTRL.updateShippingAddressSystem);
+router.post("/customer/shipping-address-select", verifyJWT, usersCTRL.selectShippingAddressSystem);
+router.delete("/customer/shipping-address-delete/:id", verifyJWT, usersCTRL.deleteShippingAddressSystem);
+router.put("/customer/password-update", verifyJWT, usersCTRL === null || usersCTRL === void 0 ? void 0 : usersCTRL.passwordChangeSystem);
 module.exports = router;

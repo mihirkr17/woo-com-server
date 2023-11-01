@@ -3,18 +3,20 @@ const router: Router = express.Router();
 const { verifyJWT } = require("../middlewares/auth.middleware");
 const cartContext = require("../controllers/buyer.cart.controller");
 
-try {
-  router.post("/add-to-cart", verifyJWT, cartContext.addToCartHandler);
+router.post("/add-to-cart", verifyJWT, cartContext.addToCartSystem);
 
-  router.get("/cart-context", verifyJWT, cartContext?.getCartContext);
+router.get("/cart-context", verifyJWT, cartContext?.getCartContextSystem);
 
-  router.put('/update-cart-product-quantity', verifyJWT, cartContext.updateCartProductQuantityController);
+router.put(
+  "/update-cart-product-quantity",
+  verifyJWT,
+  cartContext.updateCartProductQuantitySystem
+);
 
-  router.delete("/delete-cart-item/:productID/:sku/:cartTypes", verifyJWT, cartContext.deleteCartItem);
-
-} catch (error: any) {
-  console.log(error?.message);
-}
-
+router.delete(
+  "/delete-cart-item/:productID/:sku/:cartTypes",
+  verifyJWT,
+  cartContext.deleteCartItemSystem
+);
 
 module.exports = router;

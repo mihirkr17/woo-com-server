@@ -18,7 +18,7 @@ const apiResponse = require("../errors/apiResponse");
 const { generateTrackingID } = require("../utils/generator");
 const NCache = require("../utils/NodeCache");
 const Order = require("../model/order.model");
-const Supplier = require("../model/supplier.model");
+const Store = require("../model/store.model");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 module.exports.findUserByEmail = (email) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -174,9 +174,9 @@ module.exports.productStockUpdater = (type, data) => __awaiter(void 0, void 0, v
         throw error;
     }
 });
-module.exports.getSupplierInformationByID = (uuid) => __awaiter(void 0, void 0, void 0, function* () {
+module.exports.getSupplierInformationByID = (id) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        return yield Supplier.findOne({ _id: mdb.ObjectId(uuid) }, { password: 0 });
+        return yield Store.find({ userId: mdb.ObjectId(id) });
     }
     catch (error) {
         throw error;

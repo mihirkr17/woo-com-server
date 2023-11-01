@@ -13,12 +13,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const { single_purchase_pipe, shopping_cart_pipe, } = require("../utils/pipelines");
 const { cartContextCalculation } = require("../utils/common");
 const { startSession } = require("mongoose");
-const Order = require("../model/order.model");
+const { Order, OrderItems } = require("../model/order.model");
 const ShoppingCart = require("../model/shoppingCart.model");
 const { findUserByEmail, createPaymentIntents, clearCart, productStockUpdater, } = require("../services/common.service");
 const smtpSender = require("../services/email.service");
 const { Api400Error, Api500Error, Api503Error, } = require("../errors/apiResponse");
 const Product = require("../model/product.model");
+const Customer = require("../model/customer.model");
+const { ObjectId } = require("mongodb");
 function initializedOneForPurchase(req, res, next) {
     var _a, _b;
     return __awaiter(this, void 0, void 0, function* () {
@@ -69,20 +71,37 @@ function purchaseCart(req, res, next) {
                 throw new Api400Error("Required body !");
             // get state by body
             const { state, paymentMethodId, session: paymentSessionId } = req.body;
+            if (state !== "CART")
+                throw new Api400Error("Invalid state !");
             if (!paymentMethodId)
-                throw new Api500Error("Required payment method id !");
+                throw new Api400Error("Required payment method id !");
             // finding user by email;
-            const user = yield findUserByEmail(email);
+            const user = yield Customer.findOne({ userId: ObjectId(_id) });
             if (!user)
                 throw new Api400Error(`Sorry, User not found with this ${email}`);
             // getting default shipping address from user data;
-            const defaultAddress = (_a = user === null || user === void 0 ? void 0 : user.shippingAddress) === null || _a === void 0 ? void 0 : _a.find((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true);
+            const defaultAddress = (_a = user === null || user === void 0 ? void 0 : user.shippingAddress) === null || _a === void 0 ? void 0 : _a.find((adr) => (adr === null || adr === void 0 ? void 0 : adr.active) === true);
             if (!defaultAddress)
                 throw new Api400Error("Required shipping address !");
             let cartItems = yield ShoppingCart.aggregate(shopping_cart_pipe(_id));
             if (!cartItems || cartItems.length <= 0 || !Array.isArray(cartItems))
                 throw new Api400Error("Nothing for purchase ! Please add product in your cart.");
             const { finalAmount } = cartContextCalculation(cartItems);
+            // creating order instance
+            let order = new Order({
+                customerId: _id,
+                shippingAddress: defaultAddress,
+                orderStatus: "placed",
+                state,
+                orderPlacedAt: new Date(timestamp),
+                paymentMode: "card",
+                paymentStatus: "pending",
+                totalAmount: finalAmount,
+            });
+            // saving order into db
+            const result = yield order.save();
+            if (!(result === null || result === void 0 ? void 0 : result._id))
+                throw new Error("Sorry! Order not placed.");
             const productInfos = [];
             const groupOrdersBySeller = {};
             // generating item id
@@ -90,7 +109,8 @@ function purchaseCart(req, res, next) {
             // assigning some value to items
             cartItems.forEach((item) => {
                 itemId++;
-                item["itemId"] = itemId;
+                item["_id"] = new ObjectId();
+                item["orderId"] = result === null || result === void 0 ? void 0 : result._id;
                 productInfos.push({
                     productId: item === null || item === void 0 ? void 0 : item.productId,
                     sku: item === null || item === void 0 ? void 0 : item.sku,
@@ -101,22 +121,7 @@ function purchaseCart(req, res, next) {
                 }
                 groupOrdersBySeller[item === null || item === void 0 ? void 0 : item.supplierEmail].items.push(item);
             });
-            // creating order instance
-            let order = new Order({
-                customerId: _id,
-                shippingAddress: defaultAddress,
-                orderStatus: "placed",
-                state,
-                orderPlacedAt: new Date(timestamp),
-                paymentMode: "card",
-                paymentStatus: "pending",
-                items: cartItems,
-                totalAmount: finalAmount,
-            });
-            // saving order into db
-            const result = yield order.save();
-            if (!(result === null || result === void 0 ? void 0 : result._id))
-                throw new Api500Error("Sorry! Order not placed.");
+            yield OrderItems.insertMany(cartItems);
             // creating payment throw payment intent
             const intent = yield createPaymentIntents(finalAmount, result === null || result === void 0 ? void 0 : result._id.toString(), paymentMethodId, paymentSessionId, req === null || req === void 0 ? void 0 : req.ip, req.get("user-agent"));
             // if payment success then change order payment status and save

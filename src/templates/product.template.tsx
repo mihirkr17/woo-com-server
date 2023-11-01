@@ -20,7 +20,7 @@ function product_variation_template_engine({ available, pricing, attributes, sku
   }
 }
 
-const product_listing_template_engine = (body: any, supplierId: any) => {
+const product_listing_template_engine = (body: any, storeId: any) => {
 
   const packageHeight: number = parseFloat(body?.packageHeight);
   const packageLength: number = parseFloat(body?.packageLength);
@@ -41,7 +41,7 @@ const product_listing_template_engine = (body: any, supplierId: any) => {
 
     highlights: body?.highlights || [],
 
-    supplierId,
+    storeId,
 
     packaged: {
       dimension: {

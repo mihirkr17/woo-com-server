@@ -37,13 +37,13 @@ async function getStore(
   next: NextFunction
 ): Promise<any> {
   try {
-    const { storeName } = req?.params;
+    const { storeTitle } = req?.params;
     const { page, sorted, id } = req.query;
     const filters: any = req.query?.filters;
 
     const regex = /[<>{}|\\^%]/g;
 
-    if (typeof storeName !== "string")
+    if (typeof storeTitle !== "string")
       throw new Api400Error("Invalid store name !");
 
     let filterArr = filters ? filters.replace(regex, "").split("--") : [];
@@ -62,7 +62,7 @@ async function getStore(
 
     let Filter: any = {};
 
-    Filter["$and"] = [{ supplierId: ObjectId(id) }, { status: "Active" }];
+    Filter["$and"] = [{ storeId: ObjectId(id) }, { status: "Active" }];
 
     let sortList: any = {};
 
@@ -100,7 +100,7 @@ async function getStore(
       { $match: Filter },
       {
         $group: {
-          _id: "$supplierId",
+          _id: "$storeId",
           totalProduct: { $count: {} },
         },
       },
@@ -111,7 +111,7 @@ async function getStore(
 
     let storeInfo = await Product.aggregate([
       {
-        $match: { $and: [{ status: "Active" }, { supplierId: ObjectId(id) }] },
+        $match: { $and: [{ status: "Active" }, { storeId: ObjectId(id) }] },
       },
       {
         $project: {
@@ -134,7 +134,7 @@ async function getStore(
           },
           rating: 1,
           categories: 1,
-          supplierId: 1,
+          storeId: 1,
           brand: 1,
           totalMulti: {
             $reduce: {
@@ -159,22 +159,22 @@ async function getStore(
       },
       {
         $lookup: {
-          from: "suppliers",
-          localField: "supplierId",
+          from: "stores",
+          localField: "storeId",
           foreignField: "_id",
-          as: "supplier",
+          as: "store",
         },
       },
       {
         $replaceRoot: {
           newRoot: {
-            $mergeObjects: [{ $arrayElemAt: ["$supplier", 0] }, "$$ROOT"],
+            $mergeObjects: [{ $arrayElemAt: ["$store", 0] }, "$$ROOT"],
           },
         },
       },
       {
         $group: {
-          _id: "$storeName",
+          _id: "$storeTitle",
           totalProduct: { $count: {} },
           categories: { $push: { $last: "$categories" } },
           brands: { $push: "$brand" },
@@ -185,7 +185,7 @@ async function getStore(
 
       {
         $project: {
-          storeName: 1,
+          storeTitle: 1,
           supplier: 1,
           _id: 1,
           totalProduct: 1,
@@ -437,7 +437,7 @@ async function fetchTopSellingProduct(
       status: "Active",
     };
     if (sid) {
-      filterQuery["supplierId"] = ObjectId(sid);
+      filterQuery["storeId"] = ObjectId(sid);
     }
 
     const result = await Product.find(filterQuery)

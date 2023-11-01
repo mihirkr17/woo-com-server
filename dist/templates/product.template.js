@@ -15,7 +15,7 @@ function product_variation_template_engine({ available, pricing, attributes, sku
         available,
     };
 }
-const product_listing_template_engine = (body, supplierId) => {
+const product_listing_template_engine = (body, storeId) => {
     const packageHeight = parseFloat(body === null || body === void 0 ? void 0 : body.packageHeight);
     const packageLength = parseFloat(body === null || body === void 0 ? void 0 : body.packageLength);
     const packageWidth = parseFloat(body === null || body === void 0 ? void 0 : body.packageWidth);
@@ -27,7 +27,7 @@ const product_listing_template_engine = (body, supplierId) => {
         categories: (body === null || body === void 0 ? void 0 : body.categories.split("/")) || [],
         brand: (body === null || body === void 0 ? void 0 : body.brand) || "No Brand",
         highlights: (body === null || body === void 0 ? void 0 : body.highlights) || [],
-        supplierId,
+        storeId,
         packaged: {
             dimension: {
                 height: packageHeight,

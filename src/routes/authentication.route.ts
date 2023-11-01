@@ -1,6 +1,5 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
-const buyerAuthCTRL = require("../controllers/buyer.auth.controller");
 
 const {
   loginSystem,
@@ -9,18 +8,10 @@ const {
   sendOtpForForgotPwdChangeSystem,
   checkOtpForForgotPwdChangeSystem,
   setNewPwdForForgotPwdChangeSystem,
-} = require("../controllers/auth.controller");
+} = require("../controllers/users.controller");
 
-const {
-  supplierRegistrationController,
-  supplierLoginController,
-  supplierAccountVerifyByEmail,
-} = require("../controllers/supplier.auth.controller");
+const { verifyEmailByJWT } = require("../middlewares/auth.middleware");
 
-const {
-  verifyJWT,
-  verifyEmailByJWT,
-} = require("../middlewares/auth.middleware");
 const {
   loginMDL,
   registrationMDL,
@@ -42,12 +33,8 @@ router.post("/set-new-password", setNewPwdForForgotPwdChangeSystem);
 
 // unmodified
 // supplier routes
-router.post("/supplier/login", supplierLoginController);
+router.post("/supplier/login", loginSystem);
 
-router.post(
-  "/supplier/register",
-  supplierRegistrationMDL,
-  supplierRegistrationController
-);
+router.post("/supplier/register", supplierRegistrationMDL, registrationSystem);
 
 module.exports = router;

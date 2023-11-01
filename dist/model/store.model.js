@@ -15,23 +15,29 @@ const businessTypes = [
     "Food and Grocery",
 ];
 const storeSchema = new mongoose_1.Schema({
-    userId: { type: mongoose_1.Schema.Types.ObjectId, required: true },
-    storeName: { type: String, required: [true, "Required store name !"] },
+    userId: { type: mongoose_1.Schema.Types.ObjectId, required: true, ref: "User" },
+    storeTitle: { type: String, required: [true, "Required store name!"] },
+    contactPhone: { type: String, required: [true, "Required phone number!"] },
+    contactEmail: {
+        type: String,
+        required: [true, "Required contact email address!"],
+    },
+    taxId: { type: String, required: [true, "Required tax id!"] },
     storeType: { type: String, enum: businessTypes, required: true },
-    storeLicense: { type: String, required: false },
+    license: { type: String, required: [true, "Required store license!"] },
     address: {
-        country: { type: String, required: true },
-        division: { type: String, required: true },
-        city: { type: String, required: true },
-        thana: { type: String, required: true },
-        landmark: { type: String, required: true },
-        postal_code: { type: String, required: true },
+        country: { type: String, required: [true, "Required country name!"] },
+        division: { type: String, required: [true, "Required division!"] },
+        city: { type: String, required: [true, "Required city or town name!"] },
+        thana: { type: String, required: [true, "Required thana name!"] },
+        landmark: { type: String, required: [true, "Required landmark!"] },
+        postalCode: { type: String, required: [true, "Required postal code!"] },
     },
     location: {
         type: String,
         latitude: Number,
         longitude: Number,
     },
-    createdAt: { type: Date, default: Date.now },
+    storeCreatedAt: { type: Date, default: Date.now },
 });
 module.exports = (0, mongoose_1.model)("Store", storeSchema, "stores");

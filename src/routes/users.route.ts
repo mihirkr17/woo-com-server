@@ -13,7 +13,7 @@ const { verifyJWT } = require("../middlewares/auth.middleware");
  * @apiParams no params required.
  * @apiSuccess {one particular user object data}
  */
-router.get("/fau", verifyJWT, usersCTRL?.fetchAuthUser);
+router.get("/fau", verifyJWT, usersCTRL?.fetchAuthUserSystem);
 
 /**
  * @api {put} /sign in the user
@@ -25,33 +25,39 @@ router.get("/fau", verifyJWT, usersCTRL?.fetchAuthUser);
  * @apiSuccess sending success message.
  */
 
-router.get("/buyer/address-book", verifyJWT, usersCTRL?.fetchAddressBook);
+router.get("/customer/address-book", verifyJWT, usersCTRL?.fetchAddressBookSystem);
 
 router.put(
-  "/buyer/update-profile-data",
+  "/customer/update-profile-data",
   verifyJWT,
-  usersCTRL.updateProfileData
+  usersCTRL.updateProfileDataSystem
 );
 // Shipping address route
 router.post(
-  "/buyer/shipping-address",
+  "/customer/shipping-address",
   verifyJWT,
-  usersCTRL.createShippingAddress
+  usersCTRL.createShippingAddressSystem
 );
 router.put(
-  "/buyer/shipping-address",
+  "/customer/shipping-address",
   verifyJWT,
-  usersCTRL.updateShippingAddress
+  usersCTRL.updateShippingAddressSystem
 );
 router.post(
-  "/buyer/shipping-address-select",
+  "/customer/shipping-address-select",
   verifyJWT,
-  usersCTRL.selectShippingAddress
+  usersCTRL.selectShippingAddressSystem
 );
 router.delete(
-  "/buyer/shipping-address-delete/:id",
+  "/customer/shipping-address-delete/:id",
   verifyJWT,
-  usersCTRL.deleteShippingAddress
+  usersCTRL.deleteShippingAddressSystem
+);
+
+router.put(
+  "/customer/password-update",
+  verifyJWT,
+  usersCTRL?.passwordChangeSystem
 );
 
 module.exports = router;

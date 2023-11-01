@@ -73,11 +73,11 @@ const isSupplier = async (req: Request, res: Response, next: NextFunction) => {
 };
 
 // verify seller
-const isBuyer = (req: Request, res: Response, next: NextFunction) => {
+const isCustomer = (req: Request, res: Response, next: NextFunction) => {
 
   const authRole = req.decoded.role;
 
-  if (authRole === "BUYER") {
+  if (authRole === "CUSTOMER") {
     next();
   } else {
     throw new apiResponse.Api403Error("Forbidden access !");
@@ -143,7 +143,7 @@ module.exports = {
   verifyJWT,
   isRoleOwnerOrAdmin,
   isSupplier,
-  isBuyer,
+  isCustomer,
   isAdmin,
   isPermitForDashboard,
   verifyEmailByJWT

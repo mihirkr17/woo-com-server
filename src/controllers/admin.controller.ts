@@ -3,7 +3,7 @@
 import { NextFunction, Request, Response } from "express";
 const Product = require("../model/product.model");
 const User = require("../model/user.model");
-const Supplier = require("../model/supplier.model");
+const Store = require("../model/store.model");
 const smtpSender = require("../services/email.service");
 const Order = require("../model/order.model");
 const {
@@ -27,8 +27,8 @@ async function adminOverview(req: Request, res: Response, next: NextFunction) {
 
     let countQueueProducts = await Product.countDocuments({ status: "Queue" });
 
-    const suppliers = await Supplier.find();
-    const buyers = await User.find();
+    const suppliers = await User.find({ role: "SUPPLIER" });
+    const customers = await User.find({ role: "CUSTOMER" });
 
     let cursor = await Product.find({ isVerified: false, status: "Queue" });
 
@@ -46,7 +46,7 @@ async function adminOverview(req: Request, res: Response, next: NextFunction) {
       queueProducts,
       countQueueProducts,
       suppliers,
-      buyers,
+      customers,
     });
   } catch (error: any) {
     next(error);
@@ -170,17 +170,16 @@ async function deleteSupplierAccount(
 
     if (!ObjectId.isValid(id)) throw new Api400Error("Invalid supplier id !");
 
-    const result = await Supplier.deleteOne({
+    await User.deleteOne({
       $and: [{ _id: ObjectId(id) }, { email }],
     });
+    await Store.deleteOne({ userId: ObjectId(id) });
 
-    if (result) {
-      return res.status(200).send({
-        success: true,
-        statusCode: 200,
-        message: "Account deleted successfully.",
-      });
-    }
+    return res.status(200).send({
+      success: true,
+      statusCode: 200,
+      message: "Account deleted successfully.",
+    });
 
     throw new Api500Error("Internal server error !");
   } catch (error: any) {
@@ -242,7 +241,7 @@ async function allBuyers(req: Request, res: Response, next: NextFunction) {
       filter = [
         {
           $match: {
-            $and: [{ idFor: "buy" }, { role: "BUYER" }],
+            $and: [{ idFor: "buy" }, { role: "CUSTOMER" }],
             $or: [{ email: { $regex: search, $options: "mi" } }],
           },
         },
@@ -251,7 +250,7 @@ async function allBuyers(req: Request, res: Response, next: NextFunction) {
       filter = [
         {
           $match: {
-            $and: [{ idFor: "buy" }, { role: "BUYER" }],
+            $and: [{ idFor: "buy" }, { role: "CUSTOMER" }],
           },
         },
         { $skip: page * item || 0 },
@@ -260,7 +259,7 @@ async function allBuyers(req: Request, res: Response, next: NextFunction) {
 
       totalBuyerCount =
         (await User.countDocuments({
-          $and: [{ idFor: "buy" }, { role: "BUYER" }],
+          $and: [{ idFor: "buy" }, { role: "CUSTOMER" }],
         })) || 0;
     }
 

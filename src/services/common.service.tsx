@@ -8,7 +8,7 @@ const apiResponse = require("../errors/apiResponse");
 const { generateTrackingID } = require("../utils/generator");
 const NCache = require("../utils/NodeCache");
 const Order = require("../model/order.model");
-const Supplier = require("../model/supplier.model");
+const Store = require("../model/store.model");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 module.exports.findUserByEmail = async (email: string) => {
@@ -195,9 +195,9 @@ module.exports.productStockUpdater = async (type: string, data: any[]) => {
 }
 
 
-module.exports.getSupplierInformationByID = async (uuid: string) => {
+module.exports.getSupplierInformationByID = async (id: string) => {
    try {
-      return await Supplier.findOne({ _id: mdb.ObjectId(uuid) }, { password: 0 });
+      return await Store.find({ userId: mdb.ObjectId(id) });
    } catch (error) {
       throw error;
    }

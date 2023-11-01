@@ -33,7 +33,7 @@ var ProductSchema = new mongoose_1.Schema({
             pricing: Object
         }
     ],
-    supplierId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Supplier' },
+    storeId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Store' },
     warranty: {
         type: { type: String, required: false },
         duration: { type: String, required: false },

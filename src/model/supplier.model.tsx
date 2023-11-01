@@ -53,7 +53,7 @@ const supplierSchema = new Schema({
       default: "SUPPLIER",
    },
 
-   storeName: { type: String, required: [true, "Required store name !"] },
+   storeTitle: { type: String, required: [true, "Required store name !"] },
 
    storeType: { type: String, enum: businessTypes, required: true },
 

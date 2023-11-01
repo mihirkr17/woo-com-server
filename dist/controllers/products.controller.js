@@ -31,11 +31,11 @@ function getStore(req, res, next) {
     var _a, _b;
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { storeName } = req === null || req === void 0 ? void 0 : req.params;
+            const { storeTitle } = req === null || req === void 0 ? void 0 : req.params;
             const { page, sorted, id } = req.query;
             const filters = (_a = req.query) === null || _a === void 0 ? void 0 : _a.filters;
             const regex = /[<>{}|\\^%]/g;
-            if (typeof storeName !== "string")
+            if (typeof storeTitle !== "string")
                 throw new Api400Error("Invalid store name !");
             let filterArr = filters ? filters.replace(regex, "").split("--") : [];
             const filterResult = filterArr.reduce((obj, items) => {
@@ -49,7 +49,7 @@ function getStore(req, res, next) {
                 return obj;
             }, {});
             let Filter = {};
-            Filter["$and"] = [{ supplierId: ObjectId(id) }, { status: "Active" }];
+            Filter["$and"] = [{ storeId: ObjectId(id) }, { status: "Active" }];
             let sortList = {};
             if (sorted === "lowest") {
                 sortList = { $sort: { "pricing.sellingPrice": 1 } };
@@ -81,7 +81,7 @@ function getStore(req, res, next) {
                 { $match: Filter },
                 {
                     $group: {
-                        _id: "$supplierId",
+                        _id: "$storeId",
                         totalProduct: { $count: {} },
                     },
                 },
@@ -90,7 +90,7 @@ function getStore(req, res, next) {
             filteringProductTotal = filteringProductTotal[0];
             let storeInfo = yield Product.aggregate([
                 {
-                    $match: { $and: [{ status: "Active" }, { supplierId: ObjectId(id) }] },
+                    $match: { $and: [{ status: "Active" }, { storeId: ObjectId(id) }] },
                 },
                 {
                     $project: {
@@ -113,7 +113,7 @@ function getStore(req, res, next) {
                         },
                         rating: 1,
                         categories: 1,
-                        supplierId: 1,
+                        storeId: 1,
                         brand: 1,
                         totalMulti: {
                             $reduce: {
@@ -138,22 +138,22 @@ function getStore(req, res, next) {
                 },
                 {
                     $lookup: {
-                        from: "suppliers",
-                        localField: "supplierId",
+                        from: "stores",
+                        localField: "storeId",
                         foreignField: "_id",
-                        as: "supplier",
+                        as: "store",
                     },
                 },
                 {
                     $replaceRoot: {
                         newRoot: {
-                            $mergeObjects: [{ $arrayElemAt: ["$supplier", 0] }, "$$ROOT"],
+                            $mergeObjects: [{ $arrayElemAt: ["$store", 0] }, "$$ROOT"],
                         },
                     },
                 },
                 {
                     $group: {
-                        _id: "$storeName",
+                        _id: "$storeTitle",
                         totalProduct: { $count: {} },
                         categories: { $push: { $last: "$categories" } },
                         brands: { $push: "$brand" },
@@ -163,7 +163,7 @@ function getStore(req, res, next) {
                 },
                 {
                     $project: {
-                        storeName: 1,
+                        storeTitle: 1,
                         supplier: 1,
                         _id: 1,
                         totalProduct: 1,
@@ -372,7 +372,7 @@ function fetchTopSellingProduct(req, res, next) {
                 status: "Active",
             };
             if (sid) {
-                filterQuery["supplierId"] = ObjectId(sid);
+                filterQuery["storeId"] = ObjectId(sid);
             }
             const result = yield Product.find(filterQuery)
                 .sort({ sales: -1 })

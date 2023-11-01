@@ -49,7 +49,7 @@ var ProductSchema = new Schema({
       }
    ],
 
-   supplierId: { type: Schema.Types.ObjectId, ref: 'Supplier' },
+   storeId: { type: Schema.Types.ObjectId, ref: 'Store' },
 
    warranty: {
       type: { type: String, required: false },

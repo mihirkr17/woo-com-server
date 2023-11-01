@@ -24,7 +24,6 @@ module.exports.generateJwtToken = (userInfo) => {
     const token = jwt.sign({
         _id: userInfo === null || userInfo === void 0 ? void 0 : userInfo._id,
         fullName: userInfo === null || userInfo === void 0 ? void 0 : userInfo.fullName,
-        _uuid: userInfo === null || userInfo === void 0 ? void 0 : userInfo._uuid,
         email: userInfo === null || userInfo === void 0 ? void 0 : userInfo.email,
         role: userInfo === null || userInfo === void 0 ? void 0 : userInfo.role,
         status: 'online'
@@ -35,13 +34,8 @@ module.exports.generateJwtToken = (userInfo) => {
     return token;
 };
 module.exports.generateUserDataToken = (user) => {
-    var _a, _b;
     user = user.toObject();
     user["password"] = undefined;
-    if ((user === null || user === void 0 ? void 0 : user.role) === "BUYER") {
-        user.buyer["defaultShippingAddress"] = (Array.isArray((_a = user === null || user === void 0 ? void 0 : user.buyer) === null || _a === void 0 ? void 0 : _a.shippingAddress) &&
-            ((_b = user === null || user === void 0 ? void 0 : user.buyer) === null || _b === void 0 ? void 0 : _b.shippingAddress.find((adr) => (adr === null || adr === void 0 ? void 0 : adr.default_shipping_address) === true))) || {};
-    }
     const token = jwt.sign(user, process.env.ACCESS_TOKEN, {
         algorithm: "HS256",
         expiresIn: "16h",

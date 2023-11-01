@@ -14,7 +14,7 @@ try {
   router.get("/store/:limits", productCTRL.homeStoreController);
 
 
-  router.get(`/:storeName`, productCTRL?.getStore);
+  router.get(`/:storeTitle`, productCTRL?.getStore);
 
   /**
     * @requestMethod GET

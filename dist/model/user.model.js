@@ -15,7 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 // import { Schema, model } from "mongoose";
 const mongoose_1 = __importDefault(require("mongoose"));
 const bcrypt = require("bcrypt");
-mongoose_1.default.set('maxTimeMS', 30000);
+mongoose_1.default.set("maxTimeMS", 30000);
 let { Schema, model } = mongoose_1.default;
 const validator = require("validator");
 // user schema design
@@ -28,33 +28,45 @@ var UserSchema = new Schema({
         validate: [validator.isEmail, "Provide a valid email address !!!"],
     },
     phone: { type: String, required: true },
+    gender: {
+        type: String,
+        enum: ["Male", "Female", "Others"],
+        required: [true, "Required gender information!"],
+    },
+    dob: String,
     phonePrefixCode: { type: String, enum: ["880"], default: "880" },
-    contactEmail: { type: String },
     password: {
         type: String,
-        minLength: [5, "Password must be greater than or equal to 5 characters !!!",],
-        required: true
+        minLength: [
+            5,
+            "Password must be greater than or equal to 5 characters !!!",
+        ],
+        required: true,
     },
     hasPassword: {
         type: Boolean,
-        default: false
+        default: false,
     },
     role: {
         type: String,
-        enum: ["BUYER", "SUPPLIER", "ADMIN"]
+        enum: ["CUSTOMER", "SUPPLIER", "ADMIN"],
     },
-    gender: {
-        type: String, required: true, enum: ["Male", "Female", "Others"]
+    idFor: { type: String, enum: ["buy", "sell", "administration"] },
+    accountStatus: {
+        type: String,
+        enum: ["Active", "Inactive", "Blocked"],
+        default: "Inactive",
     },
-    dob: { type: String, required: false },
-    idFor: { type: String, default: "buy" },
-    accountStatus: { type: String, enum: ["Active", "Inactive", "Blocked"], default: "Inactive", },
-    authProvider: { type: String, enum: ['system', 'thirdParty'], default: 'system' },
+    authProvider: {
+        type: String,
+        enum: ["system", "thirdParty"],
+        default: "system",
+    },
     verified: { type: Boolean, default: false },
     devices: Array,
     otp: { type: String, default: undefined },
     otpExTime: { type: Date, default: undefined },
-    createdAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
 });
 UserSchema.pre("save", function (next) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -66,8 +78,7 @@ UserSchema.pre("save", function (next) {
             if (this.isModified("verified")) {
                 this.verified = this.verified;
             }
-            this.authProvider = 'system';
-            this.contactEmail = this.email;
+            this.authProvider = "system";
             next();
         }
         catch (error) {
@@ -87,4 +98,3 @@ UserSchema.methods.comparePassword = function (clientPassword) {
     });
 };
 module.exports = model("User", UserSchema, "users");
-;

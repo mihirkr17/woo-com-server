@@ -13,7 +13,7 @@ try {
     router.get("/search-products/:q", productCTRL.searchProducts);
     router.get("/fetch-single-product/:product_slug", productCTRL.fetchProductDetails);
     router.get("/store/:limits", productCTRL.homeStoreController);
-    router.get(`/:storeName`, productCTRL === null || productCTRL === void 0 ? void 0 : productCTRL.getStore);
+    router.get(`/:storeTitle`, productCTRL === null || productCTRL === void 0 ? void 0 : productCTRL.getStore);
     /**
       * @requestMethod GET
       * @controller productsByCategoryController

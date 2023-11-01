@@ -13,18 +13,18 @@ const OrderTbl = require("../model/order.model");
 const { ObjectId: mdbObjectId } = require("mongodb");
 /**
  *
- * @param supplierId
+ * @param storeId
  * @param productId
  * @param variation
  * @returns
  */
-function updateStockService(supplierId, productId, variation) {
+function updateStockService(storeId, productId, variation) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             return yield ProductTbl.findOneAndUpdate({
                 $and: [
                     { _id: mdbObjectId(productId) },
-                    { supplierId: mdbObjectId(supplierId) },
+                    { storeId: mdbObjectId(storeId) },
                 ],
             }, {
                 $set: {
@@ -42,17 +42,17 @@ function updateStockService(supplierId, productId, variation) {
 }
 /**
  *
- * @param supplierId
+ * @param storeId
  * @param productId
  * @param values
  * @returns
  */
-function updateMainProductService(supplierId, productId, values) {
+function updateMainProductService(storeId, productId, values) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             return yield ProductTbl.findOneAndUpdate({
                 $and: [
-                    { supplierId: mdbObjectId(supplierId) },
+                    { storeId: mdbObjectId(storeId) },
                     { _id: mdbObjectId(productId) },
                 ],
             }, values, { upsert: true });
@@ -64,18 +64,18 @@ function updateMainProductService(supplierId, productId, values) {
 }
 /**
  *
- * @param supplierId
+ * @param storeId
  * @param productId
  * @returns
  */
-function findProductVariationByIdAndSupplierId(supplierId, productId) {
+function findProductVariationByIdAndSupplierId(storeId, productId) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             let product = yield ProductTbl.aggregate([
                 {
                     $match: {
                         $and: [
-                            { supplierId: mdbObjectId(supplierId) },
+                            { storeId: mdbObjectId(storeId) },
                             { _id: mdbObjectId(productId) },
                         ],
                     },
@@ -96,17 +96,17 @@ function findProductVariationByIdAndSupplierId(supplierId, productId) {
 }
 /**
  *
- * @param supplierId
+ * @param storeId
  * @param productId
  * @param sku
  * @returns
  */
-function variationDeleteService(supplierId, productId, sku) {
+function variationDeleteService(storeId, productId, sku) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             return yield ProductTbl.findOneAndUpdate({
                 $and: [
-                    { supplierId: mdbObjectId(supplierId) },
+                    { storeId: mdbObjectId(storeId) },
                     { _id: mdbObjectId(productId) },
                 ],
             }, { $pull: { variations: { $elemMatch: { sku } } } });
@@ -118,17 +118,17 @@ function variationDeleteService(supplierId, productId, sku) {
 }
 /**
  *
- * @param supplierId
+ * @param storeId
  * @param productId
  * @returns
  */
-function deleteProductService(supplierId, productId) {
+function deleteProductService(storeId, productId) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             return yield ProductTbl.findOneAndDelete({
                 $and: [
                     { _id: mdbObjectId(productId) },
-                    { supplierId: mdbObjectId(supplierId) },
+                    { storeId: mdbObjectId(storeId) },
                 ],
             });
         }
@@ -139,18 +139,18 @@ function deleteProductService(supplierId, productId) {
 }
 /**
  *
- * @param supplierId
+ * @param storeId
  * @param productId
  * @param model
  * @param sku
  */
-function variationUpdateService(supplierId, productId, model, sku) {
+function variationUpdateService(storeId, productId, model, sku) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             yield ProductTbl.findOneAndUpdate({
                 $and: [
                     { _id: mdbObjectId(productId) },
-                    { supplierId: mdbObjectId(supplierId) },
+                    { storeId: mdbObjectId(storeId) },
                 ],
             }, { $set: { "variations.$[i]": model } }, { arrayFilters: [{ "i.sku": sku }] });
         }
@@ -161,18 +161,18 @@ function variationUpdateService(supplierId, productId, model, sku) {
 }
 /**
  *
- * @param supplierId
+ * @param storeId
  * @param productId
  * @param model
  * @returns
  */
-function variationCreateService(supplierId, productId, model) {
+function variationCreateService(storeId, productId, model) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             return yield ProductTbl.findOneAndUpdate({
                 $and: [
                     { _id: mdbObjectId(productId) },
-                    { supplierId: mdbObjectId(supplierId) },
+                    { storeId: mdbObjectId(storeId) },
                 ],
             }, { $push: { variations: model } }, { upsert: true });
         }
@@ -213,14 +213,14 @@ function findProductByIdService(productId) {
 }
 /**
  *
- * @param supplierId
+ * @param storeId
  * @returns
  */
-function countProductsService(supplierId) {
+function countProductsService(storeId) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             return yield ProductTbl.countDocuments({
-                supplierId: mdbObjectId(supplierId),
+                storeId: mdbObjectId(storeId),
             });
         }
         catch (error) {
@@ -230,16 +230,16 @@ function countProductsService(supplierId) {
 }
 /**
  *
- * @param supplierId
+ * @param storeId
  * @param params
  * @returns
  */
-function allProductsBySupplierService(supplierId, params) {
+function allProductsBySupplierService(storeId, params) {
     return __awaiter(this, void 0, void 0, function* () {
         const { page, filters, item } = params;
         try {
             return yield ProductTbl.aggregate([
-                { $match: { supplierId: mdbObjectId(supplierId) } },
+                { $match: { storeId: mdbObjectId(storeId) } },
                 {
                     $addFields: {
                         totalVariation: {
@@ -287,15 +287,15 @@ function allProductsBySupplierService(supplierId, params) {
 }
 /**
  *
- * @param supplierId
+ * @param storeId
  * @returns
  */
-function topSoldProductService(supplierId) {
+function topSoldProductService(storeId) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             return yield ProductTbl.aggregate([
                 {
-                    $match: { supplierId: mdbObjectId(supplierId) },
+                    $match: { storeId: mdbObjectId(storeId) },
                 },
                 {
                     $addFields: {
@@ -326,23 +326,23 @@ function topSoldProductService(supplierId) {
 }
 /**
  *
- * @param supplierId
+ * @param storeId
  * @returns
  */
-function findOrderBySupplierIdService(supplierId) {
+function findOrderBySupplierIdService(storeId) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const orders = yield OrderTbl.aggregate([
                 { $unwind: { path: "$items" } },
-                { $match: { "items.supplierId": mdbObjectId(supplierId) } },
+                { $match: { "items.storeId": mdbObjectId(storeId) } },
                 { $sort: { _id: -1 } },
             ]);
             let orderCounter = yield OrderTbl.aggregate([
                 { $unwind: { path: "$items" } },
-                { $match: { "items.supplierId": mdbObjectId(supplierId) } },
+                { $match: { "items.storeId": mdbObjectId(storeId) } },
                 {
                     $group: {
-                        _id: "$items.supplierId",
+                        _id: "$items.storeId",
                         placeOrderCount: {
                             $sum: {
                                 $cond: {

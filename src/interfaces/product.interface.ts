@@ -7,3 +7,4 @@ export interface IUpdateProductStatusController {
   productId: string;
   statusValue: string;
 }
+
