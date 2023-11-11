@@ -40,4 +40,4 @@ const storeSchema = new mongoose_1.Schema({
     },
     storeCreatedAt: { type: Date, default: Date.now },
 });
-module.exports = (0, mongoose_1.model)("Store", storeSchema, "stores");
+module.exports = (0, mongoose_1.model)("STORE_TBL", storeSchema, "STORE_TBL");

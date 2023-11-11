@@ -5,7 +5,7 @@ import {
   IBuyerProfileUpdate,
 } from "../interfaces/users.interface";
 const User = require("../model/user.model");
-const Customer = require("../model/customer.model");
+const Customer = require("../model/CUSTOMER_TBL");
 const { ObjectId } = require("mongodb");
 const NCache = require("../utils/NodeCache");
 
@@ -160,7 +160,15 @@ async function registrationSystem(
       body["idFor"] = "administration";
     }
 
-    await User.insertOne(body);
+    const newUser = await User.save(body);
+
+    if (role === "buyer") {
+      const newCustomer = new Customer({
+        userId: newUser?._id,
+      });
+
+      await newCustomer.save();
+    }
 
     return res.status(200).send({
       success: true,

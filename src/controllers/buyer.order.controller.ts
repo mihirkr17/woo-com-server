@@ -6,60 +6,30 @@ const {
 const apiResponse = require("../errors/apiResponse");
 const smtpSender = require("../services/email.service");
 const NodeCache = require("../utils/NodeCache");
-const { Order, OrderItems } = require("../model/order.model");
+const { Order, OrderItems } = require("../model/ORDER_TBL");
+const Customer = require("../model/CUSTOMER_TBL");
 const { ObjectId } = require("mongodb");
 
 async function myOrder(req: Request, res: Response, next: NextFunction) {
   try {
-    const { email } = req.params;
-    const { email: authEmail, _id } = req.decoded;
+    const { email, _id: userId } = req.decoded;
+
+    const customer = await Customer.findOne(
+      { userId: ObjectId(userId) },
+      { _id: 1 }
+    );
 
     let orders: any[];
 
-    if (email !== authEmail) {
-      return res.status(401).send();
-    }
+    let ordersInCache = NodeCache.getCache(`${email}_myOrders`);
 
-    let cacheMyOrder = NodeCache.getCache(`${authEmail}_myOrders`);
-
-    if (cacheMyOrder) {
-      orders = cacheMyOrder;
+    if (ordersInCache) {
+      orders = ordersInCache;
     } else {
-      orders = await Order.aggregate([
-        { $match: { customerId: ObjectId(_id) } },
-        {
-          $lookup: {
-            from: "orderItems",
-            localField: "_id",
-            foreignField: "orderId",
-            as: "items",
-          },
-        },
-        // { $unwind: { path: "$items" } },
-        // { $replaceRoot: { newRoot: { $mergeObjects: ["$items", "$$ROOT"] } } },
-        {
-          $project: {
-            items: 1,
-            title: 1,
-            quantity: 1,
-            imageUrl: 1,
-            itemStatus: 1,
-            sku: 1,
-            amount: 1,
-            attributes: 1,
-            orderStatus: 1,
-            sellingPrice: 1,
-            orderPlacedAt: 1,
-            orderShippedAt: 1,
-            orderCanceledAt: 1,
-            orderDispatchedAt: 1,
-            isRefunded: 1,
-          },
-        },
-      ]);
+      orders = await OrderItems.find({ customerId: ObjectId(customer?._id) });
 
-      let orderItems = await OrderItems.find();
-      NodeCache.saveCache(`${authEmail}_myOrders`, orders);
+      // let orderItems = await OrderItems.find();
+      NodeCache.saveCache(`${email}_myOrders`, orders);
     }
 
     return res
@@ -167,13 +137,63 @@ async function orderDetails(req: Request, res: Response, next: NextFunction) {
     if (orderDetailsInCache) {
       order = orderDetailsInCache;
     } else {
-      order = await Order.findOne({ _id: ObjectId(orderId) });
+      order = await Order.aggregate([
+        {
+          $match: { _id: ObjectId(orderId) },
+        },
+        {
+          $lookup: {
+            from: "ORDER_ITEMS_TBL",
+            let: {
+              order_id: "$_id",
+              customer: "$customerId",
+            },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ["$orderId", "$$order_id"] },
+                      { $eq: ["$customerId", "$$customer"] },
+                    ],
+                  },
+                },
+              },
+              {
+                $project: { customerId: 0 },
+              },
+            
+            ],
+            as: "items",
+          },
+        },
+        {
+          $project: {
+            items: 1,
+            shippingAddress: 1,
+            totalAmount: 1,
+            paymentStatus: 1,
+            customerId: 1,
+            paymentMode: 1,
+            orderPlacedAt: 1
+          },
+        },
+      ]);
+
+      order = order.length === 1 ? order[0] : {};
+
       NodeCache.saveCache(`${email}_orderDetails`, order);
     }
 
     if (!order) throw new apiResponse.Api404Error("Sorry order not found !");
 
-    return res.status(200).send({ success: true, statusCode: 200, order });
+    return res.status(200).send({
+      success: true,
+      statusCode: 200,
+      data: {
+        order,
+      },
+    });
   } catch (error: any) {
     next(error);
   }

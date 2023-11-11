@@ -1,5 +1,5 @@
-const ProductTbl = require("../model/product.model");
-const OrderTbl = require("../model/order.model");
+const ProductTbl = require("../model/PRODUCT_TBL");
+const OrderTbl = require("../model/ORDER_TBL");
 const { ObjectId: mdbObjectId } = require("mongodb");
 
 /**

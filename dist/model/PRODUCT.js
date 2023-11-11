@@ -32,6 +32,7 @@ var ProductSchema = new mongoose_1.Schema({
         }
     ],
     productType: { type: String, enum: ["single", "variant"], default: "single" },
+    // if product type is single
     attributes: { type: Object, required: false },
     stockPrice: Number,
     sellPrice: Number,
@@ -39,6 +40,7 @@ var ProductSchema = new mongoose_1.Schema({
     sku: String,
     stockQuantity: Number,
     stock: String,
+    // if product type is single
     storeId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Store' },
     storeTitle: { type: String, required: true },
     warranty: {

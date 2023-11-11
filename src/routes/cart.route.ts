@@ -14,7 +14,7 @@ router.put(
 );
 
 router.delete(
-  "/delete-cart-item/:productID/:sku/:cartTypes",
+  "/delete-cart-item/:cartId",
   verifyJWT,
   cartContext.deleteCartItemSystem
 );

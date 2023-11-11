@@ -42,4 +42,4 @@ const storeSchema = new Schema({
   storeCreatedAt: { type: Date, default: Date.now },
 });
 
-module.exports = model("Store", storeSchema, "stores");
+module.exports = model("STORE_TBL", storeSchema, "STORE_TBL");

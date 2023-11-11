@@ -12,13 +12,14 @@ try {
      */
     router.get("/search-products/:q", productCTRL.searchProducts);
     router.get("/fetch-single-product/:product_slug", productCTRL.fetchProductDetails);
+    router.get("/related/products", productCTRL === null || productCTRL === void 0 ? void 0 : productCTRL.relatedProducts);
     router.get("/store/:limits", productCTRL.homeStoreController);
     router.get(`/:storeTitle`, productCTRL === null || productCTRL === void 0 ? void 0 : productCTRL.getStore);
     /**
-      * @requestMethod GET
-      * @controller productsByCategoryController
-      * @required categories [Optional -> filters query]
-      */
+     * @requestMethod GET
+     * @controller productsByCategoryController
+     * @required categories [Optional -> filters query]
+     */
     router.post("/product-by-category", productCTRL.productsByCategoryController);
     router.get("/fetch-top-selling-product", productCTRL.fetchTopSellingProduct);
 }

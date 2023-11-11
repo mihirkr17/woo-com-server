@@ -19,7 +19,7 @@ const NodeCache = require("../utils/NodeCache");
 const PrivacyPolicy = require("../model/privacyPolicy.model");
 const User = require("../model/user.model");
 const Review = require("../model/reviews.model");
-const Product = require("../model/product.model");
+const Product = require("../model/PRODUCT_TBL");
 const { Api400Error } = require("../errors/apiResponse");
 const { store_products_pipe } = require("../utils/pipelines");
 const { ObjectId } = require("mongodb");
@@ -259,7 +259,7 @@ async function fetchProductDetails(
 
       productDetail = productDetail[0];
 
-      if (oTracker) {
+      if (oTracker === productDetail?.variation?.sku) {
         await updateProductPerformance(
           {
             _id: productID,
@@ -272,15 +272,8 @@ async function fetchProductDetails(
         );
       }
 
-      // productDetail["policies"] = await PrivacyPolicy.findOne({}) ?? {};
-
       NodeCache.saveCache(`${productID}_${sku}`, productDetail);
     }
-
-    // Related products
-    const relatedProducts = await Product.aggregate(
-      product_detail_relate_pipe(sku, productDetail?.categories)
-    );
 
     // all success
     return res.status(200).send({
@@ -288,10 +281,34 @@ async function fetchProductDetails(
       statusCode: 200,
       data: {
         product: productDetail || {},
-        relatedProducts: relatedProducts || [],
       },
     });
   } catch (error: any) {
+    next(error);
+  }
+}
+
+async function relatedProducts(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const { category, pid } = req?.query;
+
+    // Related products
+    const relatedProducts = await Product.aggregate(
+      product_detail_relate_pipe(pid, [category])
+    );
+
+    return res.status(200).json({
+      success: true,
+      statusCode: 200,
+      data: {
+        relatedProducts: relatedProducts || [],
+      },
+    });
+  } catch (error) {
     next(error);
   }
 }
@@ -454,6 +471,7 @@ async function fetchTopSellingProduct(
 module.exports = {
   getStore,
   fetchProductDetails,
+  relatedProducts,
   searchProducts,
   homeStoreController,
   fetchTopSellingProduct,

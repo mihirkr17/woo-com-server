@@ -10,11 +10,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const Product = require("../model/product.model");
+const Product = require("../model/PRODUCT_TBL");
 const User = require("../model/user.model");
 const Store = require("../model/store.model");
 const smtpSender = require("../services/email.service");
-const Order = require("../model/order.model");
+const Order = require("../model/ORDER_TBL");
 const { Api400Error, Api403Error, Api404Error, Api500Error, } = require("../errors/apiResponse");
 /**
  *

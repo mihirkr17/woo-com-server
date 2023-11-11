@@ -7,7 +7,7 @@ const {
 } = require("../utils/pipelines");
 const { cartContextCalculation } = require("../utils/common");
 const { startSession } = require("mongoose");
-const { Order, OrderItems } = require("../model/order.model");
+const { Order, OrderItems } = require("../model/ORDER_TBL");
 const ShoppingCart = require("../model/shoppingCart.model");
 const {
   findUserByEmail,
@@ -23,8 +23,8 @@ const {
   Api503Error,
 } = require("../errors/apiResponse");
 
-const Product = require("../model/product.model");
-const Customer = require("../model/customer.model");
+const Product = require("../model/PRODUCT_TBL");
+const Customer = require("../model/CUSTOMER_TBL");
 const { ObjectId } = require("mongodb");
 
 async function initializedOneForPurchase(
@@ -89,7 +89,7 @@ async function purchaseCart(req: Request, res: Response, next: NextFunction) {
   session.startTransaction();
 
   try {
-    const { email, _id } = req.decoded;
+    const { email, _id: userId } = req.decoded;
 
     // initialized current time stamp
     const timestamp: any = Date.now();
@@ -104,32 +104,41 @@ async function purchaseCart(req: Request, res: Response, next: NextFunction) {
 
     if (!paymentMethodId) throw new Api400Error("Required payment method id !");
 
-    // finding user by email;
-    const user = await Customer.findOne({ userId: ObjectId(_id) });
+    // finding customer by userId;
+    const customer = await Customer.findOne({ userId: ObjectId(userId) });
 
-    if (!user)
+    if (!customer)
       throw new Api400Error(`Sorry, User not found with this ${email}`);
 
     // getting default shipping address from user data;
-    const defaultAddress = user?.shippingAddress?.find(
+    const shippingAddress = customer?.shippingAddress?.find(
       (adr: any) => adr?.active === true
     );
 
-    if (!defaultAddress) throw new Api400Error("Required shipping address !");
+    if (!shippingAddress) throw new Api400Error("Required shipping address !");
 
-    let cartItems = await ShoppingCart.aggregate(shopping_cart_pipe(_id));
+    // finding cart items from Shopping cart table
+    let cartItems = await ShoppingCart.aggregate(
+      shopping_cart_pipe(customer?._id, "purchasing")
+    );
+
+
+    console.log(cartItems);
+
+    return;
 
     if (!cartItems || cartItems.length <= 0 || !Array.isArray(cartItems))
       throw new Api400Error(
         "Nothing for purchase ! Please add product in your cart."
       );
 
+    // Generate final amount from cart context calculation
     const { finalAmount } = cartContextCalculation(cartItems);
 
-    // creating order instance
+    // Creating order instance
     let order = new Order({
-      customerId: _id,
-      shippingAddress: defaultAddress,
+      customerId: customer?._id,
+      shippingAddress,
       orderStatus: "placed",
       state,
       orderPlacedAt: new Date(timestamp),
@@ -138,41 +147,13 @@ async function purchaseCart(req: Request, res: Response, next: NextFunction) {
       totalAmount: finalAmount,
     });
 
-    // saving order into db
+    // Saving order into db
     const result = await order.save();
 
+    // if order not saved to db
     if (!result?._id) throw new Error("Sorry! Order not placed.");
 
-    const productInfos: any[] = [];
-
-    const groupOrdersBySeller: any = {};
-
-    // generating item id
-    let itemId = Math.round(Math.random() * 9999999999);
-
-    // assigning some value to items
-    cartItems.forEach((item: any) => {
-      itemId++;
-
-      item["_id"] = new ObjectId();
-      item["orderId"] = result?._id;
-
-      productInfos.push({
-        productId: item?.productId,
-        sku: item?.sku,
-        quantity: item?.quantity,
-      });
-
-      if (!groupOrdersBySeller[item?.supplierEmail]) {
-        groupOrdersBySeller[item?.supplierEmail] = { items: [] };
-      }
-
-      groupOrdersBySeller[item?.supplierEmail].items.push(item);
-    });
-
-    await OrderItems.insertMany(cartItems);
-
-    // creating payment throw payment intent
+    // Creating payment throw payment intent
     const intent = await createPaymentIntents(
       finalAmount,
       result?._id.toString(),
@@ -182,23 +163,68 @@ async function purchaseCart(req: Request, res: Response, next: NextFunction) {
       req.get("user-agent")
     );
 
-    // if payment success then change order payment status and save
+    // Product Infos
+    const productInfos: any[] = [];
+
+    const groupOrdersBySeller: any = {};
+
+    // Assigning some value to cart items for order...
+    cartItems.forEach((item: any) => {
+      let status: any[] = [];
+
+      status.push({
+        name: "pending",
+        msg: "Thank you for shopping at WooKart! Your order is being pending.",
+        time: new Date(timestamp),
+      });
+
+      item["_id"] = new ObjectId();
+      item["orderId"] = result?._id;
+
+      item["customerId"] = customer?._id;
+
+      productInfos.push({
+        productId: item?.productId,
+        sku: item?.sku,
+        quantity: item?.quantity,
+        productType: item?.productType,
+      });
+
+      if (intent?.id) {
+        status.push({
+          name: "placed",
+          msg: "Your order has been verified and placed.",
+          time: new Date(timestamp),
+        });
+      }
+
+      if (!groupOrdersBySeller[item?.supplierEmail]) {
+        groupOrdersBySeller[item?.supplierEmail] = { items: [] };
+      }
+
+      groupOrdersBySeller[item?.supplierEmail].items.push(item);
+      item["status"] = status;
+    });
+
+    // if payment success then update the order payment status and save
     if (intent?.id) {
       order.paymentIntentId = intent?.id;
       order.paymentStatus = "paid";
+      await order.save();
+      await productStockUpdater("dec", productInfos);
     }
 
-    const [clearCartResult, orderResult, updateInventoryResult] =
-      await Promise.all([
-        clearCart(_id, email),
-        order.save(),
-        productStockUpdater("dec", productInfos),
-      ]);
+    // Clearing current cart
+    await clearCart(customer?._id, email);
 
-    if (!orderResult) throw new Api500Error("Internal server error !");
+    // Inserting items to the order items table...
+    await OrderItems.insertMany(cartItems);
 
+    // If all operation success then commit the transaction...
     await session.commitTransaction();
+
     session.endSession();
+
     // after success return the response to the client
     return res.status(200).send({
       success: true,

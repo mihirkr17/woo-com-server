@@ -13,56 +13,23 @@ const { productStockUpdater, orderStatusUpdater, } = require("../services/common
 const apiResponse = require("../errors/apiResponse");
 const smtpSender = require("../services/email.service");
 const NodeCache = require("../utils/NodeCache");
-const { Order, OrderItems } = require("../model/order.model");
+const { Order, OrderItems } = require("../model/ORDER_TBL");
+const Customer = require("../model/CUSTOMER_TBL");
 const { ObjectId } = require("mongodb");
 function myOrder(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { email } = req.params;
-            const { email: authEmail, _id } = req.decoded;
+            const { email, _id: userId } = req.decoded;
+            const customer = yield Customer.findOne({ userId: ObjectId(userId) }, { _id: 1 });
             let orders;
-            if (email !== authEmail) {
-                return res.status(401).send();
-            }
-            let cacheMyOrder = NodeCache.getCache(`${authEmail}_myOrders`);
-            if (cacheMyOrder) {
-                orders = cacheMyOrder;
+            let ordersInCache = NodeCache.getCache(`${email}_myOrders`);
+            if (ordersInCache) {
+                orders = ordersInCache;
             }
             else {
-                orders = yield Order.aggregate([
-                    { $match: { customerId: ObjectId(_id) } },
-                    {
-                        $lookup: {
-                            from: "orderItems",
-                            localField: "_id",
-                            foreignField: "orderId",
-                            as: "items",
-                        },
-                    },
-                    // { $unwind: { path: "$items" } },
-                    // { $replaceRoot: { newRoot: { $mergeObjects: ["$items", "$$ROOT"] } } },
-                    {
-                        $project: {
-                            items: 1,
-                            title: 1,
-                            quantity: 1,
-                            imageUrl: 1,
-                            itemStatus: 1,
-                            sku: 1,
-                            amount: 1,
-                            attributes: 1,
-                            orderStatus: 1,
-                            sellingPrice: 1,
-                            orderPlacedAt: 1,
-                            orderShippedAt: 1,
-                            orderCanceledAt: 1,
-                            orderDispatchedAt: 1,
-                            isRefunded: 1,
-                        },
-                    },
-                ]);
-                let orderItems = yield OrderItems.find();
-                NodeCache.saveCache(`${authEmail}_myOrders`, orders);
+                orders = yield OrderItems.find({ customerId: ObjectId(customer === null || customer === void 0 ? void 0 : customer._id) });
+                // let orderItems = await OrderItems.find();
+                NodeCache.saveCache(`${email}_myOrders`, orders);
             }
             return res
                 .status(200)
@@ -158,12 +125,59 @@ function orderDetails(req, res, next) {
                 order = orderDetailsInCache;
             }
             else {
-                order = yield Order.findOne({ _id: ObjectId(orderId) });
+                order = yield Order.aggregate([
+                    {
+                        $match: { _id: ObjectId(orderId) },
+                    },
+                    {
+                        $lookup: {
+                            from: "ORDER_ITEMS_TBL",
+                            let: {
+                                order_id: "$_id",
+                                customer: "$customerId",
+                            },
+                            pipeline: [
+                                {
+                                    $match: {
+                                        $expr: {
+                                            $and: [
+                                                { $eq: ["$orderId", "$$order_id"] },
+                                                { $eq: ["$customerId", "$$customer"] },
+                                            ],
+                                        },
+                                    },
+                                },
+                                {
+                                    $project: { customerId: 0 },
+                                },
+                            ],
+                            as: "items",
+                        },
+                    },
+                    {
+                        $project: {
+                            items: 1,
+                            shippingAddress: 1,
+                            totalAmount: 1,
+                            paymentStatus: 1,
+                            customerId: 1,
+                            paymentMode: 1,
+                            orderPlacedAt: 1
+                        },
+                    },
+                ]);
+                order = order.length === 1 ? order[0] : {};
                 NodeCache.saveCache(`${email}_orderDetails`, order);
             }
             if (!order)
                 throw new apiResponse.Api404Error("Sorry order not found !");
-            return res.status(200).send({ success: true, statusCode: 200, order });
+            return res.status(200).send({
+                success: true,
+                statusCode: 200,
+                data: {
+                    order,
+                },
+            });
         }
         catch (error) {
             next(error);

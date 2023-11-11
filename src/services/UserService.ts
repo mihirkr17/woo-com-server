@@ -1,4 +1,4 @@
-const Customer = require("../model/customer.model");
+const Customer = require("../model/CUSTOMER_TBL");
 const UserTbl = require("../model/user.model");
 const db = require("mongodb");
 module.exports = class UserService {

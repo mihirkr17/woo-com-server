@@ -10,8 +10,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const { ObjectId } = require("mongodb");
-const Product = require("../model/product.model");
-const Order = require("../model/order.model");
+const Product = require("../model/PRODUCT_TBL");
+const Order = require("../model/ORDER_TBL");
 const Review = require("../model/reviews.model");
 const { Api400Error, Api401Error } = require("../errors/apiResponse");
 const { product_detail_review_pipe } = require("../utils/pipelines");

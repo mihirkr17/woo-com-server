@@ -8,13 +8,13 @@ var ProductSchema = new mongoose_1.Schema({
     brand: { type: String, required: true },
     manufacturer: {
         origin: { type: String, required: true },
-        details: { type: String, required: true }
+        details: { type: String, required: true },
     },
     packaged: { type: Object, required: true },
     shipping: {
         fulfilledBy: { type: String, required: true },
         procurementSLA: { type: String, required: true },
-        isFree: { type: Boolean }
+        isFree: { type: Boolean },
     },
     rating: { type: Array, required: true },
     ratingAverage: { type: Number, required: true, default: 0 },
@@ -28,25 +28,23 @@ var ProductSchema = new mongoose_1.Schema({
             _id: false,
             id: String,
             src: String,
-            title: String
-        }
+            title: String,
+        },
     ],
     productType: { type: String, enum: ["single", "variant"], default: "single" },
-    attributes: { type: Object, required: false },
-    stockPrice: Number,
-    sellPrice: Number,
-    discount: Number,
-    sku: String,
-    stockQuantity: Number,
-    stock: String,
-    storeId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Store' },
+    storeId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Store" },
     storeTitle: { type: String, required: true },
     warranty: {
         type: { type: String, required: false },
         duration: { type: String, required: false },
-        details: { type: String, required: false }
+        details: { type: String, required: false },
     },
-    status: { type: String, required: true, enum: ["Active", "Queue", "Draft"], default: "Queue" },
+    status: {
+        type: String,
+        required: true,
+        enum: ["Active", "Queue", "Draft"],
+        default: "Queue",
+    },
     views: { type: Number },
     score: { type: Number },
     sales: { type: Number },
@@ -54,7 +52,7 @@ var ProductSchema = new mongoose_1.Schema({
     modifiedAt: { type: Date, required: false },
     isVerified: { type: Boolean, required: false },
     verifiedBy: { type: String },
-    verifiedAt: { type: Date, required: false }
+    verifiedAt: { type: Date, required: false },
 });
-const Product = (0, mongoose_1.model)('Product', ProductSchema, 'products');
+const Product = (0, mongoose_1.model)("PRODUCT_TBL", ProductSchema, "PRODUCT_TBL");
 module.exports = Product;

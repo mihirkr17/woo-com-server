@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const User = require("../model/user.model");
-const Customer = require("../model/customer.model");
+const Customer = require("../model/CUSTOMER_TBL");
 const { ObjectId } = require("mongodb");
 const NCache = require("../utils/NodeCache");
 const { Api400Error, Api404Error } = require("../errors/apiResponse");
@@ -128,7 +128,13 @@ function registrationSystem(req, res, next) {
                 body["role"] = "ADMIN";
                 body["idFor"] = "administration";
             }
-            yield User.insertOne(body);
+            const newUser = yield User.save(body);
+            if (role === "buyer") {
+                const newCustomer = new Customer({
+                    userId: newUser === null || newUser === void 0 ? void 0 : newUser._id,
+                });
+                yield newCustomer.save();
+            }
             return res.status(200).send({
                 success: true,
                 statusCode: 200,

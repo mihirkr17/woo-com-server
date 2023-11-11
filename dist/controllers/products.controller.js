@@ -16,7 +16,7 @@ const NodeCache = require("../utils/NodeCache");
 const PrivacyPolicy = require("../model/privacyPolicy.model");
 const User = require("../model/user.model");
 const Review = require("../model/reviews.model");
-const Product = require("../model/product.model");
+const Product = require("../model/PRODUCT_TBL");
 const { Api400Error } = require("../errors/apiResponse");
 const { store_products_pipe } = require("../utils/pipelines");
 const { ObjectId } = require("mongodb");
@@ -210,6 +210,7 @@ function getStore(req, res, next) {
  * @returns
  */
 function fetchProductDetails(req, res, next) {
+    var _a;
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const { pId: productID, sku, oTracker } = req.query;
@@ -226,7 +227,7 @@ function fetchProductDetails(req, res, next) {
             else {
                 productDetail = yield Product.aggregate(product_detail_pipe(productID, sku)).allowDiskUse(true);
                 productDetail = productDetail[0];
-                if (oTracker) {
+                if (oTracker === ((_a = productDetail === null || productDetail === void 0 ? void 0 : productDetail.variation) === null || _a === void 0 ? void 0 : _a.sku)) {
                     yield updateProductPerformance({
                         _id: productID,
                         sku: sku,
@@ -235,17 +236,32 @@ function fetchProductDetails(req, res, next) {
                         sales: (productDetail === null || productDetail === void 0 ? void 0 : productDetail.sales) || 0,
                     }, "views");
                 }
-                // productDetail["policies"] = await PrivacyPolicy.findOne({}) ?? {};
                 NodeCache.saveCache(`${productID}_${sku}`, productDetail);
             }
-            // Related products
-            const relatedProducts = yield Product.aggregate(product_detail_relate_pipe(sku, productDetail === null || productDetail === void 0 ? void 0 : productDetail.categories));
             // all success
             return res.status(200).send({
                 success: true,
                 statusCode: 200,
                 data: {
                     product: productDetail || {},
+                },
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    });
+}
+function relatedProducts(req, res, next) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const { category, pid } = req === null || req === void 0 ? void 0 : req.query;
+            // Related products
+            const relatedProducts = yield Product.aggregate(product_detail_relate_pipe(pid, [category]));
+            return res.status(200).json({
+                success: true,
+                statusCode: 200,
+                data: {
                     relatedProducts: relatedProducts || [],
                 },
             });
@@ -388,6 +404,7 @@ function fetchTopSellingProduct(req, res, next) {
 module.exports = {
     getStore,
     fetchProductDetails,
+    relatedProducts,
     searchProducts,
     homeStoreController,
     fetchTopSellingProduct,

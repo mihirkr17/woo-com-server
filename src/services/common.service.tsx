@@ -1,13 +1,14 @@
 // common.services.tsx
 const mdb = require("mongodb");
-const Product = require("../model/product.model");
+const Product = require("../model/PRODUCT_TBL");
+const ProductVariationTbl = require("../model/PRODUCT_VARIATION_TBL");
 const UserModel = require("../model/user.model");
 const ShoppingCartModel = require("../model/shoppingCart.model");
 const cryptos = require("crypto");
 const apiResponse = require("../errors/apiResponse");
 const { generateTrackingID } = require("../utils/generator");
 const NCache = require("../utils/NodeCache");
-const Order = require("../model/order.model");
+const Order = require("../model/ORDER_TBL");
 const Store = require("../model/store.model");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
@@ -135,46 +136,91 @@ module.exports.productStockUpdater = async (type: string, data: any[]) => {
       for (const item of data) {
 
          const filter = {
-            _id: mdb.ObjectId(item.productId),
+            $and: [{ productId: mdb.ObjectId(item.productId) }, { sku: item?.sku }]
          };
+
+         // let generateSkeleton: any;
+
+         // if (item?.productType === "single") {
+         //    generateSkeleton = {
+         //       stockPrice: "$stockPrice",
+         //       sellPrice: "$sellPrice",
+         //       discount: "$discount",
+         //       attributes: "$attributes",
+         //       sku: "$sku",
+         //       stockQuantity: {
+         //          $cond: {
+         //             if: { $eq: [type, 'dec'] },
+         //             then: { $max: [0, { $subtract: ['$stockQuantity', item.quantity] }] },
+         //             else: { $add: ['$stockQuantity', item.quantity] },
+         //          },
+         //       },
+         //       stock: {
+         //          $cond: {
+         //             if: { $lte: [{ $max: [0, { $subtract: ['$stockQuantity', item.quantity] }] }, 0] },
+         //             then: 'out',
+         //             else: '$stock',
+         //          },
+         //       },
+         //    }
+         // } else {
+         //    generateSkeleton = {
+         //       variations: {
+         //          $map: {
+         //             input: '$variations',
+         //             as: 'var',
+         //             in: {
+         //                $cond: {
+         //                   if: { $eq: ['$$var.sku', item.sku] },
+         //                   then: {
+         //                      $mergeObjects: [
+         //                         '$$var',
+         //                         {
+         //                            stockQuantity: {
+         //                               $cond: {
+         //                                  if: { $eq: [type, 'dec'] },
+         //                                  then: { $max: [0, { $subtract: ['$$var.stockQuantity', item.quantity] }] },
+         //                                  else: { $add: ['$$var.stockQuantity', item.quantity] },
+         //                               },
+         //                            },
+         //                            stock: {
+         //                               $cond: {
+         //                                  if: { $lte: [{ $max: [0, { $subtract: ['$$var.stockQuantity', item.quantity] }] }, 0] },
+         //                                  then: 'out',
+         //                                  else: '$$var.stock',
+         //                               },
+         //                            },
+         //                         },
+         //                      ],
+         //                   },
+         //                   else: '$$var',
+         //                },
+         //             },
+         //          },
+
+         //       }
+         //    }
+
+         // }
 
          const update = [
             {
                $set: {
-                  variations: {
-                     $map: {
-                        input: '$variations',
-                        as: 'var',
-                        in: {
-                           $cond: {
-                              if: { $eq: ['$$var.sku', item.sku] },
-                              then: {
-                                 $mergeObjects: [
-                                    '$$var', // Preserve existing fields
-                                    {
-                                       available: {
-                                          $cond: {
-                                             if: { $eq: [type, 'dec'] },
-                                             then: { $max: [0, { $subtract: ['$$var.available', item.quantity] }] },
-                                             else: { $add: ['$$var.available', item.quantity] },
-                                          },
-                                       },
-                                       stock: {
-                                          $cond: {
-                                             if: { $lte: [{ $max: [0, { $subtract: ['$$var.available', item.quantity] }] }, 0] },
-                                             then: 'out',
-                                             else: '$$var.stock',
-                                          },
-                                       },
-                                    },
-                                 ],
-                              },
-                              else: '$$var',
-                           },
-                        },
+                  stockQuantity: {
+                     $cond: {
+                        if: { $eq: [type, 'dec'] },
+                        then: { $max: [0, { $subtract: ['$stockQuantity', item.quantity] }] },
+                        else: { $add: ['$stockQuantity', item.quantity] },
                      },
                   },
-               },
+                  stock: {
+                     $cond: {
+                        if: { $lte: [{ $max: [0, { $subtract: ['$stockQuantity', item.quantity] }] }, 0] },
+                        then: 'out',
+                        else: '$stock',
+                     },
+                  }
+               }
             },
          ];
 
@@ -188,7 +234,7 @@ module.exports.productStockUpdater = async (type: string, data: any[]) => {
       }
 
       // Execute the bulkWrite operation with the update operations
-      return await Product.bulkWrite(bulkOperations);
+      return await ProductVariationTbl.bulkWrite(bulkOperations);
    } catch (error: any) {
       throw error;
    }

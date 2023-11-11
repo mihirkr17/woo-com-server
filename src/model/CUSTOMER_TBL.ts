@@ -24,4 +24,4 @@ const customerSchema = new Schema({
   customerCreatedAt: { type: Date, default: Date.now },
 });
 
-module.exports = model("Customer", customerSchema, "customers");
+module.exports = model("CUSTOMER_TBL", customerSchema, "CUSTOMER_TBL");

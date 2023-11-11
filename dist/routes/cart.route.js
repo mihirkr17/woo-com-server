@@ -10,5 +10,5 @@ const cartContext = require("../controllers/buyer.cart.controller");
 router.post("/add-to-cart", verifyJWT, cartContext.addToCartSystem);
 router.get("/cart-context", verifyJWT, cartContext === null || cartContext === void 0 ? void 0 : cartContext.getCartContextSystem);
 router.put("/update-cart-product-quantity", verifyJWT, cartContext.updateCartProductQuantitySystem);
-router.delete("/delete-cart-item/:productID/:sku/:cartTypes", verifyJWT, cartContext.deleteCartItemSystem);
+router.delete("/delete-cart-item/:cartId", verifyJWT, cartContext.deleteCartItemSystem);
 module.exports = router;

@@ -1,11 +1,11 @@
 // src/controllers/admin.controller.ts
 
 import { NextFunction, Request, Response } from "express";
-const Product = require("../model/product.model");
+const Product = require("../model/PRODUCT_TBL");
 const User = require("../model/user.model");
 const Store = require("../model/store.model");
 const smtpSender = require("../services/email.service");
-const Order = require("../model/order.model");
+const Order = require("../model/ORDER_TBL");
 const {
   Api400Error,
   Api403Error,

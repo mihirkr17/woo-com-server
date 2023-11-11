@@ -11,8 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const ShoppingCart = require("../model/shoppingCart.model");
 const { shopping_cart_pipe } = require("../utils/pipelines");
-const User = require("../model/user.model");
-const Customer = require("../model/customer.model");
+const Customer = require("../model/CUSTOMER_TBL");
 const { cartContextCalculation } = require("../utils/common");
 const { Api400Error, Api404Error } = require("../errors/apiResponse");
 const { ObjectId } = require("mongodb");
@@ -29,21 +28,31 @@ const { isProduct } = new ProductService();
 function addToCartSystem(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { _id, email } = req.decoded;
+            const { _id: userId, email } = req.decoded;
             const body = req.body;
             if (!body || typeof body !== "object")
                 throw new Api400Error("Required body !");
+            const customer = yield Customer.findOne({
+                userId: ObjectId(userId),
+            });
+            if (!(customer === null || customer === void 0 ? void 0 : customer.userId)) {
+                const newCustomer = new Customer({
+                    _id: new ObjectId(),
+                    userId,
+                });
+                yield newCustomer.save();
+            }
             const { productId, sku, action, quantity } = body;
             if (!productId || !sku)
                 throw new Api400Error("Required product id, listing id, variation id in body !");
-            const availableProduct = yield isProduct(productId, sku);
-            if (!availableProduct)
+            const { storeId, storeTitle, brand } = yield isProduct(productId, sku);
+            if (!storeId)
                 throw new Api404Error("Product is not available !");
             if (action !== "toCart")
                 throw new Api400Error("Required cart operation !");
             let existsProduct = yield ShoppingCart.findOne({
                 $and: [
-                    { customerId: ObjectId(_id) },
+                    { customerId: ObjectId(customer === null || customer === void 0 ? void 0 : customer._id) },
                     { sku },
                     { productId: ObjectId(productId) },
                 ],
@@ -55,10 +64,14 @@ function addToCartSystem(req, res, next) {
                     message: "This product already in your cart.",
                 });
             const cart = new ShoppingCart({
+                userId,
                 productId,
                 sku,
+                brand,
+                storeId,
+                storeTitle,
                 quantity,
-                customerId: _id,
+                customerId: customer === null || customer === void 0 ? void 0 : customer._id,
                 addedAt: new Date(),
             });
             const result = yield cart.save();
@@ -84,22 +97,20 @@ function addToCartSystem(req, res, next) {
  * @returns
  */
 function getCartContextSystem(req, res, next) {
-    var _a;
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { email, _id } = req.decoded;
+            const { email, _id: userId } = req.decoded;
             let cart;
-            let user = yield Customer.findOne({ userId: ObjectId(_id) });
+            let customer = yield Customer.findOne({ userId: ObjectId(userId) });
             const cartData = NodeCache.getCache(`${email}_cartProducts`);
             if (cartData) {
                 cart = cartData;
             }
             else {
-                cart = yield ShoppingCart.aggregate(shopping_cart_pipe(_id));
+                cart = yield ShoppingCart.aggregate(shopping_cart_pipe(customer === null || customer === void 0 ? void 0 : customer._id));
                 yield NodeCache.saveCache(`${email}_cartProducts`, cart);
             }
             const { amount, totalQuantity, shippingCost, finalAmount, savingAmount, discountShippingCost, } = cartContextCalculation(cart);
-            const defaultShippingAddress = (_a = user === null || user === void 0 ? void 0 : user.shippingAddress) === null || _a === void 0 ? void 0 : _a.find((adr) => adr.default_shipping_address === true);
             return res.status(200).send({
                 success: true,
                 statusCode: 200,
@@ -115,7 +126,6 @@ function getCartContextSystem(req, res, next) {
                             discountShippingCost,
                         },
                         numberOfProduct: cart.length || 0,
-                        defaultShippingAddress,
                     },
                 },
             });
@@ -133,26 +143,22 @@ function getCartContextSystem(req, res, next) {
  * @returns
  */
 function updateCartProductQuantitySystem(req, res, next) {
-    var _a, _b, _c, _d;
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { email, _id } = req.decoded;
-            const { type } = (_a = req === null || req === void 0 ? void 0 : req.body) === null || _a === void 0 ? void 0 : _a.actionRequestContext;
-            const { productID, sku, cartID, quantity } = (_c = (_b = req === null || req === void 0 ? void 0 : req.body) === null || _b === void 0 ? void 0 : _b.upsertRequest) === null || _c === void 0 ? void 0 : _c.cartContext;
-            if (!productID || !sku || !cartID)
+            const { email } = req.decoded;
+            const { productId, sku, cartId, quantity } = req === null || req === void 0 ? void 0 : req.body;
+            if (!productId || !sku || !cartId)
                 throw new Api400Error("Required product id, variation id, cart id !");
             if (!quantity || typeof quantity === "undefined")
                 throw new Api400Error("Required quantity !");
             if (quantity > 5 || quantity <= 0)
                 throw new Api400Error("Quantity can not greater than 5 and less than 1 !");
-            if (type !== "toCart")
-                throw new Api404Error("Invalid cart context !");
-            const productAvailability = yield isProduct(productID, sku);
+            const productAvailability = yield isProduct(productId, sku);
             if (!productAvailability ||
                 typeof productAvailability === "undefined" ||
                 productAvailability === null)
-                throw new Api400Error("Product is available !");
-            if (parseInt(quantity) >= ((_d = productAvailability === null || productAvailability === void 0 ? void 0 : productAvailability.variations) === null || _d === void 0 ? void 0 : _d.available)) {
+                throw new Api400Error("Product is not available !");
+            if (parseInt(quantity) >= (productAvailability === null || productAvailability === void 0 ? void 0 : productAvailability.stockQuantity)) {
                 return res.status(200).send({
                     success: false,
                     statusCode: 200,
@@ -166,28 +172,28 @@ function updateCartProductQuantitySystem(req, res, next) {
                     cacheProduct.forEach((item) => {
                         if ((item === null || item === void 0 ? void 0 : item.sku) === sku) {
                             item.quantity = quantity;
-                            item.amount = item.sellingPrice * quantity;
-                            item.savingAmount = item.price - item.sellingPrice;
+                            item.amount = item.sellPrice * quantity;
+                            item.savingAmount = item.stockPrice - item.sellPrice;
                         }
                     });
                 NodeCache.saveCache(`${email}_cartProducts`, cacheProduct);
             }
-            const result = yield ShoppingCart.findOneAndUpdate({
+            const result = yield ShoppingCart.updateOne({
                 $and: [
-                    { customerId: ObjectId(_id) },
-                    { productId: ObjectId(productID) },
+                    { _id: ObjectId(cartId) },
+                    { productId: ObjectId(productId) },
                     { sku },
                 ],
             }, {
                 $set: { quantity: parseInt(quantity) },
             }, { upsert: true });
-            if (result)
-                return res.status(200).send({
-                    success: true,
-                    statusCode: 200,
-                    message: `Quantity updated to ${quantity}.`,
-                });
-            throw new Error("Failed to update quantity !");
+            if (!result)
+                throw new Error("Failed to update quantity !");
+            return res.status(200).send({
+                success: true,
+                statusCode: 200,
+                message: `Quantity updated to ${quantity}.`,
+            });
         }
         catch (error) {
             next(error);
@@ -204,25 +210,24 @@ function updateCartProductQuantitySystem(req, res, next) {
 function deleteCartItemSystem(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { productID, sku, cartTypes } = req.params;
-            const { email, _id } = req.decoded;
-            if (!sku || !productID)
-                throw new Api400Error("Required product id & sku !");
-            if (!ObjectId.isValid(productID))
+            const { cartId } = req.params;
+            const { email, _id: userId } = req.decoded;
+            if (!cartId)
+                throw new Api400Error("Required cart id!");
+            if (!ObjectId.isValid(cartId))
                 throw new Api400Error("Product id is not valid !");
-            if (cartTypes !== "toCart")
-                throw new Error("Invalid cart type !");
-            let deleted = yield ShoppingCart.findOneAndDelete({
-                $and: [
-                    { customerId: ObjectId(_id) },
-                    { productId: ObjectId(productID) },
-                    { sku },
-                ],
+            let deleted = yield ShoppingCart.deleteOne({
+                $and: [{ _id: ObjectId(cartId) }, { userId: ObjectId(userId) }],
             });
             if (!deleted)
-                throw new Error(`Couldn't delete product with sku ${sku}!`);
+                throw new Error(`Internal server error!`);
+            const cartInCached = NodeCache.getCache(`${email}_cartProducts`);
+            if (cartInCached) {
+                const filteredItems = cartInCached.filter((item) => (item === null || item === void 0 ? void 0 : item._id) !== cartId);
+                NodeCache.saveCache(`${email}_cartProducts`, filteredItems);
+            }
             // getting cart items from cache
-            NodeCache.deleteCache(`${email}_cartProducts`);
+            // NodeCache.deleteCache(`${email}_cartProducts`);
             return res.status(200).send({
                 success: true,
                 statusCode: 200,

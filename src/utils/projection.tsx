@@ -16,8 +16,9 @@ const discount = {
 
 module.exports.basicProductProject = {
    title: 1,
+   variations: 1,
    slug: 1,
-   imageUrl: { $arrayElemAt: ["$imageUrls", 0] },
+   image: 1,
    brand: 1,
    score: 1,
    sales: 1,
@@ -32,15 +33,16 @@ module.exports.basicProductProject = {
          in: { $add: ["$$value", "$$this.count"] }
       }
    },
-   sku: "$variations.sku",
-   stock: "$variations.stock",
-   attributes: "$variations.attributes",
+   sku: "$sku",
+   stock: "$stock",
+   attributes: "$attributes",
    shipping: 1,
-   pricing: "$variations.pricing"
+   stockPrice: "$stockPrice",
+   sellPrice: "$sellPrice"
 }
 
 module.exports.shoppingCartProject = {
-   title: 1,
+   title: { $ifNull: ["$variation.title", "$title"] },
    slug: 1,
    brand: 1,
    isShippingFree: "$shipping.isFree",
@@ -49,16 +51,17 @@ module.exports.shoppingCartProject = {
    quantity: 1,
    productId: 1,
    storeId: 1,
-   storeTitle: "$storeTitle",
+   storeTitle: 1,
    sku: 1,
-   imageUrl: { $arrayElemAt: ["$imageUrls", 0] },
    customerId: 1,
-   savingAmount: { $multiply: [{ $subtract: ["$variation.pricing.price", "$variation.pricing.sellingPrice"] }, '$quantity'] },
-   amount: { $multiply: ["$variation.pricing.sellingPrice", '$quantity'] },
-   initialDiscount: "$variation.pricing.discount",
-   sellingPrice: "$variation.pricing.sellingPrice",
-   price: "$variation.pricing.price",
+   savingAmount: { $multiply: [{ $subtract: ["$variation.stockPrice", "$variation.sellPrice"] }, '$quantity'] },
+   image: "$variation.image",
+   amount: { $multiply: ["$variation.sellPrice", '$quantity'] },
+   initialDiscount: "$variation.discount",
+   sellPrice: "$variation.sellPrice",
+   stockPrice: "$variation.stockPrice",
    attributes: "$variation.attributes",
-   available: "$variation.available",
-   stock: "$variation.stock"
+   stockQuantity: "$variation.stockQuantity",
+   stock: "$variation.stock",
+   productType: 1,
 }
