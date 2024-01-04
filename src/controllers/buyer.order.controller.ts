@@ -3,10 +3,10 @@ const {
   productStockUpdater,
   orderStatusUpdater,
 } = require("../services/common.service");
-const apiResponse = require("../errors/apiResponse");
+const apiResponse = require("../res/response");
 const smtpSender = require("../services/email.service");
 const NodeCache = require("../utils/NodeCache");
-const { Order, OrderItems } = require("../model/ORDER_TBL");
+const { ORDER_TABLE, ORDER_ITEMS_TABLE } = require("../model/ORDER_TBL");
 const Customer = require("../model/CUSTOMER_TBL");
 const { ObjectId } = require("mongodb");
 
@@ -26,9 +26,11 @@ async function myOrder(req: Request, res: Response, next: NextFunction) {
     if (ordersInCache) {
       orders = ordersInCache;
     } else {
-      orders = await OrderItems.find({ customerId: ObjectId(customer?._id) });
+      orders = await ORDER_ITEMS_TABLE.find({
+        customerId: ObjectId(customer?._id),
+      });
 
-      // let orderItems = await OrderItems.find();
+      // let orderItems = await ORDER_ITEMS_TABLE.find();
       NodeCache.saveCache(`${email}_myOrders`, orders);
     }
 
@@ -44,16 +46,17 @@ async function removeOrder(req: Request, res: Response, next: any) {
   try {
     const { email, orderID } = req.params;
 
-    const result = await Order.findOneAndDelete({
+    const result = await ORDER_TABLE.findOneAndDelete({
       $and: [{ order_id: orderID }, { "customer.email": email }],
     });
 
-    if (!result) throw new apiResponse.Api400Error("Order removed failed !");
+    if (!result)
+      throw new apiResponse.Error400("ORDER_TABLE removed failed !");
 
     return res.status(200).send({
       success: true,
       statusCode: 200,
-      message: "Order Removed successfully",
+      message: "ORDER_TABLE Removed successfully",
     });
   } catch (error: any) {
     next(error);
@@ -67,13 +70,13 @@ async function cancelMyOrder(req: Request, res: Response, next: NextFunction) {
     const { cancelReason, orderID, product } = req?.body;
 
     if (!orderID || typeof orderID !== "string")
-      throw new apiResponse.Api400Error("Required order ID !");
+      throw new apiResponse.Error400("Required order ID !");
 
     if (!cancelReason || typeof cancelReason !== "string")
-      throw new apiResponse.Api400Error("Required cancel reason !");
+      throw new apiResponse.Error400("Required cancel reason !");
 
     if (!product)
-      throw new apiResponse.Api400Error("Required order items information !");
+      throw new apiResponse.Error400("Required order items information !");
 
     // calling parallel api
     const [orderStatusResult, variationResult, emailSendingResult] =
@@ -90,10 +93,10 @@ async function cancelMyOrder(req: Request, res: Response, next: NextFunction) {
 
         smtpSender({
           to: email,
-          subject: "Order canceled confirm",
+          subject: "ORDER_TABLE canceled confirm",
           html: `
           <h3>
-            Order canceled with ID : ${orderID}
+            ORDER_TABLE canceled with ID : ${orderID}
           </h3>
           <br />
           <p>Cancel Reason: ${cancelReason.replace(/[_+]/gi, " ")}</p>
@@ -113,7 +116,7 @@ async function cancelMyOrder(req: Request, res: Response, next: NextFunction) {
       res.status(200).send({
         success: true,
         statusCode: 200,
-        message: "Order canceled successfully",
+        message: "ORDER_TABLE canceled successfully",
       })
     );
   } catch (error: any) {
@@ -128,16 +131,19 @@ async function orderDetails(req: Request, res: Response, next: NextFunction) {
     const { orderId, itemId } = req?.params;
 
     if (!orderId || !itemId)
-      throw new apiResponse.Api400Error("Required order id and item id !");
+      throw new apiResponse.Error400("Required order id and item id !");
 
     let order: any;
 
-    let orderDetailsInCache = NodeCache.getCache(`${email}_orderDetails`);
+    let orderDetailsInCache = NodeCache.getCache(
+      `${email}_${orderId}_orderDetails`
+    );
 
     if (orderDetailsInCache) {
       order = orderDetailsInCache;
     } else {
-      order = await Order.aggregate([
+      let num = 1;
+      order = await ORDER_TABLE.aggregate([
         {
           $match: { _id: ObjectId(orderId) },
         },
@@ -162,7 +168,17 @@ async function orderDetails(req: Request, res: Response, next: NextFunction) {
               {
                 $project: { customerId: 0 },
               },
-            
+              {
+                $group: {
+                  _id: {
+                    storeTitle: "$storeTitle",
+                    supplierId: "$supplierId",
+                    orderId: "$orderId",
+                  },
+                  packTotal: { $sum: "$amount" },
+                  products: { $push: "$$ROOT" },
+                },
+              },
             ],
             as: "items",
           },
@@ -175,17 +191,17 @@ async function orderDetails(req: Request, res: Response, next: NextFunction) {
             paymentStatus: 1,
             customerId: 1,
             paymentMode: 1,
-            orderPlacedAt: 1
+            orderPlacedAt: 1,
           },
         },
       ]);
 
       order = order.length === 1 ? order[0] : {};
 
-      NodeCache.saveCache(`${email}_orderDetails`, order);
+      NodeCache.saveCache(`${email}_${orderId}_orderDetails`, order);
     }
 
-    if (!order) throw new apiResponse.Api404Error("Sorry order not found !");
+    if (!order) throw new apiResponse.Error404("Sorry order not found !");
 
     return res.status(200).send({
       success: true,

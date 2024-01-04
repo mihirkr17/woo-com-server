@@ -7,14 +7,14 @@ module.exports.seller_order_email_template = (product: any, customerEmail: strin
    return (
       `<div>
          <h3 style="text-align: center">You have new order From ${customerEmail} At ${time}, ${date}</h3>
-         <p>Order ID: ${orderIDs.join(", ") ?? ""}</p>
+         <p>ORDER_TABLE ID: ${orderIDs.join(", ") ?? ""}</p>
          <b>Total Amount : ${totalAmount}</b>
 
          <table style="border: 1px solid #777; width: 100%">
-          <caption style="padding: 4px;">Order Details:</caption>
+          <caption style="padding: 4px;">ORDER_TABLE Details:</caption>
             <thead>
                <tr style="line-height: 34px; text-align: center; font-weight: bold; letter-spacing: 0.4px; background: cyan; color: black">
-                  <th style="border: 1px solid #777">Order ID</th>
+                  <th style="border: 1px solid #777">ORDER_TABLE ID</th>
                   <th style="border: 1px solid #777">Product</th>
                   <th style="border: 1px solid #777">Qty</th>
                   <th style="border: 1px solid #777">SKU</th>
@@ -51,7 +51,7 @@ module.exports.seller_order_email_template = (product: any, customerEmail: strin
 
 
 
-module.exports.verify_email_html_template = (verifyToken: string, fullName: string, appUri: string) => {
+module.exports.verify_email_html_template = (fullName: string, appUri: string) => {
 
    return (
       `
@@ -78,7 +78,7 @@ module.exports.verify_email_html_template = (verifyToken: string, fullName: stri
       <tr>
          <td>
                <a style="display:block; width: 160px;border:6px solid rgb(239,239,239);margin: 20px 0;padding:12px 10px; text-decoration:none;font-family:Arial,Helvetica,sans-serif;color:#fff;background:#ff4800;text-align:center"
-                  href="${appUri}api/v1/auth/verify-email?token=${verifyToken}">
+                  href="${appUri}">
                   <span
                      style="text-decoration:none!important;color:#fff;font-size:16px;line-height:28px;text-align:center;display:block">
                      &nbsp;&nbsp;VERIFY MY EMAIL&nbsp;&nbsp;
@@ -196,7 +196,7 @@ module.exports.buyer_order_email_template = (data: any, option: any) => {
                               <tr>
                                  <td valign="top" width="100">
                                     <h1 data-key="1468266_heading" style="font-family: Georgia,serif,'Playfair Display'; font-size: 28px; line-height: 46px; font-weight: 700; color: #4b4b4b; text-transform: none; background-color: #ffffff; margin: 0;">
-                                       Order Confirmation
+                                       ORDER_TABLE Confirmation
                                     </h1>
                                  </td>
                               </tr>
@@ -235,7 +235,7 @@ module.exports.buyer_order_email_template = (data: any, option: any) => {
                                     <td width="30%" style="text-align:left;vertical-align:middle;border-left:1px solid #eee;border-bottom:1px solid #eee;border-right:0;border-top:0;word-wrap:break-word">
                                        <b>${item?.product?.title}</b> <br />
                                        <small>
-                                          Order ID: ${item?.order_id} <br />
+                                          ORDER_TABLE ID: ${item?.order_id} <br />
                                           Payment Mode: ${item?.payment?.mode}
                                        </small>
 
@@ -277,7 +277,7 @@ module.exports.buyer_order_email_template = (data: any, option: any) => {
 
                               <tr>
                                  <th width="80%" scope="row" colspan="2" style="text-align:right;background:#efefef;text-align:right;border-left:1px solid #eee;border-bottom:1px solid #eee;border-right:0;border-top:0">
-                                    Order Total
+                                    ORDER_TABLE Total
                                  </th>
                                  <td width="20%" style="background:#efefef;text-align:right;vertical-align:middle;border-left:1px solid #eee;border-bottom:1px solid #eee;border-right:1px solid #eee;border-top:0;color:#7db701;font-weight:bold">
                                     <span>${option?.totalAmount}</span>

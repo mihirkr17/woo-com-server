@@ -1,6 +1,6 @@
-const { Api400Error } = require("../errors/apiResponse");
+const { Error400 } = require("../res/response");
 import { NextFunction, Request, Response } from "express";
-const { validPassword, validEmail, validString } = require("../utils/validator");
+const { validPassword, validEmail, validString, validBDPhoneNumber } = require("../utils/validator");
 
 
 module.exports.loginMDL = async (req: Request, res: Response, next: NextFunction) => {
@@ -10,21 +10,21 @@ module.exports.loginMDL = async (req: Request, res: Response, next: NextFunction
 
    try {
       if (!email)
-         throw new Api400Error("Required email address !");
+         throw new Error400("Required email address !");
 
-      if (!validString(email)) throw new Api400Error("Invalid string type !");
+      if (!validString(email)) throw new Error400("Invalid string type !");
 
       if (!password)
-         throw new Api400Error("Required password !");
+         throw new Error400("Required password !");
 
       if (typeof password !== "string")
-         throw new Api400Error("Password should be string !");
+         throw new Error400("Password should be string !");
 
       if (!validPassword(password))
-         throw new Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
+         throw new Error400("Password should contains at least 1 digit, lowercase letter, special character !");
 
       if (password.length < 5 || password.length > 8)
-         throw new Api400Error("Password length should be 5 to 8 characters !");
+         throw new Error400("Password length should be 5 to 8 characters !");
 
       next();
    } catch (error) {
@@ -39,35 +39,35 @@ module.exports.registrationMDL = async (req: Request, res: Response, next: NextF
       const { phone, email, password, gender, fullName } = req?.body;
 
       if (!phone) {
-         throw new Api400Error("Required phone number !");
+         throw new Error400("Required phone number !");
       }
 
       else if (!email) {
-         throw new Api400Error("Required email address !");
+         throw new Error400("Required email address !");
       }
 
       else if (!gender) {
-         throw new Api400Error("Required gender !");
+         throw new Error400("Required gender !");
       }
 
       else if (!fullName) {
-         throw new Api400Error("Required full name !");
+         throw new Error400("Required full name !");
       }
 
       else if (!password) {
-         throw new Api400Error("Required password !");
+         throw new Error400("Required password !");
       }
 
       else if (password && typeof password !== "string") {
-         throw new Api400Error("Password should be string !");
+         throw new Error400("Password should be string !");
       }
 
       else if (password.length < 5 || password.length > 8) {
-         throw new Api400Error("Password length should be 5 to 8 characters !");
+         throw new Error400("Password length should be 5 to 8 characters !");
       }
 
       else if (!validPassword(password)) {
-         throw new Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
+         throw new Error400("Password should contains at least 1 digit, lowercase letter, special character !");
       }
 
       else {
@@ -79,39 +79,52 @@ module.exports.registrationMDL = async (req: Request, res: Response, next: NextF
 }
 
 module.exports.supplierRegistrationMDL = async (req: Request, res: Response, next: NextFunction) => {
-   let body = req.body;
-   const requiredGenderValue = ["Male", "Female", "Others"];
+   try {
+      const body = req.body;
+      const requiredGenderValues = ["Male", "Female", "Others"];
 
-   const { email, phone, fullName, password, gender } = body as { email: string, phone: string, fullName: string, password: string, gender: string };
+      const { email, phone, fullName, password, gender } = body as {
+         email: string,
+         phone: string, fullName: string,
+         password: string,
+         gender: string,
 
-   if (!fullName) throw new Api400Error("Required full name !");
+      };
 
-   if (fullName.length < 3 || fullName.length > 18) throw new Api400Error("Full name characters length should be 3 to 18 !");
+      const errors = [];
 
-   if (!email) throw new Api400Error("Required email address !");
-
-   if (!validEmail(email)) throw new Api400Error("Required valid email address !");
-
-   if (!phone) throw new Api400Error("Required phone number !");
-
-   if (!password)
-      throw new Api400Error(`Required password !`);
-
-   if (password && typeof password !== "string")
-      throw new Api400Error("Password should be string !");
-
-   if (password.length < 5 || password.length > 8)
-      throw new Api400Error("Password length should be 5 to 8 characters !");
-
-   if (!validPassword(password))
-      throw new Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
-
-   if (!gender)
-      return new Api400Error("Required gender !");
-
-   if (!requiredGenderValue.includes(gender))
-      return new Api400Error("Invalid gender format !");
+      const phnNumber = validBDPhoneNumber(phone);
 
 
-   next();
-}
+      if (!fullName || fullName.length < 3 || fullName.length > 18) {
+         errors.push("Full name characters length should be 3 to 18!");
+      }
+
+      if (!email || !validEmail(email)) {
+         errors.push("Invalid email address!");
+      }
+
+      if (!phnNumber) {
+         errors.push("Invalid phone number!");
+      } else {
+         req.body.phone = phnNumber;
+      }
+
+      if (!password || typeof password !== "string" || password.length < 5 || password.length > 8 || !validPassword(password)) {
+         errors.push("Invalid password format!");
+      }
+
+      if (!gender || !requiredGenderValues.includes(gender)) {
+         errors.push("Invalid gender format!");
+      }
+
+      if (errors.length > 0) {
+         throw new Error400(errors.join(" "));
+      }
+
+      // Continue with registration logic if all validations pass
+      next();
+   } catch (error) {
+      next(error);
+   }
+};

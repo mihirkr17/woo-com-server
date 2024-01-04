@@ -2,14 +2,13 @@
 const mdb = require("mongodb");
 const Product = require("../model/PRODUCT_TBL");
 const ProductVariationTbl = require("../model/PRODUCT_VARIATION_TBL");
-const UserModel = require("../model/user.model");
-const ShoppingCartModel = require("../model/shoppingCart.model");
-const cryptos = require("crypto");
-const apiResponse = require("../errors/apiResponse");
+const UserModel = require("../model/CUSTOMER_TBL");
+const ShoppingCartModel = require("../model/SHOPPING_CART_TBL");
+const apiResponse = require("../res/response");
 const { generateTrackingID } = require("../utils/generator");
 const NCache = require("../utils/NodeCache");
-const Order = require("../model/ORDER_TBL");
-const Store = require("../model/store.model");
+const ORDER_TABLE = require("../model/ORDER_TBL");
+const Store = require("../model/SUPPLIER_TBL");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 module.exports.findUserByEmail = async (email: string) => {
@@ -106,7 +105,7 @@ module.exports.orderStatusUpdater = async (obj: any) => {
 
       await NCache.deleteCache(`${customerEmail}_myOrders`);
 
-      return await Order.findOneAndUpdate({
+      return await ORDER_TABLE.findOneAndUpdate({
          $and: [
             { customerId: customerId },
             { orderId: orderID }
@@ -128,7 +127,7 @@ module.exports.productStockUpdater = async (type: string, data: any[]) => {
 
 
       if (!data || !Array.isArray(data))
-         throw new apiResponse.Api500Error("Required product id, sku, quantity !");
+         throw new apiResponse.Error500("Required product id, sku, quantity !");
 
 
       const bulkOperations = [];

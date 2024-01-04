@@ -79,29 +79,23 @@ const basicProductQuery = [
     },
     {
         $project: {
-            title: { $ifNull: ["$vTitle", "$title"] },
+            title: { $ifNull: ["$title", "$title"] },
             slug: 1,
-            image: 1,
+            image: "$mainImage",
             brand: 1,
             score: 1,
             sales: 1,
             views: 1,
             categories: 1,
-            rating: 1,
             ratingAverage: 1,
-            ratingCount: {
-                $reduce: {
-                    input: "$rating",
-                    initialValue: 0,
-                    in: { $add: ["$$value", "$$this.count"] }
-                }
-            },
+            ratingCount: 1,
             sku: "$sku",
             stock: "$stock",
             attributes: "$attributes",
             shipping: 1,
             stockPrice: "$stockPrice",
-            sellPrice: "$sellPrice"
+            sellPrice: "$sellPrice",
+            link: 1
         }
     },
 ];
@@ -116,9 +110,9 @@ module.exports.store_products_pipe = (page, Filter, sortList) => {
         { $limit: 1 }
     ];
 };
-module.exports.product_detail_pipe = (productID, sku) => {
+module.exports.product_detail_pipe = (productId, sku) => {
     return [
-        { $match: { $and: [{ _id: mongoDB.ObjectId(productID) }, { status: "Active" }] } },
+        { $match: { $and: [{ _id: mongoDB.ObjectId(productId) }, { status: "Active" }] } },
         variationTables,
         {
             $addFields: {
@@ -152,16 +146,16 @@ module.exports.product_detail_pipe = (productID, sku) => {
         },
         {
             $lookup: {
-                from: 'stores',
-                localField: 'storeId',
+                from: 'SUPPLIER_TBL',
+                localField: 'supplierId',
                 foreignField: '_id',
-                as: 'store'
+                as: 'supplier'
             }
         },
-        { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$store", 0] }, "$$ROOT"] } } },
+        { $replaceRoot: { newRoot: { $mergeObjects: [{ $arrayElemAt: ["$supplier", 0] }, "$$ROOT"] } } },
         {
             $project: {
-                title: { $ifNull: ["$variation.vTitle", "$title"] },
+                title: { $ifNull: ["$variation.title", "$title"] },
                 slug: 1,
                 swatch: 1,
                 variation: 1,
@@ -172,20 +166,14 @@ module.exports.product_detail_pipe = (productID, sku) => {
                 score: 1,
                 sales: 1,
                 views: 1,
-                categories: 1,
-                storeId: 1,
-                storeTitle: 1,
-                supplierPhone: "$contactPhone",
-                images: 1,
+                categoriesFlat: 1,
+                supplierId: 1,
+                storeTitle: "$storeInformation.companyName",
+                supplierPhone: "$personalInformation.phone",
+                images: "$variation.images",
                 rating: 1,
                 ratingAverage: 1,
-                ratingCount: {
-                    $reduce: {
-                        input: "$rating",
-                        initialValue: 0,
-                        in: { $add: ["$$value", "$$this.count"] }
-                    }
-                },
+                ratingCount: 1,
                 metaDescription: 1,
                 description: 1,
                 manufacturer: 1,
@@ -330,7 +318,7 @@ module.exports.single_purchase_pipe = (productId, sku, quantity) => {
                 _id: 0,
                 shipping: 1,
                 packaged: 1,
-                storeId: 1,
+                supplierId: 1,
                 storeTitle: 1,
                 title: "$variation.title",
                 brand: 1,
@@ -355,8 +343,8 @@ module.exports.single_purchase_pipe = (productId, sku, quantity) => {
     ];
 };
 // Shopping cart pipeline
-module.exports.shopping_cart_pipe = (customerId, action = null) => {
-    let arr = [
+module.exports.shopping_cart_pipe = (customerId, clientUri) => {
+    let pipelines = [
         { $match: { customerId: mongoDB.ObjectId(customerId) } },
         {
             $lookup: {
@@ -391,69 +379,63 @@ module.exports.shopping_cart_pipe = (customerId, action = null) => {
             }
         },
         { $unset: ["variations"] },
-        { $match: { stock: 'in' } }
-    ];
-    if (action === "purchasing") {
-        arr.push({
+        { $match: { stock: 'in' } },
+        {
             $lookup: {
-                from: "STORE_TBL",
-                localField: "storeId",
+                from: "SUPPLIER_TBL",
+                localField: "supplierId",
                 foreignField: "_id",
-                as: "supplierStore"
+                as: "supplier"
             }
         }, {
             $addFields: {
-                store: {
+                supplier: {
                     $ifNull: [
                         {
                             $arrayElemAt: [
-                                "$supplierStore",
+                                "$supplier",
                                 0
                             ]
                         }, {}
                     ]
                 }
             }
-        }, {
-            $unset: ["supplierStore"]
-        });
-    }
-    arr.push({
-        $project: {
-            title: { $ifNull: ["$vTitle", "$title"] },
-            brand: 1,
-            quantity: 1,
-            productId: 1,
-            storeId: 1,
-            storeTitle: 1,
-            sku: 1,
-            customerId: 1,
-            savingAmount: { $multiply: [{ $subtract: ["$stockPrice", "$sellPrice"] }, '$quantity'] },
-            image: 1,
-            amount: { $multiply: ["$sellPrice", '$quantity'] },
-            initialDiscount: "$discount",
-            sellPrice: "$sellPrice",
-            stockPrice: "$stockPrice",
-            attributes: "$attributes",
-            stockQuantity: "$stockQuantity",
-            stock: "$stock",
-            productType: 1,
-            supplierEmail: {
-                $ifNull: ["$store.contactEmail", null]
+        },
+        {
+            $project: {
+                title: { $ifNull: ["$title", "$title"] },
+                brand: 1,
+                quantity: 1,
+                productId: 1,
+                supplierId: 1,
+                storeTitle: "$supplier.storeInformation.companyName",
+                sku: 1,
+                imageLink: "$mainImage",
+                customerId: 1,
+                savingAmount: { $multiply: [{ $subtract: ["$stockPrice", "$sellPrice"] }, '$quantity'] },
+                amount: { $multiply: ["$sellPrice", '$quantity'] },
+                initialDiscount: "$discount",
+                sellPrice: "$sellPrice",
+                stockPrice: "$stockPrice",
+                attributes: "$attributes",
+                stockQuantity: "$stockQuantity",
+                stock: "$stock",
+                productType: 1,
+                supplierEmail: {
+                    $ifNull: ["$supplier.personalInformation.email", null]
+                },
+                link: 1
+            }
+        },
+        {
+            $set: {
+                link: {
+                    $concat: [clientUri, "/", "$link"]
+                }
             }
         }
-    });
-    if (action === "purchasing") {
-        arr.push({
-            $group: {
-                _id: "$storeId",
-                storeTitle: { $first: "$storeTitle" },
-                totalAmount: { $sum: "$amount" },
-                items: { $push: "$$ROOT" }
-            }
-        });
-    }
-    return arr;
+    ];
+    return pipelines;
 };
 /**
  *

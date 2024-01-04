@@ -9,36 +9,37 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const { Api400Error } = require("../errors/apiResponse");
+const { Error400 } = require("../res/response");
 const { product_categories } = require("../properties/listing.property");
 module.exports.listingMDL = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     const { title, brand, imageUrls, categories, manufacturerOrigin, procurementSLA } = req === null || req === void 0 ? void 0 : req.body;
     if (!imageUrls)
-        throw new Api400Error("Required product images !");
+        throw new Error400("Required product images !");
     if (imageUrls.length > 15 || imageUrls.length < 2)
-        throw new Api400Error("Image url should be 2 to 15 items !");
+        throw new Error400("Image url should be 2 to 15 items !");
     if (title === "")
-        throw new Api400Error("Required product title !");
+        throw new Error400("Required product title !");
     if (!product_categories.includes(categories))
-        throw new Api400Error("Invalid categories format !");
+        throw new Error400("Invalid categories format !");
     if (!manufacturerOrigin)
-        throw new Api400Error("Required manufacture origin !");
+        throw new Error400("Required manufacture origin !");
     if (!procurementSLA)
-        throw new Api400Error("Required procurement sla !");
+        throw new Error400("Required procurement sla !");
     next();
 });
 module.exports.variationMDL = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { formType, variation, productId } = req.body;
+        const { requestFor: formType } = req === null || req === void 0 ? void 0 : req.query;
+        const { productId, stockQuantity, stockPrice } = req.body;
         let form = ['update-variation', 'new-variation'];
         if (!form.includes(formType))
-            throw new Api400Error("Invalid form type !");
+            throw new Error400("Invalid form type !");
         if (!productId)
-            throw new Api400Error("Required product id !");
-        if (!(variation === null || variation === void 0 ? void 0 : variation.sku))
-            throw new Api400Error("Required variation sku !");
-        if (!(variation === null || variation === void 0 ? void 0 : variation.available) === null || typeof (variation === null || variation === void 0 ? void 0 : variation.available) === "undefined")
-            throw new Api400Error("Required stock, stock value should be start from 0!");
+            throw new Error400("Required product id !");
+        if (!stockPrice)
+            throw new Error400("Required variation sku !");
+        if (!stockQuantity || typeof stockQuantity === "undefined")
+            throw new Error400("Required stock, stock value should be start from 0!");
         next();
     }
     catch (error) {

@@ -2,7 +2,7 @@
 import { NextFunction, Request, Response } from "express";
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { orderStatusUpdater } = require("../services/common.service");
-const { Api400Error } = require("../errors/apiResponse");
+const { Error400 } = require("../res/response");
 
 async function refundPayment(req: Request, res: Response, next: NextFunction) {
   try {
@@ -11,7 +11,7 @@ async function refundPayment(req: Request, res: Response, next: NextFunction) {
 
     if (!chargeID) throw new Error("Required charge ID !");
 
-    if (!orderID) throw new Error("Required Order ID !");
+    if (!orderID) throw new Error("Required ORDER_TABLE ID !");
 
     if (amount && typeof amount !== "number")
       throw new Error("Amount should be number");
@@ -64,7 +64,7 @@ async function createPaymentIntent(
     const body = req.body;
 
     if (!body) {
-      throw new Api400Error({
+      throw new Error400({
         success: false,
         statusCode: 400,
         message: "Required body !",
@@ -74,14 +74,14 @@ async function createPaymentIntent(
     const { totalAmount, session, paymentMethodId, productIds } = body;
 
     if (!session)
-      throw new Api400Error({
+      throw new Error400({
         success: false,
         statusCode: 400,
         message: "Required session id !",
       });
 
     if (!totalAmount || typeof totalAmount === "undefined") {
-      throw new Api400Error({
+      throw new Error400({
         success: false,
         statusCode: 400,
         message: "Required total amount !",

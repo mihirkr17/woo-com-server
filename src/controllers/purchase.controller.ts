@@ -7,8 +7,8 @@ const {
 } = require("../utils/pipelines");
 const { cartContextCalculation } = require("../utils/common");
 const { startSession } = require("mongoose");
-const { Order, OrderItems } = require("../model/ORDER_TBL");
-const ShoppingCart = require("../model/shoppingCart.model");
+const { ORDER_TABLE, ORDER_ITEMS_TABLE } = require("../model/ORDER_TBL");
+const ShoppingCart = require("../model/SHOPPING_CART_TBL");
 const {
   findUserByEmail,
   createPaymentIntents,
@@ -18,10 +18,10 @@ const {
 
 const smtpSender = require("../services/email.service");
 const {
-  Api400Error,
-  Api500Error,
-  Api503Error,
-} = require("../errors/apiResponse");
+  Error400,
+  Error500,
+  Error503,
+} = require("../res/response");
 
 const Product = require("../model/PRODUCT_TBL");
 const Customer = require("../model/CUSTOMER_TBL");
@@ -95,40 +95,35 @@ async function purchaseCart(req: Request, res: Response, next: NextFunction) {
     const timestamp: any = Date.now();
 
     if (!req.body || typeof req.body === "undefined")
-      throw new Api400Error("Required body !");
+      throw new Error400("Required body !");
 
     // get state by body
     const { state, paymentMethodId, session: paymentSessionId } = req.body;
 
-    if (state !== "CART") throw new Api400Error("Invalid state !");
+    if (state !== "CART") throw new Error400("Invalid state !");
 
-    if (!paymentMethodId) throw new Api400Error("Required payment method id !");
+    if (!paymentMethodId) throw new Error400("Required payment method id !");
 
     // finding customer by userId;
     const customer = await Customer.findOne({ userId: ObjectId(userId) });
 
     if (!customer)
-      throw new Api400Error(`Sorry, User not found with this ${email}`);
+      throw new Error400(`Sorry, User not found with this ${email}`);
 
     // getting default shipping address from user data;
     const shippingAddress = customer?.shippingAddress?.find(
       (adr: any) => adr?.active === true
     );
 
-    if (!shippingAddress) throw new Api400Error("Required shipping address !");
+    if (!shippingAddress) throw new Error400("Required shipping address !");
 
     // finding cart items from Shopping cart table
     let cartItems = await ShoppingCart.aggregate(
       shopping_cart_pipe(customer?._id, "purchasing")
     );
 
-
-    console.log(cartItems);
-
-    return;
-
     if (!cartItems || cartItems.length <= 0 || !Array.isArray(cartItems))
-      throw new Api400Error(
+      throw new Error400(
         "Nothing for purchase ! Please add product in your cart."
       );
 
@@ -136,10 +131,11 @@ async function purchaseCart(req: Request, res: Response, next: NextFunction) {
     const { finalAmount } = cartContextCalculation(cartItems);
 
     // Creating order instance
-    let order = new Order({
+    let order = new ORDER_TABLE({
       customerId: customer?._id,
+      customerContactEmail: customer?.contactEmail,
+      totalItems: cartItems?.length || 0,
       shippingAddress,
-      orderStatus: "placed",
       state,
       orderPlacedAt: new Date(timestamp),
       paymentMode: "card",
@@ -151,7 +147,7 @@ async function purchaseCart(req: Request, res: Response, next: NextFunction) {
     const result = await order.save();
 
     // if order not saved to db
-    if (!result?._id) throw new Error("Sorry! Order not placed.");
+    if (!result?._id) throw new Error("Sorry! order not placed.");
 
     // Creating payment throw payment intent
     const intent = await createPaymentIntents(
@@ -218,7 +214,7 @@ async function purchaseCart(req: Request, res: Response, next: NextFunction) {
     await clearCart(customer?._id, email);
 
     // Inserting items to the order items table...
-    await OrderItems.insertMany(cartItems);
+    await ORDER_ITEMS_TABLE.insertMany(cartItems);
 
     // If all operation success then commit the transaction...
     await session.commitTransaction();
@@ -249,7 +245,7 @@ async function purchaseOne(req: Request, res: Response, next: NextFunction) {
     const { email, _id } = req.decoded;
     const timestamp: any = Date.now();
 
-    if (!req.body) throw new Api503Error("Service unavailable !");
+    if (!req.body) throw new Error503("Service unavailable !");
 
     const {
       sku,
@@ -260,13 +256,13 @@ async function purchaseOne(req: Request, res: Response, next: NextFunction) {
     } = req.body;
 
     if (!sku || !productId || !quantity || !paymentMethodId)
-      throw new Api400Error(
+      throw new Error400(
         "Required sku, product id, quantity, paymentMethodId"
       );
 
     const user = await findUserByEmail(email);
 
-    if (!user) throw new Api503Error("Service unavailable !");
+    if (!user) throw new Error503("Service unavailable !");
 
     const defaultAddress = user?.shippingAddress?.find(
       (adr: any) => adr?.default_shipping_address === true
@@ -277,11 +273,11 @@ async function purchaseOne(req: Request, res: Response, next: NextFunction) {
     );
 
     if (typeof item === "undefined" || !Array.isArray(item))
-      throw new Api503Error("Service unavailable !");
+      throw new Error503("Service unavailable !");
 
     const { finalAmount } = cartContextCalculation(item);
 
-    let order = new Order({
+    let order = new ORDER_TABLE({
       state: "buy",
       customerId: _id,
       shippingAddress: defaultAddress,
@@ -315,7 +311,7 @@ async function purchaseOne(req: Request, res: Response, next: NextFunction) {
       productStockUpdater("dec", item),
     ]);
 
-    if (!orderResult) throw new Api500Error("Internal server error !");
+    if (!orderResult) throw new Error500("Internal server error !");
 
     await session.commitTransaction();
     session.endSession();

@@ -1,7 +1,7 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
 const { verifyJWT } = require("../middlewares/auth.middleware");
-const cartContext = require("../controllers/buyer.cart.controller");
+const cartContext = require("../controllers/customer.cart.controller");
 
 router.post("/add-to-cart", verifyJWT, cartContext.addToCartSystem);
 

@@ -20,7 +20,7 @@ function product_variation_template_engine({ available, pricing, attributes, sku
   }
 }
 
-const product_listing_template_engine = (body: any, storeId: any) => {
+const product_listing_template_engine = (body: any, supplierId: any) => {
 
   const packageHeight: number = parseFloat(body?.packageHeight);
   const packageLength: number = parseFloat(body?.packageLength);
@@ -41,7 +41,7 @@ const product_listing_template_engine = (body: any, storeId: any) => {
 
     highlights: body?.highlights || [],
 
-    storeId,
+    supplierId,
 
     packaged: {
       dimension: {
@@ -84,13 +84,13 @@ const product_listing_template_engine = (body: any, storeId: any) => {
 
     description: body?.description || "",
 
-    rating: [
-      { weight: 5, count: 0 },
-      { weight: 4, count: 0 },
-      { weight: 3, count: 0 },
-      { weight: 2, count: 0 },
-      { weight: 1, count: 0 },
-    ],
+    rating: {
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0,
+      "5": 0
+    },
 
     ratingAverage: 0,
 

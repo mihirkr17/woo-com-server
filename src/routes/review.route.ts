@@ -1,7 +1,7 @@
 import express, { Router } from "express";
 const router: Router = express.Router();
 const { verifyJWT, isCustomer } = require("../middlewares/auth.middleware");
-const { addProductRating, getReviews, getMyReviews, toggleVotingLike, getProductDetails } = require("../controllers/buyer.review.controller");
+const { addProductRating, getReviews, getMyReviews, toggleVotingLike, getProductDetails } = require("../controllers/customer.review.controller");
 
 
 

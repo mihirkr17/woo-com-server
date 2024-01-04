@@ -9,8 +9,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const User = require("../model/user.model");
-const apiResponse = require("../errors/apiResponse");
+const User = require("../model/CUSTOMER_TBL");
+const apiResponse = require("../res/response");
 const { findUserByEmail } = require("../services/common.service");
 module.exports.addToWishlistHandler = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
@@ -19,10 +19,10 @@ module.exports.addToWishlistHandler = (req, res, next) => __awaiter(void 0, void
         const verifiedEmail = req.decoded.email;
         const body = req.body;
         if (userEmail !== verifiedEmail) {
-            throw new apiResponse.Api403Error("Forbidden !");
+            throw new apiResponse.Error403("Forbidden !");
         }
         if (!body || typeof body === "undefined") {
-            throw new apiResponse.Api400Error("Required body !");
+            throw new apiResponse.Error400("Required body !");
         }
         const { productID, sku, listingID } = body;
         let model = {
@@ -72,7 +72,7 @@ module.exports.removeFromWishlist = (req, res, next) => __awaiter(void 0, void 0
             });
         }
         else {
-            throw new apiResponse.Api500Error("Service unavailable");
+            throw new apiResponse.Error500("Service unavailable");
         }
     }
     catch (error) {

@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 var jwt = require("jsonwebtoken");
-const apiResponse = require("../errors/apiResponse");
+const apiResponse = require("../res/response");
 /**
  *
  * @param req
@@ -25,13 +25,13 @@ const verifyJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, function
         const token = ((_b = (_a = req.headers) === null || _a === void 0 ? void 0 : _a.authorization) === null || _b === void 0 ? void 0 : _b.split(" ")[1]) || req.cookies.log_tok;
         // if token not present in cookies then return 401 unauthorized errors...
         if (!token || typeof token === "undefined") {
-            throw new apiResponse.Api401Error('Token not found');
+            throw new apiResponse.Error401('Token not found');
         }
         jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
             // verifying the token with jwt verify method and if token broken then 401 status code will send and terminate the request
             if (err) {
                 res.clearCookie("token");
-                throw new apiResponse.Api401Error(err === null || err === void 0 ? void 0 : err.message);
+                throw new apiResponse.Error401(err === null || err === void 0 ? void 0 : err.message);
             }
             // if success then return email throw req.decoded
             req.decoded = decoded;
@@ -50,7 +50,7 @@ const isRoleOwnerOrAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0,
             next();
         }
         else {
-            throw new apiResponse.Api403Error("Forbidden access !");
+            throw new apiResponse.Error403("Forbidden access !");
         }
     }
     catch (error) {
@@ -65,7 +65,7 @@ const isSupplier = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
             next();
         }
         else {
-            throw new apiResponse.Api403Error("Forbidden access !");
+            throw new apiResponse.Error403("Forbidden access !");
         }
     }
     catch (error) {
@@ -79,7 +79,7 @@ const isCustomer = (req, res, next) => {
         next();
     }
     else {
-        throw new apiResponse.Api403Error("Forbidden access !");
+        throw new apiResponse.Error403("Forbidden access !");
     }
 };
 // admin authorization
@@ -90,7 +90,7 @@ const isAdmin = (req, res, next) => __awaiter(void 0, void 0, void 0, function* 
             next();
         }
         else {
-            throw new apiResponse.Api403Error("Forbidden access !");
+            throw new apiResponse.Error403("Forbidden access !");
         }
     }
     catch (error) {
@@ -104,7 +104,7 @@ const isPermitForDashboard = (req, res, next) => __awaiter(void 0, void 0, void 
             next();
         }
         else {
-            throw new apiResponse.Api403Error("Forbidden access !");
+            throw new apiResponse.Error403("Forbidden access !");
         }
     }
     catch (error) {
@@ -116,7 +116,7 @@ function verifyEmailByJWT(req, res, next) {
         const { token } = req.query; // getting from query
         // if token not present in cookies then return 401 unauthorized errors...
         if (!token || typeof token === "undefined") {
-            throw new apiResponse.Api401Error('Required verification token !');
+            throw new apiResponse.Error401('Required verification token !');
         }
         try {
             jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {

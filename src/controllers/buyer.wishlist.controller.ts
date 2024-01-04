@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
-const User = require("../model/user.model");
-const apiResponse = require("../errors/apiResponse");
+const User = require("../model/CUSTOMER_TBL");
+const apiResponse = require("../res/response");
 const { findUserByEmail } = require("../services/common.service");
 
 module.exports.addToWishlistHandler = async (
@@ -14,11 +14,11 @@ module.exports.addToWishlistHandler = async (
     const body = req.body;
 
     if (userEmail !== verifiedEmail) {
-      throw new apiResponse.Api403Error("Forbidden !");
+      throw new apiResponse.Error403("Forbidden !");
     }
 
     if (!body || typeof body === "undefined") {
-      throw new apiResponse.Api400Error("Required body !");
+      throw new apiResponse.Error400("Required body !");
     }
 
     const { productID, sku, listingID } = body;
@@ -96,7 +96,7 @@ module.exports.removeFromWishlist = async (
           message: "Product removed from your wishlist",
         });
     } else {
-      throw new apiResponse.Api500Error("Service unavailable");
+      throw new apiResponse.Error500("Service unavailable");
     }
   } catch (error: any) {
     next(error);

@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 const { ObjectId } = require("mongodb");
-const { Api500Error } = require("../errors/apiResponse");
+const { Error500 } = require("../res/response");
 const PrivacyPolicy = require("../model/privacyPolicy.model");
 const NodeCache = require("../utils/NodeCache");
 
@@ -53,7 +53,7 @@ module.exports.updatePolicy = async (
           message: "Policy updated successfully",
         });
     } else {
-      throw new Api500Error("Update failed !");
+      throw new Error500("Update failed !");
     }
   } catch (error: any) {
     next(error);

@@ -11,11 +11,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const Product = require("../model/PRODUCT_TBL");
-const User = require("../model/user.model");
-const Store = require("../model/store.model");
+const User = require("../model/CUSTOMER_TBL");
+const Store = require("../model/SUPPLIER_TBL");
 const smtpSender = require("../services/email.service");
-const Order = require("../model/ORDER_TBL");
-const { Api400Error, Api403Error, Api404Error, Api500Error, } = require("../errors/apiResponse");
+const ORDER_TABLE = require("../model/ORDER_TBL");
+const { Error400, Error403, Error404, Error500, } = require("../res/response");
 /**
  *
  * @param req
@@ -60,9 +60,9 @@ function verifyThisProduct(req, res, next) {
             const { role, email } = req === null || req === void 0 ? void 0 : req.decoded;
             const { productId } = req.body;
             if (role !== "ADMIN")
-                throw new Api403Error("Forbidden !");
+                throw new Error403("Forbidden !");
             if (!productId) {
-                throw new Api403Error("Product ID required !");
+                throw new Error403("Product ID required !");
             }
             const result = yield Product.findOneAndUpdate({ $and: [{ _id: ObjectId(productId) }, { status: "Queue" }] }, {
                 $set: {
@@ -97,9 +97,9 @@ function verifySellerAccount(req, res, next) {
         try {
             const { uuid, id, email } = req.body;
             if (!uuid || typeof uuid === "undefined")
-                throw new Api400Error("Required user unique id !");
+                throw new Error400("Required user unique id !");
             if (!id || typeof id === "undefined")
-                throw new Api400Error("Required id !");
+                throw new Error400("Required id !");
             const result = yield User.findOneAndUpdate({
                 $and: [
                     { _id: ObjectId(id) },
@@ -131,7 +131,7 @@ function verifySellerAccount(req, res, next) {
                     message: "Permission granted.",
                 });
             }
-            throw new Api500Error("Internal problem !");
+            throw new Error500("Internal problem !");
         }
         catch (error) {
             next(error);
@@ -143,9 +143,9 @@ function deleteSupplierAccount(req, res, next) {
         try {
             const { id, email } = req.body;
             if (!id || typeof id === "undefined")
-                throw new Api400Error("Required id !");
+                throw new Error400("Required id !");
             if (!ObjectId.isValid(id))
-                throw new Api400Error("Invalid supplier id !");
+                throw new Error400("Invalid supplier id !");
             yield User.deleteOne({
                 $and: [{ _id: ObjectId(id) }, { email }],
             });
@@ -155,7 +155,7 @@ function deleteSupplierAccount(req, res, next) {
                 statusCode: 200,
                 message: "Account deleted successfully.",
             });
-            throw new Api500Error("Internal server error !");
+            throw new Error500("Internal server error !");
         }
         catch (error) {
             next(error);
@@ -166,7 +166,7 @@ function getBuyerInfo(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const { id, email } = req.body;
-            const order = yield Order.findOne({ user_email: email });
+            const order = yield ORDER_TABLE.findOne({ user_email: email });
             if (order) {
                 let totalOrder = (Array.isArray(order === null || order === void 0 ? void 0 : order.orders) && (order === null || order === void 0 ? void 0 : order.orders.length)) || 0;
                 return res.status(200).send({
@@ -177,7 +177,7 @@ function getBuyerInfo(req, res, next) {
                     },
                 });
             }
-            throw new Api404Error("Data not found !");
+            throw new Error404("Data not found !");
         }
         catch (error) {
             next(error);

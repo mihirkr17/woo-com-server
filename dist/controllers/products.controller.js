@@ -14,10 +14,10 @@ const { findUserByEmail, updateProductPerformance, } = require("../services/comm
 const { product_detail_pipe, product_detail_relate_pipe, home_store_product_pipe, search_product_pipe, ctg_filter_product_pipe, ctg_main_product_pipe, product_detail_review_pipe, } = require("../utils/pipelines");
 const NodeCache = require("../utils/NodeCache");
 const PrivacyPolicy = require("../model/privacyPolicy.model");
-const User = require("../model/user.model");
-const Review = require("../model/reviews.model");
+const User = require("../model/CUSTOMER_TBL");
+const Review = require("../model/REVIEWS_TBL");
 const Product = require("../model/PRODUCT_TBL");
-const { Api400Error } = require("../errors/apiResponse");
+const { Error400 } = require("../res/response");
 const { store_products_pipe } = require("../utils/pipelines");
 const { ObjectId } = require("mongodb");
 /**
@@ -36,7 +36,7 @@ function getStore(req, res, next) {
             const filters = (_a = req.query) === null || _a === void 0 ? void 0 : _a.filters;
             const regex = /[<>{}|\\^%]/g;
             if (typeof storeTitle !== "string")
-                throw new Api400Error("Invalid store name !");
+                throw new Error400("Invalid store name !");
             let filterArr = filters ? filters.replace(regex, "").split("--") : [];
             const filterResult = filterArr.reduce((obj, items) => {
                 const [key, value] = items === null || items === void 0 ? void 0 : items.split("__");
@@ -49,7 +49,7 @@ function getStore(req, res, next) {
                 return obj;
             }, {});
             let Filter = {};
-            Filter["$and"] = [{ storeId: ObjectId(id) }, { status: "Active" }];
+            Filter["$and"] = [{ supplierId: ObjectId(id) }, { status: "Active" }];
             let sortList = {};
             if (sorted === "lowest") {
                 sortList = { $sort: { "pricing.sellingPrice": 1 } };
@@ -81,7 +81,7 @@ function getStore(req, res, next) {
                 { $match: Filter },
                 {
                     $group: {
-                        _id: "$storeId",
+                        _id: "$supplierId",
                         totalProduct: { $count: {} },
                     },
                 },
@@ -90,7 +90,7 @@ function getStore(req, res, next) {
             filteringProductTotal = filteringProductTotal[0];
             let storeInfo = yield Product.aggregate([
                 {
-                    $match: { $and: [{ status: "Active" }, { storeId: ObjectId(id) }] },
+                    $match: { $and: [{ status: "Active" }, { supplierId: ObjectId(id) }] },
                 },
                 {
                     $project: {
@@ -113,7 +113,7 @@ function getStore(req, res, next) {
                         },
                         rating: 1,
                         categories: 1,
-                        storeId: 1,
+                        supplierId: 1,
                         brand: 1,
                         totalMulti: {
                             $reduce: {
@@ -139,7 +139,7 @@ function getStore(req, res, next) {
                 {
                     $lookup: {
                         from: "stores",
-                        localField: "storeId",
+                        localField: "supplierId",
                         foreignField: "_id",
                         as: "store",
                     },
@@ -213,30 +213,31 @@ function fetchProductDetails(req, res, next) {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { pId: productID, sku, oTracker } = req.query;
-            if (!productID || typeof productID !== "string")
-                throw new Api400Error("Invalid product id ");
+            const { sku, oTracker } = req.query;
+            const { productId } = req === null || req === void 0 ? void 0 : req.params;
+            if (!productId || typeof productId !== "string")
+                throw new Error400("Invalid product id ");
             if (!sku || typeof sku !== "string")
-                throw new Api400Error("Invalid sku");
+                throw new Error400("Invalid sku");
             let productDetail;
             // Product Details
-            let cacheData = NodeCache.getCache(`${productID}_${sku}`);
+            let cacheData = NodeCache.getCache(`${productId}_${sku}`);
             if (cacheData) {
                 productDetail = cacheData;
             }
             else {
-                productDetail = yield Product.aggregate(product_detail_pipe(productID, sku)).allowDiskUse(true);
+                productDetail = yield Product.aggregate(product_detail_pipe(productId, sku)).allowDiskUse(true);
                 productDetail = productDetail[0];
                 if (oTracker === ((_a = productDetail === null || productDetail === void 0 ? void 0 : productDetail.variation) === null || _a === void 0 ? void 0 : _a.sku)) {
                     yield updateProductPerformance({
-                        _id: productID,
+                        _id: productId,
                         sku: sku,
                         views: (productDetail === null || productDetail === void 0 ? void 0 : productDetail.views) || 0,
                         ratingAverage: (productDetail === null || productDetail === void 0 ? void 0 : productDetail.ratingAverage) || 0,
                         sales: (productDetail === null || productDetail === void 0 ? void 0 : productDetail.sales) || 0,
                     }, "views");
                 }
-                NodeCache.saveCache(`${productID}_${sku}`, productDetail);
+                NodeCache.saveCache(`${productId}_${sku}`, productDetail);
             }
             // all success
             return res.status(200).send({
@@ -388,7 +389,7 @@ function fetchTopSellingProduct(req, res, next) {
                 status: "Active",
             };
             if (sid) {
-                filterQuery["storeId"] = ObjectId(sid);
+                filterQuery["supplierId"] = ObjectId(sid);
             }
             const result = yield Product.find(filterQuery)
                 .sort({ sales: -1 })

@@ -116,4 +116,12 @@ function cartContextCalculation(cart: any[]) {
 
 
 
-module.exports = { cartContextCalculation };
+function calculateAverageRatings(rating: any) {
+
+   const totalCount: any = Object.values(rating).reduce((total: any, count: any) => (total + count), 0);
+   const totalWeight = Object.keys(rating).reduce((sum: any, key: any) => sum + parseInt(key) * parseInt(rating[key]), 0);
+
+   return parseFloat((totalWeight / totalCount).toFixed(1));
+}
+
+module.exports = { cartContextCalculation, calculateAverageRatings };

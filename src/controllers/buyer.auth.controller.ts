@@ -1,12 +1,12 @@
 // src/controllers/buyer.auth.controller.ts
 
 import { NextFunction, Request, Response } from "express";
-const User = require("../model/user.model");
+const User = require("../model/CUSTOMER_TBL");
 const {
-  Api400Error,
-  Api500Error,
-  Api404Error,
-} = require("../errors/apiResponse");
+  Error400,
+  Error500,
+  Error404,
+} = require("../res/response");
 const bcrypt = require("bcrypt");
 const smtpSender = require("../services/email.service");
 const { verify_email_html_template } = require("../templates/email.template");
@@ -42,7 +42,7 @@ async function userRegistrationController(
     let existUser = await countUserByEmail(body?.email);
 
     if (existUser >= 1)
-      throw new Api400Error(
+      throw new Error400(
         "User already exists, Please try another email address !"
       );
 
@@ -56,7 +56,7 @@ async function userRegistrationController(
     });
 
     if (!emailResult?.response)
-      throw new Api400Error("Verification code not send to your email !");
+      throw new Error400("Verification code not send to your email !");
 
     return res.status(200).send({
       success: true,
@@ -85,13 +85,13 @@ async function userLoginController(
 
     let user = await User.findOne({ email: inputEmail }); //findUserByEmail(inputEmail);
 
-    if (!user) throw new Api400Error(`User with ${inputEmail} not found!`);
+    if (!user) throw new Error400(`User with ${inputEmail} not found!`);
 
     const { email, verified, accountStatus, fullName } = user || {};
 
     const matchedPwd = await user.comparePassword(inputPassword);
 
-    if (!matchedPwd) throw new Api400Error("Password didn't matched !");
+    if (!matchedPwd) throw new Error400("Password didn't matched !");
 
     console.log(user);
 
@@ -154,7 +154,7 @@ async function userAccountVerifyByEmail(
 
     let user = await findUserByEmail(email);
 
-    if (!user) throw new Api400Error(`Sorry account with ${email} not found`);
+    if (!user) throw new Error400(`Sorry account with ${email} not found`);
 
     if (user.verified && user.accountStatus === "Active")
       return res.status(200).send({
@@ -194,14 +194,14 @@ async function generateNewVerifyToken(
   try {
     const { email } = req.query;
 
-    if (!email) throw new Api400Error("Required email address !");
+    if (!email) throw new Error400("Required email address !");
 
     if (!validEmail(email))
-      throw new Api400Error("Required valid email address !");
+      throw new Error400("Required valid email address !");
 
     let user = await findUserByEmail({ email });
 
-    if (!user) throw new Api400Error("Sorry user not found !");
+    if (!user) throw new Error400("Sorry user not found !");
 
     if (user?.verificationCode || user?.accountStatus === "Inactive") {
       user.verificationCode = generateSixDigitNumber();
@@ -226,11 +226,11 @@ async function generateNewVerifyToken(
           });
         }
 
-        throw new Api500Error("Internal error !");
+        throw new Error500("Internal error !");
       }
     }
 
-    throw new Api400Error(`Your account with ${email} already active.`);
+    throw new Error400(`Your account with ${email} already active.`);
   } catch (error: any) {
     next(error);
   }
@@ -248,17 +248,17 @@ async function userEmailVerificationController(
     const { verificationCode, verificationExpiredAt, email } = req.body;
 
     if (!verificationCode)
-      throw new Api400Error("Required verification code !");
+      throw new Error400("Required verification code !");
 
     if (verificationCode.length >= 7 || verificationCode <= 5)
-      throw new Api400Error("Verification code should be 6 digits !");
+      throw new Error400("Verification code should be 6 digits !");
 
     if (new Date(verificationExpiredAt) < new Date() === true)
-      throw new Api400Error("Session expired ! Please resend code ..");
+      throw new Error400("Session expired ! Please resend code ..");
 
     let user = await User.findOne({ $and: [{ verificationCode }, { email }] });
 
-    if (!user) throw new Api400Error("Session expired !");
+    if (!user) throw new Error400("Session expired !");
 
     user.verificationCode = undefined;
     user.verificationExpiredAt = undefined;
@@ -298,16 +298,16 @@ async function changePasswordController(
     const { oldPassword, newPassword } = req.body;
 
     if (!oldPassword || !newPassword)
-      throw new Api400Error(`Required old password and new password !`);
+      throw new Error400(`Required old password and new password !`);
 
     if (newPassword && typeof newPassword !== "string")
-      throw new Api400Error("Password should be string !");
+      throw new Error400("Password should be string !");
 
     if (newPassword.length < 5 || newPassword.length > 8)
-      throw new Api400Error("Password length should be 5 to 8 characters !");
+      throw new Error400("Password length should be 5 to 8 characters !");
 
     if (!validPassword(newPassword))
-      throw new Api400Error(
+      throw new Error400(
         "Password should contains at least 1 digit, lowercase letter, special character !"
       );
 
@@ -315,17 +315,17 @@ async function changePasswordController(
     let user = await User.findOne({ email: email });
 
     if (!user && typeof user !== "object")
-      throw new Api404Error(`User not found !`);
+      throw new Error404(`User not found !`);
 
     const comparedPassword = await bcrypt.compare(oldPassword, user?.password);
 
     if (!comparedPassword) {
-      throw new Api400Error("Password didn't match !");
+      throw new Error400("Password didn't match !");
     }
 
     let hashedPwd = await bcrypt.hash(newPassword, 10);
 
-    if (!hashedPwd) throw new Api500Error("Internal errors !");
+    if (!hashedPwd) throw new Error500("Internal errors !");
 
     user.password = hashedPwd;
 
@@ -360,12 +360,12 @@ async function checkUserAuthenticationByEmail(
     const { email } = req?.body;
 
     if (!email || !validEmail(email))
-      throw new Api400Error("Required valid email address !");
+      throw new Error400("Required valid email address !");
 
     const user = await User.findOne({ email });
 
     if (!user || typeof user === "undefined")
-      throw new Api404Error(`Sorry user not found with this ${email}`);
+      throw new Error404(`Sorry user not found with this ${email}`);
 
     const securityCode = generateSixDigitNumber();
     const lifeTime = 300000;
@@ -377,7 +377,7 @@ async function checkUserAuthenticationByEmail(
     });
 
     if (!info?.response)
-      throw new Api500Error(
+      throw new Error500(
         "Sorry ! Something wrong in your email. please provide valid email address."
       );
 
@@ -415,24 +415,24 @@ async function checkUserForgotPwdSecurityKey(
   try {
     const sCode = req.cookies.securityCode;
 
-    if (!sCode) throw new Api400Error("Security code is expired !");
+    if (!sCode) throw new Error400("Security code is expired !");
 
     if (!req.body || typeof req.body === "undefined")
-      throw new Api400Error("Required body !");
+      throw new Error400("Required body !");
 
     const { email, securityCode } = req.body;
 
-    if (!email) throw new Api400Error("Required email !");
+    if (!email) throw new Error400("Required email !");
 
-    if (!securityCode) throw new Api400Error("Required security code !");
+    if (!securityCode) throw new Error400("Required security code !");
 
     const user = await User.findOne({ email });
 
     if (!user || typeof user === "undefined")
-      throw new Api404Error("Sorry user not found with this " + email);
+      throw new Error404("Sorry user not found with this " + email);
 
     if (securityCode !== sCode)
-      throw new Api400Error("Invalid security code !");
+      throw new Error400("Invalid security code !");
 
     res.clearCookie("securityCode");
 
@@ -471,28 +471,28 @@ async function userSetNewPassword(
     const { set_new_pwd_session } = req.cookies;
 
     if (!set_new_pwd_session)
-      throw new Api400Error("Sorry ! your session is expired !");
+      throw new Error400("Sorry ! your session is expired !");
 
     const { email, password, securityCode } = req.body;
 
     if (securityCode !== set_new_pwd_session)
-      throw new Api400Error("Invalid security code !");
+      throw new Error400("Invalid security code !");
 
     if (!email || !validEmail(email))
-      throw new Api400Error("Required valid email address !");
+      throw new Error400("Required valid email address !");
 
     if (password.length < 5 || password.length > 8)
-      throw new Api400Error("Password length should be 5 to 8 characters !");
+      throw new Error400("Password length should be 5 to 8 characters !");
 
     if (!validPassword(password) || typeof password !== "string")
-      throw new Api400Error(
+      throw new Error400(
         "Password should contains at least 1 digit, lowercase letter, special character !"
       );
 
     const user = await User.findOne({ email });
 
     if (!user && typeof user !== "object")
-      throw new Api404Error(`User not found!`);
+      throw new Error404(`User not found!`);
 
     const hashedPwd = await bcrypt.hash(password, 10);
 
@@ -506,7 +506,7 @@ async function userSetNewPassword(
 
     res.clearCookie("set_new_pwd_session");
 
-    if (!result) throw new Api500Error("Something wrong in server !");
+    if (!result) throw new Error500("Something wrong in server !");
 
     return res.status(200).send({
       success: true,

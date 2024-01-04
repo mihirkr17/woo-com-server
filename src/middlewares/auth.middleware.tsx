@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 var jwt = require("jsonwebtoken");
-const apiResponse = require("../errors/apiResponse");
+const apiResponse = require("../res/response");
 
 
 /**
@@ -19,7 +19,7 @@ const verifyJWT = async (req: Request, res: Response, next: NextFunction) => {
 
     // if token not present in cookies then return 401 unauthorized errors...
     if (!token || typeof token === "undefined") {
-      throw new apiResponse.Api401Error('Token not found');
+      throw new apiResponse.Error401('Token not found');
     }
 
     jwt.verify(
@@ -29,7 +29,7 @@ const verifyJWT = async (req: Request, res: Response, next: NextFunction) => {
         // verifying the token with jwt verify method and if token broken then 401 status code will send and terminate the request
         if (err) {
           res.clearCookie("token");
-          throw new apiResponse.Api401Error(err?.message);
+          throw new apiResponse.Error401(err?.message);
         }
 
         // if success then return email throw req.decoded
@@ -50,7 +50,7 @@ const isRoleOwnerOrAdmin = async (req: Request, res: Response, next: NextFunctio
     if (authRole === "OWNER" || authRole === "ADMIN") {
       next();
     } else {
-      throw new apiResponse.Api403Error("Forbidden access !");
+      throw new apiResponse.Error403("Forbidden access !");
     }
   } catch (error: any) {
     next(error);
@@ -65,7 +65,7 @@ const isSupplier = async (req: Request, res: Response, next: NextFunction) => {
     if (authRole === 'SUPPLIER') {
       next();
     } else {
-      throw new apiResponse.Api403Error("Forbidden access !");
+      throw new apiResponse.Error403("Forbidden access !");
     }
   } catch (error: any) {
     next(error);
@@ -80,7 +80,7 @@ const isCustomer = (req: Request, res: Response, next: NextFunction) => {
   if (authRole === "CUSTOMER") {
     next();
   } else {
-    throw new apiResponse.Api403Error("Forbidden access !");
+    throw new apiResponse.Error403("Forbidden access !");
   }
 };
 
@@ -94,7 +94,7 @@ const isAdmin = async (req: Request, res: Response, next: NextFunction) => {
     if (authRole === 'ADMIN') {
       next();
     } else {
-      throw new apiResponse.Api403Error("Forbidden access !");
+      throw new apiResponse.Error403("Forbidden access !");
     }
 
   } catch (error: any) {
@@ -110,7 +110,7 @@ const isPermitForDashboard = async (req: Request, res: Response, next: NextFunct
     if (authRole === 'SUPPLIER' || authRole === 'ADMIN' || authRole === 'OWNER') {
       next();
     } else {
-      throw new apiResponse.Api403Error("Forbidden access !");
+      throw new apiResponse.Error403("Forbidden access !");
     }
 
   } catch (error: any) {
@@ -124,7 +124,7 @@ async function verifyEmailByJWT(req: Request, res: Response, next: NextFunction)
 
   // if token not present in cookies then return 401 unauthorized errors...
   if (!token || typeof token === "undefined") {
-    throw new apiResponse.Api401Error('Required verification token !');
+    throw new apiResponse.Error401('Required verification token !');
   }
 
   try {

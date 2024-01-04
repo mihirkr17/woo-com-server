@@ -2,16 +2,16 @@
 
 import { NextFunction, Request, Response } from "express";
 const Product = require("../model/PRODUCT_TBL");
-const User = require("../model/user.model");
-const Store = require("../model/store.model");
+const User = require("../model/CUSTOMER_TBL");
+const Store = require("../model/SUPPLIER_TBL");
 const smtpSender = require("../services/email.service");
-const Order = require("../model/ORDER_TBL");
+const ORDER_TABLE = require("../model/ORDER_TBL");
 const {
-  Api400Error,
-  Api403Error,
-  Api404Error,
-  Api500Error,
-} = require("../errors/apiResponse");
+  Error400,
+  Error403,
+  Error404,
+  Error500,
+} = require("../res/response");
 
 /**
  *
@@ -63,10 +63,10 @@ async function verifyThisProduct(
 
     const { productId } = req.body;
 
-    if (role !== "ADMIN") throw new Api403Error("Forbidden !");
+    if (role !== "ADMIN") throw new Error403("Forbidden !");
 
     if (!productId) {
-      throw new Api403Error("Product ID required !");
+      throw new Error403("Product ID required !");
     }
 
     const result = await Product.findOneAndUpdate(
@@ -109,10 +109,10 @@ async function verifySellerAccount(
     const { uuid, id, email } = req.body;
 
     if (!uuid || typeof uuid === "undefined")
-      throw new Api400Error("Required user unique id !");
+      throw new Error400("Required user unique id !");
 
     if (!id || typeof id === "undefined")
-      throw new Api400Error("Required id !");
+      throw new Error400("Required id !");
 
     const result = await User.findOneAndUpdate(
       {
@@ -151,7 +151,7 @@ async function verifySellerAccount(
       });
     }
 
-    throw new Api500Error("Internal problem !");
+    throw new Error500("Internal problem !");
   } catch (error: any) {
     next(error);
   }
@@ -166,9 +166,9 @@ async function deleteSupplierAccount(
     const { id, email } = req.body;
 
     if (!id || typeof id === "undefined")
-      throw new Api400Error("Required id !");
+      throw new Error400("Required id !");
 
-    if (!ObjectId.isValid(id)) throw new Api400Error("Invalid supplier id !");
+    if (!ObjectId.isValid(id)) throw new Error400("Invalid supplier id !");
 
     await User.deleteOne({
       $and: [{ _id: ObjectId(id) }, { email }],
@@ -181,7 +181,7 @@ async function deleteSupplierAccount(
       message: "Account deleted successfully.",
     });
 
-    throw new Api500Error("Internal server error !");
+    throw new Error500("Internal server error !");
   } catch (error: any) {
     next(error);
   }
@@ -191,7 +191,7 @@ async function getBuyerInfo(req: Request, res: Response, next: NextFunction) {
   try {
     const { id, email } = req.body;
 
-    const order = await Order.findOne({ user_email: email });
+    const order = await ORDER_TABLE.findOne({ user_email: email });
 
     if (order) {
       let totalOrder =
@@ -206,7 +206,7 @@ async function getBuyerInfo(req: Request, res: Response, next: NextFunction) {
       });
     }
 
-    throw new Api404Error("Data not found !");
+    throw new Error404("Data not found !");
   } catch (error: any) {
     next(error);
   }

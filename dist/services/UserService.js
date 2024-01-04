@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 const Customer = require("../model/CUSTOMER_TBL");
-const UserTbl = require("../model/user.model");
+const UserTbl = require("../model/CUSTOMER_TBL");
 const db = require("mongodb");
 module.exports = class UserService {
     /**

@@ -11,7 +11,7 @@ try {
      * @apiRoutes /api/product
      */
     router.get("/search-products/:q", productCTRL.searchProducts);
-    router.get("/fetch-single-product/:product_slug", productCTRL.fetchProductDetails);
+    router.get("/fetch-single-product/:productId", productCTRL.fetchProductDetails);
     router.get("/related/products", productCTRL === null || productCTRL === void 0 ? void 0 : productCTRL.relatedProducts);
     router.get("/store/:limits", productCTRL.homeStoreController);
     router.get(`/:storeTitle`, productCTRL === null || productCTRL === void 0 ? void 0 : productCTRL.getStore);

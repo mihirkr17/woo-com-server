@@ -9,11 +9,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const ShoppingCart = require("../model/shoppingCart.model");
+const ShoppingCart = require("../model/SHOPPING_CART_TBL");
 const { shopping_cart_pipe } = require("../utils/pipelines");
 const Customer = require("../model/CUSTOMER_TBL");
 const { cartContextCalculation } = require("../utils/common");
-const { Api400Error, Api404Error } = require("../errors/apiResponse");
+const { Error400, Error404 } = require("../res/response");
 const { ObjectId } = require("mongodb");
 const NodeCache = require("../utils/NodeCache");
 const ProductService = require("../services/ProductService");
@@ -31,25 +31,18 @@ function addToCartSystem(req, res, next) {
             const { _id: userId, email } = req.decoded;
             const body = req.body;
             if (!body || typeof body !== "object")
-                throw new Api400Error("Required body !");
+                throw new Error400("Required body !");
             const customer = yield Customer.findOne({
-                userId: ObjectId(userId),
+                _id: ObjectId(userId),
             });
-            if (!(customer === null || customer === void 0 ? void 0 : customer.userId)) {
-                const newCustomer = new Customer({
-                    _id: new ObjectId(),
-                    userId,
-                });
-                yield newCustomer.save();
-            }
             const { productId, sku, action, quantity } = body;
             if (!productId || !sku)
-                throw new Api400Error("Required product id, listing id, variation id in body !");
-            const { storeId, storeTitle, brand } = yield isProduct(productId, sku);
-            if (!storeId)
-                throw new Api404Error("Product is not available !");
+                throw new Error400("Required product id, listing id, variation id in body !");
+            const { supplierId, storeTitle, brand } = yield isProduct(productId, sku);
+            if (!supplierId)
+                throw new Error404("Product is not available !");
             if (action !== "toCart")
-                throw new Api400Error("Required cart operation !");
+                throw new Error400("Required cart operation !");
             let existsProduct = yield ShoppingCart.findOne({
                 $and: [
                     { customerId: ObjectId(customer === null || customer === void 0 ? void 0 : customer._id) },
@@ -68,7 +61,7 @@ function addToCartSystem(req, res, next) {
                 productId,
                 sku,
                 brand,
-                storeId,
+                supplierId,
                 storeTitle,
                 quantity,
                 customerId: customer === null || customer === void 0 ? void 0 : customer._id,
@@ -101,7 +94,7 @@ function getCartContextSystem(req, res, next) {
         try {
             const { email, _id: userId } = req.decoded;
             let cart;
-            let customer = yield Customer.findOne({ userId: ObjectId(userId) });
+            let customer = yield Customer.findOne({ _id: ObjectId(userId) });
             const cartData = NodeCache.getCache(`${email}_cartProducts`);
             if (cartData) {
                 cart = cartData;
@@ -148,16 +141,16 @@ function updateCartProductQuantitySystem(req, res, next) {
             const { email } = req.decoded;
             const { productId, sku, cartId, quantity } = req === null || req === void 0 ? void 0 : req.body;
             if (!productId || !sku || !cartId)
-                throw new Api400Error("Required product id, variation id, cart id !");
+                throw new Error400("Required product id, variation id, cart id !");
             if (!quantity || typeof quantity === "undefined")
-                throw new Api400Error("Required quantity !");
+                throw new Error400("Required quantity !");
             if (quantity > 5 || quantity <= 0)
-                throw new Api400Error("Quantity can not greater than 5 and less than 1 !");
+                throw new Error400("Quantity can not greater than 5 and less than 1 !");
             const productAvailability = yield isProduct(productId, sku);
             if (!productAvailability ||
                 typeof productAvailability === "undefined" ||
                 productAvailability === null)
-                throw new Api400Error("Product is not available !");
+                throw new Error400("Product is not available !");
             if (parseInt(quantity) >= (productAvailability === null || productAvailability === void 0 ? void 0 : productAvailability.stockQuantity)) {
                 return res.status(200).send({
                     success: false,
@@ -213,9 +206,9 @@ function deleteCartItemSystem(req, res, next) {
             const { cartId } = req.params;
             const { email, _id: userId } = req.decoded;
             if (!cartId)
-                throw new Api400Error("Required cart id!");
+                throw new Error400("Required cart id!");
             if (!ObjectId.isValid(cartId))
-                throw new Api400Error("Product id is not valid !");
+                throw new Error400("Product id is not valid !");
             let deleted = yield ShoppingCart.deleteOne({
                 $and: [{ _id: ObjectId(cartId) }, { userId: ObjectId(userId) }],
             });

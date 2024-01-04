@@ -11,7 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { orderStatusUpdater } = require("../services/common.service");
-const { Api400Error } = require("../errors/apiResponse");
+const { Error400 } = require("../res/response");
 function refundPayment(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -19,7 +19,7 @@ function refundPayment(req, res, next) {
             if (!chargeID)
                 throw new Error("Required charge ID !");
             if (!orderID)
-                throw new Error("Required Order ID !");
+                throw new Error("Required ORDER_TABLE ID !");
             if (amount && typeof amount !== "number")
                 throw new Error("Amount should be number");
             const refund = yield stripe.refunds.create({
@@ -62,7 +62,7 @@ function createPaymentIntent(req, res, next) {
         try {
             const body = req.body;
             if (!body) {
-                throw new Api400Error({
+                throw new Error400({
                     success: false,
                     statusCode: 400,
                     message: "Required body !",
@@ -70,13 +70,13 @@ function createPaymentIntent(req, res, next) {
             }
             const { totalAmount, session, paymentMethodId, productIds } = body;
             if (!session)
-                throw new Api400Error({
+                throw new Error400({
                     success: false,
                     statusCode: 400,
                     message: "Required session id !",
                 });
             if (!totalAmount || typeof totalAmount === "undefined") {
-                throw new Api400Error({
+                throw new Error400({
                     success: false,
                     statusCode: 400,
                     message: "Required total amount !",

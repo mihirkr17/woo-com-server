@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const { ObjectId } = require("mongodb");
-const { Api500Error } = require("../errors/apiResponse");
+const { Error500 } = require("../res/response");
 const PrivacyPolicy = require("../model/privacyPolicy.model");
 const NodeCache = require("../utils/NodeCache");
 module.exports.privacyPolicy = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
@@ -48,7 +48,7 @@ module.exports.updatePolicy = (req, res, next) => __awaiter(void 0, void 0, void
             });
         }
         else {
-            throw new Api500Error("Update failed !");
+            throw new Error500("Update failed !");
         }
     }
     catch (error) {

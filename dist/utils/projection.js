@@ -49,7 +49,7 @@ module.exports.shoppingCartProject = {
     shipping: 1,
     quantity: 1,
     productId: 1,
-    storeId: 1,
+    supplierId: 1,
     storeTitle: 1,
     sku: 1,
     customerId: 1,

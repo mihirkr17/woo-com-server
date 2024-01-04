@@ -74,4 +74,9 @@ function cartContextCalculation(cart) {
     }
     return { amount, totalQuantity, shippingCost, finalAmount: parseInt(finalAmount), savingAmount, discountShippingCost };
 }
-module.exports = { cartContextCalculation };
+function calculateAverageRatings(rating) {
+    const totalCount = Object.values(rating).reduce((total, count) => (total + count), 0);
+    const totalWeight = Object.keys(rating).reduce((sum, key) => sum + parseInt(key) * parseInt(rating[key]), 0);
+    return parseFloat((totalWeight / totalCount).toFixed(1));
+}
+module.exports = { cartContextCalculation, calculateAverageRatings };

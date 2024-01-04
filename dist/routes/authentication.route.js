@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const router = express_1.default.Router();
 const { loginSystem, registrationSystem, accountVerifyByEmailSystem, sendOtpForForgotPwdChangeSystem, checkOtpForForgotPwdChangeSystem, setNewPwdForForgotPwdChangeSystem, } = require("../controllers/users.controller");
+const { supplierLogin, supplierRegistration } = require("../controllers/supplier.auth.controller");
 const { verifyEmailByJWT } = require("../middlewares/auth.middleware");
 const { loginMDL, registrationMDL, supplierRegistrationMDL, } = require("../middlewares/formInput.middleware");
 // modified
@@ -17,6 +18,6 @@ router.post("/submit-otp", checkOtpForForgotPwdChangeSystem);
 router.post("/set-new-password", setNewPwdForForgotPwdChangeSystem);
 // unmodified
 // supplier routes
-router.post("/supplier/login", loginSystem);
-router.post("/supplier/register", supplierRegistrationMDL, registrationSystem);
+router.post("/supplier/login", supplierLogin);
+router.post("/supplier/register", supplierRegistrationMDL, supplierRegistration);
 module.exports = router;

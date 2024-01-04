@@ -1,22 +1,22 @@
 import { NextFunction, Request, Response } from "express";
-const { Api400Error } = require("../errors/apiResponse");
+const { Error400 } = require("../res/response");
 const { product_categories } = require("../properties/listing.property");
 
 module.exports.listingMDL = async (req: Request, res: Response, next: NextFunction) => {
 
    const { title, brand, imageUrls, categories, manufacturerOrigin, procurementSLA }: any = req?.body;
 
-   if (!imageUrls) throw new Api400Error("Required product images !");
+   if (!imageUrls) throw new Error400("Required product images !");
 
-   if (imageUrls.length > 15 || imageUrls.length < 2) throw new Api400Error("Image url should be 2 to 15 items !");
+   if (imageUrls.length > 15 || imageUrls.length < 2) throw new Error400("Image url should be 2 to 15 items !");
 
-   if (title === "") throw new Api400Error("Required product title !");
+   if (title === "") throw new Error400("Required product title !");
 
-   if (!product_categories.includes(categories)) throw new Api400Error("Invalid categories format !");
+   if (!product_categories.includes(categories)) throw new Error400("Invalid categories format !");
 
-   if (!manufacturerOrigin) throw new Api400Error("Required manufacture origin !");
+   if (!manufacturerOrigin) throw new Error400("Required manufacture origin !");
 
-   if (!procurementSLA) throw new Api400Error("Required procurement sla !");
+   if (!procurementSLA) throw new Error400("Required procurement sla !");
 
    next();
 }
@@ -24,18 +24,20 @@ module.exports.listingMDL = async (req: Request, res: Response, next: NextFuncti
 
 module.exports.variationMDL = async (req: Request, res: Response, next: NextFunction) => {
    try {
-      const { formType, variation, productId } = req.body as { formType: string, variation: Record<string, any>, productId: string };
+      const { requestFor: formType }: any = req?.query;
+
+      const { productId, stockQuantity, stockPrice } = req.body;
 
       let form: string[] = ['update-variation', 'new-variation'];
 
-      if (!form.includes(formType)) throw new Api400Error("Invalid form type !");
+      if (!form.includes(formType)) throw new Error400("Invalid form type !");
 
-      if (!productId) throw new Api400Error("Required product id !");
+      if (!productId) throw new Error400("Required product id !");
 
-      if (!variation?.sku) throw new Api400Error("Required variation sku !");
+      if (!stockPrice) throw new Error400("Required variation sku !");
 
-      if (!variation?.available === null || typeof variation?.available === "undefined")
-         throw new Api400Error("Required stock, stock value should be start from 0!");
+      if (!stockQuantity || typeof stockQuantity === "undefined")
+         throw new Error400("Required stock, stock value should be start from 0!");
 
       next();
 

@@ -5,7 +5,12 @@ var ProductSchema = new Schema({
 
   slug: { type: String, required: true },
 
-  categories: { type: Array, required: true },
+  categories: [
+    {
+      _id: false,
+      name: String,
+    },
+  ],
 
   brand: { type: String, required: true },
 
@@ -22,9 +27,17 @@ var ProductSchema = new Schema({
     isFree: { type: Boolean },
   },
 
-  rating: { type: Array, required: true },
+  rating: {
+    "1": Number,
+    "2": Number,
+    "3": Number,
+    "4": Number,
+    "5": Number,
+  },
 
   ratingAverage: { type: Number, required: true, default: 0 },
+
+  ratingsTotal: { type: Number },
 
   keywords: { type: Array, required: true },
 
@@ -35,21 +48,10 @@ var ProductSchema = new Schema({
   specification: { type: Object, required: true },
 
   description: { type: String, required: true },
-
-  images: [
-    {
-      _id: false,
-      id: String,
-      src: String,
-      title: String,
-    },
-  ],
-
+  
   productType: { type: String, enum: ["single", "variant"], default: "single" },
 
-  storeId: { type: Schema.Types.ObjectId, ref: "Store" },
-
-  storeTitle: { type: String, required: true },
+  supplierId: { type: Schema.Types.ObjectId, ref: "SUPPLIER_TBL" },
 
   warranty: {
     type: { type: String, required: false },

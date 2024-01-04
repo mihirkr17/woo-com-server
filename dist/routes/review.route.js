@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const router = express_1.default.Router();
 const { verifyJWT, isCustomer } = require("../middlewares/auth.middleware");
-const { addProductRating, getReviews, getMyReviews, toggleVotingLike, getProductDetails } = require("../controllers/buyer.review.controller");
+const { addProductRating, getReviews, getMyReviews, toggleVotingLike, getProductDetails } = require("../controllers/customer.review.controller");
 // Set up multer middleware to handle file uploads
 // const storage = multer.diskStorage({
 //   destination: './public/uploads',

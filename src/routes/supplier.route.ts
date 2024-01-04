@@ -1,6 +1,12 @@
-import express, { Router } from "express";
+import express, { NextFunction, Router, Request, Response } from "express";
 const router: Router = express.Router();
-const { verifyJWT, isSupplier } = require("../middlewares/auth.middleware");
+const {
+  verifyJWT,
+  verifyEmailByJWT,
+  isSupplier,
+} = require("../middlewares/auth.middleware");
+
+const uploads = require("../middlewares/multer.middleware");
 
 const {
   variationMDL,
@@ -18,9 +24,41 @@ const {
   productUpdateBySupplier,
   manageOrderBySupplier,
   orderStatusManagementBySupplier,
+  settingsSystem,
 } = require("../controllers/supplier.controller");
 
+const {
+  supplierLogin,
+  supplierRegistration,
+  supplierInformationConnect,
+  supplierCredentialEmailValidation,
+  getAccountSystem,
+} = require("../controllers/supplier.auth.controller");
+
+// auth routes
+router.post("/auth/login", supplierLogin);
+
+router.post("/auth/register/individual", supplierRegistration);
+
+router.post(
+  "/auth/individual-information/render/:supplierId",
+  verifyJWT,
+  uploads("supplier-verification-data", "SVD").single("docImageLink"),
+  supplierInformationConnect
+);
+
+router.get(
+  "/auth/verify-email",
+  verifyEmailByJWT,
+  supplierCredentialEmailValidation
+);
+
+router.get("/get-account", verifyJWT, getAccountSystem);
+
+// Auth routes end.....
+
 router.get("/", verifyJWT, isSupplier, supplierOverview);
+
 router.get("/view-products", verifyJWT, isSupplier, allProductsBySupplier);
 
 router.get(
@@ -47,7 +85,7 @@ router.post(
 
 // Put routes
 router.put(
-  "/product/product-variation",
+  "/product/variation/:id",
   verifyJWT,
   isSupplier,
   variationMDL,
@@ -76,5 +114,7 @@ router.post(
 );
 
 router.get("/manage-orders", verifyJWT, isSupplier, manageOrderBySupplier);
+
+router.get("/settings", verifyJWT, settingsSystem);
 
 module.exports = router;

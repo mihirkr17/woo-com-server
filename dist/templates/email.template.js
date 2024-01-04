@@ -6,14 +6,14 @@ module.exports.seller_order_email_template = (product, customerEmail, orderIDs, 
     const date = new Date(timestamp).toDateString();
     return (`<div>
          <h3 style="text-align: center">You have new order From ${customerEmail} At ${time}, ${date}</h3>
-         <p>Order ID: ${(_a = orderIDs.join(", ")) !== null && _a !== void 0 ? _a : ""}</p>
+         <p>ORDER_TABLE ID: ${(_a = orderIDs.join(", ")) !== null && _a !== void 0 ? _a : ""}</p>
          <b>Total Amount : ${totalAmount}</b>
 
          <table style="border: 1px solid #777; width: 100%">
-          <caption style="padding: 4px;">Order Details:</caption>
+          <caption style="padding: 4px;">ORDER_TABLE Details:</caption>
             <thead>
                <tr style="line-height: 34px; text-align: center; font-weight: bold; letter-spacing: 0.4px; background: cyan; color: black">
-                  <th style="border: 1px solid #777">Order ID</th>
+                  <th style="border: 1px solid #777">ORDER_TABLE ID</th>
                   <th style="border: 1px solid #777">Product</th>
                   <th style="border: 1px solid #777">Qty</th>
                   <th style="border: 1px solid #777">SKU</th>
@@ -43,7 +43,7 @@ module.exports.seller_order_email_template = (product, customerEmail, orderIDs, 
          </table>
       </div>`);
 };
-module.exports.verify_email_html_template = (verifyToken, fullName, appUri) => {
+module.exports.verify_email_html_template = (fullName, appUri) => {
     return (`
       <table border="0" cellspacing="0" cellpadding="0">
    <tbody>
@@ -68,7 +68,7 @@ module.exports.verify_email_html_template = (verifyToken, fullName, appUri) => {
       <tr>
          <td>
                <a style="display:block; width: 160px;border:6px solid rgb(239,239,239);margin: 20px 0;padding:12px 10px; text-decoration:none;font-family:Arial,Helvetica,sans-serif;color:#fff;background:#ff4800;text-align:center"
-                  href="${appUri}api/v1/auth/verify-email?token=${verifyToken}">
+                  href="${appUri}">
                   <span
                      style="text-decoration:none!important;color:#fff;font-size:16px;line-height:28px;text-align:center;display:block">
                      &nbsp;&nbsp;VERIFY MY EMAIL&nbsp;&nbsp;
@@ -176,7 +176,7 @@ module.exports.buyer_order_email_template = (data, option) => {
                               <tr>
                                  <td valign="top" width="100">
                                     <h1 data-key="1468266_heading" style="font-family: Georgia,serif,'Playfair Display'; font-size: 28px; line-height: 46px; font-weight: 700; color: #4b4b4b; text-transform: none; background-color: #ffffff; margin: 0;">
-                                       Order Confirmation
+                                       ORDER_TABLE Confirmation
                                     </h1>
                                  </td>
                               </tr>
@@ -215,7 +215,7 @@ module.exports.buyer_order_email_template = (data, option) => {
                                     <td width="30%" style="text-align:left;vertical-align:middle;border-left:1px solid #eee;border-bottom:1px solid #eee;border-right:0;border-top:0;word-wrap:break-word">
                                        <b>${(_d = item === null || item === void 0 ? void 0 : item.product) === null || _d === void 0 ? void 0 : _d.title}</b> <br />
                                        <small>
-                                          Order ID: ${item === null || item === void 0 ? void 0 : item.order_id} <br />
+                                          ORDER_TABLE ID: ${item === null || item === void 0 ? void 0 : item.order_id} <br />
                                           Payment Mode: ${(_e = item === null || item === void 0 ? void 0 : item.payment) === null || _e === void 0 ? void 0 : _e.mode}
                                        </small>
 
@@ -255,7 +255,7 @@ module.exports.buyer_order_email_template = (data, option) => {
 
                               <tr>
                                  <th width="80%" scope="row" colspan="2" style="text-align:right;background:#efefef;text-align:right;border-left:1px solid #eee;border-bottom:1px solid #eee;border-right:0;border-top:0">
-                                    Order Total
+                                    ORDER_TABLE Total
                                  </th>
                                  <td width="20%" style="background:#efefef;text-align:right;vertical-align:middle;border-left:1px solid #eee;border-bottom:1px solid #eee;border-right:1px solid #eee;border-top:0;color:#7db701;font-weight:bold">
                                     <span>${option === null || option === void 0 ? void 0 : option.totalAmount}</span>

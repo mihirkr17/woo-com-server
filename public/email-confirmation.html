@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>Email Confirmation Success
+   </title>
+
+   <style>
+      body {
+         position: relative;
+         padding: 20px 50px;
+         width: 800px;
+         height: 100vh;
+         display: flex;
+         align-items: center;
+         justify-content: center;
+         margin: auto;
+      }
+
+      body main {
+         width: 100%;
+         height: 200px;
+         border: 15px solid aliceblue;
+         display: flex;
+         border-radius: 10px;
+         align-items: center;
+         justify-content: center;
+         flex-direction: column;
+         background: aquamarine;
+      }
+   </style>
+</head>
+
+<body style="position: relative;">
+   <main>
+      <h1>Email Validation Completed</h1>
+      <p id="email"></p>
+   </main>
+
+</body>
+
+<script>
+   const emailDiv = document.getElementById("email");
+
+   const params = new URLSearchParams(location.hash.slice(1)); // remove the "#" symbol
+   const paramValue = params.get("e");
+
+   emailDiv.innerHTML = paramValue;
+</script>
+
+</html>

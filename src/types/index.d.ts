@@ -6,6 +6,7 @@ declare global {
       decoded: any;
       appUri: string;
       device: any;
+      clientOrigin: string;
     }
   }
 }

@@ -4,7 +4,12 @@ const mongoose_1 = require("mongoose");
 var ProductSchema = new mongoose_1.Schema({
     title: { type: String, required: true },
     slug: { type: String, required: true },
-    categories: { type: Array, required: true },
+    categories: [
+        {
+            _id: false,
+            name: String,
+        },
+    ],
     brand: { type: String, required: true },
     manufacturer: {
         origin: { type: String, required: true },
@@ -16,24 +21,22 @@ var ProductSchema = new mongoose_1.Schema({
         procurementSLA: { type: String, required: true },
         isFree: { type: Boolean },
     },
-    rating: { type: Array, required: true },
+    rating: {
+        "1": Number,
+        "2": Number,
+        "3": Number,
+        "4": Number,
+        "5": Number,
+    },
     ratingAverage: { type: Number, required: true, default: 0 },
+    ratingsTotal: { type: Number },
     keywords: { type: Array, required: true },
     metaDescription: { type: String, required: true },
     highlights: { type: Array, required: false },
     specification: { type: Object, required: true },
     description: { type: String, required: true },
-    images: [
-        {
-            _id: false,
-            id: String,
-            src: String,
-            title: String,
-        },
-    ],
     productType: { type: String, enum: ["single", "variant"], default: "single" },
-    storeId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Store" },
-    storeTitle: { type: String, required: true },
+    supplierId: { type: mongoose_1.Schema.Types.ObjectId, ref: "SUPPLIER_TBL" },
     warranty: {
         type: { type: String, required: false },
         duration: { type: String, required: false },

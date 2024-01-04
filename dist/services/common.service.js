@@ -12,14 +12,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 const mdb = require("mongodb");
 const Product = require("../model/PRODUCT_TBL");
 const ProductVariationTbl = require("../model/PRODUCT_VARIATION_TBL");
-const UserModel = require("../model/user.model");
-const ShoppingCartModel = require("../model/shoppingCart.model");
-const cryptos = require("crypto");
-const apiResponse = require("../errors/apiResponse");
+const UserModel = require("../model/CUSTOMER_TBL");
+const ShoppingCartModel = require("../model/SHOPPING_CART_TBL");
+const apiResponse = require("../res/response");
 const { generateTrackingID } = require("../utils/generator");
 const NCache = require("../utils/NodeCache");
-const Order = require("../model/ORDER_TBL");
-const Store = require("../model/store.model");
+const ORDER_TABLE = require("../model/ORDER_TBL");
+const Store = require("../model/SUPPLIER_TBL");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 module.exports.findUserByEmail = (email) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -99,7 +98,7 @@ module.exports.orderStatusUpdater = (obj) => __awaiter(void 0, void 0, void 0, f
             };
         }
         yield NCache.deleteCache(`${customerEmail}_myOrders`);
-        return (yield Order.findOneAndUpdate({
+        return (yield ORDER_TABLE.findOneAndUpdate({
             $and: [
                 { customerId: customerId },
                 { orderId: orderID }
@@ -115,7 +114,7 @@ module.exports.productStockUpdater = (type, data) => __awaiter(void 0, void 0, v
         if (!type)
             throw new Error("Required action !");
         if (!data || !Array.isArray(data))
-            throw new apiResponse.Api500Error("Required product id, sku, quantity !");
+            throw new apiResponse.Error500("Required product id, sku, quantity !");
         const bulkOperations = [];
         for (const item of data) {
             const filter = {

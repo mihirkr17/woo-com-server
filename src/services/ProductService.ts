@@ -4,65 +4,18 @@ const Product_tbl = require("../model/PRODUCT_TBL");
 const ProductVariation_tbl = require("../model/PRODUCT_VARIATION_TBL");
 
 module.exports = class ProductService {
-  async isProduct(productID: string, sku: string) {
-    const pipeline = [
-      { $match: { _id: dbm.ObjectId(productID) } },
-      {
-        $lookup: {
-          from: "PRODUCT_VARIATION_TBL",
-          localField: "_id",
-          foreignField: "productId",
-          as: "variations",
-        },
-      },
-      {
-        $addFields: {
-          variation: {
-            $arrayElemAt: [
-              {
-                $ifNull: [
-                  {
-                    $filter: {
-                      input: "$variations",
-                      as: "variation",
-                      cond: { $eq: ["$$variation.sku", sku] },
-                    },
-                  },
-                  [],
-                ],
-              },
-              0,
-            ],
-          },
-        },
-      },
-      {
-        $match: { "variation.sku": sku },
-      },
-      {
-        $project: {
-          storeId: 1,
-          storeTitle: 1,
-          brand: 1,
-          sku: "$variation.sku",
-          stockQuantity: "$variation.stockQuantity",
-          stock: "$variation.stock",
-        },
-      },
-      {
-        $match: {
-          $and: [{ sku }, { stockQuantity: { $gte: 1 } }, { stock: "in" }],
-        },
-      },
-    ];
-
+  async isProduct(productId: string, sku: string) {
     try {
-      const product = await Product_tbl.aggregate(pipeline).exec();
+      const variant = await ProductVariation_tbl.findOne({
+        productId: dbm.ObjectId(productId),
+        sku,
+      });
 
-      return product.length === 1 ? product[0] : null;
-    } catch (error) {
-      // Handle the error at a higher level if needed
-      throw error;
+      if (!variant) throw new Error("Service unavailable!");
+
+      return { stockQuantity: variant?.stockQuantity, stock: variant?.stock, supplierId: variant?.supplierId };
+    } catch (error: any) {
+      throw new Error(`Error in isProduct: ${error?.message}`);
     }
   }
 };

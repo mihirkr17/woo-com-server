@@ -9,15 +9,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const User = require("../model/user.model");
+const User = require("../model/CUSTOMER_TBL");
 const Customer = require("../model/CUSTOMER_TBL");
 const { ObjectId } = require("mongodb");
 const NCache = require("../utils/NodeCache");
-const { Api400Error, Api404Error } = require("../errors/apiResponse");
+const { Error400, Error404 } = require("../res/response");
 const smtpSender = require("../services/email.service");
 const { verify_email_html_template, send_six_digit_otp_template, } = require("../templates/email.template");
 const { generateSixDigitNumber, generateJwtToken, generateUserDataToken, generateVerificationToken, } = require("../utils/generator");
-const { validEmail, validPassword } = require("../utils/validator");
+const { validEmail, validPassword, validDigit, validBDPhoneNumber, } = require("../utils/validator");
 /**
  * [async description]
  *
@@ -33,11 +33,11 @@ function loginSystem(req, res, next) {
             const { email: inputEmail, password: inputPassword } = req.body;
             let user = yield User.findOne({ email: inputEmail });
             if (!user)
-                throw new Api400Error(`User with ${inputEmail} not found!`);
+                throw new Error400(`User with ${inputEmail} not found!`);
             const { email, verified, accountStatus, fullName, devices } = user || {};
             const matchedPwd = yield user.comparePassword(inputPassword);
             if (!matchedPwd)
-                throw new Api400Error("Password didn't matched !");
+                throw new Error400("Password didn't matched !");
             if (!verified || accountStatus === "Inactive") {
                 const verifyToken = generateVerificationToken({ email });
                 const info = yield smtpSender({
@@ -100,36 +100,34 @@ function registrationSystem(req, res, next) {
         try {
             let body = req.body;
             const requiredRoles = ["buyer", "supplier", "admin"];
-            const { role } = req.query;
-            if (!role)
-                throw new Api400Error("Required role query in url !");
-            if (!requiredRoles.includes(role))
-                throw new Api400Error("Invalid role type in query !");
+            const origin = req.headers.referer || req.headers.origin || req.headers.host;
+            const headersRole = req.headers.role || "";
             let existUser = yield User.countDocuments({ email: body === null || body === void 0 ? void 0 : body.email });
             if (existUser >= 1)
-                throw new Api400Error("User already exists, Please try another email address !");
+                throw new Error400("User already exists, Please try another email address !");
             const verifyToken = generateVerificationToken({ email: body === null || body === void 0 ? void 0 : body.email });
             const emailResult = yield smtpSender({
                 to: body === null || body === void 0 ? void 0 : body.email,
                 subject: "Verify email address",
-                html: verify_email_html_template(verifyToken, body === null || body === void 0 ? void 0 : body.fullName),
+                html: verify_email_html_template(verifyToken, body === null || body === void 0 ? void 0 : body.fullName, req === null || req === void 0 ? void 0 : req.appUri),
             });
             if (!(emailResult === null || emailResult === void 0 ? void 0 : emailResult.response))
-                throw new Api400Error("Verification code not send to your email !");
-            if (role === "buyer") {
+                throw new Error400("Verification code not send to your email !");
+            if (headersRole === "buyer") {
                 body["role"] = "CUSTOMER";
                 body["idFor"] = "buy";
             }
-            if (role === "supplier") {
+            if (headersRole === "SUPPLIER") {
                 body["role"] = "SUPPLIER";
                 body["idFor"] = "sell";
             }
-            if (role === "admin") {
+            if (headersRole === "admin") {
                 body["role"] = "ADMIN";
                 body["idFor"] = "administration";
             }
-            const newUser = yield User.save(body);
-            if (role === "buyer") {
+            const newUser = new User(body);
+            yield newUser.save();
+            if (headersRole === "buyer") {
                 const newCustomer = new Customer({
                     userId: newUser === null || newUser === void 0 ? void 0 : newUser._id,
                 });
@@ -159,7 +157,7 @@ function accountVerifyByEmailSystem(req, res, next) {
             const { email } = req.decoded;
             let user = yield User.findOne({ email });
             if (!user)
-                throw new Api400Error(`Sorry account with ${email} not found`);
+                throw new Error400(`Sorry account with ${email} not found`);
             if (user.verified && user.accountStatus === "Active") {
                 return res.status(200).send({
                     success: true,
@@ -198,10 +196,10 @@ function sendOtpForForgotPwdChangeSystem(req, res, next) {
         try {
             const { email } = req.body;
             if (!email)
-                throw new Api400Error("Required email from body !");
+                throw new Error400("Required email from body !");
             const user = yield User.findOne({ email });
             if (!user)
-                throw new Api404Error(`User with ${email} Not found`);
+                throw new Error404(`User with ${email} Not found`);
             const otp = generateSixDigitNumber();
             const info = yield smtpSender({
                 to: email,
@@ -241,22 +239,22 @@ function checkOtpForForgotPwdChangeSystem(req, res, next) {
         try {
             const { otp, email } = req === null || req === void 0 ? void 0 : req.body;
             if (!otp)
-                throw new Api400Error("Required otp in body !");
+                throw new Error400("Required otp in body !");
             if (otp.length <= 5 || (otp === null || otp === void 0 ? void 0 : otp.length) >= 7)
-                throw new Api400Error("Otp must 6 digit!");
+                throw new Error400("Otp must 6 digit!");
             if (!email)
-                throw new Api400Error("Required email address in body !");
+                throw new Error400("Required email address in body !");
             const user = yield User.findOne({ email });
             if (!user)
-                throw new Api404Error(`Sorry we can't find any user with this ${email}!`);
+                throw new Error404(`Sorry we can't find any user with this ${email}!`);
             if (!user.otp)
                 throw new Error("Internal error !");
             if (user.otp !== otp)
-                throw new Api400Error("Invalid otp !");
+                throw new Error400("Invalid otp !");
             const now = new Date().getTime();
             const otpExTime = new Date(otp === null || otp === void 0 ? void 0 : otp.otpExTime).getTime();
             if (now >= otpExTime) {
-                throw new Api400Error("Otp expired !");
+                throw new Error400("Otp expired !");
             }
             return res.status(200).json({
                 success: true,
@@ -284,14 +282,14 @@ function setNewPwdForForgotPwdChangeSystem(req, res, next) {
         try {
             const { email, password } = req.body;
             if (!email || !validEmail(email))
-                throw new Api400Error("Required valid email address !");
+                throw new Error400("Required valid email address !");
             if (password.length < 5 || password.length > 8)
-                throw new Api400Error("Password length should be 5 to 8 characters !");
+                throw new Error400("Password length should be 5 to 8 characters !");
             if (!validPassword(password) || typeof password !== "string")
-                throw new Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
+                throw new Error400("Password should contains at least 1 digit, lowercase letter, special character !");
             const user = yield User.findOne({ email });
             if (!user && typeof user !== "object")
-                throw new Api404Error(`User not found!`);
+                throw new Error404(`User not found!`);
             //  const hashedPwd = await bcrypt.hash(password, 10);
             user.password = password;
             user.otp = undefined;
@@ -321,11 +319,18 @@ function createShippingAddressSystem(req, res, next) {
             const { _id } = req.decoded;
             let body = req.body;
             if (!body || typeof body !== "object")
-                throw new Api400Error("Required body !");
+                throw new Error400("Required body !");
             if (!Object.values(body).some((e) => e !== null && e !== "")) {
-                throw new Api400Error("Required all fields !");
+                throw new Error400("Required all fields !");
             }
             const { name, division, city, area, areaType, landmark, phoneNumber, postalCode, } = body;
+            let phnNumber = validBDPhoneNumber(phoneNumber);
+            if (!validDigit(phoneNumber))
+                throw new Error400("Invalid phone number!");
+            if (!phnNumber)
+                throw new Error400("Phone number format is not valid!");
+            if (!validDigit(postalCode))
+                throw new Error400("Invalid postal code format, postal code should be numeric value!");
             let shippingAddressModel = {
                 id: "spi_" + Math.floor(Math.random() * 100000000).toString(),
                 name,
@@ -334,7 +339,7 @@ function createShippingAddressSystem(req, res, next) {
                 area,
                 areaType,
                 landmark,
-                phoneNumber,
+                phoneNumber: phnNumber,
                 postalCode,
                 active: false,
             };
@@ -366,13 +371,13 @@ function updateShippingAddressSystem(req, res, next) {
             const { _id } = req.decoded;
             const body = req.body;
             if (!body || typeof body !== "object")
-                throw new Api400Error("Required body !");
+                throw new Error400("Required body !");
             if (!Object.values(body).some((e) => e !== null && e !== "")) {
-                throw new Api400Error("Required all fields !");
+                throw new Error400("Required all fields !");
             }
             const { id, name, division, city, area, areaType, landmark, phoneNumber, postalCode, active, } = body;
             if (!id)
-                throw new Api400Error("Required address id !");
+                throw new Error400("Required address id !");
             let shippingAddressModel = {
                 id,
                 name,
@@ -417,7 +422,7 @@ function selectShippingAddressSystem(req, res, next) {
             const { _id } = req.decoded;
             let { id, active } = req.body;
             if (!id || typeof id !== "string")
-                throw new Api400Error("Required address id !");
+                throw new Error400("Required address id !");
             active = active === true ? false : true;
             const result = yield Customer.updateOne({ userId: ObjectId(_id) }, {
                 $set: {
@@ -455,7 +460,7 @@ function deleteShippingAddressSystem(req, res, next) {
             const { _id } = req.decoded;
             let id = req.params.id;
             if (!id || typeof id !== "string")
-                throw new Api400Error("Required address id !");
+                throw new Error400("Required address id !");
             const result = yield Customer.updateOne({ userId: ObjectId(_id) }, { $pull: { shippingAddress: { id } } });
             if (!result)
                 throw new Error("Internal issue !");
@@ -486,18 +491,18 @@ function updateProfileDataSystem(req, res, next) {
             const { userEmail } = req.query;
             const body = req.body;
             if (userEmail !== email) {
-                throw new Api400Error("Invalid email address !");
+                throw new Error400("Invalid email address !");
             }
             if (!body || typeof body === "undefined") {
-                throw new Api400Error("Required body with request !");
+                throw new Error400("Required body with request !");
             }
             const { fullName, dob, gender } = body;
             if (!fullName || typeof fullName !== "string")
-                throw new Api400Error("Required full name !");
+                throw new Error400("Required full name !");
             if (!dob || typeof dob !== "string")
-                throw new Api400Error("Required date of birth !");
+                throw new Error400("Required date of birth !");
             if (!gender || typeof gender !== "string")
-                throw new Api400Error("Required gender !");
+                throw new Error400("Required gender !");
             let profileModel = {
                 fullName,
                 dob,
@@ -529,7 +534,7 @@ function fetchAuthUserSystem(req, res, next) {
             // const ipAddress = req.socket?.remoteAddress;
             let user = yield User.findOne({ email: authEmail }, { password: 0 });
             if (!user || typeof user !== "object")
-                throw new Api404Error("User not found !");
+                throw new Error404("User not found !");
             const userDataToken = generateUserDataToken(user);
             if (!userDataToken)
                 throw new Error("Internal issue !");
@@ -595,20 +600,20 @@ function passwordChangeSystem(req, res, next) {
             const { email } = req.decoded;
             const { oldPassword, newPassword } = req.body;
             if (!oldPassword || !newPassword)
-                throw new Api400Error(`Required old password and new password !`);
+                throw new Error400(`Required old password and new password !`);
             if (newPassword && typeof newPassword !== "string")
-                throw new Api400Error("Password should be string !");
+                throw new Error400("Password should be string !");
             if (newPassword.length < 5 || newPassword.length > 8)
-                throw new Api400Error("Password length should be 5 to 8 characters !");
+                throw new Error400("Password length should be 5 to 8 characters !");
             if (!validPassword(newPassword))
-                throw new Api400Error("Password should contains at least 1 digit, lowercase letter, special character !");
+                throw new Error400("Password should contains at least 1 digit, lowercase letter, special character !");
             // find user in db by email
             let user = yield User.findOne({ email: email });
             if (!user && typeof user !== "object")
-                throw new Api404Error(`User not found !`);
+                throw new Error404(`User not found !`);
             const comparedPassword = yield user.comparePassword(oldPassword);
             if (!comparedPassword) {
-                throw new Api400Error("Password didn't match !");
+                throw new Error400("Password didn't match !");
             }
             user.password = newPassword;
             yield user.save();

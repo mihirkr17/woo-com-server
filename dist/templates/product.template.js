@@ -15,7 +15,7 @@ function product_variation_template_engine({ available, pricing, attributes, sku
         available,
     };
 }
-const product_listing_template_engine = (body, storeId) => {
+const product_listing_template_engine = (body, supplierId) => {
     const packageHeight = parseFloat(body === null || body === void 0 ? void 0 : body.packageHeight);
     const packageLength = parseFloat(body === null || body === void 0 ? void 0 : body.packageLength);
     const packageWidth = parseFloat(body === null || body === void 0 ? void 0 : body.packageWidth);
@@ -27,7 +27,7 @@ const product_listing_template_engine = (body, storeId) => {
         categories: (body === null || body === void 0 ? void 0 : body.categories.split("/")) || [],
         brand: (body === null || body === void 0 ? void 0 : body.brand) || "No Brand",
         highlights: (body === null || body === void 0 ? void 0 : body.highlights) || [],
-        storeId,
+        supplierId,
         packaged: {
             dimension: {
                 height: packageHeight,
@@ -60,13 +60,13 @@ const product_listing_template_engine = (body, storeId) => {
         metaDescription: body === null || body === void 0 ? void 0 : body.metaDescription,
         specification: (body === null || body === void 0 ? void 0 : body.specification) || {},
         description: (body === null || body === void 0 ? void 0 : body.description) || "",
-        rating: [
-            { weight: 5, count: 0 },
-            { weight: 4, count: 0 },
-            { weight: 3, count: 0 },
-            { weight: 2, count: 0 },
-            { weight: 1, count: 0 },
-        ],
+        rating: {
+            "1": 0,
+            "2": 0,
+            "3": 0,
+            "4": 0,
+            "5": 0
+        },
         ratingAverage: 0,
         isVerified: false,
         createdAt: new Date()

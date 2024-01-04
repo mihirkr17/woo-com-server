@@ -11,12 +11,7 @@ const {
   productStockUpdater,
 } = require("../services/common.service");
 
-const {
-  Api400Error,
-  Api500Error,
-  Api403Error,
-  Api404Error,
-} = require("../errors/apiResponse");
+const { Error400, Error500, Error403, Error404 } = require("../res/response");
 
 const {
   updateStockService,
@@ -32,6 +27,7 @@ const {
   allProductsBySupplierService,
   topSoldProductService,
   findOrderBySupplierIdService,
+  settingService,
 } = require("../services/supplier.service");
 
 async function supplierOverview(
@@ -162,7 +158,7 @@ async function productListingBySupplier(
 
     const result = await productListingCreateService(model);
 
-    if (!result) throw new Api500Error("Internal server error !");
+    if (!result) throw new Error500("Internal server error !");
 
     return res.status(200).send({
       success: true,
@@ -190,28 +186,29 @@ async function productVariationListingBySupplier(
   try {
     let result: any;
 
-    const { _id } = req?.decoded;
-    const { productId, variation, formType } = req.body as {
-      formType: string;
-      variation: Record<string, any>;
+    const { _id: supplierId } = req?.decoded;
+    const { id } = req?.params;
+    const { requestFor: formType } = req?.query;
+    const { productId } = req.body as {
       productId: string;
     };
 
-    const model = product_variation_template_engine(variation);
-
     // Update variation
     if (formType === "update-variation") {
-      result = await variationUpdateService(
-        _id,
-        productId,
-        model,
-        variation?.sku
-      );
+      result = await variationUpdateService({
+        supplierId,
+        _id: id,
+        ...req?.body,
+      });
     }
 
     // create new variation
     if (formType === "new-variation") {
-      result = await variationCreateService(_id, productId, model);
+      result = await variationCreateService({
+        supplierId,
+        productId,
+        ...req?.body,
+      });
     }
 
     if (result)
@@ -224,7 +221,7 @@ async function productVariationListingBySupplier(
             : "Welcome new variation added.",
       });
 
-    throw new Api500Error(
+    throw new Error500(
       formType === "update-variation"
         ? "Variation update failed !"
         : "Can't added new variation !"
@@ -255,7 +252,7 @@ async function productDeleteBySupplier(
     //return --> "acknowledged" : true, "deletedCount" : 1
     const result = await productDeleteService(_id, productId);
 
-    if (!result.deletedCount) throw new Api500Error("Internal Server Error !");
+    if (!result.deletedCount) throw new Error500("Internal Server Error !");
 
     return res.status(200).send({
       success: true,
@@ -291,10 +288,10 @@ async function productVariationDeleteBySupplier(
       productId
     );
 
-    if (!variations) throw new Api404Error("Sorry! Variation not found!!!");
+    if (!variations) throw new Error404("Sorry! Variation not found!!!");
 
     if (Array.isArray(variations) && variations.length <= 1)
-      throw new Api400Error(
+      throw new Error400(
         "Please create another variation before delete this variation !"
       );
 
@@ -303,7 +300,7 @@ async function productVariationDeleteBySupplier(
       Array.isArray(variations) &&
       variations.find((variation: any) => variation?.sku === productSku);
 
-    if (!variationToDelete) throw new Api404Error("Variation not found");
+    if (!variationToDelete) throw new Error404("Variation not found");
 
     await variationDeleteService(_id, productId, productSku);
 
@@ -343,12 +340,12 @@ async function productUpdateBySupplier(
       status,
     } = req.body;
 
-    if (!productId) throw new Api400Error("Required product ID !");
+    if (!productId) throw new Error400("Required product ID !");
 
-    if (!actionType) throw new Api400Error("Required actionType !");
+    if (!actionType) throw new Error400("Required actionType !");
 
     if (actionType === "SHIPPING-INFORMATION") {
-      if (!shipping) throw new Api400Error("Required shipping information !");
+      if (!shipping) throw new Error400("Required shipping information !");
 
       const { fulfilledBy, procurementType, procurementSLA, provider } =
         shipping && shipping;
@@ -359,7 +356,7 @@ async function productUpdateBySupplier(
         procurementSLA === "" ||
         provider === ""
       )
-        throw new Api400Error(
+        throw new Error400(
           "Required fulfilledBy, procurementType, procurementSLA"
         );
 
@@ -426,7 +423,7 @@ async function productUpdateBySupplier(
 
     if (actionType === "MANUFACTURER-INFORMATION") {
       if (!manufacturer || typeof manufacturer !== "object")
-        throw new Api400Error("Required manufacturer details about product !");
+        throw new Error400("Required manufacturer details about product !");
 
       const { manufacturerOrigin, manufacturerDetails } =
         manufacturer && manufacturer;
@@ -470,7 +467,7 @@ async function productUpdateBySupplier(
       const statusValues = ["Active", "Draft"];
 
       if (!statusValues.includes(status) || !status)
-        throw new Api400Error("Invalid status value!");
+        throw new Error400("Invalid status value!");
 
       const result = await updateMainProductService(_id, productId, {
         $set: { status },
@@ -489,7 +486,7 @@ async function productUpdateBySupplier(
     // update stock
     if (actionType === "UPDATE-STOCK") {
       if (!variation?.sku || !variation?.available)
-        throw new Api400Error("Product sku and unit required !");
+        throw new Error400("Product sku and unit required !");
 
       let stock = variation?.available <= 1 ? "out" : "in";
 
@@ -498,7 +495,7 @@ async function productUpdateBySupplier(
       const result = await updateStockService(_id, productId, variation);
 
       if (!result) {
-        throw new Api500Error("Failed to update stock quantity !!!");
+        throw new Error500("Failed to update stock quantity !!!");
       }
 
       return res.status(200).send({
@@ -551,7 +548,7 @@ async function manageOrderBySupplier(
 }
 
 /**
- * [Order Status Management Controller]
+ * [ORDER_TABLE Status Management Controller]
  * @param req
  * @param res
  * @param next
@@ -564,7 +561,7 @@ async function orderStatusManagementBySupplier(
 ) {
   try {
     if (!req.body)
-      throw new Api400Error("Required body information about orders !");
+      throw new Error400("Required body information about orders !");
 
     const { type, customerEmail, orderID, cancelReason, sellerEmail, items } =
       req.body as {
@@ -576,12 +573,12 @@ async function orderStatusManagementBySupplier(
         items: any[];
       };
 
-    if (!type || type === "") throw new Api400Error("Required status type !");
+    if (!type || type === "") throw new Error400("Required status type !");
 
-    if (!customerEmail) throw new Api400Error("Required customer email !");
+    if (!customerEmail) throw new Error400("Required customer email !");
 
     if (!orderID || orderID === "")
-      throw new Api400Error("Required Order ID !");
+      throw new Error400("Required ORDER_TABLE ID !");
 
     const result = await orderStatusUpdater({
       type,
@@ -602,10 +599,41 @@ async function orderStatusManagementBySupplier(
       return res.status(200).send({
         success: true,
         statusCode: 200,
-        message: "Order status updated to " + type,
+        message: "ORDER_TABLE status updated to " + type,
       });
     }
   } catch (error: any) {
+    next(error);
+  }
+}
+
+/**
+ * [async description]
+ *
+ * @param   {Request}       req   [req description]
+ * @param   {Response}      res   [res description]
+ * @param   {NextFunction}  next  [next description]
+ *
+ * @return  {[type]}              [return description]
+ */
+async function settingsSystem(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { _id } = req?.decoded;
+    const Store = await settingService(_id);
+
+    if (!Store)
+      return res
+        .status(200)
+        .json({ success: true, statusCode: 200, data: null });
+
+    return res.status(200).send({
+      success: true,
+      statusCode: 200,
+      data: {
+        store: Store,
+      },
+    });
+  } catch (error) {
     next(error);
   }
 }
@@ -621,4 +649,5 @@ module.exports = {
   productUpdateBySupplier,
   manageOrderBySupplier,
   orderStatusManagementBySupplier,
+  settingsSystem,
 };

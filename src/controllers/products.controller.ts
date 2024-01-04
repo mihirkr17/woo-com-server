@@ -17,10 +17,10 @@ const {
 } = require("../utils/pipelines");
 const NodeCache = require("../utils/NodeCache");
 const PrivacyPolicy = require("../model/privacyPolicy.model");
-const User = require("../model/user.model");
-const Review = require("../model/reviews.model");
+const User = require("../model/CUSTOMER_TBL");
+const Review = require("../model/REVIEWS_TBL");
 const Product = require("../model/PRODUCT_TBL");
-const { Api400Error } = require("../errors/apiResponse");
+const { Error400 } = require("../res/response");
 const { store_products_pipe } = require("../utils/pipelines");
 const { ObjectId } = require("mongodb");
 
@@ -44,7 +44,7 @@ async function getStore(
     const regex = /[<>{}|\\^%]/g;
 
     if (typeof storeTitle !== "string")
-      throw new Api400Error("Invalid store name !");
+      throw new Error400("Invalid store name !");
 
     let filterArr = filters ? filters.replace(regex, "").split("--") : [];
 
@@ -62,7 +62,7 @@ async function getStore(
 
     let Filter: any = {};
 
-    Filter["$and"] = [{ storeId: ObjectId(id) }, { status: "Active" }];
+    Filter["$and"] = [{ supplierId: ObjectId(id) }, { status: "Active" }];
 
     let sortList: any = {};
 
@@ -100,7 +100,7 @@ async function getStore(
       { $match: Filter },
       {
         $group: {
-          _id: "$storeId",
+          _id: "$supplierId",
           totalProduct: { $count: {} },
         },
       },
@@ -111,7 +111,7 @@ async function getStore(
 
     let storeInfo = await Product.aggregate([
       {
-        $match: { $and: [{ status: "Active" }, { storeId: ObjectId(id) }] },
+        $match: { $and: [{ status: "Active" }, { supplierId: ObjectId(id) }] },
       },
       {
         $project: {
@@ -134,7 +134,7 @@ async function getStore(
           },
           rating: 1,
           categories: 1,
-          storeId: 1,
+          supplierId: 1,
           brand: 1,
           totalMulti: {
             $reduce: {
@@ -160,7 +160,7 @@ async function getStore(
       {
         $lookup: {
           from: "stores",
-          localField: "storeId",
+          localField: "supplierId",
           foreignField: "_id",
           as: "store",
         },
@@ -238,23 +238,24 @@ async function fetchProductDetails(
   next: NextFunction
 ) {
   try {
-    const { pId: productID, sku, oTracker } = req.query;
+    const { sku, oTracker } = req.query;
+    const { productId } = req?.params;
 
-    if (!productID || typeof productID !== "string")
-      throw new Api400Error("Invalid product id ");
+    if (!productId || typeof productId !== "string")
+      throw new Error400("Invalid product id ");
 
-    if (!sku || typeof sku !== "string") throw new Api400Error("Invalid sku");
+    if (!sku || typeof sku !== "string") throw new Error400("Invalid sku");
 
     let productDetail: any;
 
     // Product Details
-    let cacheData = NodeCache.getCache(`${productID}_${sku}`);
+    let cacheData = NodeCache.getCache(`${productId}_${sku}`);
 
     if (cacheData) {
       productDetail = cacheData;
     } else {
       productDetail = await Product.aggregate(
-        product_detail_pipe(productID, sku)
+        product_detail_pipe(productId, sku)
       ).allowDiskUse(true);
 
       productDetail = productDetail[0];
@@ -262,7 +263,7 @@ async function fetchProductDetails(
       if (oTracker === productDetail?.variation?.sku) {
         await updateProductPerformance(
           {
-            _id: productID,
+            _id: productId,
             sku: sku,
             views: productDetail?.views || 0,
             ratingAverage: productDetail?.ratingAverage || 0,
@@ -272,7 +273,7 @@ async function fetchProductDetails(
         );
       }
 
-      NodeCache.saveCache(`${productID}_${sku}`, productDetail);
+      NodeCache.saveCache(`${productId}_${sku}`, productDetail);
     }
 
     // all success
@@ -454,7 +455,7 @@ async function fetchTopSellingProduct(
       status: "Active",
     };
     if (sid) {
-      filterQuery["storeId"] = ObjectId(sid);
+      filterQuery["supplierId"] = ObjectId(sid);
     }
 
     const result = await Product.find(filterQuery)

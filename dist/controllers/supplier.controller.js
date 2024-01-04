@@ -12,8 +12,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const { product_listing_template_engine, product_variation_template_engine, } = require("../templates/product.template");
 const { orderStatusUpdater, productStockUpdater, } = require("../services/common.service");
-const { Api400Error, Api500Error, Api403Error, Api404Error, } = require("../errors/apiResponse");
-const { updateStockService, updateMainProductService, findProductVariationByIdAndSupplierId, variationDeleteService, productDeleteService, variationUpdateService, variationCreateService, productListingCreateService, findProductByIdService, countProductsService, allProductsBySupplierService, topSoldProductService, findOrderBySupplierIdService, } = require("../services/supplier.service");
+const { Error400, Error500, Error403, Error404 } = require("../res/response");
+const { updateStockService, updateMainProductService, findProductVariationByIdAndSupplierId, variationDeleteService, productDeleteService, variationUpdateService, variationCreateService, productListingCreateService, findProductByIdService, countProductsService, allProductsBySupplierService, topSoldProductService, findOrderBySupplierIdService, settingService, } = require("../services/supplier.service");
 function supplierOverview(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -114,7 +114,7 @@ function productListingBySupplier(req, res, next) {
             const model = product_listing_template_engine(body, _id);
             const result = yield productListingCreateService(model);
             if (!result)
-                throw new Api500Error("Internal server error !");
+                throw new Error500("Internal server error !");
             return res.status(200).send({
                 success: true,
                 statusCode: 200,
@@ -137,16 +137,18 @@ function productVariationListingBySupplier(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             let result;
-            const { _id } = req === null || req === void 0 ? void 0 : req.decoded;
-            const { productId, variation, formType } = req.body;
-            const model = product_variation_template_engine(variation);
+            const { _id: supplierId } = req === null || req === void 0 ? void 0 : req.decoded;
+            const { id } = req === null || req === void 0 ? void 0 : req.params;
+            const { requestFor: formType } = req === null || req === void 0 ? void 0 : req.query;
+            const { productId } = req.body;
             // Update variation
             if (formType === "update-variation") {
-                result = yield variationUpdateService(_id, productId, model, variation === null || variation === void 0 ? void 0 : variation.sku);
+                result = yield variationUpdateService(Object.assign({ supplierId, _id: id }, req === null || req === void 0 ? void 0 : req.body));
             }
             // create new variation
             if (formType === "new-variation") {
-                result = yield variationCreateService(_id, productId, model);
+                result = yield variationCreateService(Object.assign({ supplierId,
+                    productId }, req === null || req === void 0 ? void 0 : req.body));
             }
             if (result)
                 return res.status(200).send({
@@ -156,7 +158,7 @@ function productVariationListingBySupplier(req, res, next) {
                         ? "Variation successfully updated."
                         : "Welcome new variation added.",
                 });
-            throw new Api500Error(formType === "update-variation"
+            throw new Error500(formType === "update-variation"
                 ? "Variation update failed !"
                 : "Can't added new variation !");
         }
@@ -180,7 +182,7 @@ function productDeleteBySupplier(req, res, next) {
             //return --> "acknowledged" : true, "deletedCount" : 1
             const result = yield productDeleteService(_id, productId);
             if (!result.deletedCount)
-                throw new Api500Error("Internal Server Error !");
+                throw new Error500("Internal Server Error !");
             return res.status(200).send({
                 success: true,
                 statusCode: 200,
@@ -206,14 +208,14 @@ function productVariationDeleteBySupplier(req, res, next) {
             const { _id } = req === null || req === void 0 ? void 0 : req.decoded;
             const { variations } = yield findProductVariationByIdAndSupplierId(_id, productId);
             if (!variations)
-                throw new Api404Error("Sorry! Variation not found!!!");
+                throw new Error404("Sorry! Variation not found!!!");
             if (Array.isArray(variations) && variations.length <= 1)
-                throw new Api400Error("Please create another variation before delete this variation !");
+                throw new Error400("Please create another variation before delete this variation !");
             // Validate that productSku corresponds to an actual variation
             const variationToDelete = Array.isArray(variations) &&
                 variations.find((variation) => (variation === null || variation === void 0 ? void 0 : variation.sku) === productSku);
             if (!variationToDelete)
-                throw new Api404Error("Variation not found");
+                throw new Error404("Variation not found");
             yield variationDeleteService(_id, productId, productSku);
             return res.status(200).send({
                 success: true,
@@ -239,18 +241,18 @@ function productUpdateBySupplier(req, res, next) {
             const { _id } = req === null || req === void 0 ? void 0 : req.decoded;
             const { productId, actionType, shipping, packageInfo, manufacturer, description, variation, status, } = req.body;
             if (!productId)
-                throw new Api400Error("Required product ID !");
+                throw new Error400("Required product ID !");
             if (!actionType)
-                throw new Api400Error("Required actionType !");
+                throw new Error400("Required actionType !");
             if (actionType === "SHIPPING-INFORMATION") {
                 if (!shipping)
-                    throw new Api400Error("Required shipping information !");
+                    throw new Error400("Required shipping information !");
                 const { fulfilledBy, procurementType, procurementSLA, provider } = shipping && shipping;
                 if (procurementType === "" ||
                     fulfilledBy === "" ||
                     procurementSLA === "" ||
                     provider === "")
-                    throw new Api400Error("Required fulfilledBy, procurementType, procurementSLA");
+                    throw new Error400("Required fulfilledBy, procurementType, procurementSLA");
                 const result = yield updateMainProductService(_id, productId, {
                     $set: { shipping: shipping },
                 });
@@ -294,7 +296,7 @@ function productUpdateBySupplier(req, res, next) {
             }
             if (actionType === "MANUFACTURER-INFORMATION") {
                 if (!manufacturer || typeof manufacturer !== "object")
-                    throw new Api400Error("Required manufacturer details about product !");
+                    throw new Error400("Required manufacturer details about product !");
                 const { manufacturerOrigin, manufacturerDetails } = manufacturer && manufacturer;
                 const result = yield updateMainProductService(_id, productId, {
                     $set: {
@@ -326,7 +328,7 @@ function productUpdateBySupplier(req, res, next) {
             if (actionType === "UPDATE-STATUS") {
                 const statusValues = ["Active", "Draft"];
                 if (!statusValues.includes(status) || !status)
-                    throw new Api400Error("Invalid status value!");
+                    throw new Error400("Invalid status value!");
                 const result = yield updateMainProductService(_id, productId, {
                     $set: { status },
                 });
@@ -340,12 +342,12 @@ function productUpdateBySupplier(req, res, next) {
             // update stock
             if (actionType === "UPDATE-STOCK") {
                 if (!(variation === null || variation === void 0 ? void 0 : variation.sku) || !(variation === null || variation === void 0 ? void 0 : variation.available))
-                    throw new Api400Error("Product sku and unit required !");
+                    throw new Error400("Product sku and unit required !");
                 let stock = (variation === null || variation === void 0 ? void 0 : variation.available) <= 1 ? "out" : "in";
                 variation.stock = stock;
                 const result = yield updateStockService(_id, productId, variation);
                 if (!result) {
-                    throw new Api500Error("Failed to update stock quantity !!!");
+                    throw new Error500("Failed to update stock quantity !!!");
                 }
                 return res.status(200).send({
                     success: true,
@@ -390,7 +392,7 @@ function manageOrderBySupplier(req, res, next) {
     });
 }
 /**
- * [Order Status Management Controller]
+ * [ORDER_TABLE Status Management Controller]
  * @param req
  * @param res
  * @param next
@@ -400,14 +402,14 @@ function orderStatusManagementBySupplier(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             if (!req.body)
-                throw new Api400Error("Required body information about orders !");
+                throw new Error400("Required body information about orders !");
             const { type, customerEmail, orderID, cancelReason, sellerEmail, items } = req.body;
             if (!type || type === "")
-                throw new Api400Error("Required status type !");
+                throw new Error400("Required status type !");
             if (!customerEmail)
-                throw new Api400Error("Required customer email !");
+                throw new Error400("Required customer email !");
             if (!orderID || orderID === "")
-                throw new Api400Error("Required Order ID !");
+                throw new Error400("Required ORDER_TABLE ID !");
             const result = yield orderStatusUpdater({
                 type,
                 customerEmail,
@@ -423,9 +425,40 @@ function orderStatusManagementBySupplier(req, res, next) {
                 return res.status(200).send({
                     success: true,
                     statusCode: 200,
-                    message: "Order status updated to " + type,
+                    message: "ORDER_TABLE status updated to " + type,
                 });
             }
+        }
+        catch (error) {
+            next(error);
+        }
+    });
+}
+/**
+ * [async description]
+ *
+ * @param   {Request}       req   [req description]
+ * @param   {Response}      res   [res description]
+ * @param   {NextFunction}  next  [next description]
+ *
+ * @return  {[type]}              [return description]
+ */
+function settingsSystem(req, res, next) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const { _id } = req === null || req === void 0 ? void 0 : req.decoded;
+            const Store = yield settingService(_id);
+            if (!Store)
+                return res
+                    .status(200)
+                    .json({ success: true, statusCode: 200, data: null });
+            return res.status(200).send({
+                success: true,
+                statusCode: 200,
+                data: {
+                    store: Store,
+                },
+            });
         }
         catch (error) {
             next(error);
@@ -443,4 +476,5 @@ module.exports = {
     productUpdateBySupplier,
     manageOrderBySupplier,
     orderStatusManagementBySupplier,
+    settingsSystem,
 };
